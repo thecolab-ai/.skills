@@ -1,7 +1,8 @@
 import { pathToFileURL } from 'node:url';
 
 const API_BASE = 'https://forecast-v2.metoceanapi.com/point/time';
-const API_KEY = process.env.METOCEAN_API_KEY ?? 'WivT6STgNqryZDoFyj4bGD';
+const API_KEY = process.env.METOCEAN_API_KEY;
+if (!API_KEY) throw new Error('METOCEAN_API_KEY env var not set. Sign up at https://forecast-v2.metoceanapi.com and add it to your .env');
 const DEFAULT_TIMEOUT_MS = 15_000;
 
 export interface Location {
