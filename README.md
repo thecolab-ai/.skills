@@ -2,7 +2,7 @@
 
 Community-contributed AI skills for useful New Zealand-specific data and workflows.
 
-Point your agent at real NZ infrastructure, public datasets, market data, industry feeds, transport APIs, pricing sources, and other useful local information.
+Point your agent at real NZ infrastructure, public datasets, market data, industry feeds, transport APIs, pricing sources, weather services, and other useful local information.
 
 ## What is this?
 
@@ -23,32 +23,15 @@ It includes:
 
 We are borrowing the shape of the best public skills repos, but not copying their skill content.
 
-## Authentication
-
-Skills that call external APIs may need an API key. Follow these rules:
-
-- **Never hardcode API keys** in skill scripts — environment variables only, no fallback to a raw key
-- Store keys in `~/.env` or the workspace `.env` (e.g. `/home/adam/agents/kev/.env`)
-- Pattern to use in TypeScript:
-  ```typescript
-  const API_KEY = process.env.MY_API_KEY;
-  if (!API_KEY) throw new Error('MY_API_KEY env var not set. Get a key at https://example.com and add it to your .env');
-  ```
-- Each skill that requires a key must document in its `SKILL.md`:
-  - What the env var is called
-  - Where to get the API key (URL)
-  - Whether there's a free tier
-  - Example `.env` entry
-
-Skills that scrape public websites or consume open RSS feeds generally need no key — check each skill's **Setup** section.
-
 ## Available skills
 
 | Skill | Source | Auth | Contributor |
 |-------|--------|------|-------------|
-| `fuelclock-nz` | fuelclock.nz | None | [Adam Holt](https://github.com/adam91holt) |
-| `metservice-nz` | MetOcean API | `METOCEAN_API_KEY` | [Adam Holt](https://github.com/adam91holt) |
-| `nz-news` | NZ RSS feeds | None | [Adam Holt](https://github.com/adam91holt) |
+| `at-transport` | dev-portal.at.govt.nz | API key required | [Adam Holt](https://github.com/adam91holt) |
+| `fuelclock-nz` | fuelclock.nz | No auth | [Adam Holt](https://github.com/adam91holt) |
+| `fuelclock-nz-watch` | fuelclock.nz watch endpoints | No auth | [Adam Holt](https://github.com/adam91holt) |
+| `metservice-nz` | MetService / marine API | No auth | [Adam Holt](https://github.com/adam91holt) |
+| `nz-news` | NZ RSS feeds | No auth | [Adam Holt](https://github.com/adam91holt) |
 
 ## Skill sets
 
@@ -103,6 +86,12 @@ npm run typecheck
 
 - Skills should target useful NZ-specific data or workflows
 - Public and open data is great, but not the only valid source
+- If auth is required, document it clearly in `SKILL.md`, including:
+  - How to obtain access
+  - Required environment variables
+  - Whether there's a free tier
+  - Example `.env` entry
+- Skills that scrape public websites or consume open RSS feeds should note rate limits, caching expectations, and source stability concerns
 - `description` must say what the skill does and when to use it
 - Keep `SKILL.md` lean and operational
 - Move deep detail into `references/`
