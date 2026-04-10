@@ -7,7 +7,7 @@ description: Query New Zealand fuel price and supply data from fuelclock.nz. Use
 
 ## Goal
 
-Fetch live New Zealand fuel price and supply data from fuelclock.nz, then turn it into clean agent-readable output.
+Query live New Zealand fuel price and supply data from fuelclock.nz through a CLI that is easy for agents to script and easy for humans to scan.
 
 ## Use this when
 
@@ -24,84 +24,155 @@ Fetch live New Zealand fuel price and supply data from fuelclock.nz, then turn i
 - Vehicle fuel efficiency calculations
 - Forecasting future fuel prices beyond the live observed data
 
-## Workflow
+## Preferred workflow
 
-1. Run `scripts/client.ts` via `tsx`, or import its exported functions
-2. Call the narrowest function that answers the task
-3. Use `getSummary()` for a plain-text briefing
-4. If the user wants raw data, return the typed JSON instead of paraphrasing it loosely
+1. Run `scripts/cli.ts` with the narrowest subcommand that answers the task
+2. Use default human output for direct answers
+3. Use `--json` when another tool or agent needs machine-readable output
+4. Fall back to importing `scripts/client.ts` only when you need the raw typed fetch functions
 
-## Resources
+## CLI
 
-- Main implementation: `scripts/client.ts`
-- Smoke test: `scripts/smoke-test.ts`
+Run with:
 
-## Functions
+```bash
+npx tsx skills/fuelclock-nz/scripts/cli.ts <command> [flags]
+```
 
-### `getFuelPrices()`
+### `summary [--json]`
 
-Returns national average NZ retail prices from FuelClock's Gaspy-backed endpoint.
+Best default for general questions. Combines prices, supply, inbound vessels, top tracked markets, and recent headlines.
 
-Response shape:
-- `prices`: array of fuel price rows
-- `source`: source label
-- `fetchedAt`: ISO timestamp
-- `isFallback`: whether cached data was served
+JSON shape:
+- `prices`: fetched price snapshot plus filtered price rows
+- `supply`: overall risk, countdown, lowest fuel, below-MSO list, and fuel rows
+- `vessels`: inbound vessel count, flagged count, and top vessels
+- `risk`: fetched time, total market count, and top markets
+- `news`: fetched time, total article count, and latest articles
 
-### `getSupplyStatus()`
+Examples:
 
-Returns NZ fuel supply state, including days remaining, MSO thresholds, the most constrained fuel, and the overall risk.
+```bash
+npx tsx skills/fuelclock-nz/scripts/cli.ts summary
+npx tsx skills/fuelclock-nz/scripts/cli.ts summary --json
+```
 
-Response shape:
+### `prices [--fuel 91|95|98|diesel] [--json]`
+
+Shows national average NZ pump prices from FuelClock's Gaspy-backed endpoint.
+
+JSON shape:
+- `fetchedAt`
+- `source`
+- `isFallback`
+- `filters.fuel`
+- `count`
+- `prices[]` with `fuel`, `label`, `price`, `change7d`, `change28d`, `changePercent28d`, `direction7d`, `direction28d`, `min`, `max`, `stationCount`
+
+Examples:
+
+```bash
+npx tsx skills/fuelclock-nz/scripts/cli.ts prices
+npx tsx skills/fuelclock-nz/scripts/cli.ts prices --fuel diesel
+npx tsx skills/fuelclock-nz/scripts/cli.ts prices --fuel 95 --json
+```
+
+### `supply [--fuel petrol|diesel|jet] [--below-mso] [--json]`
+
+Shows NZ fuel supply state, including days remaining, MSO gap, and depletion timing.
+
+JSON shape:
 - `timestamp`
-- `fuelStates`
+- `anchorDate`
+- `mbieAsAtDate`
 - `overallRisk`
 - `countdownHours`
 - `lowestFuel`
+- `filters.fuel`
+- `filters.belowMSO`
+- `count`
+- `fuels[]` with `fuel`, `label`, `currentDays`, `totalDays`, `onLandDays`, `onWaterDays`, `msoThreshold`, `gapToMSODays`, `belowMSO`, `calendarDaysToDepletion`, `dailyConsumptionML`, `currentStockML`, `remainingOnWaterDays`, `remainingOnWaterML`, `mbieInCountryDays`
 
-### `getMbieStocks()`
-
-Returns official MBIE stock figures, including in-country, on-water, and total days of supply.
-
-### `getVessels()`
-
-Returns incoming fuel vessel data, including cargo size, origin, ETA, and any risk flags.
-
-### `getGeopoliticalRisk()`
-
-Returns a wrapped object with:
-- `markets`: Polymarket-derived geopolitical risk markets relevant to fuel shipping
-- `fetchedAt`: latest market update time if available
-
-### `getNews()`
-
-Returns recent NZ fuel-related articles.
-
-Response shape:
-- `articles`: headline list with title, URL, source, and date
-- `fetchedAt`: fetch timestamp
-
-### `getSummary()`
-
-Returns a plain-text NZ fuel briefing combining pump prices and supply status. This is the best default for general questions.
-
-## Running directly
-
-Quick summary:
+Examples:
 
 ```bash
-npx tsx skills/fuelclock-nz/scripts/client.ts
+npx tsx skills/fuelclock-nz/scripts/cli.ts supply
+npx tsx skills/fuelclock-nz/scripts/cli.ts supply --below-mso
+npx tsx skills/fuelclock-nz/scripts/cli.ts supply --fuel diesel --json
 ```
 
-Smoke test all endpoints:
+### `vessels [--fuel petrol|diesel|jet] [--flagged-only] [--limit N] [--json]`
+
+Shows inbound vessel data, sorted by ETA.
+
+JSON shape:
+- `fetchedAt`
+- `source`
+- `govOnWaterByFuel`
+- `filters.fuel`
+- `filters.flaggedOnly`
+- `filters.limit`
+- `totalMatching`
+- `returnedCount`
+- `vessels[]` with `name`, `fuel`, `status`, `eta`, `arrived`, `cargoML`, `cargoDays`, `origin`, `progressPct`, `flagRisk`, `flagReason`, `hormuzTransit`
+
+Examples:
 
 ```bash
-npx tsx skills/fuelclock-nz/scripts/smoke-test.ts
+npx tsx skills/fuelclock-nz/scripts/cli.ts vessels
+npx tsx skills/fuelclock-nz/scripts/cli.ts vessels --flagged-only --limit 3
+npx tsx skills/fuelclock-nz/scripts/cli.ts vessels --fuel diesel --json
 ```
+
+### `risk [--limit N] [--json]`
+
+Shows tracked geopolitical markets relevant to fuel shipping. Output is sorted by market volume. The `probability` field is the market yes-price, not a direct NZ fuel risk score.
+
+JSON shape:
+- `fetchedAt`
+- `sort`
+- `filters.limit`
+- `totalMarkets`
+- `returnedCount`
+- `markets[]` with `title`, `shortTitle`, `probability`, `volume`, `liquidity`, `lastUpdated`, `isFallback`, `subMarkets[]`
+
+Examples:
+
+```bash
+npx tsx skills/fuelclock-nz/scripts/cli.ts risk
+npx tsx skills/fuelclock-nz/scripts/cli.ts risk --limit 5
+npx tsx skills/fuelclock-nz/scripts/cli.ts risk --limit 3 --json
+```
+
+### `news [--limit N] [--json]`
+
+Shows recent NZ fuel headlines, newest first.
+
+JSON shape:
+- `fetchedAt`
+- `filters.limit`
+- `totalArticles`
+- `returnedCount`
+- `articles[]` with `title`, `source`, `date`, `url`
+
+Examples:
+
+```bash
+npx tsx skills/fuelclock-nz/scripts/cli.ts news
+npx tsx skills/fuelclock-nz/scripts/cli.ts news --limit 3
+npx tsx skills/fuelclock-nz/scripts/cli.ts news --limit 5 --json
+```
+
+## Resources
+
+- CLI entrypoint: `scripts/cli.ts`
+- Typed fetch client: `scripts/client.ts`
+- Live smoke test: `scripts/smoke-test.ts`
 
 ## Notes
 
 - No API key required
 - Uses the built-in `fetch` available in modern Node runtimes
-- Price deltas are treated as cents per litre in the human summary to avoid misleading output
+- Default output is human-readable and filtered for quick answers
+- `--json` output is intended for chaining into other tools or agent steps
 - FuelClock supply data and MBIE stock data are related but not identical, FuelClock applies its own live supply model on top of source data
