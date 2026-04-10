@@ -18,31 +18,56 @@ Every skill in this repo is a drop-in connector. Clone the repo, install the ski
 
 ## Contributing
 
-1. Fork this repo
-2. Create a folder: `skills/<your-skill-name>/`
-3. Add a `SKILL.md` describing what it does, what data it hits, and how to use it
-4. Add your implementation (Python, JS, shell — whatever works)
-5. Open a PR
+We’ve made this repo opinionated on purpose.
 
-### Skill folder structure
+Don’t freestyle the structure. Generate a scaffold, fill it in properly, then validate it before you open a PR. The repo tooling for this is TypeScript-based.
 
+### Quick start
+
+```bash
+npm install
+npm run new-skill -- auckland-transport-departures --variant minimal
+npm run validate-skill -- skills/auckland-transport-departures
 ```
+
+### Available scaffold variants
+
+- `minimal` for narrow one-file skills
+- `cli-workflow` for multi-step skills with `references/` and `scripts/`
+- `tool-wrapper` for skills centered around a specific CLI or API client
+
+### Canonical skill folder structure
+
+```text
 skills/
-  auckland-transport/
-    SKILL.md          # Description, usage, examples
-    skill.py          # Implementation
-    requirements.txt  # Dependencies (if any)
-  stats-nz/
+  auckland-transport-departures/
     SKILL.md
-    skill.py
+    references/
+    scripts/
+    assets/
 ```
 
-### What makes a good skill?
+Only create the directories the skill actually needs.
 
-- Hits a **publicly available NZ dataset** (no auth required is ideal)
-- Returns data in a format agents can reason about (JSON, markdown, plain text)
-- Has clear usage docs in `SKILL.md`
-- Works without needing paid API keys
+### Repo commands
+
+```bash
+npm run new-skill -- <name> --variant minimal
+npm run validate-skill -- skills/<name>
+npm run validate-skill -- skills
+npm run typecheck
+```
+
+### Contribution rules
+
+- Skills must target real, useful NZ public data workflows
+- `description` must say what the skill does and when to use it
+- Keep `SKILL.md` lean and operational
+- Move deep detail into `references/`
+- Put deterministic helpers in `scripts/`
+- Do not add per-skill `README.md`, `CHANGELOG.md`, or junk notes
+
+Full guide: [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## Data sources to cover
 
