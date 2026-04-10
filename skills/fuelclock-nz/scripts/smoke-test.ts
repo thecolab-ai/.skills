@@ -6,9 +6,6 @@ import {
   getSupplyStatus,
   getMbieStocks,
   getVessels,
-  getGeopoliticalRisk,
-  getNews,
-  getSummary,
 } from './client.js';
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -45,19 +42,11 @@ async function main() {
   const vessels = await getVessels();
   assert(Array.isArray(vessels.vessels), 'vessels.vessels must be an array');
 
-  const risk = await getGeopoliticalRisk();
-  assert(Array.isArray(risk.markets), 'risk.markets must be an array');
-
-  const news = await getNews();
-  assert(Array.isArray(news.articles), 'news.articles must be an array');
-
-  const summary = await getSummary();
-  assert(summary.includes('NZ Fuel Summary'), 'summary must include the title');
-
   const summaryJson = runCliJson(['summary']);
   assert(typeof summaryJson === 'object', 'summary JSON must parse');
   assert('prices' in summaryJson, 'summary JSON must include prices');
   assert('supply' in summaryJson, 'summary JSON must include supply');
+  assert('vessels' in summaryJson, 'summary JSON must include vessels');
 
   const pricesJson = runCliJson(['prices', '--fuel', 'diesel']);
   assert(pricesJson.count === 1, 'prices --fuel diesel should return one row');
@@ -67,12 +56,6 @@ async function main() {
 
   const vesselsJson = runCliJson(['vessels', '--flagged-only', '--limit', '2']);
   assert(typeof vesselsJson.returnedCount === 'number', 'vessels JSON must include returnedCount');
-
-  const riskJson = runCliJson(['risk', '--limit', '2']);
-  assert(riskJson.returnedCount === 2, 'risk --limit 2 should return two rows');
-
-  const newsJson = runCliJson(['news', '--limit', '2']);
-  assert(newsJson.returnedCount === 2, 'news --limit 2 should return two rows');
 
   console.log('FuelClock NZ smoke test passed.');
 }

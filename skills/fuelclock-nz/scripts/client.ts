@@ -108,39 +108,6 @@ export interface VesselsResponse {
   fetchedAt: string;
 }
 
-export interface GeopoliticalRiskMarket {
-  id: string;
-  slug: string;
-  title: string;
-  shortTitle?: string;
-  probability: number;
-  volume: number;
-  liquidity?: number;
-  description?: string;
-  endDate?: string;
-  outcomes?: string[];
-  lastUpdated?: string;
-  isFallback?: boolean;
-  subMarkets?: Array<{ label: string; probability: number }>;
-}
-
-export interface GeopoliticalRiskResponse {
-  markets: GeopoliticalRiskMarket[];
-  fetchedAt: string | null;
-}
-
-export interface NewsArticle {
-  title: string;
-  url: string;
-  source: string;
-  date: string;
-}
-
-export interface NewsResponse {
-  articles: NewsArticle[];
-  fetchedAt: string;
-}
-
 async function getJson<T>(path: string): Promise<T> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
@@ -177,72 +144,9 @@ export async function getVessels(): Promise<VesselsResponse> {
   return getJson<VesselsResponse>('/api/vessels');
 }
 
-export async function getGeopoliticalRisk(): Promise<GeopoliticalRiskResponse> {
-  const markets = await getJson<GeopoliticalRiskMarket[]>('/api/polymarket');
-  const fetchedAt = markets.reduce<string | null>((latest, market) => {
-    if (!market.lastUpdated) return latest;
-    if (!latest) return market.lastUpdated;
-    return market.lastUpdated > latest ? market.lastUpdated : latest;
-  }, null);
-
-  return { markets, fetchedAt };
-}
-
-export async function getNews(): Promise<NewsResponse> {
-  return getJson<NewsResponse>('/api/news');
-}
-
-function formatDeltaCents(value: number): string {
-  return `${value >= 0 ? '+' : ''}${value.toFixed(2)} c/L`;
-}
-
-function formatFuelStatus(fuel: FuelState): string {
-  const status = fuel.belowMSO ? 'below MSO' : 'meets MSO';
-  return `${status}, depletion in ${fuel.calendarDaysToDepletion.toFixed(1)} days`;
-}
-
-export async function getSummary(): Promise<string> {
-  const [pricesData, supplyData] = await Promise.all([getFuelPrices(), getSupplyStatus()]);
-
-  const lines: string[] = [];
-  lines.push(`NZ Fuel Summary (${pricesData.fetchedAt ?? supplyData.timestamp ?? 'unknown'})`);
-  lines.push('');
-  lines.push('Retail pump prices (NZD/litre, national average):');
-
-  for (const price of pricesData.prices) {
-    const arrow = { up: '↑', down: '↓', flat: '→' }[price.direction7d] ?? '';
-    lines.push(
-      `  ${price.type}: $${price.price.toFixed(3)}/L ${arrow} (7d: ${formatDeltaCents(price.change7d)}, 28d: ${formatDeltaCents(price.change28d)})`,
-    );
-  }
-
-  lines.push('');
-  lines.push(`Supply security: overall risk = ${supplyData.overallRisk.toUpperCase()}`);
-  if (typeof supplyData.countdownHours === 'number') {
-    lines.push(
-      `  Most constrained fuel depletes in ${supplyData.countdownHours.toFixed(1)} hours (${(supplyData.countdownHours / 24).toFixed(1)} days)`,
-    );
-  }
-
-  lines.push('');
-  lines.push('Days of supply remaining:');
-  for (const fuel of supplyData.fuelStates) {
-    lines.push(
-      `  ${fuel.label}: ${fuel.currentDays.toFixed(1)} days (MSO threshold: ${fuel.msoThreshold} days)${fuel.belowMSO ? ' [BELOW MSO]' : ''}`,
-    );
-    lines.push(`    Status: ${formatFuelStatus(fuel)}`);
-  }
-
-  if (pricesData.isFallback) {
-    lines.push('');
-    lines.push('Note: price data is currently being served from cache.');
-  }
-
-  return lines.join('\n');
-}
-
 async function main() {
-  console.log(await getSummary());
+  const [prices, supply] = await Promise.all([getFuelPrices(), getSupplyStatus()]);
+  console.log(`FuelClock NZ client is reachable. Prices: ${prices.prices.length}, fuels: ${supply.fuelStates.length}`);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
