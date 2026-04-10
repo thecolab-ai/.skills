@@ -2,19 +2,39 @@
 
 Community-contributed AI skills for New Zealand public data.
 
-Point your agent at real NZ infrastructure — LINZ, Stats NZ, Auckland Transport, weather, census data, and more.
+Point your agent at real NZ infrastructure, LINZ, Stats NZ, Auckland Transport, weather, census data, and more.
 
 ## What is this?
 
 Think Folding@home, but for spare AI tokens. Instead of donating idle compute, the community contributes skills that make New Zealand's public data actually usable by AI agents.
 
-Every skill in this repo is a drop-in connector. Clone the repo, install the skill, and your agent gains access to real NZ data without you having to figure out the APIs yourself.
+Every skill in this repo is a drop-in connector. Clone the repo, install the skill, and your agent gains access to real NZ data without you having to reverse-engineer the APIs yourself.
 
-## Available Skills
+## About this repository
+
+This repo is intentionally structured like a proper skills library.
+
+It includes:
+- `skills/` for real contributed skills
+- `spec/` for the Agent Skills spec link plus our repo stance
+- `template/` for a basic manual starting point
+- `templates/` for richer TypeScript-powered scaffold variants
+- `scripts/` for repo tooling like generation and validation
+
+We are borrowing the shape of the best public skills repos, but not copying their skill content.
+
+## Available skills
 
 | Skill | Data Source | Contributor |
 |-------|-------------|-------------|
 | *(coming soon)* | | |
+
+## Skill sets
+
+- [./skills](./skills) - Real skills contributed to this repo
+- [./spec](./spec/agent-skills-spec.md) - Agent Skills spec and repo-specific stance
+- [./template](./template/SKILL.md) - Minimal starter template
+- [./templates](./templates) - Opinionated scaffold variants for different skill types
 
 ## Contributing
 
@@ -71,16 +91,16 @@ Full guide: [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## Data sources to cover
 
-- [LINZ Data Service](https://data.linz.govt.nz/) — land, property, cadastral
-- [Stats NZ](https://www.stats.govt.nz/large-datasets/csv-files-for-download/) — census, population, economic data
-- [Auckland Transport](https://dev-portal.at.govt.nz/) — real-time transport, GTFS feeds
-- [MetService / NIWA](https://developer.metservice.com/) — weather data
-- [data.govt.nz](https://www.data.govt.nz/) — NZ government open data portal
-- [MfE Environmental Data](https://data.mfe.govt.nz/) — environment, climate
-- [NZTA](https://opendata-nzta.opendata.arcgis.com/) — roads, traffic
+- [LINZ Data Service](https://data.linz.govt.nz/) - land, property, cadastral
+- [Stats NZ](https://www.stats.govt.nz/large-datasets/csv-files-for-download/) - census, population, economic data
+- [Auckland Transport](https://dev-portal.at.govt.nz/) - real-time transport, GTFS feeds
+- [MetService / NIWA](https://developer.metservice.com/) - weather data
+- [data.govt.nz](https://www.data.govt.nz/) - NZ government open data portal
+- [MfE Environmental Data](https://data.mfe.govt.nz/) - environment, climate
+- [NZTA](https://opendata-nzta.opendata.arcgis.com/) - roads, traffic
 
 ## Community
 
-Built by the [TheColab](https://thecolab.ai) community — New Zealand's AI builders' collective.
+Built by the [TheColab](https://thecolab.ai) community, New Zealand's AI builders' collective.
 
 Join us at the next weekly catchup.
