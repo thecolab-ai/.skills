@@ -163,6 +163,10 @@ npx tsx skills/fuelclock-nz/scripts/cli.ts news --limit 3
 npx tsx skills/fuelclock-nz/scripts/cli.ts news --limit 5 --json
 ```
 
+## Setup
+
+No API key required — just Node.js and `npx tsx`.
+
 ## Resources
 
 - CLI entrypoint: `scripts/cli.ts`

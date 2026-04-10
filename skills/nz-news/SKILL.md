@@ -117,6 +117,10 @@ npx tsx skills/nz-news/scripts/cli.ts summary --json
 
 Primary sources are queried by default. Category feeds (RNZ sub-feeds) are available via `source <id>` but excluded from `headlines`/`topic`/`summary` to avoid duplicates.
 
+## Setup
+
+No API key required — just Node.js and `npx tsx`.
+
 ## Resources
 
 - CLI entrypoint: `scripts/cli.ts`

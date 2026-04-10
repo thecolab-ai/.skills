@@ -30,10 +30,16 @@ Query point forecasts from the MetOcean API for New Zealand locations — weathe
 3. Use `--json` when another tool or agent needs machine-readable output
 4. Use `--location lat,lon` for custom coordinates not in the named list
 
-## Environment
+## Setup
 
-- **API Key env var:** `METOCEAN_API_KEY`
-- Falls back to hardcoded key if env var is not set
+Requires a MetOcean API key (free tier available).
+
+1. Sign up at https://forecast-v2.metoceanapi.com
+2. Add to your `.env`:
+   ```
+   METOCEAN_API_KEY=your_key_here
+   ```
+3. The skill reads `process.env.METOCEAN_API_KEY` — no fallback, key is required.
 
 ## CLI
 
@@ -211,7 +217,7 @@ npx tsx skills/metservice-nz/scripts/cli.ts locations --json
 
 ## Notes
 
-- API key required — set `METOCEAN_API_KEY` or falls back to embedded key
+- API key required — set `METOCEAN_API_KEY` in your `.env`
 - Temperature returned in Kelvin, converted to Celsius in display
 - Pressure returned in Pascals, converted to hPa in display
 - Wind speed returned in m/s, converted to km/h in display
