@@ -1,14 +1,14 @@
 # thecolab-ai/.skills
 
-Community-contributed AI skills for New Zealand public data.
+Community-contributed AI skills for useful New Zealand-specific data and workflows.
 
-Point your agent at real NZ infrastructure, LINZ, Stats NZ, Auckland Transport, weather, census data, and more.
+Point your agent at real NZ infrastructure, public datasets, market data, industry feeds, transport APIs, pricing sources, and other useful local information.
 
 ## What is this?
 
-Think Folding@home, but for spare AI tokens. Instead of donating idle compute, the community contributes skills that make New Zealand's public data actually usable by AI agents.
+Think Folding@home, but for spare AI tokens. Instead of donating idle compute, the community contributes skills that make New Zealand-specific data actually usable by AI agents.
 
-Every skill in this repo is a drop-in connector. Clone the repo, install the skill, and your agent gains access to real NZ data without you having to reverse-engineer the APIs yourself.
+Every skill in this repo is a drop-in connector. Clone the repo, install the skill, and your agent gains access to real NZ-relevant data without you having to reverse-engineer the source.
 
 ## About this repository
 
@@ -25,9 +25,9 @@ We are borrowing the shape of the best public skills repos, but not copying thei
 
 ## Available skills
 
-| Skill | Data Source | Contributor |
-|-------|-------------|-------------|
-| *(coming soon)* | | |
+| Skill | Source | Contributor |
+|-------|--------|-------------|
+| `fuelclock-nz` | fuelclock.nz | [Adam Holt](https://github.com/adam91holt) |
 
 ## Skill sets
 
@@ -46,8 +46,8 @@ Don’t freestyle the structure. Generate a scaffold, fill it in properly, then 
 
 ```bash
 npm install
-npm run new-skill -- auckland-transport-departures --variant minimal
-npm run validate-skill -- skills/auckland-transport-departures
+npm run new-skill -- my-nz-skill --variant minimal
+npm run validate-skill -- skills/my-nz-skill
 ```
 
 ### Available scaffold variants
@@ -60,7 +60,7 @@ npm run validate-skill -- skills/auckland-transport-departures
 
 ```text
 skills/
-  auckland-transport-departures/
+  my-nz-skill/
     SKILL.md
     references/
     scripts/
@@ -80,7 +80,8 @@ npm run typecheck
 
 ### Contribution rules
 
-- Skills must target real, useful NZ public data workflows
+- Skills should target useful NZ-specific data or workflows
+- Public and open data is great, but not the only valid source
 - `description` must say what the skill does and when to use it
 - Keep `SKILL.md` lean and operational
 - Move deep detail into `references/`
@@ -89,15 +90,15 @@ npm run typecheck
 
 Full guide: [CONTRIBUTING.md](CONTRIBUTING.md)
 
-## Data sources to cover
+## Good areas to cover
 
-- [LINZ Data Service](https://data.linz.govt.nz/) - land, property, cadastral
-- [Stats NZ](https://www.stats.govt.nz/large-datasets/csv-files-for-download/) - census, population, economic data
-- [Auckland Transport](https://dev-portal.at.govt.nz/) - real-time transport, GTFS feeds
-- [MetService / NIWA](https://developer.metservice.com/) - weather data
-- [data.govt.nz](https://www.data.govt.nz/) - NZ government open data portal
-- [MfE Environmental Data](https://data.mfe.govt.nz/) - environment, climate
-- [NZTA](https://opendata-nzta.opendata.arcgis.com/) - roads, traffic
+- Government and public datasets
+- Transport and logistics feeds
+- Weather, marine, and environmental data
+- Retail and pricing data
+- Property, mapping, and local infrastructure data
+- Industry-specific NZ information sources
+- Other useful NZ-centric APIs or data workflows
 
 ## Community
 

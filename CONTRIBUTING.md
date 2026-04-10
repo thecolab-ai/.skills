@@ -36,7 +36,22 @@ A contribution is only ready when it passes all of these:
 
 ## Repo rules
 
-### 1. Write narrow skills
+### 1. Build useful NZ-specific skills
+
+The bar is not "must be government". The bar is "genuinely useful for New Zealand-specific tasks".
+
+Good sources include:
+- public and open datasets
+- government APIs
+- transport feeds
+- pricing sources
+- logistics or supply-chain data
+- industry-specific NZ data sources
+- other lawful, stable, agent-useful local data workflows
+
+If the skill is useful, NZ-specific, and the source is legitimate, it belongs in scope.
+
+### 2. Write narrow skills
 
 Good:
 - `auckland-transport-departures`
@@ -50,7 +65,7 @@ Bad:
 
 If a skill wants to teach three different jobs, split it.
 
-### 2. Treat frontmatter as the trigger surface
+### 3. Treat frontmatter as the trigger surface
 
 The `description` is not marketing copy. It is routing logic in plain English.
 
@@ -72,12 +87,12 @@ description: Helps with NZ data.
 ---
 ```
 
-### 3. Keep `SKILL.md` lean
+### 4. Keep `SKILL.md` lean
 
 Put the workflow, decision points, and non-obvious rules in `SKILL.md`.
 Do not dump background theory, changelogs, setup diaries, or generic tutorials in there.
 
-### 4. Keep one source of truth per concern
+### 5. Keep one source of truth per concern
 
 - Trigger logic lives in frontmatter
 - Execution guidance lives in `SKILL.md`
@@ -87,7 +102,7 @@ Do not dump background theory, changelogs, setup diaries, or generic tutorials i
 
 Do not duplicate the same instructions in multiple places.
 
-### 5. Ban clutter files inside skill folders
+### 6. Ban clutter files inside skill folders
 
 Do not add these unless they are runtime-critical:
 
@@ -98,16 +113,17 @@ Do not add these unless they are runtime-critical:
 
 One clean central contribution guide beats a graveyard of side docs.
 
-### 6. Make examples realistic
+### 7. Make examples realistic
 
 Good:
 - `Fetch the latest departures for Britomart platform 2 and show them as JSON.`
 - `Build a LINZ skill that can search parcels by title reference.`
+- `Show me the latest NZ fuel summary and only flagged incoming diesel vessels.`
 
 Bad:
 - `Use this amazing skill to improve your project.`
 
-### 7. If you ship a script, mention how to use it
+### 8. If you ship a script, mention how to use it
 
 A script with no invocation guidance is dead weight.
 Reference the script from `SKILL.md` or a linked reference doc.
