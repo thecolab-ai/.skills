@@ -28,8 +28,7 @@ We are borrowing the shape of the best public skills repos, but not copying thei
 | Skill | Source | Auth | Contributor |
 |-------|--------|------|-------------|
 | `at-transport` | dev-portal.at.govt.nz | API key required | [Adam Holt](https://github.com/adam91holt) |
-| `fuelclock-nz` | fuelclock.nz | No auth | [Adam Holt](https://github.com/adam91holt) |
-| `fuelclock-nz-watch` | fuelclock.nz watch endpoints | No auth | [Adam Holt](https://github.com/adam91holt) |
+| `fuelclock-nz` | fuelclock.nz (prices, supply, vessels, risk markets, headlines) | No auth | [Adam Holt](https://github.com/adam91holt) |
 | `metservice-nz` | MetService / marine API | No auth | [Adam Holt](https://github.com/adam91holt) |
 | `nz-news` | NZ RSS feeds | No auth | [Adam Holt](https://github.com/adam91holt) |
 

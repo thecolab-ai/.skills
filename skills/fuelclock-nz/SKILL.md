@@ -1,13 +1,13 @@
 ---
 name: fuelclock-nz
-description: Query New Zealand fuel price and supply data from fuelclock.nz. Use when the task involves NZ petrol or diesel prices, fuel supply security, days of supply remaining, MSO status, or incoming fuel tankers. No authentication required.
+description: Query New Zealand fuel price, supply, vessel, geopolitical risk market, and recent headline data from fuelclock.nz. Use when the task involves NZ petrol or diesel prices, fuel supply security, days of supply remaining, MSO status, incoming fuel tankers, shipping market risk signals, or recent NZ fuel news. No authentication required.
 ---
 
 # FuelClock NZ
 
 ## Goal
 
-Query live New Zealand fuel price and supply data from fuelclock.nz through a CLI that is easy for agents to script and easy for humans to scan.
+Query live New Zealand fuel price and supply data from fuelclock.nz through a CLI that is easy for agents to script and easy for humans to scan. Includes geopolitical shipping risk markets and recent NZ fuel headlines.
 
 ## Use this when
 
@@ -15,6 +15,8 @@ Query live New Zealand fuel price and supply data from fuelclock.nz through a CL
 - A user wants to know whether NZ fuel supply is tight or below MSO thresholds
 - A user asks what tankers are en route to New Zealand
 - A user wants a quick fuel situation summary focused on prices, supply, and vessels
+- A user asks about geopolitical shipping risk markets relevant to NZ fuel supply
+- A user wants recent NZ fuel headlines
 
 ## Do not use this for
 
@@ -22,15 +24,15 @@ Query live New Zealand fuel price and supply data from fuelclock.nz through a CL
 - Electricity, gas, or LPG pricing
 - Vehicle fuel efficiency calculations
 - Forecasting future fuel prices beyond the live observed data
-- Recent fuel headlines or geopolitical watch signals, use `fuelclock-nz-watch` for that
 
 ## Preferred workflow
 
 1. Run `scripts/cli.ts` with the narrowest subcommand that answers the task
-2. Use `summary` for a quick situational briefing
-3. Use default human output for direct answers
-4. Use `--json` when another tool or agent needs machine-readable output
-5. Fall back to importing `scripts/client.ts` only when you need the raw typed fetch functions
+2. Use `summary` for a quick situational briefing across prices, supply, and vessels
+3. Use `watch` for a quick briefing across geopolitical risk markets and recent headlines
+4. Use default human output for direct answers
+5. Use `--json` when another tool or agent needs machine-readable output
+6. Fall back to importing `scripts/client.ts` only when you need the raw typed fetch functions
 
 ## CLI
 
@@ -42,7 +44,7 @@ npx tsx skills/fuelclock-nz/scripts/cli.ts <command> [flags]
 
 ### `summary [--json]`
 
-Best default for general questions. Combines prices, supply, and inbound vessels.
+Best default for general fuel questions. Combines prices, supply, and inbound vessels.
 
 JSON shape:
 
@@ -55,6 +57,22 @@ Examples:
 ```bash
 npx tsx skills/fuelclock-nz/scripts/cli.ts summary
 npx tsx skills/fuelclock-nz/scripts/cli.ts summary --json
+```
+
+### `watch [--json]`
+
+Quick briefing combining top geopolitical risk markets and recent NZ fuel headlines.
+
+JSON shape:
+
+- `risk.fetchedAt`, `risk.totalMarkets`, `risk.markets[]`
+- `news.fetchedAt`, `news.totalArticles`, `news.articles[]`
+
+Examples:
+
+```bash
+npx tsx skills/fuelclock-nz/scripts/cli.ts watch
+npx tsx skills/fuelclock-nz/scripts/cli.ts watch --json
 ```
 
 ### `prices [--fuel 91|95|98|diesel] [--json]`
@@ -127,6 +145,47 @@ npx tsx skills/fuelclock-nz/scripts/cli.ts vessels --flagged-only --limit 3
 npx tsx skills/fuelclock-nz/scripts/cli.ts vessels --fuel diesel --json
 ```
 
+### `risk [--limit N] [--json]`
+
+Shows tracked geopolitical markets relevant to fuel shipping (Polymarket-style), sorted by trading volume.
+
+JSON shape:
+
+- `fetchedAt`
+- `sort`
+- `filters.limit`
+- `totalMarkets`
+- `returnedCount`
+- `markets[]` with `title`, `shortTitle`, `probability`, `volume`, `liquidity`, `lastUpdated`, `isFallback`, `subMarkets[]`
+
+Examples:
+
+```bash
+npx tsx skills/fuelclock-nz/scripts/cli.ts risk
+npx tsx skills/fuelclock-nz/scripts/cli.ts risk --limit 5
+npx tsx skills/fuelclock-nz/scripts/cli.ts risk --limit 3 --json
+```
+
+### `news [--limit N] [--json]`
+
+Shows recent NZ fuel headlines, newest first.
+
+JSON shape:
+
+- `fetchedAt`
+- `filters.limit`
+- `totalArticles`
+- `returnedCount`
+- `articles[]` with `title`, `source`, `date`, `url`
+
+Examples:
+
+```bash
+npx tsx skills/fuelclock-nz/scripts/cli.ts news
+npx tsx skills/fuelclock-nz/scripts/cli.ts news --limit 3
+npx tsx skills/fuelclock-nz/scripts/cli.ts news --limit 5 --json
+```
+
 ## Resources
 
 - CLI entrypoint: `scripts/cli.ts`
@@ -140,4 +199,4 @@ npx tsx skills/fuelclock-nz/scripts/cli.ts vessels --fuel diesel --json
 - Default output is human-readable and filtered for quick answers
 - `--json` output is intended for chaining into other tools or agent steps
 - FuelClock supply data and MBIE stock data are related but not identical, FuelClock applies its own live supply model on top of source data
-- For NZ fuel headlines and geopolitical watch signals, use `fuelclock-nz-watch`
+- Geopolitical risk probabilities are market yes-prices from Polymarket-style data, not direct NZ fuel risk scores

@@ -144,6 +144,54 @@ export async function getVessels(): Promise<VesselsResponse> {
   return getJson<VesselsResponse>('/api/vessels');
 }
 
+export interface GeopoliticalRiskMarket {
+  id: string;
+  slug: string;
+  title: string;
+  shortTitle?: string;
+  probability: number;
+  volume: number;
+  liquidity?: number;
+  description?: string;
+  endDate?: string;
+  outcomes?: string[];
+  lastUpdated?: string;
+  isFallback?: boolean;
+  subMarkets?: Array<{ label: string; probability: number }>;
+}
+
+export interface GeopoliticalRiskResponse {
+  markets: GeopoliticalRiskMarket[];
+  fetchedAt: string | null;
+}
+
+export interface NewsArticle {
+  title: string;
+  url: string;
+  source: string;
+  date: string;
+}
+
+export interface NewsResponse {
+  articles: NewsArticle[];
+  fetchedAt: string;
+}
+
+export async function getGeopoliticalRisk(): Promise<GeopoliticalRiskResponse> {
+  const markets = await getJson<GeopoliticalRiskMarket[]>('/api/polymarket');
+  const fetchedAt = markets.reduce<string | null>((latest, market) => {
+    if (!market.lastUpdated) return latest;
+    if (!latest) return market.lastUpdated;
+    return market.lastUpdated > latest ? market.lastUpdated : latest;
+  }, null);
+
+  return { markets, fetchedAt };
+}
+
+export async function getNews(): Promise<NewsResponse> {
+  return getJson<NewsResponse>('/api/news');
+}
+
 async function main() {
   const [prices, supply] = await Promise.all([getFuelPrices(), getSupplyStatus()]);
   console.log(`FuelClock NZ client is reachable. Prices: ${prices.prices.length}, fuels: ${supply.fuelStates.length}`);
