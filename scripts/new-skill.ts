@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync, chmodSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -47,6 +47,11 @@ function walk(dir: string): string[] {
   return results;
 }
 
+function displayPath(path: string): string {
+  const rel = relative(repoRoot, path);
+  return rel === '' || (!rel.startsWith('..') && rel !== '.') ? (rel || '.') : path;
+}
+
 function scaffoldSkill(options: { name: string; variant: Variant; path: string; force: boolean }) {
   const name = normalizeName(options.name);
   if (!name) throw new Error('Skill name must include at least one letter or digit.');
@@ -77,7 +82,7 @@ function scaffoldSkill(options: { name: string; variant: Variant; path: string; 
   }
 
   console.log(`[OK] Created ${options.variant} skill scaffold at ${targetDir}`);
-  console.log('[NEXT] Fill in the description, remove placeholders, and run validate-skill before review.');
+  console.log(`[NEXT] Fill in the description, remove placeholders, then run: npm run validate-skill -- ${displayPath(targetDir)}`);
 }
 
 const program = new Command();

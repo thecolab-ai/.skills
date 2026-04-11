@@ -4,6 +4,10 @@ const API_BASE = 'https://forecast-v2.metoceanapi.com/point/time';
 const API_KEY = process.env.METOCEAN_API_KEY;
 if (!API_KEY) throw new Error('METOCEAN_API_KEY env var not set. Sign up at https://forecast-v2.metoceanapi.com and add it to your .env');
 const DEFAULT_TIMEOUT_MS = 15_000;
+const DEFAULT_HEADERS: Record<string, string> = {
+  'x-api-key': API_KEY,
+  'Content-Type': 'application/json',
+};
 
 export interface Location {
   name: string;
@@ -51,10 +55,7 @@ export async function queryPointTime(request: PointTimeRequest): Promise<PointTi
   try {
     const response = await fetch(API_BASE, {
       method: 'POST',
-      headers: {
-        'x-api-key': API_KEY,
-        'Content-Type': 'application/json',
-      },
+      headers: DEFAULT_HEADERS,
       body: JSON.stringify(request),
       signal: controller.signal,
     });
@@ -477,16 +478,19 @@ export async function fetchCycloneData(location: Location, hours: number = 48): 
     rainMmH: rainArr[i] !== null && rainArr[i] !== undefined ? Math.max(0, rainArr[i]!) : null,
   }));
 
-  const current = hoursList[0] ?? {
-    pressureHpa: null, windSpeedKmh: null, gustSpeedKmh: null,
-    windDirDeg: null, waveHeightM: null, swellHeightM: null,
-    wavePeriodS: null, rainMmH: null,
-  };
+  const current = hoursList[0];
 
   return {
     location,
-    time: times[0] ?? from,
-    ...current,
+    time: current?.time ?? times[0] ?? from,
+    pressureHpa: current?.pressureHpa ?? null,
+    windSpeedKmh: current?.windSpeedKmh ?? null,
+    gustSpeedKmh: current?.gustSpeedKmh ?? null,
+    windDirDeg: current?.windDirDeg ?? null,
+    waveHeightM: current?.waveHeightM ?? null,
+    swellHeightM: current?.swellHeightM ?? null,
+    wavePeriodS: current?.wavePeriodS ?? null,
+    rainMmH: current?.rainMmH ?? null,
     hours: hoursList,
   };
 }
