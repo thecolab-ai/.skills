@@ -53,6 +53,8 @@ npm run new-skill -- my-nz-skill --variant minimal
 npm run validate-skill -- skills/my-nz-skill
 ```
 
+> **Note:** If `NODE_ENV=production` is set in your environment, `npm install` silently skips devDependencies, which breaks `npm run typecheck` and skill smoke tests. Fix this with `NODE_ENV=development npm install` or `npm install --include=dev`.
+
 ### Available scaffold variants
 
 - `minimal` for narrow one-file skills

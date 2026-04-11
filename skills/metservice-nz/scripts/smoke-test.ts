@@ -51,6 +51,11 @@ function runCliFails(args: string[]): boolean {
 }
 
 async function main() {
+  if (!process.env.METOCEAN_API_KEY) {
+    console.log('SKIP: METOCEAN_API_KEY not set — set this env var to run the smoke test');
+    process.exit(0);
+  }
+
   console.log('Testing MetOcean API client functions...');
 
   // Test resolveLocation
