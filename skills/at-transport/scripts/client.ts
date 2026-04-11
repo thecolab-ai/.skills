@@ -148,7 +148,7 @@ export async function getStops(): Promise<Stop[]> {
 
 export async function getStop(stopId: string): Promise<Stop> {
   const data = await getJson<{ data: { attributes: Stop } }>(`/gtfs/v3/stops/${stopId}`);
-  return data.attributes;
+  return data.data.attributes;
 }
 
 export async function getRoutesMap(): Promise<Map<string, Route>> {
@@ -160,7 +160,7 @@ export async function getRoutesMap(): Promise<Map<string, Route>> {
 
 export async function getRoute(routeId: string): Promise<Route> {
   const data = await getJson<{ data: { attributes: Route } }>(`/gtfs/v3/routes/${routeId}`);
-  return data.attributes;
+  return data.data.attributes;
 }
 
 export async function searchStops(query: string): Promise<Stop[]> {

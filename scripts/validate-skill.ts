@@ -25,6 +25,17 @@ type ValidationResult = {
   warnings: string[];
 };
 
+function displayPath(path: string): string {
+  const rel = relative(repoRoot, path);
+  return rel === '' || (!rel.startsWith('..') && rel !== '.') ? (rel || '.') : path;
+}
+
+function listSkillDirs(dir: string): string[] {
+  return readdirSync(dir)
+    .map((entry) => join(dir, entry))
+    .filter((entry) => statSync(entry).isDirectory() && existsSync(join(entry, 'SKILL.md')));
+}
+
 function walk(dir: string): string[] {
   const out: string[] = [];
   for (const entry of readdirSync(dir)) {
@@ -55,11 +66,15 @@ function resolveSkillDirs(targetPath: string): string[] {
     ? absolute
     : join(absolute, 'skills');
 
-  if (!existsSync(skillsDir)) throw new Error(`No skill directory found at: ${absolute}`);
+  if (existsSync(skillsDir)) {
+    const skillDirs = listSkillDirs(skillsDir);
+    if (skillDirs.length > 0) return skillDirs;
+  }
 
-  return readdirSync(skillsDir)
-    .map((entry) => join(skillsDir, entry))
-    .filter((entry) => statSync(entry).isDirectory() && existsSync(join(entry, 'SKILL.md')));
+  const directSkillDirs = listSkillDirs(absolute);
+  if (directSkillDirs.length > 0) return directSkillDirs;
+
+  throw new Error(`No skill directory found at: ${absolute}`);
 }
 
 function validateFrontmatter(frontmatter: Record<string, unknown>, result: ValidationResult) {
@@ -103,7 +118,7 @@ function validateLinks(skillDir: string, filePath: string, content: string, resu
 
 function validateSkill(skillDir: string): ValidationResult {
   const result: ValidationResult = {
-    skill: relative(repoRoot, skillDir),
+    skill: displayPath(skillDir),
     errors: [],
     warnings: [],
   };
