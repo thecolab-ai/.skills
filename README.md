@@ -10,6 +10,24 @@ Think Folding@home, but for spare AI tokens. Instead of donating idle compute, t
 
 Every skill in this repo is a drop-in connector. Clone the repo, install the skill, and your agent gains access to real NZ-relevant data without you having to reverse-engineer the source.
 
+## Try it in 30 seconds
+
+```bash
+git clone https://github.com/thecolab-ai/.skills
+cd .skills && npm install
+
+# NZ fuel prices, supply, and vessels
+npx tsx skills/fuelclock-nz/scripts/cli.ts summary
+
+# Latest NZ news
+npx tsx skills/nz-news/scripts/cli.ts headlines
+
+# Auckland Transport real-time (needs AT API key)
+npx tsx skills/at-transport/scripts/cli.ts alerts
+```
+
+No auth needed for `fuelclock-nz`, `metservice-nz`, or `nz-news`. `at-transport` requires a free API key from [dev-portal.at.govt.nz](https://dev-portal.at.govt.nz).
+
 ## About this repository
 
 This repo is intentionally structured like a proper skills library.
