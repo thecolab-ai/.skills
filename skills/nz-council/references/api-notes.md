@@ -20,6 +20,7 @@ Implemented as the primary event source.
 - List Auckland: `https://www.eventfinda.co.nz/whatson/events/auckland`
 - List Wellington: `https://www.eventfinda.co.nz/whatson/events/wellington`
 - List Christchurch: `https://www.eventfinda.co.nz/whatson/events/christchurch`
+- List New Plymouth: `https://www.eventfinda.co.nz/whatson/events/new-plymouth`
 - List all NZ: `https://www.eventfinda.co.nz/whatson/events/new-zealand`
 - Category form: `https://www.eventfinda.co.nz/{category}/events/{location}`
 - Pagination: `?page=N`
@@ -213,6 +214,25 @@ Butcher's Pool is listed separately because the public park-reserve page describ
 Kuirau Park is included as a public council-managed park water facility because the council page lists foot pools and a paddling pool among park facilities. It is not treated as a lane-swimming pool.
 
 Freshness: static source records derived from public pages. Rotorua Aquatic Centre's CLM pages expose current lane availability links through Perfect Gym-backed pages; v1 links those pages but does not scrape the dynamic availability payload.
+
+### New Plymouth pools
+
+Implemented as source-backed public pool records.
+
+- Community pools: `https://www.npdc.govt.nz/leisure-and-culture/community-swimming-pools/`
+- Todd Energy Aquatic Centre: `https://www.npdc.govt.nz/leisure-and-culture/todd-energy-aquatic-centre/`
+- Inglewood Pool: `https://www.npdc.govt.nz/leisure-and-culture/community-swimming-pools/inglewood-pool/`
+- Waitara Pool: `https://www.npdc.govt.nz/leisure-and-culture/community-swimming-pools/waitara-pool/`
+- Methanex Bell Block Aquatic Centre: `https://www.bellblockaquaticcentre.co.nz/`
+
+Observed NPDC/Bell Block records:
+
+- Todd Energy Aquatic Centre, 8-10 Tisch Avenue, New Plymouth. NPDC publishes current opening hours, phone, location, and facilities such as indoor and outdoor pools, hydroslides, sauna, spa, and fitness centre.
+- Methanex Bell Block Aquatic Centre, 10 Murray Street, Bell Block. The public pool site exposes LocalBusiness JSON-LD and visible opening hours; it lists a 25 metre six-lane indoor pool and a seasonal outdoor pool.
+- Inglewood Pool, corner of Elliot and Rata Streets, Inglewood. NPDC describes a six-lane outdoor pool and toddlers' pool; the page was closed for the season during discovery.
+- Waitara Pool, 1 Leslie Street, Waitara. NPDC describes a 33m six-lane outdoor pool, learners' pool, toddlers' pool, and 4m deep dive pool; the page was closed for the season during discovery.
+
+Freshness: source-backed static records in the CLI with source URLs for verification. Seasonal pool status and Todd Energy daily opening times can change, so users should verify the linked public pages before travel.
 
 ### Christchurch recreation and sport
 
