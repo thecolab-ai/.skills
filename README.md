@@ -52,6 +52,7 @@ We are borrowing the shape of the best public skills repos, but not copying thei
 | `newworld-nz` | New World NZ public website guest-token APIs | No account login | [Adam Holt](https://github.com/adam91holt) |
 | `nz-news` | NZ RSS feeds | No auth | [Adam Holt](https://github.com/adam91holt) |
 | `paknsave-nz` | PAK'nSAVE NZ public website guest-token APIs | No account login | [Adam Holt](https://github.com/adam91holt) |
+| `trademe-nz` | Trade Me NZ public listing/search endpoints for marketplace, property, motors, jobs, regions, and categories | No login/app credentials | [Adam Holt](https://github.com/adam91holt) |
 | `woolworths-nz` | Woolworths NZ public product search, specials, and SKU detail endpoints | No account login | [Adam Holt](https://github.com/adam91holt) |
 
 ## Skill sets
