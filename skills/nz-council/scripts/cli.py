@@ -32,6 +32,7 @@ NPL_TEAC_URL = NPL_BASE + "/leisure-and-culture/todd-energy-aquatic-centre/"
 BELL_BLOCK_POOL_URL = "https://www.bellblockaquaticcentre.co.nz/"
 NPR_BASE = "https://www.napier.govt.nz"
 HAS_BASE = "https://www.hastingsdc.govt.nz"
+HAM_POOLS_BASE = "https://www.hamiltonpools.co.nz"
 
 UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146 Safari/537.36"
 
@@ -43,6 +44,7 @@ COUNCIL_LOCATIONS = {
     "npl": "new-plymouth",
     "npr": "napier",
     "has": "hastings",
+    "ham": "hamilton",
 }
 
 COUNCIL_NAMES = {
@@ -53,6 +55,7 @@ COUNCIL_NAMES = {
     "npl": "New Plymouth",
     "npr": "Napier",
     "has": "Hastings",
+    "ham": "Hamilton",
 }
 
 AKL_AREA_IDS = {
@@ -68,7 +71,7 @@ AKL_FACILITY_IDS = {
     "gym": "1119",
 }
 
-RECREATION_COUNCILS = ("akl", "wlg", "chc", "rot", "npl", "npr", "has")
+RECREATION_COUNCILS = ("akl", "wlg", "chc", "rot", "npl", "npr", "has", "ham")
 
 ROT_RECREATION_SOURCE_URL = ROT_BASE + "/parks-lakes-recreation"
 ROT_PARK_RESERVES_SOURCE_URL = ROT_BASE + "/parks-lakes-recreation/park-reserves"
@@ -468,6 +471,13 @@ STATIC_RECREATION_FACILITIES: dict[str, list[dict[str, Any]]] = {
         },
     ],
 }
+
+HAM_MAIN_POOL_PATHS = (
+    "/facilities/waterworld",
+    "/facilities/gallagher-aquatic-centre",
+)
+
+HAM_PARTNER_POOLS_PATH = "/facilities/partner-pools"
 
 EVENT_TYPES = {
     "Event",
@@ -1071,6 +1081,269 @@ def parse_akl_availability(url: str) -> dict[str, Any]:
     }
 
 
+def unique_text(values: list[str]) -> list[str]:
+    out: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        cleaned = strip_tags(value) if "<" in value else re.sub(r"\s+", " ", html.unescape(value)).strip()
+        if not cleaned:
+            continue
+        key = cleaned.lower()
+        if key not in seen:
+            seen.add(key)
+            out.append(cleaned)
+    return out
+
+
+def html_table_rows(table_html: str) -> list[list[str]]:
+    rows: list[list[str]] = []
+    for row_m in re.finditer(r"<tr\b[^>]*>(.*?)</tr>", table_html, flags=re.I | re.S):
+        cells: list[str] = []
+        for cell_m in re.finditer(r"<t[hd]\b[^>]*>(.*?)</t[hd]>", row_m.group(1), flags=re.I | re.S):
+            text = strip_tags(cell_m.group(1), br="; ")
+            cells.append(text)
+        if any(cells):
+            rows.append(cells)
+    return rows
+
+
+def table_after(page_html: str, start_pattern: str) -> str:
+    start = re.search(start_pattern, page_html, flags=re.I | re.S)
+    if not start:
+        return ""
+    table = re.search(r"<table\b[^>]*>.*?</table>", page_html[start.end() :], flags=re.I | re.S)
+    return table.group(0) if table else ""
+
+
+def parse_ham_hours_table(table_html: str) -> list[dict[str, str]]:
+    rows = html_table_rows(table_html)
+    if len(rows) < 2:
+        return []
+    headers = rows[0][1:] if len(rows[0]) > 1 else []
+    hours: list[dict[str, str]] = []
+    for row in rows[1:]:
+        label = row[0]
+        if headers and len(row) > 1:
+            parts = []
+            for idx, value in enumerate(row[1:]):
+                if value:
+                    heading = headers[idx] if idx < len(headers) else f"Column {idx + 1}"
+                    parts.append(f"{heading}: {value}")
+            text = "; ".join(parts)
+        else:
+            text = row[1] if len(row) > 1 else label
+        if label and text:
+            hours.append({"label": label, "text": text})
+    return hours
+
+
+def parse_ham_address(address_html: str) -> str | None:
+    spans = [strip_tags(x) for x in re.findall(r"<span\b[^>]*>(.*?)</span>", address_html, flags=re.I | re.S)]
+    parts = [x for x in spans if x and x.lower() not in ("waikato", "new zealand")]
+    if not parts:
+        text = strip_tags(address_html, br=", ")
+        return text or None
+    if len(parts) >= 3 and re.fullmatch(r"\d{4}", parts[-1]):
+        return f"{parts[0]}, {parts[1]} {parts[-1]}"
+    return ", ".join(parts)
+
+
+def parse_ham_contact_page(page_html: str) -> tuple[dict[str, dict[str, str | None]], str | None]:
+    email_m = re.search(r'href=["\']mailto:([^"?\']+)', page_html, flags=re.I)
+    email = html.unescape(email_m.group(1)).strip() if email_m else None
+    contacts: dict[str, dict[str, str | None]] = {}
+    for block_m in re.finditer(r'<section\b[^>]*class=["\'][^"\']*\blocation\b[^"\']*["\'][^>]*>(.*?)</section>', page_html, flags=re.I | re.S):
+        block = block_m.group(1)
+        name_m = re.search(r"<h2\b[^>]*>(.*?)</h2>", block, flags=re.I | re.S)
+        if not name_m:
+            continue
+        name = strip_tags(name_m.group(1))
+        phone_m = re.search(r'href=["\']tel:([^"\']+)["\'][^>]*>(.*?)</a>', block, flags=re.I | re.S)
+        address_m = re.search(r"<address\b[^>]*>(.*?)</address>", block, flags=re.I | re.S)
+        contacts[slug_text(name)] = {
+            "phone": strip_tags(phone_m.group(2)) if phone_m else None,
+            "phone_href": html.unescape(phone_m.group(1)).strip() if phone_m else None,
+            "address": parse_ham_address(address_m.group(1)) if address_m else None,
+        }
+    return contacts, email
+
+
+def parse_ham_detail_contact(page_html: str) -> dict[str, str | None]:
+    phone_m = re.search(r'href=["\']tel:([^"\']+)["\'][^>]*>(.*?)</a>', page_html, flags=re.I | re.S)
+    address_m = re.search(r"<address\b[^>]*>(.*?)</address>", page_html, flags=re.I | re.S)
+    return {
+        "phone": strip_tags(phone_m.group(2)) if phone_m else None,
+        "phone_href": html.unescape(phone_m.group(1)).strip() if phone_m else None,
+        "address": parse_ham_address(address_m.group(1)) if address_m else None,
+    }
+
+
+def parse_ham_main_pool(page_html: str, final_url: str, contacts: dict[str, dict[str, str | None]], email: str | None) -> dict[str, Any]:
+    title_m = re.search(r"<title\b[^>]*>(.*?)</title>", page_html, flags=re.I | re.S)
+    name = strip_tags(title_m.group(1)).split("|")[0].strip() if title_m else None
+    if not name:
+        json_ld = json_ld_objects(page_html)
+        name = next((str(o.get("name")) for o in json_ld if o.get("name")), "Hamilton pool")
+    facility_id = slug_text(name)
+
+    intro = text_between(page_html, r'<div\b[^>]*class=["\']intro-content["\'][^>]*>', [r'<section\b[^>]*class=["\']timetable__outer', r'<div\b[^>]*class=["\']hours__outer'])
+    description = strip_tags(intro).lstrip("> ") or None
+    opening_hours = parse_ham_hours_table(table_after(page_html, r"<h3\b[^>]*>\s*Opening hours\s*</h3>"))
+    public_holiday_hours = parse_ham_hours_table(table_after(page_html, r'<div\b[^>]*class=["\']hours__outer'))
+    disclaimer_m = re.search(r'<p\b[^>]*class=["\']disclaimer["\'][^>]*>(.*?)</p>', page_html, flags=re.I | re.S)
+
+    features_section = text_between(
+        page_html,
+        r"<h2\b[^>]*>\s*Features\s*</h2>",
+        [r"<h2\b[^>]*>\s*Visiting", r'<div\b[^>]*class=["\'][^"\']*blogpostselement'],
+    )
+    feature_headings = [strip_tags(x) for x in re.findall(r"<h3\b[^>]*>(.*?)</h3>", features_section, flags=re.I | re.S)]
+    feature_items = [strip_tags(x) for x in re.findall(r"<li\b[^>]*>(.*?)</li>", features_section, flags=re.I | re.S)]
+    pool_details = unique_text(feature_items)
+    features = unique_text(feature_headings + pool_details)
+
+    detail_contact = parse_ham_detail_contact(page_html)
+    fallback_contact = contacts.get(facility_id, {})
+
+    return {
+        "name": name,
+        "id": facility_id,
+        "type": "pool",
+        "council": "ham",
+        "council_name": "Hamilton",
+        "source": "hamilton-pools",
+        "source_url": final_url,
+        "description": description,
+        "address": detail_contact.get("address") or fallback_contact.get("address"),
+        "operator": "Hamilton City Council",
+        "status": None,
+        "hours": opening_hours,
+        "hours_summary": opening_hours[0]["text"] if opening_hours else None,
+        "public_holiday_hours": public_holiday_hours,
+        "hours_note": strip_tags(disclaimer_m.group(1)) if disclaimer_m else None,
+        "phone": detail_contact.get("phone") or fallback_contact.get("phone"),
+        "email": email,
+        "features": features,
+        "pool_details": pool_details,
+    }
+
+
+def parse_ham_pricing_blocks(page_html: str) -> dict[str, list[dict[str, str]]]:
+    pricing: dict[str, list[dict[str, str]]] = {}
+    for block_m in re.finditer(r'<section\b[^>]*class=["\'][^"\']*\bgym-class__box\b[^"\']*["\'][^>]*>(.*?)</section>', page_html, flags=re.I | re.S):
+        block = block_m.group(1)
+        title_m = re.search(r"<h3\b[^>]*>(.*?)</h3>", block, flags=re.I | re.S)
+        if not title_m:
+            continue
+        title = strip_tags(title_m.group(1))
+        items: list[dict[str, str]] = []
+        for item_m in re.finditer(r"<p\b[^>]*>(.*?)</p>\s*<span\b[^>]*>(.*?)</span>", block, flags=re.I | re.S):
+            label = strip_tags(item_m.group(1))
+            value = strip_tags(item_m.group(2))
+            if label or value:
+                items.append({"label": label, "value": value})
+        if items:
+            pricing[slug_text(title)] = items
+    return pricing
+
+
+def parse_ham_partner_pools(page_html: str, final_url: str, contacts: dict[str, dict[str, str | None]]) -> list[dict[str, Any]]:
+    detail_html = text_between(page_html, r"Everything You Need to Know About Our Partner Pools", [r'<div\b[^>]*class=["\'][^"\']*dnadesign__elemental__models__elementcontent'])
+    detail_text = strip_tags(detail_html)
+    page_text = strip_tags(page_html)
+    closed_m = re.search(r"all partner pools are closed for the season as of (\d{1,2}\s+[A-Za-z]+\s+\d{4})", page_text, flags=re.I)
+    closed_status = f"Closed for the season as of {closed_m.group(1)}" if closed_m else "Closed for the season"
+    pricing = parse_ham_pricing_blocks(page_html)
+    partner_contact = contacts.get("partner-pools", {})
+
+    markers = [
+        ("Te Rapa Primary", "Te Rapa Primary School Pool"),
+        ("Fairfield College", "Fairfield College Pool"),
+        ("Hillcrest Normal School", "Hillcrest Normal School Pool"),
+        ("Hamilton Boys High School", "Hamilton Boys High School Pool"),
+    ]
+    facilities: list[dict[str, Any]] = []
+    for idx, (marker, name) in enumerate(markers):
+        next_markers = [re.escape(m[0]) for m in markers[idx + 1 :]]
+        end_pat = "|".join(next_markers) if next_markers else "$"
+        block_m = re.search(rf"{re.escape(marker)}\s+(.*?)(?={end_pat})", detail_text, flags=re.I | re.S)
+        block = block_m.group(1).strip() if block_m else ""
+        season_m = re.search(r"Opening season\s*:?\s*(.*?)(?:\s+Address\s*:|\s+Address\b|$)", block, flags=re.I | re.S)
+        address_m = re.search(r"Address\s*:?\s*(.*?)(?:\s+Stay connected|\s+Follow|\s+Closed for the season|\s+Information for|\s+Private hire|\s+Community group hire|$)", block, flags=re.I | re.S)
+        email_m = re.search(r"[\w.+-]+@[\w.-]+\.\w+", block)
+        follow_m = re.search(r"(?:Stay connected!\s*)?(Follow .*?)(?:\s+Closed for the season|\s+Private hire|\s+Community group hire|$)", block, flags=re.I | re.S)
+        hire_m = re.search(r"((?:Private hire|Community group hire):\s*.*?)(?:$)", block, flags=re.I | re.S)
+
+        season = re.sub(r"\s+", " ", season_m.group(1)).strip() if season_m else None
+        address = re.sub(r"\s+", " ", address_m.group(1)).strip(" .") if address_m else None
+        contact_note = strip_tags(follow_m.group(1)).replace(" Key information below", "") if follow_m else None
+        hire_note = strip_tags(hire_m.group(1)) if hire_m else None
+        if contact_note and hire_note:
+            contact_note = f"{contact_note}; {hire_note}"
+        elif hire_note:
+            contact_note = hire_note
+
+        facility_id = slug_text(name)
+        price_key = slug_text(marker)
+        if marker == "Te Rapa Primary":
+            price_key = "te-rapa-primary-school"
+        fees = pricing.get(price_key, [])
+        hours = [{"label": "Opening season", "text": season}] if season else []
+        pool_details = ["Outdoor partner pool", "Seasonal community access"]
+        facilities.append(
+            {
+                "name": name,
+                "id": facility_id,
+                "type": "pool",
+                "council": "ham",
+                "council_name": "Hamilton",
+                "source": "hamilton-pools",
+                "source_url": final_url,
+                "listing_source_url": final_url,
+                "description": "Hamilton City Council seasonal partner pool.",
+                "address": address,
+                "operator": "Hamilton City Council partner pool",
+                "status": closed_status if "closed for the season" in block.lower() or closed_m else None,
+                "hours": hours,
+                "hours_summary": closed_status if closed_m else (season or None),
+                "hours_note": "Information for the next summer season will be updated on the Hamilton Pools partner-pools page.",
+                "phone": partner_contact.get("phone"),
+                "email": email_m.group(0) if email_m else None,
+                "contact_note": contact_note,
+                "features": pool_details,
+                "pool_details": pool_details,
+                "fees": fees,
+            }
+        )
+    return facilities
+
+
+def fetch_ham_facilities(kind: str) -> tuple[list[dict[str, Any]], str]:
+    if kind != "pool":
+        return [], HAM_POOLS_BASE
+    home, home_url, _ = fetch_text("/", HAM_POOLS_BASE)
+    discovered_paths: list[str] = []
+    for href in re.findall(r'href=["\']([^"\']+/facilities/[^"\']+|/facilities/[^"\']+)["\']', home, flags=re.I):
+        path = urllib.parse.urlparse(html.unescape(href)).path
+        if path in HAM_MAIN_POOL_PATHS and path not in discovered_paths:
+            discovered_paths.append(path)
+    if not discovered_paths:
+        discovered_paths = list(HAM_MAIN_POOL_PATHS)
+
+    contact_body, _, _ = fetch_text("/contact", HAM_POOLS_BASE)
+    contacts, email = parse_ham_contact_page(contact_body)
+    facilities: list[dict[str, Any]] = []
+    for path in discovered_paths:
+        body, final_url, _ = fetch_text(path, HAM_POOLS_BASE)
+        facility = parse_ham_main_pool(body, final_url, contacts, email)
+        facility["listing_source_url"] = home_url
+        facilities.append(facility)
+
+    partner_body, partner_url, _ = fetch_text(HAM_PARTNER_POOLS_PATH, HAM_POOLS_BASE)
+    facilities.extend(parse_ham_partner_pools(partner_body, partner_url, contacts))
+    return facilities, home_url
+
+
 def find_facility(cards: list[dict[str, Any]], query: str) -> dict[str, Any] | None:
     needle = slug_text(query)
     if not needle:
@@ -1143,6 +1416,15 @@ def pool_detail_for_council(council: str, name: str) -> tuple[dict[str, Any] | N
             "facility": card,
             "lane_availability_today": None,
         }, listing_url, []
+    if council == "ham":
+        cards, listing_url = fetch_ham_facilities("pool")
+        card = find_facility(cards, name)
+        if not card:
+            return None, listing_url, [c["name"] for c in cards[:10]]
+        return {
+            "facility": card,
+            "lane_availability_today": None,
+        }, listing_url, []
     die("Christchurch pool detail is not wired in v1")
 
 
@@ -1172,6 +1454,11 @@ def cmd_pools(args: argparse.Namespace) -> None:
             die("--region is only supported for Auckland pools")
         pools, source_url = static_recreation_facilities(args.council, "pool")
         pools = pools[: args.limit]
+    elif args.council == "ham":
+        if args.region:
+            die("--region is only supported for Auckland pools")
+        pools, source_url = fetch_ham_facilities("pool")
+        pools = pools[: args.limit]
     else:
         die("Christchurch pools are not wired in v1 because the public council recreation source is JS/vendor-backed")
 
@@ -1179,6 +1466,7 @@ def cmd_pools(args: argparse.Namespace) -> None:
         "query": {"council": args.council, "region": args.region, "limit": args.limit},
         "source_url": source_url,
         "elapsed_ms": round((time.perf_counter() - started) * 1000),
+        "note": "Hamilton Pools currently lists Waterworld, Gallagher Aquatic Centre, and seasonal partner pools; Founders Memorial Theatre Pool is not listed as an active pool." if args.council == "ham" else None,
         "pools": pools,
     }
     emit_facility_list(data, "pools", args.json)
@@ -1186,7 +1474,7 @@ def cmd_pools(args: argparse.Namespace) -> None:
 
 def cmd_pool(args: argparse.Namespace) -> None:
     started = time.perf_counter()
-    councils = [args.council] if args.council else ["npr", "has", "npl", "rot", "akl", "wlg"]
+    councils = [args.council] if args.council else ["npr", "has", "npl", "rot", "akl", "wlg", "ham"]
     suggestions_by_council: list[str] = []
     for council in councils:
         detail, listing_url, suggestions = pool_detail_for_council(council, args.name)
@@ -1259,6 +1547,22 @@ def cmd_facilities(args: argparse.Namespace) -> None:
         else:
             facilities, source_url = [], NPL_COMMUNITY_POOLS_URL
             note = "New Plymouth recreation support is scoped to public pools in v1."
+        facilities = facilities[: args.limit]
+    elif args.council == "ham":
+        if args.region:
+            die("--region is only supported for Auckland facilities")
+        if args.type == "pool":
+            facilities, source_url = fetch_ham_facilities("pool")
+            note = "Hamilton Pools currently lists Waterworld, Gallagher Aquatic Centre, and seasonal partner pools; Founders Memorial Theatre Pool is not listed as an active pool."
+        elif args.type == "leisure-centre":
+            facilities, source_url = fetch_ham_facilities("pool")
+            note = "Hamilton Pools publishes aquatic recreation facilities; returned pool facilities for this recreation-centre-style query."
+        elif args.type == "gym":
+            facilities, source_url = [], HAM_POOLS_BASE
+            note = "Hamilton gym listings are not wired; Hamilton Pools pages mention gym/fitness but this skill is scoped to pool facilities."
+        else:
+            facilities, source_url = [], HAM_POOLS_BASE
+            note = "Libraries are outside this skill's recreation-focused data source."
         facilities = facilities[: args.limit]
     else:
         facilities, source_url = [], "https://recandsport.ccc.govt.nz/"

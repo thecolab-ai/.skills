@@ -303,6 +303,69 @@ Useful fields emitted:
 
 Freshness: facility identity, status notes, and source URLs are static in the CLI. Flaxmere, Clive, Village Pool, Splash Planet, and the regional aquatic centre source pages publish current hours and seasonal changes.
 
+### Hamilton Pools
+
+Implemented for Hamilton pool facilities.
+
+- Council navigation page: `https://hamilton.govt.nz/search?Search=pool`
+- Hamilton Pools home: `https://www.hamiltonpools.co.nz/`
+- Waterworld: `https://www.hamiltonpools.co.nz/facilities/waterworld`
+- Gallagher Aquatic Centre: `https://www.hamiltonpools.co.nz/facilities/gallagher-aquatic-centre`
+- Partner pools: `https://www.hamiltonpools.co.nz/facilities/partner-pools`
+- Contact: `https://www.hamiltonpools.co.nz/contact`
+
+Observed active Hamilton Pools facility pages:
+
+- Waterworld
+- Gallagher Aquatic Centre
+- Partner Pools
+
+Observed seasonal partner pools:
+
+- Te Rapa Primary School Pool
+- Fairfield College Pool
+- Hillcrest Normal School Pool
+- Hamilton Boys High School Pool
+
+The Hamilton City Council page path suggested during discovery,
+`https://hamilton.govt.nz/our-services/parks-and-recreation/pools`, returned the council
+page-not-found template. Current Hamilton City Council navigation links to
+`https://www.hamiltonpools.co.nz/` as the Hamilton Pools source. The suggested
+`https://www.h2oxtream.com/` source was checked and belongs to Upper Hutt, not Hamilton.
+
+Founders Memorial Theatre Pool was checked against the current Hamilton Pools facility
+paths and Hamilton City Council search. The current official sources did not list it as an
+active Hamilton pool; council search results instead reference Founders Theatre site news
+and redevelopment decisions.
+
+Main facility schema emitted:
+
+```json
+{
+  "name": "Waterworld",
+  "id": "waterworld",
+  "type": "pool",
+  "council": "ham",
+  "source": "hamilton-pools",
+  "source_url": "https://www.hamiltonpools.co.nz/facilities/waterworld",
+  "address": "Garnett Avenue, Te Rapa, Hamilton 3200",
+  "phone": "07 958 5860",
+  "email": "hamiltonpools@hcc.govt.nz",
+  "hours": [
+    {"label": "Monday - Friday", "text": "Kids & Toddler Pool: 8.00am to 8.00pm; ..."}
+  ],
+  "pool_details": ["25m lane-swimming pool", "50m lane-swimming pool", "Hydroslide"]
+}
+```
+
+Partner pool schema uses the same facility shape and includes `status`, seasonal
+`hours`, `hours_note`, `contact_note`, and visible fee rows where the partner-pools page
+publishes them. As of discovery, Hamilton Pools says all partner pools are closed for the
+season as of 29 March 2026.
+
+Freshness: live static pages at command time. Hamilton Pools controls opening hours,
+facility notices, and partner-pool seasonal updates.
+
 ### Christchurch recreation and sport
 
 Discovered, documented, not wired in v1.
