@@ -69,6 +69,9 @@ QLDC_SWIM_SOURCE = QLDC_BASE + "/recreation/swim/"
 DUD_BASE = "https://www.dunedin.govt.nz"
 DUD_POOLS_URL = DUD_BASE + "/community-facilities/swimming-pools"
 DUD_SPORTS_REVIEW_URL = DUD_BASE + "/community-facilities/parks-and-reserves/dunedin-sports-facilities-review"
+NSN_BASE = "https://www.nelson.govt.nz"
+TDC_BASE = "https://www.tasman.govt.nz"
+CLM_BASE = "https://www.clmnz.co.nz"
 
 UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146 Safari/537.36"
 
@@ -86,6 +89,8 @@ COUNCIL_LOCATIONS = {
     "tga": "tauranga",
     "qldc": "queenstown",
     "dud": "dunedin",
+    "nsn": "nelson-region",
+    "tdc": "tasman-district",
 }
 
 COUNCIL_NAMES = {
@@ -106,6 +111,8 @@ COUNCIL_NAMES = {
     "tga": "Tauranga",
     "qldc": "Queenstown Lakes",
     "dud": "Dunedin",
+    "nsn": "Nelson",
+    "tdc": "Tasman",
 }
 
 RECREATION_COUNCILS = (
@@ -114,6 +121,8 @@ RECREATION_COUNCILS = (
     "chc",
     "rot",
     "npl",
+    "nsn",
+    "tdc",
     "npr",
     "has",
     "ham",
@@ -332,6 +341,9 @@ NPL_POOL_FACILITIES = [
     },
 ]
 
+NSN_POOL_LISTING_URL = NSN_BASE + "/5community/2recreation/swimming-pools"
+TDC_SWIMMING_LISTING_URL = TDC_BASE + "/my-region/recreation/beaches-and-swimming"
+TDC_RECREATION_LISTING_URL = TDC_BASE + "/my-region/recreation/sport-and-recreation-centres"
 NPR_AQUATIC_SOURCE_URL = NPR_BASE + "/napier/facilities/napier-aquatic-centre/"
 HAS_SWIMMING_POOLS_URL = HAS_BASE + "/hastings/facilities/swimming-pools/"
 
@@ -535,6 +547,119 @@ STATIC_RECREATION_FACILITIES: dict[str, list[dict[str, Any]]] = {
                 "learn-to-swim pool",
                 "hydrotherapy pools",
                 "swim school",
+            ],
+        },
+    ],
+    "nsn": [
+        {
+            "name": "Riverside Pool",
+            "id": "riverside-pool",
+            "type": "pool",
+            "facility_types": ["pool", "gym", "leisure-centre"],
+            "council": "nsn",
+            "council_name": "Nelson",
+            "source": "nelson-city-council",
+            "source_url": CLM_BASE + "/riverside-swimming-pool/",
+            "listing_source_url": NSN_POOL_LISTING_URL,
+            "address": "25 Riverside Drive, Nelson",
+            "operator": "CLM",
+            "description": "Council-owned indoor pool and fitness facility in central Nelson with all-year access.",
+            "hours": None,
+            "hours_summary": "Open all year; current hours are published on the linked CLM page.",
+            "phone": "03 546 3221",
+            "email": "nelsonaquatics@clmnz.co.nz",
+            "features": [
+                "Lane swimming",
+                "Open swimming",
+                "Kids swimming",
+                "Spa pool",
+                "Swimming lessons",
+                "Fitness centre",
+                "Aquafitness classes",
+            ],
+        },
+        {
+            "name": "Nayland Park Pool",
+            "id": "nayland-park-pool",
+            "aliases": ["nayland-pool"],
+            "type": "pool",
+            "facility_types": ["pool"],
+            "council": "nsn",
+            "council_name": "Nelson",
+            "source": "nelson-city-council",
+            "source_url": CLM_BASE + "/nayland-park-pool/",
+            "listing_source_url": NSN_POOL_LISTING_URL,
+            "address": "192 Nayland Park, Nelson",
+            "operator": "CLM",
+            "description": "Council-owned community summer pool in Stoke, adjacent to Nayland College.",
+            "hours": None,
+            "hours_summary": "Open for the summer season; current hours are published on the linked CLM page.",
+            "phone": "03 547 0292",
+            "email": "naylandpark@clmnz.co.nz",
+            "features": [
+                "50 metre lane pool",
+                "Toddlers pool",
+                "Teaching pool",
+                "Diving boards",
+            ],
+        },
+    ],
+    "tdc": [
+        {
+            "name": "Richmond Aquatic Centre",
+            "id": "richmond-aquatic-centre",
+            "type": "pool",
+            "facility_types": ["pool", "gym", "leisure-centre"],
+            "council": "tdc",
+            "council_name": "Tasman",
+            "source": "tasman-district-council",
+            "source_url": TDC_RECREATION_LISTING_URL + "/richmond-aquatic-centre",
+            "listing_source_url": TDC_SWIMMING_LISTING_URL,
+            "address": "161 Salisbury Road, Richmond, Nelson",
+            "operator": "CLM",
+            "operator_url": CLM_BASE + "/richmond/",
+            "description": "Tasman public year-round aquatic and fitness centre with lane, wave, hydrotherapy, spa, tots, and learn-to-swim pools.",
+            "hours": None,
+            "hours_summary": "Open all year; current hours are published on the linked CLM page.",
+            "phone": "03 543 9755",
+            "email": "aru@clmnz.co.nz",
+            "features": [
+                "25m lane pool",
+                "Wave pool",
+                "Lazy river",
+                "Spa pools",
+                "Hydrotherapy pool",
+                "Sauna",
+                "Tots pool",
+                "Learn to swim pool",
+                "Fitness centre",
+            ],
+        },
+        {
+            "name": "Motueka Recreation Centre",
+            "id": "motueka-recreation-centre",
+            "type": "leisure-centre",
+            "facility_types": ["leisure-centre", "gym"],
+            "council": "tdc",
+            "council_name": "Tasman",
+            "source": "tasman-district-council",
+            "source_url": TDC_RECREATION_LISTING_URL + "/motueka-recreation-centre",
+            "listing_source_url": TDC_RECREATION_LISTING_URL,
+            "address": "40 Old Wharf Road, Motueka, Tasman",
+            "operator": "Sport Tasman",
+            "description": "Multi-purpose recreation facility with an office space, fitness lounge, theatre facility, stadium, games room, skating rink, netball courts, and climbing wall.",
+            "hours": None,
+            "hours_note": "Opening details are published by the linked Tasman District Council and operator pages.",
+            "phone": "03 528 8228",
+            "email": "MRC@sporttasman.org.nz",
+            "features": [
+                "Fitness lounge",
+                "Theatre facility",
+                "Stadium",
+                "Games room",
+                "Skating rink",
+                "Netball courts",
+                "Climbing wall",
             ],
         },
     ],
@@ -2103,15 +2228,22 @@ def fetch_npl_facilities(kind: str) -> tuple[list[dict[str, Any]], str]:
 
 
 def static_recreation_facilities(council: str, kind: str | None = None) -> tuple[list[dict[str, Any]], str]:
-    source_url = {"npr": NPR_AQUATIC_SOURCE_URL, "has": HAS_SWIMMING_POOLS_URL}.get(council, "")
+    source_url = {
+        "npr": NPR_AQUATIC_SOURCE_URL,
+        "has": HAS_SWIMMING_POOLS_URL,
+        "nsn": NSN_POOL_LISTING_URL,
+        "tdc": TDC_SWIMMING_LISTING_URL if kind == "pool" else TDC_RECREATION_LISTING_URL,
+    }.get(council, "")
     facilities: list[dict[str, Any]] = []
     for item in STATIC_RECREATION_FACILITIES.get(council, []):
-        item_type = item.get("type")
-        if kind == "pool" and item_type not in {"pool", "water-park", "aquatic-centre"}:
+        item_types = set(item.get("facility_types") or item.get("types") or [item.get("type")])
+        if kind == "pool" and not item_types.intersection({"pool", "water-park", "aquatic-centre"}):
             continue
-        if kind and kind != "pool" and item_type != kind:
+        if kind and kind != "pool" and kind not in item_types:
             continue
         facility = dict(item)
+        if council == "tdc" and kind != "pool":
+            facility["listing_source_url"] = TDC_RECREATION_LISTING_URL
         facility["id"] = facility.get("id") or slug_text(str(facility.get("name") or ""))
         facilities.append(facility)
     return facilities, source_url
@@ -3899,7 +4031,7 @@ def pool_detail_for_council(council: str, name: str) -> tuple[dict[str, Any] | N
             "facility": card,
             "lane_availability_today": None,
         }, listing_url, []
-    if council in {"npr", "has"}:
+    if council in {"npr", "has", "nsn", "tdc"}:
         cards, listing_url = static_recreation_facilities(council, "pool")
         card = find_facility(cards, name)
         if not card:
@@ -3989,7 +4121,7 @@ def cmd_pools(args: argparse.Namespace) -> None:
             die("--region is only supported for Auckland pools")
         pools, source_url = fetch_npl_facilities("pool")
         pools = pools[: args.limit]
-    elif args.council in {"npr", "has"}:
+    elif args.council in {"npr", "has", "nsn", "tdc"}:
         if args.region:
             die("--region is only supported for Auckland pools")
         pools, source_url = static_recreation_facilities(args.council, "pool")
@@ -4048,7 +4180,7 @@ def cmd_pools(args: argparse.Namespace) -> None:
 
 def cmd_pool(args: argparse.Namespace) -> None:
     started = time.perf_counter()
-    councils = [args.council] if args.council else ["dud", "qldc", "whg", "npr", "has", "npl", "rot", "akl", "tga", "wlg", "ham", "hutt", "porirua", "uhutt", "kapiti", "chc", "pmn"]
+    councils = [args.council] if args.council else ["dud", "qldc", "whg", "npr", "has", "npl", "nsn", "tdc", "rot", "akl", "tga", "wlg", "ham", "hutt", "porirua", "uhutt", "kapiti", "chc", "pmn"]
     suggestions_by_council: list[str] = []
     for council in councils:
         detail, listing_url, suggestions = pool_detail_for_council(council, args.name)
@@ -4114,12 +4246,14 @@ def cmd_facilities(args: argparse.Namespace) -> None:
             if args.type == "gym":
                 note = "Rotorua Aquatic Centre includes a gym; linked operator pages have current programme details."
         facilities = facilities[: args.limit]
-    elif args.council in {"npr", "has"}:
+    elif args.council in {"npr", "has", "nsn", "tdc"}:
         if args.region:
             die("--region is only supported for Auckland facilities")
         facilities, source_url = static_recreation_facilities(args.council, args.type)
         note = None
-        if args.type != "pool":
+        if args.type == "library":
+            note = "Libraries are outside this skill's recreation-focused data source."
+        elif args.council in {"npr", "has"} and args.type != "pool":
             note = f"{COUNCIL_NAMES[args.council]} recreation support currently covers aquatic facilities only."
         facilities = facilities[: args.limit]
     elif args.council == "npl":
