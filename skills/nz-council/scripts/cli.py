@@ -66,6 +66,9 @@ TGA_CDP_ENDPOINT = CDP_HTTP_BASE
 QLDC_BASE = "https://www.qldc.govt.nz"
 QLDC_RECREATION_SOURCE = QLDC_BASE + "/recreation/"
 QLDC_SWIM_SOURCE = QLDC_BASE + "/recreation/swim/"
+DUD_BASE = "https://www.dunedin.govt.nz"
+DUD_POOLS_URL = DUD_BASE + "/community-facilities/swimming-pools"
+DUD_SPORTS_REVIEW_URL = DUD_BASE + "/community-facilities/parks-and-reserves/dunedin-sports-facilities-review"
 
 UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146 Safari/537.36"
 
@@ -82,6 +85,7 @@ COUNCIL_LOCATIONS = {
     "pmn": "palmerston-north",
     "tga": "tauranga",
     "qldc": "queenstown",
+    "dud": "dunedin",
 }
 
 COUNCIL_NAMES = {
@@ -101,6 +105,7 @@ COUNCIL_NAMES = {
     "pmn": "Palmerston North",
     "tga": "Tauranga",
     "qldc": "Queenstown Lakes",
+    "dud": "Dunedin",
 }
 
 RECREATION_COUNCILS = (
@@ -120,6 +125,7 @@ RECREATION_COUNCILS = (
     "pmn",
     "tga",
     "qldc",
+    "dud",
 )
 
 AKL_AREA_IDS = {
@@ -540,6 +546,37 @@ HAM_MAIN_POOL_PATHS = (
 )
 
 HAM_PARTNER_POOLS_PATH = "/facilities/partner-pools"
+
+DUD_POOL_PAGES = {
+    "Moana Pool": {
+        "url": DUD_BASE + "/community-facilities/swimming-pools/moana-pool",
+        "hours_url": DUD_BASE + "/community-facilities/swimming-pools/moana-pool/moana-pool-opening-hours",
+        "pools_url": DUD_BASE + "/community-facilities/swimming-pools/moana-pool/pools",
+        "aliases": [],
+    },
+    "Te Puna o Whakaehu": {
+        "url": DUD_BASE + "/community-facilities/swimming-pools/te-puna-o-whakaehu",
+        "aliases": ["Mosgiel Pool"],
+    },
+    "Port Chalmers Pool": {
+        "url": DUD_BASE + "/community-facilities/swimming-pools/port-chalmers-pool",
+        "aliases": [],
+    },
+    "St Clair Hot Salt Water Pool": {
+        "url": DUD_BASE + "/community-facilities/swimming-pools/st-clair-pool",
+        "aliases": ["St Clair Pool"],
+    },
+}
+
+DUD_POOL_PROP_KEYS = {
+    "temperature": "temperature",
+    "depth": "depth",
+    "features": "features",
+    "access": "access",
+    "activities": "activities",
+    "pool access": "pool_access",
+    "slide access": "slide_access",
+}
 
 WHG_POOL_NO_COMMUNITY_NOTE = (
     "Current public Whangarei District Council pages checked for v1 expose parks, beaches, sports parks, "
@@ -2080,6 +2117,360 @@ def static_recreation_facilities(council: str, kind: str | None = None) -> tuple
     return facilities, source_url
 
 
+def fetch_dud_text(url_or_path: str, timeout: int = 30) -> tuple[str, str, int, str]:
+    url = resolve_url(url_or_path, DUD_BASE)
+    body, final_url, status, error = fetch_text_result(
+        url,
+        headers={"Accept": "text/html,application/xhtml+xml"},
+        timeout=timeout,
+        allow_http_error=True,
+    )
+    if body and (status is None or status < 400) and not is_bot_wall(body) and not is_missing_page(body):
+        return body, final_url, status or 200, "direct"
+
+    cdp_body = fetch_text_via_cdp(final_url, timeout=18)
+    if cdp_body and not is_bot_wall(cdp_body) and not is_missing_page(cdp_body):
+        return cdp_body, final_url, 200, "cdp"
+
+    reason = error or ("bot-wall" if body and is_bot_wall(body) else "missing-page")
+    die(f"Dunedin page fetch failed for {final_url} ({reason}); CDP fallback at {CDP_HTTP_BASE} did not return usable HTML")
+
+
+def dud_html_text_lines(page_html: str) -> list[str]:
+    value = re.sub(r"<script\b.*?</script>", " ", page_html, flags=re.I | re.S)
+    value = re.sub(r"<style\b.*?</style>", " ", value, flags=re.I | re.S)
+    value = re.sub(r"<br\s*/?>", "\n", value, flags=re.I)
+    value = re.sub(r"</(p|div|li|h[1-6]|tr|td|th|section|article)>", "\n", value, flags=re.I)
+    value = re.sub(r"<(p|div|li|h[1-6]|tr|td|th|section|article)\b[^>]*>", "\n", value, flags=re.I)
+    value = re.sub(r"<[^>]+>", " ", value)
+    value = html.unescape(value).replace("\xa0", " ")
+    lines = []
+    for raw in value.splitlines():
+        line = re.sub(r"\s+", " ", raw).strip(" |;\t\r\n")
+        if line:
+            lines.append(line)
+    return lines
+
+
+def dud_content_lines(page_html: str) -> list[str]:
+    lines = dud_html_text_lines(page_html)
+    start = 0
+    for idx, line in enumerate(lines):
+        if line.startswith("Last updated:"):
+            start = idx + 1
+            break
+    end = len(lines)
+    for idx in range(start, len(lines)):
+        if lines[idx].startswith("Still didn't find"):
+            end = idx
+            break
+    return lines[start:end]
+
+
+def dud_content_text(page_html: str) -> str:
+    text = strip_tags(page_html, br=" ")
+    lower = text.lower()
+    start = lower.find("last updated:")
+    if start != -1:
+        text = text[start:]
+    lower = text.lower()
+    end = lower.find("still didn't find")
+    if end != -1:
+        text = text[:end]
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def dud_clean_text(value: str | None, limit: int | None = None) -> str | None:
+    if not value:
+        return None
+    cleaned = re.sub(r"\s+", " ", value).strip(" |;\t\r\n")
+    cleaned = cleaned.replace("Area Open from Closes at ", "")
+    cleaned = cleaned.replace("Day Time ", "")
+    cleaned = cleaned.replace(" Scroll to view", "")
+    cleaned = re.sub(r"^[–-]\s*Friday\s+", "", cleaned)
+    if limit and len(cleaned) > limit:
+        return cleaned[: limit - 3].rstrip() + "..."
+    return cleaned
+
+
+def dud_between(text: str, start_label: str, end_labels: list[str]) -> str | None:
+    lower = text.lower()
+    start = lower.find(start_label.lower())
+    if start == -1:
+        return None
+    start += len(start_label)
+    end = len(text)
+    for label in end_labels:
+        pos = lower.find(label.lower(), start)
+        if pos != -1:
+            end = min(end, pos)
+    return dud_clean_text(text[start:end])
+
+
+def dud_hours_summary(hours: list[dict[str, str]]) -> str | None:
+    chunks = []
+    for item in hours[:3]:
+        text = dud_clean_text(item.get("text"), 120)
+        if text:
+            chunks.append(f"{item['label']}: {text}")
+    return "; ".join(chunks) if chunks else None
+
+
+def parse_dud_hours(name: str, detail_html: str, hours_html: str | None = None) -> tuple[list[dict[str, str]], str | None]:
+    page_html = hours_html or detail_html
+    text = dud_content_text(page_html)
+    hours: list[dict[str, str]] = []
+    if name == "Moana Pool":
+        weekday = dud_between(text, "Monday - Friday", ["Saturday - Sunday"])
+        weekend = dud_between(text, "Saturday - Sunday", ["Public holiday hours"])
+        public = dud_between(text, "Public holiday hours", ["Contact us"])
+        for label, value in (("Monday - Friday", weekday), ("Saturday - Sunday", weekend), ("Public holidays", public)):
+            if value:
+                hours.append({"label": label, "text": value})
+    elif name == "Te Puna o Whakaehu":
+        weekday = dud_between(text, "Monday - Friday", ["Saturday - Sunday"])
+        weekend = dud_between(text, "Saturday - Sunday", ["Public holiday hours"])
+        public = dud_between(text, "Public holiday hours", ["Kid"])
+        for label, value in (("Monday - Friday", weekday), ("Saturday - Sunday", weekend), ("Public holidays", public)):
+            if value:
+                hours.append({"label": label, "text": value})
+    elif name == "Port Chalmers Pool":
+        season = dud_between(text, "Open hours", ["Hours (school terms 1 & 4)"])
+        term = dud_between(text, "Hours (school terms 1 & 4)", ["Additional swimming times", "Hours (school holidays)"])
+        extra = dud_between(text, "Additional swimming times - Monday", ["Hours (school holidays)"])
+        holidays = dud_between(text, "Hours (school holidays)", ["Top of this page", "Identification and concession rate"])
+        for label, value in (
+            ("Season", season),
+            ("School terms 1 & 4", term),
+            ("Additional weekday times", extra),
+            ("School holidays", holidays),
+        ):
+            if value:
+                hours.append({"label": label, "text": value})
+    elif name == "St Clair Hot Salt Water Pool":
+        season = dud_between(text, "Open hours", ["Monday - Friday", "Day Time"])
+        regular = dud_between(text, "Day Time", ["Identification and concession rate"])
+        if not regular:
+            regular = dud_between(text, "Open date:", ["Identification and concession rate"])
+        for label, value in (("Season", season), ("Regular season hours", regular)):
+            if value:
+                hours.append({"label": label, "text": value})
+    return hours, dud_hours_summary(hours)
+
+
+def parse_dud_pool_details(page_html: str, default_pool_name: str) -> list[dict[str, str]]:
+    lines = dud_content_lines(page_html)
+    start = -1
+    for idx, line in enumerate(lines):
+        if line in {"About the pool", "About the pools", "Pools"}:
+            start = idx + 1
+            break
+    if start == -1:
+        return []
+
+    stop_prefixes = (
+        "Open hours",
+        "Opening Hours",
+        "Te Puna o Whakaehu timetable",
+        "Kid",
+        "Kid's stuff",
+        "Identification and concession rate",
+        "Contact us",
+    )
+    skip_lines = {
+        "You can click on image to open a larger version of the layout.",
+        "Information on pools available at Moana pool.",
+    }
+    pools: list[dict[str, str]] = []
+    current: dict[str, str] | None = None
+
+    def finish_current() -> None:
+        nonlocal current
+        if current and any(k != "name" for k in current):
+            pools.append(current)
+        current = None
+
+    for line in lines[start:]:
+        if line.startswith(stop_prefixes):
+            break
+        if line in skip_lines or line.startswith("Image:"):
+            continue
+        if ":" in line:
+            key, value = line.split(":", 1)
+            normalized_key = key.strip().strip("*").lower()
+            field = DUD_POOL_PROP_KEYS.get(normalized_key)
+            if field:
+                if current is None:
+                    current = {"name": default_pool_name}
+                current[field] = value.strip().lstrip("* ").strip()
+            continue
+        if len(line) <= 80:
+            finish_current()
+            current = {"name": line.strip("# ")}
+    finish_current()
+    return pools
+
+
+def parse_dud_contact_and_address(name: str, page_html: str) -> tuple[str | None, str | None, str | None]:
+    text = dud_content_text(page_html)
+    full_text = strip_tags(page_html, br=" ")
+    address = None
+    phone = None
+    location_m = re.search(r"Location:\s*([^.;]+(?:,\s*[^.;]+)?)\.\s*Phone\s*([+0-9 ()-]+)", text, flags=re.I)
+    if location_m:
+        address = dud_clean_text(location_m.group(1))
+        phone = dud_clean_text(location_m.group(2))
+    elif name == "Moana Pool":
+        address_m = re.search(r"Moana Pool sits .*? at\s+([^.;]+)", text, flags=re.I)
+        address = dud_clean_text(address_m.group(1)) if address_m else "60 Littlebourne Road, Dunedin"
+    elif name == "Te Puna o Whakaehu":
+        address_m = re.search(r"located at\s+([^.;]+)", text, flags=re.I)
+        if address_m:
+            street = re.split(r"\s+at the\s+", address_m.group(1), maxsplit=1, flags=re.I)[0]
+            address = dud_clean_text(street + ", Mosgiel")
+        else:
+            address = "215 Gordon Road, Mosgiel"
+
+    if not phone:
+        phone_m = re.search(r"Phone\s+([+0-9][+0-9 ()-]+)", full_text, flags=re.I)
+        phone = dud_clean_text(phone_m.group(1)) if phone_m else None
+
+    emails = re.findall(r"[\w.+-]+@[\w.-]+\.\w+", full_text)
+    preferred_email = next((e for e in emails if e.lower() != "dcc@dcc.govt.nz"), None)
+    email = preferred_email or (emails[0] if emails else None)
+    return address, phone, email
+
+
+def parse_dud_description(name: str, page_html: str) -> str | None:
+    text = dud_content_text(page_html)
+    text = re.sub(r"^Last updated:\s*\d{2}\s+[A-Za-z]+\s+\d{4}\s+\d{1,2}:\d{2}[ap]m\s*", "", text, flags=re.I).strip()
+    stops = [
+        "Location of Moana Pool",
+        "History of Te Puna o Whakaehu",
+        "About the pool",
+        "About the pools",
+        "Open hours",
+        "Te Puna o Whakaehu timetable",
+        "list apps",
+    ]
+    end = len(text)
+    lower = text.lower()
+    for stop in stops:
+        pos = lower.find(stop.lower())
+        if pos != -1:
+            end = min(end, pos)
+    return dud_clean_text(text[:end], 500)
+
+
+def dud_pool_links(index_html: str) -> dict[str, str]:
+    links: dict[str, str] = {}
+    for match in re.finditer(r"<a\b([^>]*)>(.*?)</a>", index_html, flags=re.I | re.S):
+        name = strip_tags(match.group(2))
+        if name not in DUD_POOL_PAGES:
+            continue
+        href = attr(match.group(1), "href")
+        if href and "#" not in href:
+            links[name] = absolutize(href, DUD_BASE) or DUD_POOL_PAGES[name]["url"]
+    return links
+
+
+def parse_dud_facility(name: str, meta: dict[str, Any], listing_source_url: str) -> dict[str, Any]:
+    detail_html, final_url, _status, fetch_mode = fetch_dud_text(str(meta["url"]))
+    hours_html = detail_html
+    hours_url = final_url
+    if meta.get("hours_url"):
+        hours_html, hours_url, _hours_status, _hours_mode = fetch_dud_text(str(meta["hours_url"]))
+    pool_html = detail_html
+    pool_url = final_url
+    if meta.get("pools_url"):
+        pool_html, pool_url, _pool_status, _pool_mode = fetch_dud_text(str(meta["pools_url"]))
+
+    address, phone, email = parse_dud_contact_and_address(name, detail_html)
+    hours, hours_summary = parse_dud_hours(name, detail_html, hours_html)
+    pool_details = parse_dud_pool_details(pool_html, name)
+    features = [p["name"] for p in pool_details if p.get("name")]
+    if name == "Moana Pool" and "Gym" not in features:
+        features.append("Gym")
+    aliases = list(meta.get("aliases") or [])
+    source_urls = [final_url]
+    for url in (hours_url, pool_url):
+        if url and url not in source_urls:
+            source_urls.append(url)
+    facility = {
+        "name": name,
+        "id": slug_text(name),
+        "aliases": aliases,
+        "type": "pool",
+        "council": "dud",
+        "council_name": "Dunedin",
+        "source": "dunedin-city-council",
+        "source_url": final_url,
+        "listing_source_url": listing_source_url,
+        "source_urls": source_urls,
+        "fetch_mode": fetch_mode,
+        "description": parse_dud_description(name, detail_html),
+        "address": address,
+        "phone": phone,
+        "email": email,
+        "hours": hours,
+        "hours_summary": hours_summary,
+        "features": features,
+        "pool_details": pool_details,
+        "resource_availability_url": None,
+    }
+    if "Mosgiel Pool" in aliases:
+        facility["former_name"] = "Mosgiel Pool"
+    if name in {"Port Chalmers Pool", "St Clair Hot Salt Water Pool"}:
+        facility["seasonal"] = True
+    return facility
+
+
+def fetch_dud_facilities(kind: str) -> tuple[list[dict[str, Any]], str]:
+    if kind == "pool":
+        index_html, listing_url, _status, _mode = fetch_dud_text(DUD_POOLS_URL)
+        live_links = dud_pool_links(index_html)
+        facilities = []
+        for name, meta in DUD_POOL_PAGES.items():
+            merged = dict(meta)
+            if live_links.get(name):
+                merged["url"] = live_links[name]
+            facilities.append(parse_dud_facility(name, merged, listing_url))
+        return facilities, listing_url
+
+    if kind == "leisure-centre":
+        review_html, final_url, _status, _mode = fetch_dud_text(DUD_SPORTS_REVIEW_URL)
+        text = dud_content_text(review_html)
+        facilities: list[dict[str, Any]] = []
+        if "Edgar Centre" in text:
+            owned_context = dud_between(text, "We own 85 sports facilities,", ["Information from this survey"])
+            description = f"DCC says it owns 85 sports facilities, {owned_context}" if owned_context else None
+            facilities.append(
+                {
+                    "name": "Edgar Centre",
+                    "id": "edgar-centre",
+                    "type": "leisure-centre",
+                    "facility_type": "indoor-sports-venue",
+                    "council": "dud",
+                    "council_name": "Dunedin",
+                    "source": "dunedin-city-council",
+                    "source_url": final_url,
+                    "listing_source_url": final_url,
+                    "description": dud_clean_text(description, 400)
+                    or "Dunedin City Council lists Edgar Centre as a DCC-owned indoor sports venue.",
+                    "address": None,
+                    "phone": "+64 3 477 4000",
+                    "email": "dcc@dcc.govt.nz",
+                    "hours": None,
+                    "hours_summary": None,
+                    "hours_note": "The DCC source lists ownership but does not publish venue hours on this page.",
+                    "pool_details": [],
+                }
+            )
+        return facilities, final_url
+
+    return [], DUD_BASE
+
+
 def fetch_whg_facilities(kind: str) -> tuple[list[dict[str, Any]], str, str | None]:
     if kind == "library":
         return [], WHG_WDC_BASE, "Libraries are outside this skill's recreation-focused v1 data source."
@@ -3414,6 +3805,7 @@ def find_facility(cards: list[dict[str, Any]], query: str) -> dict[str, Any] | N
     def keys(card: dict[str, Any]) -> list[str]:
         values = [card.get("id"), card.get("name")]
         values.extend(card.get("aliases") or [])
+        values.extend([card.get("former_name")])
         return [slug_text(str(v)) for v in values if v]
 
     exact = [c for c in cards if needle in keys(c)]
@@ -3534,6 +3926,15 @@ def pool_detail_for_council(council: str, name: str) -> tuple[dict[str, Any] | N
             "facility": card,
             "lane_availability_today": None,
         }, listing_url, []
+    if council == "dud":
+        cards, listing_url = fetch_dud_facilities("pool")
+        card = find_facility(cards, name)
+        if not card:
+            return None, listing_url, [c["name"] for c in cards[:10]]
+        return {
+            "facility": card,
+            "lane_availability_today": None,
+        }, listing_url, []
     if council in REGIONAL_POOL_CATALOG:
         cards, listing_url, _ = regional_pool_cards(council)
         card = find_facility(cards, name)
@@ -3599,6 +4000,11 @@ def cmd_pools(args: argparse.Namespace) -> None:
         pools, source_url = fetch_ham_facilities("pool")
         note = "Hamilton Pools currently lists Waterworld, Gallagher Aquatic Centre, and seasonal partner pools; Founders Memorial Theatre Pool is not listed as an active pool."
         pools = pools[: args.limit]
+    elif args.council == "dud":
+        if args.region:
+            die("--region is only supported for Auckland pools")
+        pools, source_url = fetch_dud_facilities("pool")
+        pools = pools[: args.limit]
     elif args.council in REGIONAL_POOL_CATALOG:
         if args.region:
             die("--region is only supported for Auckland pools")
@@ -3642,7 +4048,7 @@ def cmd_pools(args: argparse.Namespace) -> None:
 
 def cmd_pool(args: argparse.Namespace) -> None:
     started = time.perf_counter()
-    councils = [args.council] if args.council else ["qldc", "whg", "npr", "has", "npl", "rot", "akl", "tga", "wlg", "ham", "hutt", "porirua", "uhutt", "kapiti", "chc", "pmn"]
+    councils = [args.council] if args.council else ["dud", "qldc", "whg", "npr", "has", "npl", "rot", "akl", "tga", "wlg", "ham", "hutt", "porirua", "uhutt", "kapiti", "chc", "pmn"]
     suggestions_by_council: list[str] = []
     for council in councils:
         detail, listing_url, suggestions = pool_detail_for_council(council, args.name)
@@ -3741,6 +4147,22 @@ def cmd_facilities(args: argparse.Namespace) -> None:
         else:
             facilities, source_url = [], HAM_POOLS_BASE
             note = "Libraries are outside this skill's recreation-focused data source."
+        facilities = facilities[: args.limit]
+    elif args.council == "dud":
+        if args.region:
+            die("--region is only supported for Auckland facilities")
+        if args.type == "pool":
+            facilities, source_url = fetch_dud_facilities("pool")
+            note = None
+        elif args.type == "leisure-centre":
+            facilities, source_url = fetch_dud_facilities("leisure-centre")
+            note = None
+        elif args.type == "gym":
+            facilities, source_url = [], DUD_BASE
+            note = "Dunedin gym listings are not wired in v1; Moana Pool includes a gym on its pool detail."
+        else:
+            facilities, source_url = [], DUD_BASE
+            note = "Libraries are outside this skill's recreation-focused v1 data source."
         facilities = facilities[: args.limit]
     elif args.council in REGIONAL_POOL_CATALOG:
         if args.region:
