@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Bunnings lightweight public read-only CLI.
 
-Self-contained stdlib wrapper around public Bunnings NZ/AU page data.
+Self-contained stdlib wrapper around Bunnings NZ/AU read-only JSON APIs.
 No login, cart mutation, browser automation, or third-party dependencies.
 """
 from __future__ import annotations
 
 import argparse
+import http.cookiejar
 import html
 import json
 import os
@@ -16,20 +17,41 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import uuid
 from typing import Any
 
 COUNTRIES = {
     "nz": {
         "label": "Bunnings NZ",
         "base": "https://www.bunnings.co.nz",
+        "auth_base": "https://authorisation.api.bunnings.co.nz",
+        "guest_client_id": "budp_guest_user_nz",
+        "country_code": "NZ",
+        "country_name": "New Zealand",
+        "locale": "en_NZ",
         "currency": "NZD",
+        "default_store": "9489",
+        "default_region": "NI_Zone_9",
     },
     "au": {
         "label": "Bunnings AU",
         "base": "https://www.bunnings.com.au",
+        "auth_base": "https://authorisation.api.bunnings.com.au",
+        "guest_client_id": "budp_guest_user_au",
+        "country_code": "AU",
+        "country_name": "Australia",
+        "locale": "en_AU",
         "currency": "AUD",
+        "default_store": "6400",
+        "default_region": "VICMetro",
     },
 }
+
+APIGEE_CLIENT_ID = "mHPVWnzuBkrW7rmt56XGwKkb5Gp9BJMk"
+GUEST_SCOPE = "chk:exec cm:access ecom:access chk:pub vch:public bsk:pub"
+TOKEN_CACHE_SECONDS = int(os.environ.get("BUNNINGS_GUEST_TOKEN_CACHE_SECONDS", "3600"))
+TOKEN_REFRESH_SKEW = 300
+TOKEN_CACHE: dict[str, dict[str, Any]] = {}
 
 UA = os.environ.get(
     "BUNNINGS_USER_AGENT",
@@ -73,6 +95,200 @@ def request_text(cfg: dict[str, str], path_or_url: str, timeout: int = 30) -> st
         die(f"network error calling {url}: {e.reason}")
 
 
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req: urllib.request.Request, fp: Any, code: int, msg: str, headers: Any, newurl: str) -> None:
+        return None
+
+
+def token_cache_path(cfg: dict[str, str]) -> str:
+    cache_home = os.environ.get("XDG_CACHE_HOME") or os.path.join(os.path.expanduser("~"), ".cache")
+    return os.path.join(cache_home, "bunnings-skill", f"guest-token-{cfg['country_code'].lower()}.json")
+
+
+def read_cached_token(cfg: dict[str, str]) -> str | None:
+    key = cfg["country_code"].lower()
+    cached = TOKEN_CACHE.get(key)
+    now = time.time()
+    if cached and float(cached.get("cache_expires_at") or 0) > now + TOKEN_REFRESH_SKEW:
+        return str(cached.get("token") or "")
+    path = token_cache_path(cfg)
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            cached = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return None
+    if float(cached.get("cache_expires_at") or 0) <= now + TOKEN_REFRESH_SKEW:
+        return None
+    TOKEN_CACHE[key] = cached
+    return str(cached.get("token") or "") or None
+
+
+def write_cached_token(cfg: dict[str, str], token: str, expires_in: int) -> None:
+    now = time.time()
+    real_expires_at = now + max(0, expires_in)
+    cache_expires_at = min(real_expires_at - TOKEN_REFRESH_SKEW, now + max(60, TOKEN_CACHE_SECONDS))
+    cached = {
+        "token": token,
+        "real_expires_at": real_expires_at,
+        "cache_expires_at": cache_expires_at,
+        "country": cfg["country_code"],
+    }
+    TOKEN_CACHE[cfg["country_code"].lower()] = cached
+    path = token_cache_path(cfg)
+    try:
+        os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(cached, f)
+    except OSError:
+        pass
+
+
+def clear_cached_token(cfg: dict[str, str]) -> None:
+    TOKEN_CACHE.pop(cfg["country_code"].lower(), None)
+    try:
+        os.unlink(token_cache_path(cfg))
+    except OSError:
+        pass
+
+
+def open_no_redirect(opener: urllib.request.OpenerDirector, url: str, headers: dict[str, str], timeout: int) -> Any:
+    req = urllib.request.Request(url, headers=headers, method="GET")
+    try:
+        return opener.open(req, timeout=timeout)
+    except urllib.error.HTTPError as e:
+        if e.code in (301, 302, 303, 307, 308):
+            return e
+        raise
+
+
+def mint_guest_token(cfg: dict[str, str], timeout: int = 30) -> tuple[str, int]:
+    jar = http.cookiejar.CookieJar()
+    opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar), NoRedirect)
+    params = {
+        "response_type": "token",
+        "scope": GUEST_SCOPE,
+        "client_id": cfg["guest_client_id"],
+        "redirect_uri": cfg["base"] + "/static/guest.html",
+        "nonce": uuid.uuid4().hex[:18],
+        "acr_values": "adtid:" + str(uuid.uuid1()),
+    }
+    current = cfg["auth_base"] + "/connect/authorize?" + urllib.parse.urlencode(params)
+    headers = {
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-NZ,en-AU;q=0.9,en;q=0.8",
+        "Referer": cfg["base"] + "/",
+        "User-Agent": UA,
+    }
+    last_body = ""
+    location = ""
+    try:
+        for _ in range(12):
+            resp = open_no_redirect(opener, current, headers, timeout)
+            location = resp.headers.get("Location", "")
+            if not location:
+                last_body = resp.read().decode("utf-8", "replace")[:300]
+                break
+            current = urllib.parse.urljoin(current, location)
+            if urllib.parse.urlparse(current).fragment:
+                location = current
+                break
+    except urllib.error.HTTPError as e:
+        detail = e.read().decode("utf-8", "replace")[:300]
+        die(f"guest token bootstrap failed with HTTP {e.code}: {detail}")
+    except urllib.error.URLError as e:
+        die(f"guest token bootstrap network error: {e.reason}")
+    fragment = urllib.parse.parse_qs(urllib.parse.urlparse(location).fragment)
+    token = (fragment.get("access_token") or fragment.get("id_token") or [""])[0]
+    expires_in = int((fragment.get("expires_in") or ["0"])[0] or 0)
+    if not token:
+        detail = re.sub(r"\s+", " ", last_body).strip()
+        die(f"guest token bootstrap did not return a token{': ' + detail if detail else ''}")
+    return token, expires_in
+
+
+def guest_token(cfg: dict[str, str]) -> str:
+    cached = read_cached_token(cfg)
+    if cached:
+        return cached
+    token, expires_in = mint_guest_token(cfg)
+    write_cached_token(cfg, token, expires_in)
+    return token
+
+
+def api_headers(cfg: dict[str, str], referer_path: str = "/", token: str | None = None, json_body: bool = False) -> dict[str, str]:
+    token = token or guest_token(cfg)
+    headers = {
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "en-NZ,en-AU;q=0.9,en;q=0.8",
+        "Authorization": "Bearer " + token,
+        "Cookie": "GuestAuthentication=" + token,
+        "Referer": build_url(cfg, referer_path),
+        "User-Agent": UA,
+        "clientId": APIGEE_CLIENT_ID,
+        "correlationid": str(uuid.uuid1()),
+        "country": cfg["country_code"],
+        "currency": cfg["currency"],
+        "locale": cfg["locale"],
+        "locationCode": cfg["default_store"],
+        "sessionid": str(uuid.uuid1()),
+        "stream": "RETAIL",
+        "userId": "anonymous",
+        "X-region": cfg["default_region"],
+    }
+    if json_body:
+        headers["Content-Type"] = "application/json"
+    return headers
+
+
+def api_json(
+    cfg: dict[str, str],
+    path: str,
+    method: str = "GET",
+    body: dict[str, Any] | None = None,
+    referer_path: str = "/",
+    retry_auth: bool = True,
+) -> Any:
+    url = build_url(cfg, path)
+    token = guest_token(cfg)
+    data = json.dumps(body, separators=(",", ":")).encode("utf-8") if body is not None else None
+    req = urllib.request.Request(url, data=data, headers=api_headers(cfg, referer_path, token, body is not None), method=method)
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            raw = resp.read().decode("utf-8", "replace")
+    except urllib.error.HTTPError as e:
+        raw = e.read().decode("utf-8", "replace")
+        if e.code in (401, 403) and retry_auth:
+            clear_cached_token(cfg)
+            return api_json(cfg, path, method, body, referer_path, retry_auth=False)
+        detail = api_error_detail(raw) or re.sub(r"\s+", " ", raw[:300]).strip()
+        die(f"HTTP {e.code} from {url}: {detail}")
+    except urllib.error.URLError as e:
+        die(f"network error calling {url}: {e.reason}")
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError as e:
+        die(f"invalid JSON from {url}: {e}")
+    status = payload.get("statusDetails") if isinstance(payload, dict) else None
+    if isinstance(status, dict) and status.get("state") == "FAILURE":
+        die(f"{status.get('errorCode') or 'API'} from {url}: {status.get('description') or 'request failed'}")
+    if isinstance(payload, dict) and "data" in payload and isinstance(status, dict):
+        return payload["data"]
+    return payload
+
+
+def api_error_detail(raw: str) -> str:
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError:
+        return ""
+    if not isinstance(payload, dict):
+        return ""
+    status = payload.get("statusDetails")
+    if isinstance(status, dict):
+        return str(status.get("description") or status.get("errorCode") or "")
+    return str(payload.get("message") or payload.get("detail") or payload.get("title") or "")
+
+
 def next_data_from_text(text: str, url: str) -> dict[str, Any]:
     stripped = text.lstrip()
     if stripped.startswith("{"):
@@ -97,7 +313,7 @@ def fetch_next_data(cfg: dict[str, str], path_or_url: str) -> dict[str, Any]:
 
 
 def page_props(data: dict[str, Any]) -> dict[str, Any]:
-    return ((data.get("props") or {}).get("pageProps") or {})
+    return ((data.get("props") or {}).get("pageProps") or data.get("pageProps") or {})
 
 
 def query_states(data: dict[str, Any]) -> list[dict[str, Any]]:
@@ -165,7 +381,19 @@ def category_label(raw: dict[str, Any]) -> str:
 def parse_raw_product(raw: dict[str, Any], cfg: dict[str, str]) -> dict[str, Any]:
     route = raw.get("productroutingurl") or raw.get("productRoutingUrl")
     offers = raw.get("productoffers")
-    ranges = raw.get("productranges")
+    store = cfg["default_store"]
+    region = cfg["default_region"].lower()
+    ranges = (
+        raw.get("productranges")
+        or raw.get("productRanges")
+        or raw.get(f"productRanges_{store}")
+        or raw.get(f"productranges_{store}")
+        or raw.get(f"productRanges_{region}")
+        or raw.get(f"productranges_{region}")
+    )
+    price = raw.get("price")
+    if price is None:
+        price = raw.get(f"price_{store}")
     if isinstance(offers, str):
         offers = [offers]
     if isinstance(ranges, str):
@@ -174,7 +402,7 @@ def parse_raw_product(raw: dict[str, Any], cfg: dict[str, str]) -> dict[str, Any
         "sku": str(raw.get("code") or raw.get("itemnumber") or raw.get("itemNumber") or ""),
         "name": raw.get("name") or raw.get("title") or "",
         "brand": raw.get("brandname") or "",
-        "price": raw.get("price"),
+        "price": price,
         "currency": raw.get("currency") or cfg.get("currency"),
         "unit": raw.get("unitofprice"),
         "rating": raw.get("rating"),
@@ -199,11 +427,129 @@ def products_from_search_payload(payload: dict[str, Any], cfg: dict[str, str], l
     return products[: max(1, limit)]
 
 
+def search_fields(cfg: dict[str, str]) -> list[str]:
+    store = cfg["default_store"]
+    region = cfg["default_region"].lower()
+    return [
+        "source",
+        "thumbnailimageurl",
+        "supercategoriescode",
+        "supercategoriesurl",
+        "supercategories",
+        "ratingcount",
+        "brandiconurl",
+        "title",
+        "objecttype",
+        "currency",
+        "colorcount",
+        f"price_{store}",
+        "price",
+        "rating",
+        "stockstatus",
+        "forhire",
+        "orderingid",
+        "bestseller",
+        "productroutingurl",
+        "brandcode",
+        "categories",
+        "brandname",
+        "name",
+        "itemnumber",
+        "url",
+        "newarrival",
+        "imageurl",
+        "availability",
+        "code",
+        "basicbundle",
+        f"productRanges_{store}",
+        f"productRanges_{region}",
+        "productranges",
+        "stockindicator",
+        "familycolourname",
+        "unitofprice",
+        f"storeattributes_{store}",
+        "isactive",
+        "keysellingpoints",
+        "agerestricted",
+        "sellername",
+        f"cprice_{store}",
+        "comparisonunit",
+        "comparisonunitofmeasure",
+        "comparisonunitofmeasurecode",
+        "promotionalcampaign",
+        "promotionalcampaignstart",
+        "promotionalcampaignend",
+        "defaultofferid",
+        "productoffers",
+    ]
+
+
+def coveo_payload(cfg: dict[str, str], query: str, limit: int, category_code: str | None = None, category_path: str | None = None) -> dict[str, Any]:
+    store = cfg["default_store"]
+    region = cfg["default_region"].lower()
+    country = cfg["country_code"]
+    clauses = [
+        f"@availableinregions==({region})",
+        f"@price_{store} > 0",
+        "@isactive==true",
+        f"@batchcountry==({country})",
+        "@origin==(OPERATOR)",
+    ]
+    if category_code:
+        clauses.insert(0, f"@supercategoriescode==({category_code})")
+    visitor = str(uuid.uuid4())
+    body: dict[str, Any] = {
+        "debug": False,
+        "enableDidYouMean": True,
+        "enableDuplicateFiltering": False,
+        "enableQuerySyntax": False,
+        "facetOptions": {"freezeFacetOrder": True},
+        "filterField": "@baseid",
+        "filterFieldRange": 10,
+        "lowerCaseOperators": True,
+        "partialMatch": True,
+        "partialMatchKeywords": 2,
+        "partialMatchThreshold": "30%",
+        "questionMark": True,
+        "enableWordCompletion": True,
+        "firstResult": 0,
+        "isGuestUser": True,
+        "numberOfResults": min(max(limit, 1), 36),
+        "sortCriteria": "relevancy",
+        "q": query,
+        "aq": " AND ".join(clauses),
+        "cq": f"@source==(PRODUCT_STREAM_{country})",
+        "searchHub": "PRODUCT_LISTING" if category_code else "PRODUCT_SEARCH",
+        "visitorId": visitor,
+        "context": {
+            "store": store,
+            "country": cfg["country_name"],
+            "platform": "Web",
+            "role": "retail",
+            "website": country,
+        },
+        "context_website": country,
+        "cu": cfg["currency"],
+        "de": "UTF-8",
+        "analytics": {
+            "clientId": visitor,
+            "trackingId": country,
+            "actionCause": "interfaceLoad" if category_code else "searchboxSubmit",
+            "capture": True,
+        },
+        "extendedSearchOptions": {"includes": ["Banner", "SponsoredProducts", "Facets"]},
+        "pipeline": "Variant_Product",
+        "fieldsToInclude": search_fields(cfg),
+    }
+    if category_path:
+        body["tab"] = category_path.strip("/")
+    return body
+
+
 def search_products(cfg: dict[str, str], query: str, limit: int = 10) -> dict[str, Any]:
     started = time.perf_counter()
-    path = "/search/products?" + urllib.parse.urlencode({"q": query})
-    data = fetch_next_data(cfg, path)
-    payload = search_payload(data)
+    referer = "/search/products?" + urllib.parse.urlencode({"q": query})
+    payload = api_json(cfg, "/_apis/v1/coveo/search", method="POST", body=coveo_payload(cfg, query, limit), referer_path=referer)
     products = products_from_search_payload(payload, cfg, min(max(limit, 1), 36))
     return {
         "country": cfg["label"],
@@ -344,11 +690,103 @@ def parse_product_detail(data: dict[str, Any], cfg: dict[str, str], sku: str, pa
     }
 
 
+def product_route_from_api(product: dict[str, Any], sku: str) -> str | None:
+    route = product.get("url") or product.get("productUrl") or product.get("productRoutingUrl")
+    if isinstance(route, str) and route and "BaseSite/products" not in route:
+        return normalize_product_path(route)
+    slug = product.get("slug")
+    if isinstance(slug, str) and slug:
+        return normalize_product_path(slug)
+    name = product.get("name")
+    if isinstance(name, str) and name:
+        return f"/{slugify_path(name)}_p{sku}"
+    return None
+
+
+def parse_api_product_detail(
+    product: dict[str, Any],
+    price: dict[str, Any],
+    fulfilment: dict[str, Any],
+    aisle_data: Any,
+    cfg: dict[str, str],
+    sku: str,
+) -> dict[str, Any]:
+    if not isinstance(product, dict) or not product.get("code"):
+        die(f"could not find product detail data for {sku}")
+    brand = product.get("brand") or {}
+    feature = product.get("feature") or {}
+    in_store = fulfilment.get("inStorePickUpData") if isinstance(fulfilment, dict) else {}
+    click_collect = fulfilment.get("clickNCollectData") if isinstance(fulfilment, dict) else {}
+    delivery = fulfilment.get("deliveryData") if isinstance(fulfilment, dict) else {}
+    aisle_locations = []
+    if isinstance(aisle_data, list):
+        for group in aisle_data:
+            if not isinstance(group, dict):
+                continue
+            for loc in group.get("inStoreLocations") or []:
+                if isinstance(loc, dict):
+                    aisle_locations.append(
+                        {
+                            "aisle": loc.get("aisle"),
+                            "bay": loc.get("bay"),
+                            "sequence": loc.get("sequence"),
+                        }
+                    )
+    route = product_route_from_api(product, str(product.get("code") or sku))
+    return {
+        "sku": str(product.get("code") or sku),
+        "item_number": product.get("itemNumber"),
+        "name": product.get("name"),
+        "brand": brand.get("name") if isinstance(brand, dict) else product.get("brandName"),
+        "price": price.get("value") if isinstance(price, dict) else None,
+        "price_display": price.get("formattedValue") if isinstance(price, dict) else None,
+        "currency": price.get("currencyIso") if isinstance(price, dict) else cfg.get("currency"),
+        "rating": product.get("averageRating"),
+        "rating_count": product.get("numberOfReviews"),
+        "category": category_from_detail(product),
+        "key_selling_points": feature.get("pointers") if isinstance(feature, dict) else [],
+        "description": feature.get("description") if isinstance(feature, dict) else None,
+        "features": feature_values(product),
+        "product_ranges": [
+            "Click & Collect" if click_collect and click_collect.get("isClicknCollectAvailable") else None,
+            "In-Store" if in_store and in_store.get("inStorePickUpAvailable") else None,
+            "Delivery" if delivery and delivery.get("isDeliveryAvailable") else None,
+        ],
+        "stock": {
+            "store": in_store.get("storeName") if isinstance(in_store, dict) else None,
+            "in_store_text": in_store.get("inStoreStockTxt") if isinstance(in_store, dict) else None,
+            "in_store_stock": in_store.get("stock") if isinstance(in_store, dict) else None,
+            "click_collect_text": click_collect.get("clickNCollectStockTxt") if isinstance(click_collect, dict) else None,
+            "click_collect_stock": click_collect.get("stock") if isinstance(click_collect, dict) else None,
+        },
+        "aisle_locations": aisle_locations,
+        "image": primary_image(product),
+        "source_url": build_url(cfg, route) if route else None,
+    }
+
+
 def product_detail(cfg: dict[str, str], sku_or_route: str) -> dict[str, Any]:
     started = time.perf_counter()
-    sku, path = find_product_route(cfg, sku_or_route)
-    data = fetch_next_data(cfg, path)
-    product = parse_product_detail(data, cfg, sku, path)
+    sku = sku_from_value(sku_or_route)
+    if not sku:
+        die(f"invalid product SKU or product URL: {sku_or_route}")
+    referer = "/search/products?" + urllib.parse.urlencode({"q": sku})
+    product_data = api_json(cfg, f"/_apis/v1/products/{urllib.parse.quote(sku)}?fields=FULL", referer_path=referer)
+    price = api_json(cfg, f"/_apis/v2/products/{urllib.parse.quote(sku)}/priceInfo", referer_path=referer)
+    fulfilment = api_json(
+        cfg,
+        f"/_apis/v2/products/{urllib.parse.quote(sku)}/fulfillment",
+        method="POST",
+        body={"includeVariantStock": False, "locationCode": cfg["default_store"], "storeRadius": "200000"},
+        referer_path=referer,
+    )
+    aisle = api_json(
+        cfg,
+        "/_apis/v1/item-api/locations?"
+        + urllib.parse.urlencode({"locationCode": cfg["default_store"], "productCode": sku}),
+        referer_path=referer,
+    )
+    product = parse_api_product_detail(product_data, price, fulfilment, aisle, cfg, sku)
     return {
         "country": cfg["label"],
         "elapsed_ms": round((time.perf_counter() - started) * 1000),
@@ -361,21 +799,15 @@ def browse_category(cfg: dict[str, str], category: str, limit: int = 10) -> dict
     path = normalize_product_path(category)
     if not path.startswith("/products/"):
         path = "/products/" + path.lstrip("/")
-    data = fetch_next_data(cfg, path)
-    payload = search_payload(data)
-    category_data = query_data(data, "retail-category") or {}
+    category_code = path.rstrip("/").split("/")[-1]
+    payload = api_json(
+        cfg,
+        "/_apis/v1/coveo/search",
+        method="POST",
+        body=coveo_payload(cfg, "", limit, category_code=category_code, category_path=path.replace("/products/", "", 1)),
+        referer_path=path,
+    )
     children = []
-    if isinstance(category_data, dict):
-        for child in category_data.get("levels") or []:
-            if isinstance(child, dict):
-                children.append(
-                    {
-                        "code": child.get("code"),
-                        "name": child.get("displayName"),
-                        "path": child.get("internalPath"),
-                        "level": child.get("level"),
-                    }
-                )
     products = products_from_search_payload(payload, cfg, min(max(limit, 1), 36))
     return {
         "country": cfg["label"],
@@ -454,6 +886,45 @@ def parse_store_detail(data: dict[str, Any], cfg: dict[str, str], path: str) -> 
     }
 
 
+def slugify_path(value: str) -> str:
+    value = value.lower()
+    value = re.sub(r"[^a-z0-9]+", "-", value)
+    return value.strip("-")
+
+
+def parse_store_api(store: dict[str, Any], cfg: dict[str, str]) -> dict[str, Any] | None:
+    if not isinstance(store, dict) or not store.get("name"):
+        return None
+    address = store.get("address") or {}
+    geo = store.get("geoPoint") or {}
+    region = store.get("urlRegion") or ""
+    store_slug = slugify_path(str(store.get("displayName") or store.get("description") or store.get("name") or ""))
+    path = f"/stores/{region}/{store_slug}" if region and store_slug else "/stores"
+    return {
+        "code": store.get("name"),
+        "name": store.get("displayName") or store.get("description"),
+        "region": region,
+        "store_region": store.get("storeRegion"),
+        "pricing_region": store.get("pricingRegion"),
+        "address": address.get("formattedAddress"),
+        "line1": address.get("line1"),
+        "suburb": address.get("line2") or address.get("suburb"),
+        "town": address.get("town"),
+        "state": address.get("state"),
+        "postal_code": address.get("postalCode"),
+        "phone": address.get("phone"),
+        "email": address.get("email"),
+        "latitude": geo.get("latitude"),
+        "longitude": geo.get("longitude"),
+        "has_click_and_collect": bool(store.get("hasClickAndCollect")),
+        "has_delivery": bool(store.get("hasDelivery")),
+        "services": store.get("storeServices") or [],
+        "hours": parse_hours(store),
+        "map_url": store.get("mapUrl") or ((store.get("mapIcon") or {}).get("url") if isinstance(store.get("mapIcon"), dict) else None),
+        "source_url": build_url(cfg, path),
+    }
+
+
 def store_matches(store: dict[str, Any], region: str | None) -> bool:
     if not region:
         return True
@@ -464,25 +935,20 @@ def store_matches(store: dict[str, Any], region: str | None) -> bool:
 
 def stores(cfg: dict[str, str], region: str | None = None, limit: int = 20) -> dict[str, Any]:
     started = time.perf_counter()
-    links = store_links(cfg)
-    path_needle = (region or "").lower().replace(" ", "").replace("-", "")
-    if path_needle:
-        path_matches = [p for p in links if path_needle in p.lower().replace("-", "")]
-        if path_matches:
-            links = path_matches
+    payload = api_json(cfg, f"/_apis/v1/stores/country/{cfg['country_code']}?fields=FULL", referer_path="/stores")
+    all_stores = payload.get("pointOfServices") if isinstance(payload, dict) else []
     rows = []
-    for path in links:
+    for raw in all_stores or []:
         if len(rows) >= max(1, limit):
             break
-        data = fetch_next_data(cfg, path)
-        store = parse_store_detail(data, cfg, path)
+        store = parse_store_api(raw, cfg)
         if store and store_matches(store, region):
             rows.append(store)
     return {
         "country": cfg["label"],
         "region": region,
         "count": len(rows),
-        "available_store_links": len(links),
+        "available_store_links": len(all_stores or []),
         "elapsed_ms": round((time.perf_counter() - started) * 1000),
         "stores": rows,
     }
