@@ -18,6 +18,7 @@ import json
 import os
 import re
 import socket
+import struct
 import sys
 import time
 import urllib.error
@@ -55,6 +56,12 @@ CHC_REC_BASE = "https://recandsport.ccc.govt.nz"
 CHC_FILTER_ENDPOINT = CHC_REC_BASE + "/api/FilterCardData/getCentres"
 CHC_HE_PUNA_BASE = "https://www.hepunataimoana.co.nz"
 CHC_WHARENUI_BASE = "https://www.wharenuisportscentre.co.nz"
+TGA_BASE = "https://www.tauranga.govt.nz"
+TGA_POOLS_BASE = "https://www.taurangapools.co.nz"
+MOUNT_HOT_POOLS_BASE = "https://www.mounthotpools.co.nz"
+TGA_RECREATION_POOLS_URL = TGA_BASE + "/parks-and-recreation/swimming-pools-and-aquatic-centres"
+TGA_POOL_LOCATIONS_URL = TGA_POOLS_BASE + "/about-us/locations"
+TGA_CDP_ENDPOINT = CDP_HTTP_BASE
 
 UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146 Safari/537.36"
 
@@ -69,6 +76,7 @@ COUNCIL_LOCATIONS = {
     "ham": "hamilton",
     "whg": "whangarei",
     "pmn": "palmerston-north",
+    "tga": "tauranga",
 }
 
 COUNCIL_NAMES = {
@@ -86,9 +94,10 @@ COUNCIL_NAMES = {
     "kapiti": "Kāpiti Coast",
     "whg": "Whangarei",
     "pmn": "Palmerston North",
+    "tga": "Tauranga",
 }
 
-RECREATION_COUNCILS = ("akl", "wlg", "chc", "rot", "npl", "npr", "has", "ham", "hutt", "porirua", "uhutt", "kapiti", "whg", "pmn")
+RECREATION_COUNCILS = ("akl", "wlg", "chc", "rot", "npl", "npr", "has", "ham", "hutt", "porirua", "uhutt", "kapiti", "whg", "pmn", "tga")
 
 AKL_AREA_IDS = {
     "central": "1134",
@@ -600,6 +609,27 @@ CHC_REC_PHONE = "03 941 8999"
 CHC_LANE_PHONE = "03 941 6446"
 CHC_LANE_EMAIL = "rsebookings@ccc.govt.nz"
 
+TGA_POOL_DETAIL_URLS = {
+    "baywave-tect-aquatic": TGA_POOLS_BASE + "/public-pools/baywave",
+    "greerton-aquatic-leisure-centre": TGA_POOLS_BASE + "/public-pools/greerton",
+    "mount-hot-pools": MOUNT_HOT_POOLS_BASE + "/",
+    "memorial-pool": TGA_POOLS_BASE + "/public-pools/memorial-pool",
+    "otumoetai-pool": TGA_POOLS_BASE + "/public-pools/otumoetai-pool",
+}
+
+TGA_POOL_INFO_URLS = {
+    "mount-hot-pools": MOUNT_HOT_POOLS_BASE + "/facilities/our-pools",
+    "memorial-pool": TGA_POOLS_BASE + "/public-pools/memorial-pool/memorial-pool-information",
+}
+
+TGA_KIND_HINTS = {
+    "baywave-tect-aquatic": {"pool", "leisure-centre", "gym"},
+    "greerton-aquatic-leisure-centre": {"pool", "leisure-centre", "gym"},
+    "mount-hot-pools": {"pool"},
+    "memorial-pool": {"pool"},
+    "otumoetai-pool": {"pool"},
+}
+
 EVENT_TYPES = {
     "Event",
     "BusinessEvent",
@@ -905,6 +935,7 @@ def fetch_text_result(
     base: str = "",
     headers: dict[str, str] | None = None,
     timeout: int = 30,
+    allow_http_error: bool = False,
 ) -> tuple[str | None, str, int | None, str | None]:
     url = resolve_url(url_or_path, base)
 
@@ -921,6 +952,8 @@ def fetch_text_result(
             return body, resp.geturl(), resp.status, None
     except urllib.error.HTTPError as e:
         raw = e.read().decode("utf-8", "replace")
+        if allow_http_error:
+            return raw, e.geturl() or url, e.code, None
         message = strip_tags(raw)[:240] or e.reason
         return raw, url, e.code, f"HTTP {e.code} from {url}: {message}"
     except urllib.error.URLError as e:
@@ -956,6 +989,194 @@ def fetch_json_post(url: str, payload: dict[str, Any], headers: dict[str, str] |
         die(f"HTTP {e.code} from {url}: {message}")
     except urllib.error.URLError as e:
         die(f"network error calling {url}: {e.reason}")
+
+
+def looks_bot_walled(page_html: str) -> bool:
+    text = (strip_tags(page_html) + " " + page_html).lower()
+    markers = (
+        "incapsula",
+        "imperva",
+        "cloudflare",
+        "checking your browser",
+        "enable javascript and cookies",
+        "access denied",
+        "bot detection",
+        "captcha",
+    )
+    return any(marker in text for marker in markers)
+
+
+def read_http_response(sock: socket.socket, marker: bytes = b"\r\n\r\n") -> bytes:
+    chunks: list[bytes] = []
+    data = b""
+    while marker not in data:
+        chunk = sock.recv(4096)
+        if not chunk:
+            break
+        chunks.append(chunk)
+        data = b"".join(chunks)
+    return data
+
+
+class WebSocket:
+    def __init__(self, ws_url: str, timeout: int = 20):
+        parsed = urllib.parse.urlparse(ws_url)
+        if parsed.scheme != "ws":
+            raise RuntimeError(f"unsupported CDP websocket scheme: {parsed.scheme}")
+        host = parsed.hostname or "127.0.0.1"
+        port = parsed.port or 80
+        path = parsed.path or "/"
+        if parsed.query:
+            path += "?" + parsed.query
+        self.sock = socket.create_connection((host, port), timeout=timeout)
+        self.sock.settimeout(timeout)
+        key = base64.b64encode(os.urandom(16)).decode("ascii")
+        req = (
+            f"GET {path} HTTP/1.1\r\n"
+            f"Host: {host}:{port}\r\n"
+            "Upgrade: websocket\r\n"
+            "Connection: Upgrade\r\n"
+            f"Sec-WebSocket-Key: {key}\r\n"
+            "Sec-WebSocket-Version: 13\r\n\r\n"
+        )
+        self.sock.sendall(req.encode("ascii"))
+        response = read_http_response(self.sock)
+        if b" 101 " not in response.split(b"\r\n", 1)[0]:
+            raise RuntimeError("CDP websocket handshake failed")
+
+    def close(self) -> None:
+        try:
+            self.sock.close()
+        except OSError:
+            pass
+
+    def send_json(self, payload: dict[str, Any]) -> None:
+        raw = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+        header = bytearray([0x81])
+        if len(raw) < 126:
+            header.append(0x80 | len(raw))
+        elif len(raw) < 65536:
+            header.append(0x80 | 126)
+            header.extend(struct.pack("!H", len(raw)))
+        else:
+            header.append(0x80 | 127)
+            header.extend(struct.pack("!Q", len(raw)))
+        mask = os.urandom(4)
+        header.extend(mask)
+        header.extend(b ^ mask[i % 4] for i, b in enumerate(raw))
+        self.sock.sendall(header)
+
+    def recv_json(self) -> dict[str, Any]:
+        while True:
+            first = self._recv_exact(2)
+            opcode = first[0] & 0x0F
+            masked = bool(first[1] & 0x80)
+            length = first[1] & 0x7F
+            if length == 126:
+                length = struct.unpack("!H", self._recv_exact(2))[0]
+            elif length == 127:
+                length = struct.unpack("!Q", self._recv_exact(8))[0]
+            mask = self._recv_exact(4) if masked else b""
+            payload = bytearray(self._recv_exact(length))
+            if masked:
+                for i in range(len(payload)):
+                    payload[i] ^= mask[i % 4]
+            if opcode == 8:
+                raise RuntimeError("CDP websocket closed")
+            if opcode in (1, 2):
+                return json.loads(payload.decode("utf-8", "replace"))
+
+    def _recv_exact(self, size: int) -> bytes:
+        chunks: list[bytes] = []
+        remaining = size
+        while remaining:
+            chunk = self.sock.recv(remaining)
+            if not chunk:
+                raise RuntimeError("CDP websocket closed")
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        return b"".join(chunks)
+
+
+def cdp_call(ws: WebSocket, message_id: int, method: str, params: dict[str, Any] | None = None, timeout: int = 20) -> dict[str, Any]:
+    payload: dict[str, Any] = {"id": message_id, "method": method}
+    if params is not None:
+        payload["params"] = params
+    ws.send_json(payload)
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        msg = ws.recv_json()
+        if msg.get("id") != message_id:
+            continue
+        if msg.get("error"):
+            raise RuntimeError(f"CDP {method} failed: {msg['error']}")
+        return msg.get("result") or {}
+    raise RuntimeError(f"timed out waiting for CDP {method}")
+
+
+def fetch_text_cdp(url: str, endpoint: str = TGA_CDP_ENDPOINT, timeout: int = 25) -> str:
+    endpoint = endpoint.rstrip("/")
+    new_url = endpoint + "/json/new?" + urllib.parse.quote(url, safe=":/?&=%")
+    req = urllib.request.Request(new_url, method="PUT", headers={"User-Agent": UA})
+    with urllib.request.urlopen(req, timeout=5) as resp:
+        target = json.loads(resp.read().decode("utf-8", "replace"))
+    ws_url = target.get("webSocketDebuggerUrl")
+    if not ws_url:
+        raise RuntimeError("CDP target did not expose a websocket URL")
+    ws = WebSocket(ws_url, timeout=timeout)
+    try:
+        message_id = 1
+        for method in ("Page.enable", "Runtime.enable"):
+            cdp_call(ws, message_id, method)
+            message_id += 1
+        cdp_call(ws, message_id, "Page.navigate", {"url": url})
+        message_id += 1
+        for _ in range(20):
+            time.sleep(0.5)
+            result = cdp_call(
+                ws,
+                message_id,
+                "Runtime.evaluate",
+                {"expression": "document.readyState", "returnByValue": True},
+            )
+            message_id += 1
+            value = ((result.get("result") or {}).get("value") or "").lower()
+            if value == "complete":
+                break
+        result = cdp_call(
+            ws,
+            message_id,
+            "Runtime.evaluate",
+            {"expression": "document.documentElement.outerHTML", "returnByValue": True},
+        )
+        value = (result.get("result") or {}).get("value")
+        if not isinstance(value, str) or not value:
+            raise RuntimeError("CDP returned empty page HTML")
+        return value
+    finally:
+        ws.close()
+        target_id = target.get("id")
+        if target_id:
+            close_url = endpoint + "/json/close/" + urllib.parse.quote(str(target_id))
+            try:
+                urllib.request.urlopen(urllib.request.Request(close_url, headers={"User-Agent": UA}), timeout=3).read()
+            except Exception:
+                pass
+
+
+def fetch_text_with_cdp(url_or_path: str, base: str = "", headers: dict[str, str] | None = None, timeout: int = 30) -> tuple[str, str, int]:
+    body, final_url, status, error = fetch_text_result(url_or_path, base, headers=headers, timeout=timeout, allow_http_error=True)
+    body = body or ""
+    status = status or 0
+    if status >= 400 and not looks_bot_walled(body):
+        message = strip_tags(body)[:240] or "HTTP error"
+        die(f"HTTP {status} from {final_url}: {message}")
+    if error or status >= 400 or looks_bot_walled(body):
+        try:
+            body = fetch_text_cdp(final_url)
+        except Exception as exc:
+            die(f"direct fetch looked bot-walled and CDP fallback at {TGA_CDP_ENDPOINT} failed: {exc}")
+    return body, final_url, status
 
 
 def strip_tags(value: str, br: str = " ") -> str:
@@ -2060,6 +2281,277 @@ def enrich_chc_details(cards: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [x for x in out if x is not None]
 
 
+def unique_texts(values: list[str]) -> list[str]:
+    out: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        cleaned = re.sub(r"\s+", " ", value).strip(" ;,\t\r\n")
+        if not cleaned:
+            continue
+        key = cleaned.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(cleaned)
+    return out
+
+
+def clean_tga_pool_detail_text(value: str) -> str | None:
+    value = re.sub(r"\s+", " ", value).strip(" ;,\t\r\n")
+    if not value:
+        return None
+    value = re.sub(r"\s*Click here for [^.]*?accessibility info\.?", "", value, flags=re.I).strip(" ;,")
+    target_starts = (
+        "Mount Hot Pools features three outdoor pools",
+        "Memorial Pool was built",
+        "The new Memorial Park Aquatic Centre",
+        "Even if a new facility",
+        "The existing pool would always have needed to close",
+    )
+    for phrase in target_starts:
+        pos = value.find(phrase)
+        if pos >= 0:
+            value = value[pos:]
+            break
+    return value.strip(" ;,\t\r\n") or None
+
+
+def parse_meta_description(page_html: str) -> str | None:
+    meta_m = re.search(r'<meta\s+name=["\']description["\']\s+content=["\']([^"\']*)', page_html, flags=re.I)
+    return html.unescape(meta_m.group(1)).strip() if meta_m else None
+
+
+def clean_tga_hours_text(value: str) -> str | None:
+    value = re.sub(r"\s+", " ", value).strip(" ;")
+    if not value:
+        return None
+    stale_markers = (
+        "Reduced hours from 15 July - 24 July",
+        "Weekdays (15-22 July)",
+        "Saturday & Sunday (16, 17 & 23 July)",
+        "Sunday 24 July",
+        "Thursday 23 June until Monday 4 July",
+    )
+    if any(marker in value for marker in stale_markers):
+        if value.startswith("Clubfit Gym"):
+            value = re.sub(r";?\s*Sunday 24 July:\s*CLOSED", "", value, flags=re.I)
+        else:
+            return None
+    return value.strip(" ;") or None
+
+
+def tga_hours_item(value: str) -> dict[str, str] | None:
+    cleaned = clean_tga_hours_text(value)
+    if not cleaned:
+        return None
+    label = "Opening hours"
+    text = cleaned
+    for prefix in ("Aquatic Centre", "Clubfit Gym", "Normal Hours"):
+        if cleaned.lower().startswith(prefix.lower()):
+            label = "Aquatic Centre" if prefix == "Normal Hours" else prefix
+            text = cleaned[len(prefix) :].strip(" ;")
+            break
+    if not re.search(r"\d", text):
+        return None
+    return {"label": label, "text": text}
+
+
+def tga_status_from_text(text: str) -> str | None:
+    lowered = text.lower()
+    if "permanently closed" in lowered:
+        return "Permanently closed"
+    if "closed until further notice" in lowered:
+        return "Closed until further notice"
+    if "currently closed" in lowered:
+        return "Currently closed"
+    return None
+
+
+def parse_tga_location_cards(page_html: str, source_url: str, council_url: str) -> list[dict[str, Any]]:
+    cards: list[dict[str, Any]] = []
+    for m in re.finditer(r'<section\b([^>]*)class="[^"]*cLocationWithText[^"]*"[^>]*>(.*?)</section>', page_html, flags=re.I | re.S):
+        block = m.group(2)
+        title_m = re.search(r"<h1[^>]*>(.*?)</h1>", block, flags=re.I | re.S)
+        if not title_m:
+            continue
+        name = strip_tags(title_m.group(1))
+        if not name:
+            continue
+        facility_id = slug_text(name)
+        if facility_id not in TGA_KIND_HINTS:
+            continue
+        after_title = block[title_m.end() :]
+        contact_html = after_title.split("<h2", 1)[0]
+        contact_p = re.search(r"<p[^>]*>(.*?)</p>", contact_html, flags=re.I | re.S)
+        contact_text = strip_tags(contact_p.group(1), br=", ") if contact_p else ""
+        phone_m = re.search(r'href=["\']tel:([^"\']+)', contact_html, flags=re.I)
+        phone = None
+        if phone_m:
+            digits = re.sub(r"\D+", "", html.unescape(phone_m.group(1)))
+            if digits:
+                phone = " ".join([digits[:2], digits[2:5], digits[5:]]) if digits.startswith("07") and len(digits) == 9 else digits
+        address = contact_text
+        if phone:
+            address = re.sub(re.escape(phone), "", address)
+            address = re.sub(r"\b0\d(?:[\s-]?\d){6,}\b", "", address)
+        address = re.sub(r"\s*,\s*,+", ",", address).strip(" ,") or None
+
+        hours: list[dict[str, str]] = []
+        hours_m = re.search(r"<h2[^>]*>\s*Opening Hours\s*</h2>(.*?)(?:</div>\s*<p|</div>\s*</div>)", after_title, flags=re.I | re.S)
+        if hours_m:
+            for p in re.findall(r"<p[^>]*>(.*?)</p>", hours_m.group(1), flags=re.I | re.S):
+                item = tga_hours_item(strip_tags(p, br="; "))
+                if item:
+                    hours.append(item)
+
+        detail_url = TGA_POOL_DETAIL_URLS.get(facility_id)
+        if not detail_url:
+            link_m = re.search(r'<a\s+[^>]*href=["\']([^"\']+)["\']', block, flags=re.I)
+            detail_url = absolutize(link_m.group(1), TGA_POOLS_BASE) if link_m else source_url
+
+        cards.append(
+            {
+                "name": name,
+                "id": facility_id,
+                "type": "pool",
+                "types": sorted(TGA_KIND_HINTS.get(facility_id, {"pool"})),
+                "council": "tga",
+                "council_name": "Tauranga",
+                "source": "tauranga-pools-bayvenues",
+                "source_url": detail_url,
+                "listing_source_url": source_url,
+                "council_source_url": council_url,
+                "address": address,
+                "operator": "Bay Venues",
+                "phone": phone,
+                "hours": hours,
+                "hours_summary": hours[0]["text"] if hours else None,
+            }
+        )
+    return cards
+
+
+def extract_tga_pool_details(page_html: str) -> list[str]:
+    facilities = text_between(
+        page_html,
+        r"<h3[^>]*>\s*(?:<strong>)?\s*Pool Facilities",
+        [
+            r"<h3[^>]*>\s*Regular Activities",
+            r"<section\b[^>]*class=[\"'][^\"']*cTaurangaPoolTemp",
+            r"<section\b[^>]*class=[\"'][^\"']*IconimagebuttonText",
+            r"<section\b[^>]*class=[\"'][^\"']*cFullWithCta",
+        ],
+    )
+    details: list[str] = []
+    for item in re.findall(r"<li[^>]*>(.*?)</li>", facilities, flags=re.I | re.S):
+        text = clean_tga_pool_detail_text(strip_tags(item, br="; "))
+        if text:
+            details.append(text)
+    if details:
+        return unique_texts(details)[:20]
+
+    targeted_paragraphs = [
+        strip_tags(paragraph, br="; ")
+        for paragraph in re.findall(r"<p[^>]*>(.*?)</p>", page_html, flags=re.I | re.S)
+    ]
+    target_phrases = (
+        "Mount Hot Pools features three outdoor pools",
+        "three outdoor pools",
+        "pools ranging from",
+        "natural ocean water",
+        "Memorial Pool was built",
+        "new Memorial Park Aquatic Centre",
+        "existing pool would always have needed to close",
+    )
+    for text in targeted_paragraphs:
+        if any(phrase in text for phrase in target_phrases):
+            cleaned = clean_tga_pool_detail_text(text)
+            if cleaned:
+                details.append(cleaned)
+    return unique_texts(details)[:20]
+
+
+def extract_tga_pool_temperatures(page_html: str) -> list[dict[str, str]]:
+    temps: list[dict[str, str]] = []
+    temp_section = text_between(page_html, r"<h2[^>]*>\s*Pool Temps", [r"</section>"])
+    if not temp_section:
+        temp_section = text_between(page_html, r"<h2[^>]*>\s*Pool Temperatures", [r"</section>"])
+    for row in re.findall(r"<tr[^>]*>(.*?)</tr>", temp_section, flags=re.I | re.S):
+        cells = [strip_tags(cell) for cell in re.findall(r"<t[dh][^>]*>(.*?)</t[dh]>", row, flags=re.I | re.S)]
+        if len(cells) >= 2 and cells[0] and cells[1]:
+            temps.append({"pool": cells[0], "temperature": cells[1]})
+    return temps
+
+
+def extract_tga_status(page_html: str) -> tuple[str | None, str | None]:
+    text = strip_tags(page_html, br="; ")
+    status = tga_status_from_text(text)
+    status_note = None
+    if status:
+        if "mauao landslides" in text.lower():
+            status_note = "Mount Hot Pools is currently closed due to 2026 Mauao landslides."
+        elif "Permanently closed" in text:
+            status_note = "Permanently closed."
+    return status, status_note
+
+
+def parse_tga_detail(page_html: str, final_url: str, card: dict[str, Any]) -> dict[str, Any]:
+    title_m = re.search(r"<h1[^>]*>(.*?)</h1>", page_html, flags=re.I | re.S)
+    name = strip_tags(title_m.group(1)) if title_m else card.get("name")
+    if name and ("currently closed" in name.lower() or "closed until" in name.lower()):
+        name = card.get("name")
+    description = parse_meta_description(page_html)
+    status, status_note = extract_tga_status(page_html)
+    pool_details = extract_tga_pool_details(page_html)
+    pool_temperatures = extract_tga_pool_temperatures(page_html)
+    detail = dict(card)
+    detail.update(
+        {
+            "name": name or card.get("name"),
+            "id": card.get("id") or slug_text(name or ""),
+            "source_url": final_url,
+            "description": description,
+            "status": status,
+            "status_note": status_note,
+            "pool_details": pool_details,
+            "features": pool_details,
+            "pool_temperatures": pool_temperatures,
+        }
+    )
+    if status:
+        detail["hours_summary"] = status
+    return detail
+
+
+def enrich_tga_facilities(cards: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def one(card: dict[str, Any]) -> dict[str, Any]:
+        try:
+            body, final_url, _ = fetch_text_with_cdp(card["source_url"], timeout=30)
+            detail = parse_tga_detail(body, final_url, card)
+            info_url = TGA_POOL_INFO_URLS.get(detail.get("id", ""))
+            if info_url:
+                try:
+                    info_body, info_final_url, _ = fetch_text_with_cdp(info_url, timeout=30)
+                    extra_details = extract_tga_pool_details(info_body)
+                    if extra_details:
+                        detail["pool_details"] = unique_texts((detail.get("pool_details") or []) + extra_details)[:20]
+                        detail["features"] = detail["pool_details"]
+                    detail["pool_info_url"] = info_final_url
+                except SystemExit:
+                    pass
+        except SystemExit as exc:
+            detail = dict(card)
+            detail["detail_error"] = str(exc)
+        return detail
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as pool:
+        futures = {pool.submit(one, dict(card)): idx for idx, card in enumerate(cards)}
+        out: list[dict[str, Any] | None] = [None] * len(cards)
+        for future in concurrent.futures.as_completed(futures):
+            out[futures[future]] = future.result()
+    return [x for x in out if x is not None]
+
+
 def fetch_chc_facilities(kind: str) -> tuple[list[dict[str, Any]], str]:
     if kind == "library":
         return [], CHC_REC_BASE
@@ -2318,6 +2810,26 @@ def fetch_pmn_facilities(kind: str) -> tuple[list[dict[str, Any]], str]:
     body, final_url, _ = fetch_pmn_text(PNCC_SWIMMING_PATH, PNCC_BASE)
     facilities = parse_pmn_pool_listing(body, final_url)
     return [enrich_pmn_facility(card) for card in facilities], final_url
+
+
+def fetch_tga_facilities(kind: str) -> tuple[list[dict[str, Any]], str]:
+    if kind == "library":
+        return [], TGA_RECREATION_POOLS_URL
+    _, council_url, _ = fetch_text_with_cdp(TGA_RECREATION_POOLS_URL, timeout=30)
+    body, final_url, _ = fetch_text_with_cdp(TGA_POOL_LOCATIONS_URL, timeout=30)
+    cards = parse_tga_location_cards(body, final_url, council_url)
+    cards = enrich_tga_facilities(cards)
+    if kind == "pool":
+        facilities = cards
+    elif kind == "gym":
+        facilities = [c for c in cards if "gym" in (c.get("types") or [])]
+    elif kind == "leisure-centre":
+        facilities = [c for c in cards if "leisure-centre" in (c.get("types") or [])]
+    else:
+        facilities = []
+    for facility in facilities:
+        facility["facility_type"] = kind
+    return facilities, final_url
 
 
 def parse_time_label(value: str) -> dt.datetime | None:
@@ -2752,6 +3264,15 @@ def pool_detail_for_council(council: str, name: str) -> tuple[dict[str, Any] | N
             "facility": card,
             "lane_availability_today": None,
         }, listing_url, []
+    if council == "tga":
+        cards, listing_url = fetch_tga_facilities("pool")
+        card = find_facility(cards, name)
+        if not card:
+            return None, listing_url, [c["name"] for c in cards[:10]]
+        return {
+            "facility": card,
+            "lane_availability_today": None,
+        }, listing_url, []
     if council in {"npr", "has"}:
         cards, listing_url = static_recreation_facilities(council, "pool")
         card = find_facility(cards, name)
@@ -2849,6 +3370,11 @@ def cmd_pools(args: argparse.Namespace) -> None:
         if args.region:
             die("--region is only supported for Auckland pools")
         pools = pools[: args.limit]
+    elif args.council == "tga":
+        if args.region:
+            die("--region is only supported for Auckland pools")
+        pools, source_url = fetch_tga_facilities("pool")
+        pools = pools[: args.limit]
     else:
         if args.region:
             die("--region is only supported for Auckland pools")
@@ -2868,7 +3394,7 @@ def cmd_pools(args: argparse.Namespace) -> None:
 
 def cmd_pool(args: argparse.Namespace) -> None:
     started = time.perf_counter()
-    councils = [args.council] if args.council else ["whg", "npr", "has", "npl", "rot", "akl", "wlg", "ham", "hutt", "porirua", "uhutt", "kapiti", "chc", "pmn"]
+    councils = [args.council] if args.council else ["whg", "npr", "has", "npl", "rot", "akl", "tga", "wlg", "ham", "hutt", "porirua", "uhutt", "kapiti", "chc", "pmn"]
     suggestions_by_council: list[str] = []
     for council in councils:
         detail, listing_url, suggestions = pool_detail_for_council(council, args.name)
@@ -2992,6 +3518,16 @@ def cmd_facilities(args: argparse.Namespace) -> None:
         else:
             facilities, source_url = [], urllib.parse.urljoin(PNCC_BASE, PNCC_SWIMMING_PATH)
             note = "Palmerston North recreation is wired for council-listed swimming facilities only."
+        facilities = facilities[: args.limit]
+    elif args.council == "tga":
+        if args.region:
+            die("--region is only supported for Auckland facilities")
+        if args.type == "library":
+            facilities, source_url = [], TGA_RECREATION_POOLS_URL
+            note = "Libraries are outside this skill's recreation-focused Tauranga pool source."
+        else:
+            facilities, source_url = fetch_tga_facilities(args.type)
+            note = None
         facilities = facilities[: args.limit]
     else:
         if args.region:
