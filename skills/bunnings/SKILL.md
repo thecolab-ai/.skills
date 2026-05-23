@@ -1,0 +1,75 @@
+---
+name: bunnings
+description: Query Bunnings NZ public product search, pricing, product detail, category browse, store locator, and redemption/specials pages through a lightweight no-login CLI, with optional Bunnings AU support via --country au. Use when the task involves Bunnings New Zealand product lookup, live prices, SKUs, store details, category browsing, promotional/redemption offers, or machine-readable Bunnings product data. Read-only; no cart, checkout, account, or login actions.
+---
+
+# Bunnings
+
+## Goal
+
+Query live Bunnings NZ product, pricing, store, category, and promotion data through a small deterministic CLI with human-readable and JSON output, without browser automation or account login.
+
+## Use this when
+
+- A user asks for Bunnings NZ product prices, product details, or SKUs
+- A user wants to search Bunnings products by keyword
+- A user wants Bunnings store details, phone numbers, opening hours, or map links
+- A user wants current Bunnings redemption/promotional offer products
+- A workflow needs lightweight machine-readable Bunnings product or store data
+- Bunnings AU is acceptable and the user explicitly asks for Australian results
+
+## Do not use this for
+
+- Cart, checkout, project list, account, login, delivery-slot, payment, order, or trade account actions
+- Authenticated/private Bunnings data
+- High-volume scraping or dataset redistribution
+- Historical price tracking or price-change claims unless another dataset provides history
+- Guaranteed local stock claims beyond the live default-store snapshot returned by the site
+
+## Preferred workflow
+
+1. Run `scripts/cli.py` with the narrowest subcommand that answers the task
+2. Use `search` for keyword price/product lookup and `product` when an exact SKU is known
+3. Use `browse` when a product category path is known
+4. Use `stores --region` for location-scoped store lookup
+5. Use `specials` for redemption/promotion products, optionally filtered by query
+6. Use `--json` for agent chaining, comparisons, or structured reports
+7. Mention that prices, stock, and promotions are live Bunnings snapshots from unofficial public page data
+
+## CLI
+
+Run with:
+
+```bash
+python3 skills/bunnings/scripts/cli.py <command> [flags]
+```
+
+Set `--country au` before the subcommand for Bunnings Australia. The default is `nz`.
+
+### Commands
+
+- `search <query> [--limit N] [--json]` - product search with prices
+- `product <sku-or-product-url> [--json]` - fetch product detail, price, default-store stock, and aisle data when present
+- `browse <category-path> [--limit N] [--json]` - browse a known category path such as `tools/power-tools/drills`
+- `stores [--region text] [--limit N] [--json]` - list store details, optionally filtered by region/path/name text
+- `specials [query] [--limit N] [--json]` - list redemption/promotion products
+
+Examples:
+
+```bash
+python3 skills/bunnings/scripts/cli.py search drill --limit 5
+python3 skills/bunnings/scripts/cli.py product 0715241 --json
+python3 skills/bunnings/scripts/cli.py browse tools/power-tools/drills --limit 5
+python3 skills/bunnings/scripts/cli.py stores --region uppernorthisland --limit 5 --json
+python3 skills/bunnings/scripts/cli.py specials dewalt --limit 5
+python3 skills/bunnings/scripts/cli.py --country au search drill --limit 5
+```
+
+## Notes
+
+- No API key, username, password, account cookie, or browser automation is required for the implemented read-only commands
+- The CLI uses public Bunnings page state rather than auth-walled cart/account APIs
+- Product prices and stock are live snapshots and may vary by store, fulfilment method, country, and time
+- Promotion data is based on the public redemption-offers page; Bunnings may not expose a conventional specials feed
+- Endpoint shapes can change without notice because this is not an official public API
+- Keep usage narrow and respectful
