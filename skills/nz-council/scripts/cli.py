@@ -24,6 +24,8 @@ EVENTFINDA_BASE = "https://www.eventfinda.co.nz"
 AKL_LEISURE_BASE = "https://www.aucklandleisure.co.nz"
 AKL_LOCATION_ENDPOINT = AKL_LEISURE_BASE + "/umbraco/surface/LocationListing/RenderLocationListing"
 WLG_BASE = "https://wellington.govt.nz"
+ROT_BASE = "https://www.rotorualakescouncil.nz"
+ROT_AQUATIC_BASE = "https://www.clmnz.co.nz/rotorua-aquatic-centre"
 
 UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146 Safari/537.36"
 
@@ -31,12 +33,14 @@ COUNCIL_LOCATIONS = {
     "akl": "auckland",
     "wlg": "wellington",
     "chc": "christchurch",
+    "rot": "rotorua",
 }
 
 COUNCIL_NAMES = {
     "akl": "Auckland",
     "wlg": "Wellington",
     "chc": "Christchurch",
+    "rot": "Rotorua Lakes",
 }
 
 AKL_AREA_IDS = {
@@ -51,6 +55,102 @@ AKL_FACILITY_IDS = {
     "pool": "1126",
     "gym": "1119",
 }
+
+ROT_RECREATION_SOURCE_URL = ROT_BASE + "/parks-lakes-recreation"
+ROT_PARK_RESERVES_SOURCE_URL = ROT_BASE + "/parks-lakes-recreation/park-reserves"
+ROT_FACILITIES: list[dict[str, Any]] = [
+    {
+        "name": "Rotorua Aquatic Centre",
+        "id": "rotorua-aquatic-centre",
+        "type": "pool",
+        "facility_types": ["pool", "gym", "leisure-centre"],
+        "council": "rot",
+        "council_name": "Rotorua Lakes",
+        "source": "rotorua-lakes-council",
+        "source_url": ROT_BASE + "/parks-lakes-recreation/recreational-venues/aquatic-centre",
+        "operator_source_url": ROT_AQUATIC_BASE + "/",
+        "pools_source_url": ROT_AQUATIC_BASE + "/pools/",
+        "contact_source_url": ROT_AQUATIC_BASE + "/contact/",
+        "listing_source_url": ROT_RECREATION_SOURCE_URL,
+        "address": "Kuirau Park, 18 Tarewa Rd, Rotorua 3010",
+        "operator": "Community Leisure Management (CLM)",
+        "status": None,
+        "description": (
+            "Main Rotorua aquatic centre for aquatic sports, recreation, health, fitness, "
+            "leisure programmes, swimming lessons, and community use."
+        ),
+        "hours": [{"label": "Opening hours", "text": "Monday - Sunday: 6:00am - 9:00pm"}],
+        "hours_summary": "Monday - Sunday: 6:00am - 9:00pm",
+        "phone": "07 348 8833",
+        "email": "racr@clmnz.co.nz",
+        "features": [
+            "Outdoor 50m heated pool",
+            "Indoor 25m heated pool",
+            "Indoor learner pool",
+            "Gym",
+            "Fitness classes",
+            "Swim programmes",
+            "Birthday party spaces",
+        ],
+        "availability_urls": [
+            {
+                "label": "Outdoor Pool Availability",
+                "url": "https://clm.perfectgym.com.au/ClientPortal2/ClubZoneOccupancyCalendar/6935ad313",
+            },
+            {
+                "label": "Indoor Pool Availability",
+                "url": "https://clm.perfectgym.com.au/ClientPortal2/ClubZoneOccupancyCalendar/d905956020",
+            },
+        ],
+        "hours_note": "Use the linked operator pages for live lane availability and programme changes.",
+    },
+    {
+        "name": "Butcher's Pool",
+        "id": "butchers-pool",
+        "type": "pool",
+        "facility_types": ["pool"],
+        "council": "rot",
+        "council_name": "Rotorua Lakes",
+        "source": "rotorua-lakes-council",
+        "source_url": ROT_BASE + "/parks-lakes-recreation/park-reserves/butchers-pool",
+        "listing_source_url": ROT_PARK_RESERVES_SOURCE_URL,
+        "address": "Broadlands Road, 1.8km south of Reporoa Village",
+        "operator": "Rotorua Lakes Council",
+        "status": "Unsupervised",
+        "description": "Free hot mineral pool with mineral water piped from an adjacent spring.",
+        "hours": None,
+        "hours_summary": None,
+        "hours_note": "Free public hot mineral pool; no opening hours are published on the council page.",
+        "phone": None,
+        "email": None,
+        "features": ["Hot mineral pool", "Changing rooms", "Toilets"],
+        "safety_notes": [
+            "Keep your head above water to avoid amoebic meningitis risk.",
+            "Pool is unsupervised.",
+        ],
+    },
+    {
+        "name": "Kuirau Park foot pools and paddling pool",
+        "id": "kuirau-park-foot-pools-paddling-pool",
+        "type": "pool",
+        "facility_types": ["pool"],
+        "council": "rot",
+        "council_name": "Rotorua Lakes",
+        "source": "rotorua-lakes-council",
+        "source_url": ROT_BASE + "/parks-lakes-recreation/park-reserves/kuirau-park",
+        "listing_source_url": ROT_PARK_RESERVES_SOURCE_URL,
+        "address": "Corner of Ranolf Street and Lake Road, Rotorua",
+        "operator": "Rotorua Lakes Council",
+        "status": None,
+        "description": "Public park facilities include geothermal foot pools and a paddling pool.",
+        "hours": None,
+        "hours_summary": None,
+        "hours_note": "Park page lists facilities but not pool opening hours; stay on tracks around geothermal features.",
+        "phone": None,
+        "email": None,
+        "features": ["Foot pools", "Paddling pool", "BBQs", "Picnic tables", "Playground", "Public toilets"],
+    },
+]
 
 EVENT_TYPES = {
     "Event",
@@ -547,6 +647,15 @@ def fetch_wlg_facilities(kind: str) -> tuple[list[dict[str, Any]], str]:
     return facilities, final_url
 
 
+def fetch_rot_facilities(kind: str | None = "pool") -> tuple[list[dict[str, Any]], str]:
+    facilities: list[dict[str, Any]] = []
+    for facility in ROT_FACILITIES:
+        if kind and kind not in facility.get("facility_types", []):
+            continue
+        facilities.append(dict(facility))
+    return facilities, ROT_RECREATION_SOURCE_URL
+
+
 def parse_time_label(value: str) -> dt.datetime | None:
     for fmt in ("%I:%M %p", "%I %p"):
         try:
@@ -644,6 +753,11 @@ def cmd_pools(args: argparse.Namespace) -> None:
         if args.region:
             die("--region is only supported for Auckland pools")
         pools = pools[: args.limit]
+    elif args.council == "rot":
+        if args.region:
+            die("--region is only supported for Auckland pools")
+        pools, source_url = fetch_rot_facilities("pool")
+        pools = pools[: args.limit]
     else:
         die("Christchurch pools are not wired in v1 because the public council recreation source is JS/vendor-backed")
 
@@ -656,42 +770,71 @@ def cmd_pools(args: argparse.Namespace) -> None:
     emit_facility_list(data, "pools", args.json)
 
 
-def cmd_pool(args: argparse.Namespace) -> None:
-    started = time.perf_counter()
-    if args.council == "akl":
+def pool_detail_for_council(council: str, name: str, started: float) -> tuple[dict[str, Any] | None, str | None]:
+    if council == "akl":
         cards, listing_url = akl_location_listing("pool", None)
-        card = find_facility(cards, args.name)
+        card = find_facility(cards, name)
         if not card:
             suggestions = ", ".join(c["name"] for c in cards[:10])
-            die(f"no Auckland pool matched {args.name!r}. Try one of: {suggestions}")
+            return None, f"Auckland: {suggestions}"
         body, final_url, _ = fetch_text(card["source_url"], AKL_LEISURE_BASE)
         facility = parse_akl_detail(body, final_url, card)
         availability = None
         if facility.get("resource_availability_url"):
             availability = parse_akl_availability(facility["resource_availability_url"])
-        data = {
-            "query": {"council": args.council, "name": args.name},
+        return {
+            "query": {"council": council, "name": name},
             "listing_source_url": listing_url,
             "elapsed_ms": round((time.perf_counter() - started) * 1000),
             "facility": facility,
             "lane_availability_today": availability,
-        }
-    elif args.council == "wlg":
+        }, None
+    if council == "wlg":
         cards, listing_url = fetch_wlg_facilities("pool")
-        card = find_facility(cards, args.name)
+        card = find_facility(cards, name)
         if not card:
             suggestions = ", ".join(c["name"] for c in cards[:10])
-            die(f"no Wellington pool matched {args.name!r}. Try one of: {suggestions}")
-        data = {
-            "query": {"council": args.council, "name": args.name},
+            return None, f"Wellington: {suggestions}"
+        return {
+            "query": {"council": council, "name": name},
             "listing_source_url": listing_url,
             "elapsed_ms": round((time.perf_counter() - started) * 1000),
             "facility": card,
             "lane_availability_today": None,
-        }
-    else:
-        die("Christchurch pool detail is not wired in v1")
-    emit_pool_detail(data, args.json)
+        }, None
+    if council == "rot":
+        cards, listing_url = fetch_rot_facilities("pool")
+        card = find_facility(cards, name)
+        if not card:
+            suggestions = ", ".join(c["name"] for c in cards[:10])
+            return None, f"Rotorua Lakes: {suggestions}"
+        return {
+            "query": {"council": council, "name": name},
+            "listing_source_url": listing_url,
+            "elapsed_ms": round((time.perf_counter() - started) * 1000),
+            "facility": card,
+            "lane_availability_today": None,
+        }, None
+    die("Christchurch pool detail is not wired in v1")
+
+
+def cmd_pool(args: argparse.Namespace) -> None:
+    started = time.perf_counter()
+    councils = [args.council] if args.council else ["rot", "akl", "wlg"]
+    misses: list[str] = []
+    for council in councils:
+        data, miss = pool_detail_for_council(council, args.name, started)
+        if data:
+            emit_pool_detail(data, args.json)
+            return
+        if miss:
+            misses.append(miss)
+    if args.council:
+        council_name = COUNCIL_NAMES.get(args.council, args.council)
+        suggestion = misses[0] if misses else "no suggestions available"
+        die(f"no {council_name} pool matched {args.name!r}. Try one of: {suggestion}")
+    suggestion_text = " | ".join(misses) if misses else "use --council akl, wlg, or rot"
+    die(f"no pool matched {args.name!r}. Try one of: {suggestion_text}")
 
 
 def cmd_facilities(args: argparse.Namespace) -> None:
@@ -715,6 +858,18 @@ def cmd_facilities(args: argparse.Namespace) -> None:
         else:
             facilities, source_url = fetch_wlg_facilities(args.type)
             note = None
+        facilities = facilities[: args.limit]
+    elif args.council == "rot":
+        if args.region:
+            die("--region is only supported for Auckland facilities")
+        if args.type == "library":
+            facilities, source_url = [], ROT_RECREATION_SOURCE_URL
+            note = "Libraries are outside this skill's recreation-focused v1 data source."
+        else:
+            facilities, source_url = fetch_rot_facilities(args.type)
+            note = None
+            if args.type == "gym":
+                note = "Rotorua Aquatic Centre includes a gym; linked operator pages have current programme details."
         facilities = facilities[: args.limit]
     else:
         facilities, source_url = [], "https://recandsport.ccc.govt.nz/"
@@ -816,7 +971,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     events = sub.add_parser("events", help="list council-area public events")
-    events.add_argument("--council", choices=sorted(COUNCIL_LOCATIONS), help="council area: akl, wlg, or chc")
+    events.add_argument("--council", choices=sorted(COUNCIL_LOCATIONS), help="council area: akl, wlg, chc, or rot")
     events.add_argument("--from", dest="date_from", help="start date filter, ISO yyyy-mm-dd")
     events.add_argument("--to", dest="date_to", help="end date filter, ISO yyyy-mm-dd")
     events.add_argument("--category", help="Eventfinda category slug, e.g. concerts-gig-guide")
@@ -831,7 +986,7 @@ def build_parser() -> argparse.ArgumentParser:
     event.set_defaults(func=cmd_event)
 
     pools = sub.add_parser("pools", help="list public pools with available hours where supported")
-    pools.add_argument("--council", choices=["akl", "wlg", "chc"], default="akl", help="council recreation source")
+    pools.add_argument("--council", choices=["akl", "wlg", "chc", "rot"], default="akl", help="council recreation source")
     pools.add_argument("--region", choices=sorted(AKL_AREA_IDS), help="Auckland region filter")
     pools.add_argument("--limit", type=int, default=50, help="maximum pools to emit")
     pools.add_argument("--json", action="store_true", help="emit JSON")
@@ -839,12 +994,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     pool = sub.add_parser("pool", help="show one pool detail and lane availability where supported")
     pool.add_argument("name", help="pool name or slug, e.g. Tepid Baths")
-    pool.add_argument("--council", choices=["akl", "wlg", "chc"], default="akl", help="council recreation source")
+    pool.add_argument("--council", choices=["akl", "wlg", "chc", "rot"], help="council recreation source; default searches supported pool sources")
     pool.add_argument("--json", action="store_true", help="emit JSON")
     pool.set_defaults(func=cmd_pool)
 
     facilities = sub.add_parser("facilities", help="list recreation facilities")
-    facilities.add_argument("--council", choices=["akl", "wlg", "chc"], default="akl", help="council recreation source")
+    facilities.add_argument("--council", choices=["akl", "wlg", "chc", "rot"], default="akl", help="council recreation source")
     facilities.add_argument("--type", choices=["pool", "gym", "leisure-centre", "library"], default="pool", help="facility type")
     facilities.add_argument("--region", choices=sorted(AKL_AREA_IDS), help="Auckland region filter")
     facilities.add_argument("--limit", type=int, default=50, help="maximum facilities to emit")

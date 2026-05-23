@@ -171,6 +171,49 @@ Schema parsed:
 
 Freshness: live static listing page. Opening hours remain on linked detail pages in v1.
 
+### Rotorua Lakes pools and aquatic facilities
+
+Implemented as a static public facility source, based on Rotorua Lakes Council recreation and park pages plus the Rotorua Aquatic Centre operator site.
+
+- Rotorua Lakes recreation entry: `https://www.rotorualakescouncil.nz/parks-lakes-recreation`
+- Rotorua Aquatic Centre council page: `https://www.rotorualakescouncil.nz/parks-lakes-recreation/recreational-venues/aquatic-centre`
+- Rotorua Aquatic Centre operator pages:
+  - `https://www.clmnz.co.nz/rotorua-aquatic-centre/`
+  - `https://www.clmnz.co.nz/rotorua-aquatic-centre/pools/`
+  - `https://www.clmnz.co.nz/rotorua-aquatic-centre/contact/`
+- Direct checks of `rotoruaaquaticcentre.co.nz` and `www.rotoruaaquaticcentre.co.nz` did not resolve during discovery; the council page links to the CLM operator path above.
+- Butcher's Pool council page: `https://www.rotorualakescouncil.nz/parks-lakes-recreation/park-reserves/butchers-pool`
+- Kuirau Park council page: `https://www.rotorualakescouncil.nz/parks-lakes-recreation/park-reserves/kuirau-park`
+- Council OIA cross-check: `https://www.rotorualakescouncil.nz/our-council/officialinformation/official-information-requests?item=id%3A2qgeujsul17q9sfg7ls7`
+
+Observed facilities:
+
+- Rotorua Aquatic Centre
+- Butcher's Pool
+- Kuirau Park foot pools and paddling pool
+
+Rotorua Aquatic Centre fields are sourced from the council page and CLM operator pages:
+
+```json
+{
+  "name": "Rotorua Aquatic Centre",
+  "id": "rotorua-aquatic-centre",
+  "type": "pool",
+  "council": "rot",
+  "source": "rotorua-lakes-council",
+  "address": "Kuirau Park, 18 Tarewa Rd, Rotorua 3010",
+  "operator": "Community Leisure Management (CLM)",
+  "hours_summary": "Monday - Sunday: 6:00am - 9:00pm",
+  "features": ["Outdoor 50m heated pool", "Indoor 25m heated pool", "Indoor learner pool", "Gym"]
+}
+```
+
+Butcher's Pool is listed separately because the public park-reserve page describes it as a free hot mineral pool and says Rotorua Lakes Council manages the changing rooms and toilets. The CLI includes the linked safety notes that the pool is unsupervised and users should keep their head above water.
+
+Kuirau Park is included as a public council-managed park water facility because the council page lists foot pools and a paddling pool among park facilities. It is not treated as a lane-swimming pool.
+
+Freshness: static source records derived from public pages. Rotorua Aquatic Centre's CLM pages expose current lane availability links through Perfect Gym-backed pages; v1 links those pages but does not scrape the dynamic availability payload.
+
 ### Christchurch recreation and sport
 
 Discovered, documented, not wired in v1.
