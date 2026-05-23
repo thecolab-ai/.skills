@@ -6,6 +6,30 @@ from pathlib import Path
 
 SKILL_DIR = Path(__file__).parent.parent
 CLI = SKILL_DIR / "scripts" / "cli.py"
+SKILL_NAME = "auckland-bin-schedule"
+
+_ANTIBOT_SIGNALS = (
+    "just a moment",
+    "cloudflare",
+    "attention required",
+    "checking your browser",
+    "status 403",
+    "status 406",
+    "http 403",
+    "http 406",
+    "403 forbidden",
+)
+
+
+def _is_antibot(result: subprocess.CompletedProcess) -> bool:
+    combined = (result.stdout + result.stderr).lower()
+    return any(sig in combined for sig in _ANTIBOT_SIGNALS)
+
+
+def _skip_if_antibot(result: subprocess.CompletedProcess) -> None:
+    if _is_antibot(result):
+        print(f"[SKIP] {SKILL_NAME} — upstream anti-bot block")
+        sys.exit(0)
 
 
 def run(args: list) -> subprocess.CompletedProcess:
@@ -44,6 +68,7 @@ results.append(test("--help exits 0", test_help))
 def test_list():
     result = run(["--list", "12 Tawa Road Onehunga", "--limit", "3", "--json"])
     if result.returncode != 0:
+        _skip_if_antibot(result)
         print(f"  stderr: {result.stderr[:200]}")
         return False
     data = json.loads(result.stdout)
@@ -60,6 +85,7 @@ results.append(test("--list '12 Tawa Road Onehunga' returns matches[]", test_lis
 def test_schedule():
     result = run(["12 Tawa Road Onehunga", "--json"])
     if result.returncode != 0:
+        _skip_if_antibot(result)
         print(f"  stderr: {result.stderr[:200]}")
         return False
     schedule = json.loads(result.stdout)

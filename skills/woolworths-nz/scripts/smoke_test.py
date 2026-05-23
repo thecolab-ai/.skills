@@ -6,6 +6,30 @@ from pathlib import Path
 
 SKILL_DIR = Path(__file__).parent.parent
 CLI = SKILL_DIR / "scripts" / "cli.py"
+SKILL_NAME = "woolworths-nz"
+
+_ANTIBOT_SIGNALS = (
+    "just a moment",
+    "cloudflare",
+    "attention required",
+    "checking your browser",
+    "status 403",
+    "status 406",
+    "http 403",
+    "http 406",
+    "403 forbidden",
+)
+
+
+def _is_antibot(result: subprocess.CompletedProcess) -> bool:
+    combined = (result.stdout + result.stderr).lower()
+    return any(sig in combined for sig in _ANTIBOT_SIGNALS)
+
+
+def _skip_if_antibot(result: subprocess.CompletedProcess) -> None:
+    if _is_antibot(result):
+        print(f"[SKIP] {SKILL_NAME} — upstream anti-bot block")
+        sys.exit(0)
 
 
 def run(args: list) -> subprocess.CompletedProcess:
@@ -47,6 +71,7 @@ def test_search():
     global _search_sku
     result = run(["search", "milk", "--limit", "3", "--json"])
     if result.returncode != 0:
+        _skip_if_antibot(result)
         print(f"  stderr: {result.stderr[:200]}")
         return False
     search = json.loads(result.stdout)
@@ -66,6 +91,7 @@ results.append(test("search milk returns products[]", test_search))
 def test_product():
     result = run(["product", _search_sku, "--json"])
     if result.returncode != 0:
+        _skip_if_antibot(result)
         print(f"  stderr: {result.stderr[:200]}")
         return False
     product = json.loads(result.stdout)
@@ -85,6 +111,7 @@ results.append(test("product <sku> returns products[].sku", test_product))
 def test_specials():
     result = run(["specials", "cheese", "--limit", "3", "--json"])
     if result.returncode != 0:
+        _skip_if_antibot(result)
         print(f"  stderr: {result.stderr[:200]}")
         return False
     specials = json.loads(result.stdout)

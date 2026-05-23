@@ -6,6 +6,30 @@ from pathlib import Path
 
 SKILL_DIR = Path(__file__).parent.parent
 CLI = SKILL_DIR / "scripts" / "cli.py"
+SKILL_NAME = "eventfinda-nz"
+
+_ANTIBOT_SIGNALS = (
+    "just a moment",
+    "cloudflare",
+    "attention required",
+    "checking your browser",
+    "status 403",
+    "status 406",
+    "http 403",
+    "http 406",
+    "403 forbidden",
+)
+
+
+def _is_antibot(result: subprocess.CompletedProcess) -> bool:
+    combined = (result.stdout + result.stderr).lower()
+    return any(sig in combined for sig in _ANTIBOT_SIGNALS)
+
+
+def _skip_if_antibot(result: subprocess.CompletedProcess) -> None:
+    if _is_antibot(result):
+        print(f"[SKIP] {SKILL_NAME} — upstream anti-bot block")
+        sys.exit(0)
 
 
 def run(args: list) -> subprocess.CompletedProcess:
@@ -47,6 +71,7 @@ def test_upcoming():
     global _first_event_url
     result = run(["upcoming", "--location", "auckland", "--limit", "3", "--json"])
     if result.returncode != 0:
+        _skip_if_antibot(result)
         print(f"  stderr: {result.stderr[:200]}")
         return False
     upcoming = json.loads(result.stdout)
@@ -68,6 +93,7 @@ results.append(test("upcoming auckland returns events[] with title and url", tes
 def test_search():
     result = run(["search", "music", "--limit", "3", "--json"])
     if result.returncode != 0:
+        _skip_if_antibot(result)
         print(f"  stderr: {result.stderr[:200]}")
         return False
     search = json.loads(result.stdout)
@@ -87,6 +113,7 @@ def test_event_detail():
         return False
     result = run(["event", _first_event_url, "--json"])
     if result.returncode != 0:
+        _skip_if_antibot(result)
         print(f"  stderr: {result.stderr[:200]}")
         return False
     detail = json.loads(result.stdout)
