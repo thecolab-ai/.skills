@@ -36,8 +36,8 @@ It includes:
 - `skills/` for real contributed skills
 - `spec/` for the Agent Skills spec link plus our repo stance
 - `template/` for a basic manual starting point
-- `templates/` for richer TypeScript-powered scaffold variants
-- `scripts/` for repo tooling like generation and validation
+- `templates/` for richer scaffold variants (minimal, cli-workflow, tool-wrapper)
+- `scripts/` for repo tooling like generation and validation (Python stdlib, no install needed)
 
 We are borrowing the shape of the best public skills repos, but not copying their skill content.
 
@@ -106,10 +106,13 @@ Don’t freestyle the structure. Generate a scaffold, fill it in properly, then 
 
 ```bash
 git clone https://github.com/thecolab-ai/.skills
-cd .skills && npm install   # repo tooling only — not required for running skills
+cd .skills
 
-npm run new-skill -- my-nz-skill --variant minimal
-npm run validate-skill -- skills/my-nz-skill
+# No install step required — this repo has zero Node.js dependencies.
+# Everything is Python stdlib.
+
+python3 scripts/new_skill.py my-nz-skill --variant minimal
+python3 scripts/validate_skill.py skills/my-nz-skill
 
 # Run smoke tests (Python, no extra deps)
 python3 skills/paknsave-nz/scripts/smoke_test.py
