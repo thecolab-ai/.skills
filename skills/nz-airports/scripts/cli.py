@@ -28,8 +28,20 @@ UA = os.environ.get(
     "NZ_AIRPORTS_USER_AGENT",
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
 )
+ADSB_UA = "nz-airports-cli/1.0"
+ADSB_TIMEOUT_SECONDS = 6
+ADSB_MAX_AIRCRAFT = 250
 
 AIRPORTS: dict[str, dict[str, str]] = {
+    "AKL": {
+        "name": "Auckland Airport",
+        "city": "Auckland",
+        "iata": "AKL",
+        "icao": "NZAA",
+        "source": "adsb.lol",
+        "source_url": "https://api.adsb.lol/v2/lat/-37.008/lon/174.785/dist/30",
+        "source_kind": "live_adsb",
+    },
     "CHC": {
         "name": "Christchurch Airport",
         "city": "Christchurch",
@@ -37,6 +49,7 @@ AIRPORTS: dict[str, dict[str, str]] = {
         "icao": "NZCH",
         "source": "christchurchairport.nz",
         "source_url": "https://www.christchurchairport.nz/travellers/flights/arrivals-and-departures/",
+        "source_kind": "scheduled_fids",
     },
     "ZQN": {
         "name": "Queenstown Airport",
@@ -45,6 +58,7 @@ AIRPORTS: dict[str, dict[str, str]] = {
         "icao": "NZQN",
         "source": "queenstownairport.co.nz",
         "source_url": "https://www.queenstownairport.co.nz/",
+        "source_kind": "scheduled_fids",
     },
     "WLG": {
         "name": "Wellington Airport",
@@ -53,7 +67,12 @@ AIRPORTS: dict[str, dict[str, str]] = {
         "icao": "NZWN",
         "source": "wellingtonairport.co.nz",
         "source_url": "https://www.wellingtonairport.co.nz/flights/",
+        "source_kind": "scheduled_fids",
     },
+}
+
+ADSB_AIRPORTS: dict[str, dict[str, float]] = {
+    "AKL": {"lat": -37.008, "lon": 174.785, "radius_nm": 30},
 }
 
 CHC_API = "https://www.christchurchairport.nz/api/flights"
@@ -106,6 +125,35 @@ def request_json(url: str, timeout: int = 25) -> Any:
         die(f"invalid JSON from {url}: {e}")
 
 
+def request_adsb_aircraft(code: str) -> tuple[list[dict[str, Any]], str]:
+    url = adsb_url(code)
+    headers = {
+        "Accept": "application/json",
+        "User-Agent": ADSB_UA,
+    }
+    req = urllib.request.Request(url, headers=headers, method="GET")
+    try:
+        with urllib.request.urlopen(req, timeout=ADSB_TIMEOUT_SECONDS) as resp:
+            raw = resp.read().decode("utf-8", "replace")
+        payload = json.loads(raw) if raw else {}
+    except urllib.error.HTTPError as e:
+        return [], f"HTTP {e.code} from adsb.lol"
+    except urllib.error.URLError as e:
+        return [], f"network error calling adsb.lol: {e.reason}"
+    except json.JSONDecodeError as e:
+        return [], f"invalid JSON from adsb.lol: {e}"
+
+    if not isinstance(payload, dict):
+        return [], "unexpected adsb.lol payload shape"
+    aircraft = payload.get("ac")
+    if not isinstance(aircraft, list):
+        return [], clean(payload.get("msg"))
+    rows = [row for row in aircraft if isinstance(row, dict)]
+    if len(rows) > ADSB_MAX_AIRCRAFT:
+        return rows[:ADSB_MAX_AIRCRAFT], f"capped ADS-B aircraft at {ADSB_MAX_AIRCRAFT} of {len(rows)}"
+    return rows, ""
+
+
 def now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
@@ -120,6 +168,14 @@ def clean(value: Any) -> str:
     if value is None:
         return ""
     return " ".join(str(value).split())
+
+
+def numeric(value: Any) -> int | float | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return value
+    return None
 
 
 def airport_code(raw: str | None) -> str | None:
@@ -243,6 +299,63 @@ def normalize_wlg(row: dict[str, Any], direction: str, day: str) -> dict[str, An
     }
 
 
+def classify_adsb_aircraft(aircraft: dict[str, Any]) -> str:
+    if aircraft.get("alt_baro") == "ground":
+        return "ground"
+    alt = numeric(aircraft.get("alt_baro"))
+    rate = numeric(aircraft.get("baro_rate")) or 0
+    if alt is None:
+        return "overhead"
+    if alt < 6000:
+        if rate < -200:
+            return "arrival"
+        if rate > 200:
+            return "departure"
+        return "arrival"
+    return "overhead"
+
+
+def normalize_adsb(row: dict[str, Any], direction: str) -> dict[str, Any]:
+    hex_value = clean(row.get("hex")).upper()
+    callsign = clean(row.get("flight")).upper().replace(" ", "") or hex_value
+    alt_baro = row.get("alt_baro")
+    altitude_ft = 0 if alt_baro == "ground" else numeric(alt_baro)
+    classification = classify_adsb_aircraft(row)
+    return {
+        "airport": "AKL",
+        "airport_name": AIRPORTS["AKL"]["name"],
+        "direction": direction,
+        "data_type": "live_adsb",
+        "flight_numbers": [callsign] if callsign else [],
+        "primary_flight": callsign,
+        "callsign": callsign,
+        "hex": hex_value,
+        "registration": clean(row.get("r")),
+        "aircraft_type": clean(row.get("t")),
+        "classification": classification,
+        "altitude_ft": altitude_ft,
+        "altitude_baro": alt_baro,
+        "distance_nm": numeric(row.get("dst")),
+        "ground_speed_kt": numeric(row.get("gs")),
+        "vertical_rate_fpm": numeric(row.get("baro_rate")),
+        "lat": numeric(row.get("lat")),
+        "lon": numeric(row.get("lon")),
+        "airline_code": carrier_from_flight(callsign),
+        "airline_name": "",
+        "origin": "",
+        "destination": "",
+        "scheduled": "",
+        "estimated": "",
+        "gate": "",
+        "status": classification,
+        "terminal": "",
+        "is_domestic": None,
+        "source": AIRPORTS["AKL"]["source"],
+        "source_url": AIRPORTS["AKL"]["source_url"],
+        "raw_adsb": row,
+    }
+
+
 def fetch_chc(direction: str) -> dict[str, Any]:
     api_direction = "Arrive" if direction == "arrivals" else "Depart"
     flights: list[dict[str, Any]] = []
@@ -301,6 +414,41 @@ def fetch_wlg(direction: str) -> dict[str, Any]:
     return board_result("WLG", direction, flights, clean(payload.get("last_updated")))
 
 
+def adsb_url(code: str) -> str:
+    meta = ADSB_AIRPORTS[code]
+    return f"https://api.adsb.lol/v2/lat/{meta['lat']}/lon/{meta['lon']}/dist/{meta['radius_nm']}"
+
+
+def fetch_adsb_akl(direction: str) -> dict[str, Any]:
+    aircraft, source_note = request_adsb_aircraft("AKL")
+    counts = {"arrival": 0, "departure": 0, "ground": 0, "overhead": 0}
+    normalized: list[dict[str, Any]] = []
+    for row in aircraft:
+        classification = classify_adsb_aircraft(row)
+        counts[classification] += 1
+        if classification == direction.rstrip("s"):
+            normalized.append(normalize_adsb(row, direction))
+    normalized.sort(
+        key=lambda flight: (
+            flight.get("distance_nm") is None,
+            flight.get("distance_nm") if flight.get("distance_nm") is not None else 999,
+        )
+    )
+    result = board_result("AKL", direction, normalized, "")
+    result.update(
+        {
+            "data_type": "live_adsb",
+            "adsb_endpoint": adsb_url("AKL"),
+            "adsb_radius_nm": ADSB_AIRPORTS["AKL"]["radius_nm"],
+            "adsb_total_aircraft": len(aircraft),
+            "classification_counts": counts,
+        }
+    )
+    if source_note:
+        result["source_note"] = source_note
+    return result
+
+
 def board_result(airport: str, direction: str, flights: list[dict[str, Any]], source_last_updated: str) -> dict[str, Any]:
     meta = AIRPORTS[airport]
     return {
@@ -309,6 +457,7 @@ def board_result(airport: str, direction: str, flights: list[dict[str, Any]], so
         "direction": direction,
         "source": meta["source"],
         "source_url": meta["source_url"],
+        "data_type": meta["source_kind"],
         "source_last_updated": source_last_updated,
         "fetched_at": now_iso(),
         "total_flights": len(flights),
@@ -317,6 +466,7 @@ def board_result(airport: str, direction: str, flights: list[dict[str, Any]], so
 
 
 FETCHERS = {
+    "AKL": fetch_adsb_akl,
     "CHC": fetch_chc,
     "ZQN": fetch_zqn,
     "WLG": fetch_wlg,
@@ -392,16 +542,11 @@ def cmd_airports(args: argparse.Namespace) -> None:
                 "icao": meta["icao"],
                 "source": meta["source"],
                 "source_url": meta["source_url"],
+                "source_kind": meta["source_kind"],
             }
             for code, meta in AIRPORTS.items()
         ],
-        "not_wired": [
-            {
-                "code": "AKL",
-                "name": "Auckland Airport",
-                "reason": "public flight board blocked direct and CDP fetches with Cloudflare in this environment",
-            }
-        ],
+        "not_wired": [],
     }
     emit_airports(data, args.json)
 
@@ -421,6 +566,8 @@ def time_label(flight: dict[str, Any]) -> str:
 
 
 def flight_line(flight: dict[str, Any]) -> str:
+    if flight.get("data_type") == "live_adsb":
+        return adsb_flight_line(flight)
     nums = "/".join(flight.get("flight_numbers") or [flight.get("primary_flight") or "-"])
     airline = flight.get("airline_name") or flight.get("airline_code") or ""
     gate = f" gate {flight['gate']}" if flight.get("gate") else ""
@@ -429,11 +576,60 @@ def flight_line(flight: dict[str, Any]) -> str:
     return f"  {time_label(flight):<28} {nums:<18} {route_label(flight)}{gate}{terminal} {airline}{status}".rstrip()
 
 
+def adsb_altitude_label(flight: dict[str, Any]) -> str:
+    if flight.get("altitude_baro") == "ground":
+        return "ground"
+    altitude = numeric(flight.get("altitude_ft"))
+    return f"{altitude:.0f} ft" if altitude is not None else "-"
+
+
+def adsb_number_label(value: Any, suffix: str, decimals: int = 0) -> str:
+    number = numeric(value)
+    if number is None:
+        return "-"
+    return f"{number:.{decimals}f} {suffix}"
+
+
+def adsb_flight_line(flight: dict[str, Any]) -> str:
+    callsign = flight.get("callsign") or flight.get("hex") or "-"
+    aircraft = flight.get("aircraft_type") or "-"
+    registration = flight.get("registration") or "-"
+    altitude = adsb_altitude_label(flight)
+    distance = adsb_number_label(flight.get("distance_nm"), "nm", 1)
+    speed = adsb_number_label(flight.get("ground_speed_kt"), "kt")
+    vertical = adsb_number_label(flight.get("vertical_rate_fpm"), "fpm")
+    return (
+        f"  {callsign:<10} {aircraft:<8} {registration:<9} "
+        f"alt {altitude:<8} dist {distance:<8} gs {speed:<7} vr {vertical}"
+    ).rstrip()
+
+
 def print_board(result: dict[str, Any]) -> None:
+    if result.get("data_type") == "live_adsb":
+        print_adsb_board(result)
+        return
     updated = f", updated {result['source_last_updated']}" if result.get("source_last_updated") else ""
     print(f"{result['airport']} {result['direction']}: {result.get('returned', len(result['flights']))} of {result['total_flights']} flights ({result['source']}{updated})")
     if not result["flights"]:
         print("  No flights currently listed.")
+        return
+    for flight in result["flights"]:
+        print(flight_line(flight))
+
+
+def print_adsb_board(result: dict[str, Any]) -> None:
+    returned = result.get("returned", len(result["flights"]))
+    total = result["total_flights"]
+    nearby = result.get("adsb_total_aircraft", 0)
+    radius = result.get("adsb_radius_nm")
+    print(
+        f"{result['airport']} {result['direction']}: {returned} of {total} classified live aircraft "
+        f"({result['source']}, {nearby} nearby within {radius:g} nm)"
+    )
+    if result.get("source_note"):
+        print(f"  Source note: {result['source_note']}")
+    if not result["flights"]:
+        print(f"  No live ADS-B aircraft currently classified as {result['direction']} near this airport.")
         return
     for flight in result["flights"]:
         print(flight_line(flight))
@@ -474,11 +670,13 @@ def emit_airports(data: dict[str, Any], as_json: bool) -> None:
         return
     print(f"Supported airports: {data['count']}")
     for airport in data["airports"]:
-        print(f"  {airport['code']}  {airport['name']} ({airport['source']})")
-    print()
-    print("Not wired:")
-    for airport in data["not_wired"]:
-        print(f"  {airport['code']}  {airport['name']} - {airport['reason']}")
+        kind = "live ADS-B aircraft positions" if airport["source_kind"] == "live_adsb" else "scheduled FIDS board"
+        print(f"  {airport['code']}  {airport['name']} ({airport['source']}; {kind})")
+    if data["not_wired"]:
+        print()
+        print("Not wired:")
+        for airport in data["not_wired"]:
+            print(f"  {airport['code']}  {airport['name']} - {airport['reason']}")
 
 
 def positive_int(raw: str) -> int:
