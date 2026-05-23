@@ -7,6 +7,7 @@ No login, booking, PNR lookup, browser automation, or third-party dependencies.
 from __future__ import annotations
 
 import argparse
+import base64
 import html
 import json
 import os
@@ -38,9 +39,9 @@ AIRPORTS: dict[str, dict[str, str]] = {
         "city": "Auckland",
         "iata": "AKL",
         "icao": "NZAA",
-        "source": "adsb.lol",
-        "source_url": "https://api.adsb.lol/v2/lat/-37.008/lon/174.785/dist/30",
-        "source_kind": "live_adsb",
+        "source": "h2g.aucklandairport.co.nz",
+        "source_url": "https://h2g.aucklandairport.co.nz/api/",
+        "source_kind": "scheduled_fids",
     },
     "CHC": {
         "name": "Christchurch Airport",
@@ -78,6 +79,11 @@ ADSB_AIRPORTS: dict[str, dict[str, float]] = {
 CHC_API = "https://www.christchurchairport.nz/api/flights"
 ZQN_API = "https://www.queenstownairport.co.nz/api/flights"
 WLG_FLIGHTS = "https://www.wellingtonairport.co.nz/flights/"
+AKL_FIDS_API = "https://h2g.aucklandairport.co.nz/api"
+AKL_FIDS_USERNAME = os.environ.get("AKL_API_USERNAME", "app-v5")
+AKL_FIDS_PASSWORD = os.environ.get("AKL_API_PASSWORD", "AWLyxd6{zxGsVg?coY")
+AKL_FIDS_APP_VERSION = "android|8.2.2"
+AKL_ADSB_SOURCE = "adsb.lol"
 
 
 def die(message: str, code: int = 1) -> None:
@@ -118,6 +124,42 @@ def request_json(url: str, timeout: int = 25) -> Any:
     except urllib.error.HTTPError as e:
         raw = e.read().decode("utf-8", "replace")
         detail = raw[:300].replace("\n", " ")
+        die(f"HTTP {e.code} from {url}: {detail}")
+    except urllib.error.URLError as e:
+        die(f"network error calling {url}: {e.reason}")
+    except json.JSONDecodeError as e:
+        die(f"invalid JSON from {url}: {e}")
+
+
+def akl_fids_auth_header() -> str:
+    if not AKL_FIDS_USERNAME or not AKL_FIDS_PASSWORD:
+        die("AKL FIDS requires AKL_API_USERNAME and AKL_API_PASSWORD")
+    token = base64.b64encode(f"{AKL_FIDS_USERNAME}:{AKL_FIDS_PASSWORD}".encode("utf-8")).decode("ascii")
+    return f"Basic {token}"
+
+
+def request_akl_fids_json(endpoint: str, params: dict[str, str], timeout: int = 25) -> Any:
+    url = f"{AKL_FIDS_API}/{endpoint}?" + urllib.parse.urlencode(params)
+    headers = {
+        "Accept": "application/json, text/plain, */*",
+        "App-Version": AKL_FIDS_APP_VERSION,
+        "Authorization": akl_fids_auth_header(),
+        "Content-Type": "application/vnd.api+json",
+        "User-Agent": UA,
+    }
+    req = urllib.request.Request(url, headers=headers, method="GET")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            raw = resp.read().decode("utf-8", "replace")
+            return json.loads(raw) if raw else None
+    except urllib.error.HTTPError as e:
+        raw = e.read().decode("utf-8", "replace")
+        detail = raw[:300].replace("\n", " ")
+        if e.code in (401, 403):
+            die(
+                f"HTTP {e.code} from Auckland Airport FIDS API; "
+                "set AKL_API_USERNAME/AKL_API_PASSWORD if the public app credentials have rotated"
+            )
         die(f"HTTP {e.code} from {url}: {detail}")
     except urllib.error.URLError as e:
         die(f"network error calling {url}: {e.reason}")
@@ -170,6 +212,15 @@ def clean(value: Any) -> str:
     return " ".join(str(value).split())
 
 
+def dig(data: Any, *path: str) -> Any:
+    current = data
+    for key in path:
+        if not isinstance(current, dict):
+            return None
+        current = current.get(key)
+    return current
+
+
 def numeric(value: Any) -> int | float | None:
     if isinstance(value, bool):
         return None
@@ -209,10 +260,83 @@ def carrier_from_flight(number: str) -> str:
     return match.group(1) if match else ""
 
 
+def format_nz_time(value: Any) -> str:
+    text = clean(value)
+    if not text:
+        return ""
+    try:
+        dt = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return text
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    if ZoneInfo is not None:
+        dt = dt.astimezone(ZoneInfo("Pacific/Auckland"))
+    return dt.strftime("%Y-%m-%d %H:%M")
+
+
 def combine_date_time(date_value: str, time_value: str) -> str:
     if not date_value or not time_value:
         return clean(time_value or date_value)
     return f"{date_value} {time_value}"
+
+
+def akl_codeshares(values: Any) -> list[str]:
+    out: list[str] = []
+    if not isinstance(values, list):
+        return out
+    for item in values:
+        value = item[0] if isinstance(item, list) and item else item
+        number = clean(value).upper().replace(" ", "")
+        if number:
+            out.append(number)
+    return out
+
+
+def normalize_akl_fids(row: dict[str, Any], direction: str) -> dict[str, Any]:
+    attrs = row.get("attributes") if isinstance(row.get("attributes"), dict) else {}
+    iata_code = attrs.get("iataCode")
+    primary = clean((iata_code or [""])[0] if isinstance(iata_code, list) else iata_code).upper().replace(" ", "")
+    numbers = flight_numbers([primary, *akl_codeshares(attrs.get("codeshares"))])
+    scheduled_utc = clean(dig(attrs, "time", "scheduled"))
+    estimated_utc = clean(dig(attrs, "time", "estimated"))
+    actual_utc = clean(dig(attrs, "time", "actual"))
+    range_name = clean(attrs.get("range"))
+    is_arrival = direction == "arrivals"
+    status = "Cancelled" if dig(attrs, "state", "cancelled") else clean(dig(attrs, "time", "status"))
+    baggage = clean(dig(attrs, "landing", "baggageNumber")) if is_arrival else ""
+    return {
+        "airport": "AKL",
+        "airport_name": AIRPORTS["AKL"]["name"],
+        "direction": direction,
+        "flight_id": clean(row.get("id")),
+        "flight_numbers": numbers,
+        "primary_flight": numbers[0] if numbers else primary,
+        "airline_code": carrier_from_flight(numbers[0]) if numbers else carrier_from_flight(primary),
+        "airline_name": "",
+        "origin": clean(dig(attrs, "origin", "city")),
+        "origin_airport_code": clean(dig(attrs, "origin", "airportCode")),
+        "destination": clean(dig(attrs, "destination", "city")),
+        "destination_airport_code": clean(dig(attrs, "destination", "airportCode")),
+        "scheduled": format_nz_time(scheduled_utc),
+        "estimated": format_nz_time(estimated_utc),
+        "actual": format_nz_time(actual_utc),
+        "scheduled_utc": scheduled_utc,
+        "estimated_utc": estimated_utc,
+        "actual_utc": actual_utc,
+        "gate": clean(dig(attrs, "boarding", "gate")) if not is_arrival else "",
+        "checkin_zone": clean(dig(attrs, "checkin", "zone")) if not is_arrival else "",
+        "checkin_status": clean(dig(attrs, "checkin", "status")) if not is_arrival else "",
+        "boarding_status": clean(dig(attrs, "boarding", "status")) if not is_arrival else "",
+        "baggage_carousel": baggage,
+        "landing_status": clean(dig(attrs, "landing", "status")) if is_arrival else "",
+        "status": status,
+        "status_code": clean(dig(attrs, "time", "statusCode")),
+        "terminal": range_name,
+        "is_domestic": range_name == "domestic",
+        "source": AIRPORTS["AKL"]["source"],
+        "source_url": AIRPORTS["AKL"]["source_url"],
+    }
 
 
 def normalize_chc(row: dict[str, Any], direction: str, flight_type: str) -> dict[str, Any]:
@@ -350,10 +474,40 @@ def normalize_adsb(row: dict[str, Any], direction: str) -> dict[str, Any]:
         "status": classification,
         "terminal": "",
         "is_domestic": None,
-        "source": AIRPORTS["AKL"]["source"],
-        "source_url": AIRPORTS["AKL"]["source_url"],
+        "source": AKL_ADSB_SOURCE,
+        "source_url": adsb_url("AKL"),
         "raw_adsb": row,
     }
+
+
+def fetch_akl_fids(direction: str) -> dict[str, Any]:
+    endpoint = "arrivals" if direction == "arrivals" else "departures"
+    flights: list[dict[str, Any]] = []
+    for range_name in ("domestic", "international"):
+        payload = request_akl_fids_json(
+            endpoint,
+            {
+                "range": range_name,
+                "date": nz_today(),
+            },
+        )
+        if not isinstance(payload, dict) or not isinstance(payload.get("data"), list):
+            die(f"unexpected Auckland Airport FIDS payload from {AKL_FIDS_API}/{endpoint}")
+        flights.extend(
+            normalize_akl_fids(row, direction)
+            for row in payload["data"]
+            if isinstance(row, dict)
+        )
+    flights.sort(
+        key=lambda flight: (
+            flight.get("scheduled_utc") or flight.get("scheduled") or "",
+            flight.get("primary_flight") or "",
+        )
+    )
+    result = board_result("AKL", direction, flights, "")
+    result["board_date"] = nz_today()
+    result["fids_endpoint"] = f"{AKL_FIDS_API}/{endpoint}"
+    return result
 
 
 def fetch_chc(direction: str) -> dict[str, Any]:
@@ -438,6 +592,8 @@ def fetch_adsb_akl(direction: str) -> dict[str, Any]:
     result.update(
         {
             "data_type": "live_adsb",
+            "source": AKL_ADSB_SOURCE,
+            "source_url": adsb_url("AKL"),
             "adsb_endpoint": adsb_url("AKL"),
             "adsb_radius_nm": ADSB_AIRPORTS["AKL"]["radius_nm"],
             "adsb_total_aircraft": len(aircraft),
@@ -466,14 +622,18 @@ def board_result(airport: str, direction: str, flights: list[dict[str, Any]], so
 
 
 FETCHERS = {
-    "AKL": fetch_adsb_akl,
+    "AKL": fetch_akl_fids,
     "CHC": fetch_chc,
     "ZQN": fetch_zqn,
     "WLG": fetch_wlg,
 }
 
 
-def fetch_board(code: str, direction: str) -> dict[str, Any]:
+def fetch_board(code: str, direction: str, source: str | None = None) -> dict[str, Any]:
+    if source == "adsb":
+        if code != "AKL":
+            die("--source adsb is only supported with --airport AKL")
+        return fetch_adsb_akl(direction)
     return FETCHERS[code](direction)
 
 
@@ -491,7 +651,8 @@ def selected_airports(raw: str | None) -> list[str]:
 
 
 def cmd_board(args: argparse.Namespace, direction: str) -> None:
-    results = [limited_board(fetch_board(code, direction), args.limit) for code in selected_airports(args.airport)]
+    validate_source_args(args)
+    results = [limited_board(fetch_board(code, direction, args.source), args.limit) for code in selected_airports(args.airport)]
     if args.airport:
         emit_board(results[0], args.json)
     else:
@@ -512,11 +673,12 @@ def cmd_departures(args: argparse.Namespace) -> None:
 
 
 def cmd_flight(args: argparse.Namespace) -> None:
+    validate_source_args(args)
     needle = args.flight_number.upper().replace(" ", "")
     matches: list[dict[str, Any]] = []
     for code in selected_airports(args.airport):
         for direction in ("arrivals", "departures"):
-            result = fetch_board(code, direction)
+            result = fetch_board(code, direction, args.source)
             for flight in result["flights"]:
                 if needle in flight.get("flight_numbers", []):
                     matches.append(flight)
@@ -571,9 +733,10 @@ def flight_line(flight: dict[str, Any]) -> str:
     nums = "/".join(flight.get("flight_numbers") or [flight.get("primary_flight") or "-"])
     airline = flight.get("airline_name") or flight.get("airline_code") or ""
     gate = f" gate {flight['gate']}" if flight.get("gate") else ""
+    baggage = f" bag {flight['baggage_carousel']}" if flight.get("baggage_carousel") else ""
     terminal = f" {flight['terminal']}" if flight.get("terminal") else ""
     status = f" - {flight['status']}" if flight.get("status") else ""
-    return f"  {time_label(flight):<28} {nums:<18} {route_label(flight)}{gate}{terminal} {airline}{status}".rstrip()
+    return f"  {time_label(flight):<28} {nums:<18} {route_label(flight)}{gate}{baggage}{terminal} {airline}{status}".rstrip()
 
 
 def adsb_altitude_label(flight: dict[str, Any]) -> str:
@@ -671,7 +834,8 @@ def emit_airports(data: dict[str, Any], as_json: bool) -> None:
     print(f"Supported airports: {data['count']}")
     for airport in data["airports"]:
         kind = "live ADS-B aircraft positions" if airport["source_kind"] == "live_adsb" else "scheduled FIDS board"
-        print(f"  {airport['code']}  {airport['name']} ({airport['source']}; {kind})")
+        extra = "; ADS-B available with --source adsb" if airport["code"] == "AKL" else ""
+        print(f"  {airport['code']}  {airport['name']} ({airport['source']}; {kind}{extra})")
     if data["not_wired"]:
         print()
         print("Not wired:")
@@ -689,9 +853,21 @@ def positive_int(raw: str) -> int:
     return value
 
 
+def validate_source_args(args: argparse.Namespace) -> None:
+    source = getattr(args, "source", None)
+    if source == "adsb" and airport_code(args.airport) != "AKL":
+        die("--source adsb requires --airport AKL")
+
+
 def add_board_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--airport", choices=sorted(AIRPORTS), help="airport code; defaults to all supported airports")
     parser.add_argument("--limit", type=positive_int, default=20, help="max flights to show per airport (default 20)")
+    parser.add_argument(
+        "--source",
+        choices=["fids", "adsb"],
+        default="fids",
+        help="AKL source: scheduled FIDS by default, or live ADS-B with --source adsb",
+    )
     parser.add_argument("--json", action="store_true", help="emit machine-readable JSON")
 
 
@@ -710,6 +886,12 @@ def build_parser() -> argparse.ArgumentParser:
     sp = sub.add_parser("flight", help="lookup a flight number across current boards")
     sp.add_argument("flight_number", help="flight number, e.g. NZ5640")
     sp.add_argument("--airport", choices=sorted(AIRPORTS), help="airport code; defaults to all supported airports")
+    sp.add_argument(
+        "--source",
+        choices=["fids", "adsb"],
+        default="fids",
+        help="AKL source: scheduled FIDS by default, or live ADS-B with --source adsb",
+    )
     sp.add_argument("--json", action="store_true", help="emit machine-readable JSON")
     sp.set_defaults(func=cmd_flight)
 

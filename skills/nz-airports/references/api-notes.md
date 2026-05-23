@@ -4,20 +4,68 @@ This skill is an unofficial lightweight wrapper around public airport flight-boa
 
 ## Source and auth
 
-No username, password, API key, private token, cookie, or browser session is required for the implemented commands.
+No personal username, password, API key, private token, cookie, or browser session is required for the implemented commands.
+
+AKL FIDS uses Auckland Airport mobile app v5 Basic auth. The default credentials are the public app credentials embedded in the Auckland Airport Android APK v8.2.2, not a user credential. They can be overridden with:
+
+- `AKL_API_USERNAME`
+- `AKL_API_PASSWORD`
 
 Implemented airports:
 
-- Auckland (AKL): `https://api.adsb.lol`
+- Auckland (AKL) scheduled FIDS default: `https://h2g.aucklandairport.co.nz`
+- Auckland (AKL) live ADS-B optional source: `https://api.adsb.lol`
 - Christchurch (CHC): `https://www.christchurchairport.nz`
 - Queenstown (ZQN): `https://www.queenstownairport.co.nz`
 - Wellington (WLG): `https://www.wellingtonairport.co.nz`
 
 Investigated with alternate implementation:
 
-- Auckland Airport's official flight-board API and pages, including `https://www.prod.aucklandairport.co.nz/flights`, `https://corporate.aucklandairport.co.nz/content/aial-traveller/nz/en/flights.html`, and `https://www.aucklandairport.co.nz/content/aial/api/v1/flights`, returned Cloudflare challenge/block pages from direct CLI fetches. CloakBrowser CDP navigation also returned a Cloudflare 403 block in this environment. AKL is therefore implemented with live ADS-B positions from adsb.lol instead of scheduled airport-board data.
+- Auckland Airport's public website flight-board API and pages, including `https://www.prod.aucklandairport.co.nz/flights`, `https://corporate.aucklandairport.co.nz/content/aial-traveller/nz/en/flights.html`, and `https://www.aucklandairport.co.nz/content/aial/api/v1/flights`, returned Cloudflare challenge/block pages from direct CLI fetches. CloakBrowser CDP navigation also returned a Cloudflare 403 block in this environment. AKL scheduled data is therefore implemented through the mobile app v5 FIDS API instead.
 
 ## Endpoint families used
+
+### Auckland Airport scheduled FIDS via mobile app v5 API
+
+Base endpoint:
+
+```text
+GET https://h2g.aucklandairport.co.nz/api/{arrivals|departures}?range={domestic|international}&date={YYYY-MM-DD}
+```
+
+The CLI calls all four combinations for today's `Pacific/Auckland` date:
+
+- `arrivals?range=domestic`
+- `arrivals?range=international`
+- `departures?range=domestic`
+- `departures?range=international`
+
+Auth and headers:
+
+- HTTP Basic auth with public mobile-app credentials embedded in the APK.
+- Defaults can be overridden with `AKL_API_USERNAME` and `AKL_API_PASSWORD`.
+- `Content-Type: application/vnd.api+json`
+- `App-Version: android|8.2.2`
+
+Response shape:
+
+- top-level `data[]`
+- each row has `type`, `id`, and `attributes`
+- `attributes` includes `range`, `iataCode`, `origin`, `destination`, `codeshares`, `time`, `state`
+- departures include `checkin.zone`, `checkin.status`, `boarding.gate`, `boarding.status`
+- arrivals include `landing.baggageNumber`, `landing.status`
+
+Normalized AKL FIDS fields include:
+
+- `flight_id`
+- `flight_numbers[]`, including codeshares
+- `primary_flight`, `airline_code`
+- `origin`, `origin_airport_code`, `destination`, `destination_airport_code`
+- `scheduled`, `estimated`, `actual` formatted in `Pacific/Auckland`
+- `scheduled_utc`, `estimated_utc`, `actual_utc`
+- `gate`, `checkin_zone`, `checkin_status`, `boarding_status`
+- `baggage_carousel`, `landing_status`
+- `status`, `status_code`, `terminal`, `is_domestic`
 
 ### Auckland Airport via adsb.lol live ADS-B
 
@@ -56,7 +104,7 @@ Classification logic:
 - `alt_baro < 6000` with no strong climb/descent -> `arrival`, because low and level traffic near the field is likely on final approach
 - `alt_baro >= 6000`, missing altitude, or otherwise unclassified high traffic -> `overhead`
 
-The `arrivals --airport AKL` and `departures --airport AKL` commands return aircraft classified as `arrival` or `departure` respectively. Ground and overhead aircraft are counted in JSON metadata but are not returned by those board commands.
+The `arrivals --airport AKL --source adsb` and `departures --airport AKL --source adsb` commands return aircraft classified as `arrival` or `departure` respectively. Ground and overhead aircraft are counted in JSON metadata but are not returned by those board commands.
 
 Normalized AKL fields include:
 
@@ -70,7 +118,7 @@ Normalized AKL fields include:
 - `lat`, `lon`
 - `raw_adsb` with the returned ADS-B row for JSON consumers
 
-AKL is live aircraft-position data, not a scheduled FIDS board. It answers "which aircraft are physically near Auckland Airport now?" rather than "what has the airline published on the airport board?"
+AKL `--source adsb` is live aircraft-position data, not a scheduled FIDS board. It answers "which aircraft are physically near Auckland Airport now?" rather than "what has the airline published on the airport board?"
 
 ### Christchurch Airport
 
@@ -133,7 +181,7 @@ The board can legitimately be empty for departures late in the local operating d
 
 ## Normalized CLI schema
 
-Each normalized CHC/ZQN/WLG scheduled-board flight includes:
+Each normalized AKL/CHC/ZQN/WLG scheduled-board flight includes:
 
 - `airport`, `airport_name`, `direction`
 - `flight_numbers[]`, `primary_flight`
@@ -143,14 +191,15 @@ Each normalized CHC/ZQN/WLG scheduled-board flight includes:
 - `gate`, `status`, `terminal`, `is_domestic`
 - `source`, `source_url`
 
-Some fields are source-dependent. Queenstown does not expose gate or airline name in the JSON endpoint. Wellington exposes one flight number per row in the embedded board. Christchurch exposes codeshare flight numbers and airline branding image URLs, but the CLI does not emit image URLs in the normalized record.
+Some fields are source-dependent. Auckland exposes check-in zone, boarding gate, baggage carousel, and codeshares through the mobile app API. Queenstown does not expose gate or airline name in the JSON endpoint. Wellington exposes one flight number per row in the embedded board. Christchurch exposes codeshare flight numbers and airline branding image URLs, but the CLI does not emit image URLs in the normalized record.
 
 AKL ADS-B rows use a different live-position schema. They include callsign, aircraft type, registration, altitude, distance from the airport query point, ground speed, vertical rate, location, classification, and `raw_adsb`. They do not include scheduled/estimated board times, gate, terminal, airline-published status text, origin, or destination.
 
 ## Stability and safety
 
 - Treat CHC/ZQN/WLG results as live public-board snapshots, not historical data.
-- Treat AKL results as live ADS-B aircraft-position snapshots, not a scheduled airport board.
+- Treat default AKL results as live public-board snapshots.
+- Treat AKL `--source adsb` results as live ADS-B aircraft-position snapshots, not a scheduled airport board.
 - Always prefer narrow commands and small limits for routine checks.
 - Do not use this skill for booking, check-in, account, payment, passenger, baggage ownership, or mutation workflows.
 - Endpoint shapes can change without notice because these are public website implementation details rather than official public APIs.
