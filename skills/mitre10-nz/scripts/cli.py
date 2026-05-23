@@ -22,6 +22,8 @@ ALGOLIA_APP_ID = "CQ00O09OXX"
 ALGOLIA_SEARCH_KEY = "edc61cb5be5216c9cc02459f13e33729"
 ALGOLIA_INDEX = "retail_products_relevance"
 ALGOLIA_HOST = "https://cq00o09oxx-dsn.algolia.net"
+STORE_LOCATOR_FALLBACK_LAT = -40.900557
+STORE_LOCATOR_FALLBACK_LON = 174.885971
 UA = os.environ.get(
     "MITRE10_NZ_USER_AGENT",
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
@@ -103,7 +105,7 @@ def algolia_url() -> str:
 def algolia_params(query: str, *, limit: int, page: int, specials: bool = False) -> str:
     filters = "online:true AND availableNationWide:true"
     if specials:
-        filters += " AND prices.onNationalPromo:true"
+        filters += " AND prices.nationalPromo > 0"
     params = {
         "analyticsTags": json.dumps(["search", "standard"], separators=(",", ":")),
         "clickAnalytics": "true",
@@ -124,28 +126,32 @@ def algolia_params(query: str, *, limit: int, page: int, specials: bool = False)
 
 def algolia_search(query: str, *, limit: int, page: int = 0, specials: bool = False) -> dict[str, Any]:
     started = time.perf_counter()
+    fetch_limit = min(max(limit * 5, limit), 100) if specials else limit
     payload = {
         "requests": [
             {
                 "indexName": ALGOLIA_INDEX,
-                "params": algolia_params(query, limit=limit, page=page, specials=specials),
+                "params": algolia_params(query, limit=fetch_limit, page=page, specials=specials),
             }
         ]
     }
     data = request_json(algolia_url(), method="POST", body=payload)
     result = (data.get("results") or [{}])[0] if isinstance(data, dict) else {}
     products = [parse_algolia_product(hit) for hit in result.get("hits") or [] if isinstance(hit, dict)]
+    if specials:
+        products = [product for product in products if has_sale_price(product)]
+    returned_products = products[:limit]
     return {
         "kind": "products",
         "source": "algolia",
         "query": query,
         "specials": specials,
-        "count": len(products),
+        "count": len(returned_products),
         "total": result.get("nbHits"),
         "page": result.get("page", page),
         "pages": result.get("nbPages"),
         "elapsed_ms": round((time.perf_counter() - started) * 1000),
-        "products": products[:limit],
+        "products": returned_products,
     }
 
 
@@ -174,12 +180,23 @@ def image_url(path: Any) -> str | None:
     return None
 
 
+def algolia_image(hit: dict[str, Any]) -> str | None:
+    images = hit.get("images")
+    if isinstance(images, dict):
+        for key in ("img300Wx300H", "img515Wx515H", "img96Wx96H", "img65Wx65H", "img30Wx30H"):
+            if images.get(key):
+                return image_url(images[key])
+    if isinstance(images, list):
+        for entry in images:
+            if isinstance(entry, dict):
+                image = entry.get("url") or entry.get("imageUrl")
+                if image:
+                    return image_url(image)
+    return image_url(hit.get("img96Wx96H"))
+
+
 def parse_algolia_product(hit: dict[str, Any]) -> dict[str, Any]:
     prices = hit.get("prices") if isinstance(hit.get("prices"), dict) else {}
-    images = hit.get("images") if isinstance(hit.get("images"), list) else []
-    image = None
-    if images and isinstance(images[0], dict):
-        image = images[0].get("url") or images[0].get("imageUrl")
     code = str(hit.get("objectID") or hit.get("code") or "")
     return {
         "code": code,
@@ -191,8 +208,15 @@ def parse_algolia_product(hit: dict[str, Any]) -> dict[str, Any]:
         "home_delivery_region_count": len(hit.get("homeDelivery") or []),
         "category": category_from_hit(hit),
         "url": BASE_WEB + hit["url"] if isinstance(hit.get("url"), str) and hit["url"].startswith("/") else hit.get("url"),
-        "image": image_url(hit.get("img96Wx96H") or image),
+        "image": algolia_image(hit),
     }
+
+
+def category_name(value: Any) -> str:
+    if not isinstance(value, str) or not value:
+        return ""
+    parts = value.split("|")
+    return parts[1] if len(parts) >= 2 and parts[1] else value
 
 
 def category_from_hit(hit: dict[str, Any]) -> str:
@@ -203,9 +227,31 @@ def category_from_hit(hit: dict[str, Any]) -> str:
         if levels:
             return levels[-1]
     names = hit.get("categoryNames")
+    if isinstance(names, dict):
+        for key in ("lvl4", "lvl3", "lvl2", "lvl1", "lvl0"):
+            values = names.get(key)
+            if isinstance(values, list) and values:
+                name = category_name(values[0])
+                if name:
+                    return name
     if isinstance(names, list):
-        return " / ".join(str(x) for x in names[:3] if x)
+        return " / ".join(category_name(x) for x in names[:3] if x)
+    page_ids = hit.get("categoryPageId")
+    if isinstance(page_ids, list) and page_ids:
+        return str(page_ids[-1]).split(" > ")[-1]
     return ""
+
+
+def has_sale_price(product: dict[str, Any]) -> bool:
+    price = product.get("price") if isinstance(product.get("price"), dict) else {}
+    promo = price.get("promo")
+    regular = price.get("regular")
+    if promo is None or regular is None:
+        return False
+    try:
+        return float(promo) < float(regular)
+    except (TypeError, ValueError):
+        return promo != regular
 
 
 def parse_occ_product(item: dict[str, Any]) -> dict[str, Any]:
@@ -357,17 +403,37 @@ def cmd_stores(args: argparse.Namespace) -> None:
         )
     else:
         payload = request_json(occ_url("/stores", {"fields": "FULL", "pageSize": limit}))
+    invalid_region = bool(args.region) and is_store_locator_fallback(payload)
     stores = [parse_store(s) for s in (payload.get("stores") or []) if isinstance(s, dict)] if isinstance(payload, dict) else []
+    if invalid_region:
+        stores = []
     data = {
         "kind": "stores",
         "source": "occ",
         "region": args.region,
         "count": len(stores),
         "pagination": payload.get("pagination") if isinstance(payload, dict) else None,
+        "source_latitude": payload.get("sourceLatitude") if isinstance(payload, dict) else None,
+        "source_longitude": payload.get("sourceLongitude") if isinstance(payload, dict) else None,
         "elapsed_ms": round((time.perf_counter() - started) * 1000),
         "stores": stores[:limit],
     }
+    if invalid_region:
+        data["error"] = f"no store locator match for region: {args.region}"
     emit(data, args.json)
+    if invalid_region:
+        raise SystemExit(1)
+
+
+def is_store_locator_fallback(payload: Any) -> bool:
+    if not isinstance(payload, dict):
+        return False
+    try:
+        lat = float(payload.get("sourceLatitude"))
+        lon = float(payload.get("sourceLongitude"))
+    except (TypeError, ValueError):
+        return False
+    return abs(lat - STORE_LOCATOR_FALLBACK_LAT) < 0.000001 and abs(lon - STORE_LOCATOR_FALLBACK_LON) < 0.000001
 
 
 def print_products(data: dict[str, Any]) -> None:
@@ -412,9 +478,14 @@ def print_product(data: dict[str, Any]) -> None:
         print("Summary: " + (text[:220] + "..." if len(text) > 220 else text))
     if product.get("url"):
         print(product["url"])
+    if product.get("image"):
+        print("Image: " + product["image"])
 
 
 def print_stores(data: dict[str, Any]) -> None:
+    if data.get("error"):
+        print(f"mitre10-nz: {data['error']}", file=sys.stderr)
+        return
     label = data.get("region") or "all stores"
     print(f"{label}: {data.get('count', 0)} stores ({data.get('elapsed_ms')} ms)")
     pagination = data.get("pagination") or {}
