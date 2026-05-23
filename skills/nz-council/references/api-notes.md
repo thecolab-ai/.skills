@@ -23,6 +23,7 @@ Implemented as the primary event source.
 - List New Plymouth: `https://www.eventfinda.co.nz/whatson/events/new-plymouth`
 - List Whangarei: `https://www.eventfinda.co.nz/whatson/events/whangarei`
 - List Tauranga: `https://www.eventfinda.co.nz/whatson/events/tauranga`
+- List Queenstown Lakes: `https://www.eventfinda.co.nz/whatson/events/queenstown`
 - List all NZ: `https://www.eventfinda.co.nz/whatson/events/new-zealand`
 - Category form: `https://www.eventfinda.co.nz/{category}/events/{location}`
 - Pagination: `?page=N`
@@ -565,6 +566,43 @@ Current closure/status handling:
 Direct fetch worked during discovery. The implementation still includes a local CDP fallback at `http://127.0.0.1:5100` for Tauranga/Bay Venues pages when fetched HTML looks bot-walled.
 
 Freshness: live public page scrape at command time. Users should verify hours before travel, especially around holidays, temporary closures, and weather-affected facilities.
+
+### Queenstown Lakes pools and recreation facilities
+
+Implemented as source-linked public-page records because direct stdlib requests to QLDC recreation pages returned Radware captcha pages during discovery. A local CDP session was used to inspect the public pages after direct fetch was blocked. The legacy path supplied during discovery, `https://www.qldc.govt.nz/services/sport-and-recreation`, returned QLDC's 404 page; the current public recreation entry points are under `/recreation/`. `sportandrec.qldc.govt.nz` did not resolve from the discovery environment.
+
+Primary pages:
+
+- Swim listing: `https://www.qldc.govt.nz/recreation/swim/`
+- Alpine Aqualand: `https://www.qldc.govt.nz/recreation/swim/alpine-aqualand/`
+- Wānaka Recreation Centre: `https://www.qldc.govt.nz/recreation/wanaka-recreation-centre/`
+- Arrowtown Memorial Pool: `https://www.qldc.govt.nz/recreation/swim/arrowtown-memorial-pool/`
+- Queenstown Events Centre: `https://www.qldc.govt.nz/recreation/queenstown-events-centre/`
+- Paetara Aspiring Central: `https://www.qldc.govt.nz/recreation/paetara-aspiring-central/`
+
+Implemented pools:
+
+- Alpine Aqualand
+- Wānaka Recreation Centre
+- Arrowtown Memorial Pool
+- Glenorchy Community Pool (grant-assisted community pool)
+- Hāwea Community Pool (grant-assisted community pool)
+
+Implemented recreation facilities:
+
+- Queenstown Events Centre
+- Wānaka Recreation Centre
+- Paetara Aspiring Central
+- Alpine Health and Fitness
+
+Useful fields observed:
+
+- Facility pages expose visible names, descriptions, addresses, phone numbers, email links, feature sections, and opening-hours tables.
+- The swim page states that QLDC Sport and Recreation operates three aquatic facilities: Alpine Aqualand, Wānaka Recreation Centre, and Arrowtown Pool.
+- Community pools are listed separately as grant-assisted pools at Glenorchy and Hāwea.
+- QLDC pages link users to lane availability/bookings, but no anonymous public lane-availability payload is wired in v1.
+
+Freshness: source-linked snapshot from public QLDC pages. Users should follow the `source_url` before travel, especially for seasonal Arrowtown Memorial Pool and community pools.
 
 ### Christchurch recreation and sport
 
