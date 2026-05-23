@@ -34,7 +34,7 @@ Query live Bunnings NZ product, pricing, store, category, and promotion data thr
 4. Use `stores --region` for location-scoped store lookup
 5. Use `specials` for redemption/promotion products, optionally filtered by query
 6. Use `--json` for agent chaining, comparisons, or structured reports
-7. Mention that prices, stock, and promotions are live Bunnings snapshots from unofficial public page data
+7. Mention that prices, stock, stores, search, and category results are live Bunnings `_apis` snapshots; redemption specials still come from public page state
 
 ## CLI
 
@@ -67,9 +67,12 @@ python3 skills/bunnings/scripts/cli.py --country au search drill --limit 5
 
 ## Notes
 
-- No API key, username, password, account cookie, or browser automation is required for the implemented read-only commands
-- The CLI uses public Bunnings page state rather than auth-walled cart/account APIs
+- No username, password, account cookie, cart, checkout, or browser automation is required at runtime
+- The CLI mints a short-lived cached guest bearer token through Bunnings' public guest authorize redirect flow, then calls read-only `_apis` JSON endpoints with stdlib `urllib`
+- Search and browse use `POST /_apis/v1/coveo/search`
+- Product detail combines `GET /_apis/v1/products/{sku}`, `GET /_apis/v2/products/{sku}/priceInfo`, `POST /_apis/v2/products/{sku}/fulfillment`, and `GET /_apis/v1/item-api/locations`
+- Store lookup uses `GET /_apis/v1/stores/country/{NZ|AU}?fields=FULL`
+- Redemption specials remain a public page-state fallback from `/campaign/redemption-offers`; no clean read-only `_apis` feed was found during CDP discovery
 - Product prices and stock are live snapshots and may vary by store, fulfilment method, country, and time
-- Promotion data is based on the public redemption-offers page; Bunnings may not expose a conventional specials feed
 - Endpoint shapes can change without notice because this is not an official public API
 - Keep usage narrow and respectful
