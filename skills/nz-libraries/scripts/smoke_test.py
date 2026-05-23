@@ -1,0 +1,96 @@
+#!/usr/bin/env python3
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+SKILL_DIR = Path(__file__).parent.parent
+CLI = SKILL_DIR / "scripts" / "cli.py"
+
+
+def run(args: list) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        [sys.executable, str(CLI)] + args,
+        capture_output=True,
+        text=True,
+        cwd=str(SKILL_DIR),
+        timeout=30,
+    )
+
+
+def test(name: str, fn):
+    try:
+        ok = fn()
+        status = "PASS" if ok else "FAIL"
+        print(f"[{status}] {name}")
+        return ok
+    except Exception as e:
+        print(f"[FAIL] {name}")
+        print(f"  error: {e}")
+        return False
+
+
+results = []
+
+
+def test_help():
+    result = run(["--help"])
+    return result.returncode == 0
+
+
+results.append(test("--help exits 0", test_help))
+
+
+def test_networks():
+    result = run(["networks", "--json"])
+    if result.returncode != 0:
+        print(f"  stderr: {result.stderr[:200]}")
+        return False
+    data = json.loads(result.stdout)
+    if not isinstance(data.get("networks"), list) or len(data["networks"]) < 1:
+        print(f"  stdout: {result.stdout[:200]}")
+        print("  Expected networks[] with at least one result")
+        return False
+    return True
+
+
+results.append(test("networks returns networks[]", test_networks))
+
+
+def test_branches_wellington():
+    result = run(["branches", "--network", "wellington", "--json"])
+    if result.returncode != 0:
+        print(f"  stderr: {result.stderr[:200]}")
+        return False
+    data = json.loads(result.stdout)
+    if not isinstance(data.get("branches"), list):
+        print(f"  stdout: {result.stdout[:200]}")
+        print("  Expected branches[] in response")
+        return False
+    return True
+
+
+results.append(test("branches --network wellington returns branches[]", test_branches_wellington))
+
+
+def test_search():
+    result = run(["search", "hobbit", "--network", "auckland", "--limit", "3", "--json"])
+    if result.returncode != 0:
+        print(f"  stderr: {result.stderr[:200]}")
+        return False
+    data = json.loads(result.stdout)
+    if not isinstance(data.get("results"), list):
+        print(f"  stdout: {result.stdout[:200]}")
+        print("  Expected results[] in search response")
+        return False
+    return True
+
+
+results.append(test("search hobbit --network auckland returns results[]", test_search))
+
+if all(results):
+    print("All tests passed.")
+    sys.exit(0)
+else:
+    print(f"{results.count(False)} test(s) failed.")
+    sys.exit(1)
