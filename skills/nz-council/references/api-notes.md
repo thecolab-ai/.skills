@@ -22,6 +22,7 @@ Implemented as the primary event source.
 - List Christchurch: `https://www.eventfinda.co.nz/whatson/events/christchurch`
 - List New Plymouth: `https://www.eventfinda.co.nz/whatson/events/new-plymouth`
 - List Whangarei: `https://www.eventfinda.co.nz/whatson/events/whangarei`
+- List Tauranga: `https://www.eventfinda.co.nz/whatson/events/tauranga`
 - List all NZ: `https://www.eventfinda.co.nz/whatson/events/new-zealand`
 - Category form: `https://www.eventfinda.co.nz/{category}/events/{location}`
 - Pagination: `?page=N`
@@ -513,6 +514,57 @@ PNCC pages expose:
 - CLM contact and price links for Lido and Freyberg
 
 Splashhurst redirects from PNCC to the linked public CLM site. CLM contact pages expose phone, email, address, and public opening-hour cards. The CLI follows those public links for current hours without logging in or using booking/payment surfaces.
+
+### Tauranga City Council pools and aquatic centres
+
+Implemented for Tauranga pools and pool-like recreation facilities.
+
+- Council entry page: `https://www.tauranga.govt.nz/parks-and-recreation/swimming-pools-and-aquatic-centres`
+- Bay Venues / Tauranga Pools locations page: `https://www.taurangapools.co.nz/about-us/locations`
+- Baywave detail: `https://www.taurangapools.co.nz/public-pools/baywave`
+- Greerton detail: `https://www.taurangapools.co.nz/public-pools/greerton`
+- Otumoetai detail: `https://www.taurangapools.co.nz/public-pools/otumoetai-pool`
+- Memorial Pool detail: `https://www.taurangapools.co.nz/public-pools/memorial-pool`
+- Memorial Pool information: `https://www.taurangapools.co.nz/public-pools/memorial-pool/memorial-pool-information`
+- Mount Hot Pools home: `https://www.mounthotpools.co.nz/`
+- Mount Hot Pools pool details: `https://www.mounthotpools.co.nz/facilities/our-pools`
+
+Observed facilities:
+
+- Baywave TECT Aquatic & Leisure Centre
+- Greerton Aquatic & Leisure Centre
+- Mount Hot Pools
+- Memorial Pool
+- Otumoetai Pool
+
+The CLI parses the locations page for name, address, phone, and regular opening-hours blocks, then enriches each facility from detail pages for description, status, pool details, and pool-temperature tables when present.
+
+Schema emitted:
+
+```json
+{
+  "name": "Baywave TECT Aquatic & Leisure Centre",
+  "id": "baywave-tect-aquatic",
+  "type": "pool",
+  "types": ["gym", "leisure-centre", "pool"],
+  "council": "tga",
+  "source": "tauranga-pools-bayvenues",
+  "address": "Corner Girven Road & Gloucester Rd, Bayfair, Mount Maunganui 3116",
+  "operator": "Bay Venues",
+  "phone": "07 577 8550",
+  "hours": [{"label": "Aquatic Centre", "text": "Mon-Fri: 6.00am - 8:45pm; Weekends & Public Holidays: 7.00am - 6.45pm"}],
+  "pool_details": ["25m Lap pool Depth: 2m", "Leisure pool with wave machine Depth: 0 - 1.8m"]
+}
+```
+
+Current closure/status handling:
+
+- Mount Hot Pools: current homepage indicates it is closed until further notice due to 2026 Mauao landslides.
+- Memorial Pool: current detail page indicates it is permanently closed, with a new Memorial Park Aquatic Centre planned on the same site.
+
+Direct fetch worked during discovery. The implementation still includes a local CDP fallback at `http://127.0.0.1:5100` for Tauranga/Bay Venues pages when fetched HTML looks bot-walled.
+
+Freshness: live public page scrape at command time. Users should verify hours before travel, especially around holidays, temporary closures, and weather-affected facilities.
 
 ### Christchurch recreation and sport
 
