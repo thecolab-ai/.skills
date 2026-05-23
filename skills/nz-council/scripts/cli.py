@@ -21,6 +21,7 @@ import socket
 import struct
 import sys
 import time
+import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -62,6 +63,9 @@ MOUNT_HOT_POOLS_BASE = "https://www.mounthotpools.co.nz"
 TGA_RECREATION_POOLS_URL = TGA_BASE + "/parks-and-recreation/swimming-pools-and-aquatic-centres"
 TGA_POOL_LOCATIONS_URL = TGA_POOLS_BASE + "/about-us/locations"
 TGA_CDP_ENDPOINT = CDP_HTTP_BASE
+QLDC_BASE = "https://www.qldc.govt.nz"
+QLDC_RECREATION_SOURCE = QLDC_BASE + "/recreation/"
+QLDC_SWIM_SOURCE = QLDC_BASE + "/recreation/swim/"
 
 UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146 Safari/537.36"
 
@@ -77,6 +81,7 @@ COUNCIL_LOCATIONS = {
     "whg": "whangarei",
     "pmn": "palmerston-north",
     "tga": "tauranga",
+    "qldc": "queenstown",
 }
 
 COUNCIL_NAMES = {
@@ -95,9 +100,27 @@ COUNCIL_NAMES = {
     "whg": "Whangarei",
     "pmn": "Palmerston North",
     "tga": "Tauranga",
+    "qldc": "Queenstown Lakes",
 }
 
-RECREATION_COUNCILS = ("akl", "wlg", "chc", "rot", "npl", "npr", "has", "ham", "hutt", "porirua", "uhutt", "kapiti", "whg", "pmn", "tga")
+RECREATION_COUNCILS = (
+    "akl",
+    "wlg",
+    "chc",
+    "rot",
+    "npl",
+    "npr",
+    "has",
+    "ham",
+    "hutt",
+    "porirua",
+    "uhutt",
+    "kapiti",
+    "whg",
+    "pmn",
+    "tga",
+    "qldc",
+)
 
 AKL_AREA_IDS = {
     "central": "1134",
@@ -629,6 +652,189 @@ TGA_KIND_HINTS = {
     "memorial-pool": {"pool"},
     "otumoetai-pool": {"pool"},
 }
+
+QLDC_FACILITIES: list[dict[str, Any]] = [
+    {
+        "name": "Alpine Aqualand",
+        "id": "alpine-aqualand",
+        "type": "pool",
+        "facility_types": ["pool"],
+        "council": "qldc",
+        "council_name": "Queenstown Lakes",
+        "source": "queenstown-lakes-district-council",
+        "source_url": QLDC_BASE + "/recreation/swim/alpine-aqualand/",
+        "listing_source_url": QLDC_SWIM_SOURCE,
+        "description": "Lap pool, leisure pool and hydroslides at Queenstown Events Centre in Frankton.",
+        "address": "Joe O'Connell Drive, Frankton, Queenstown",
+        "operator": "QLDC Sport and Recreation",
+        "phone": "03-450-9005",
+        "email": "qec@qldc.govt.nz",
+        "status": None,
+        "hours": [
+            {"label": "Weekdays", "text": "Pools and changing rooms 6.00am-9.00pm; hydroslides 4.00pm-6.30pm"},
+            {"label": "Saturdays and Sundays", "text": "Pools and changing rooms 8.00am-6.00pm; hydroslides 10.30am-4.00pm"},
+            {"label": "School holidays", "text": "Pools as normal; hydroslides 10.30am-4.00pm"},
+            {"label": "Public holidays", "text": "Pools and changing rooms 8.00am-8.00pm; hydroslides 10.30am-6.30pm"},
+            {"label": "ANZAC Day", "text": "Pools and changing rooms 1.00pm-8.00pm; hydroslides 1.00pm-6.30pm"},
+            {"label": "Christmas Day and New Year's Day", "text": "Closed"},
+        ],
+        "hours_summary": "Weekdays pools 6.00am-9.00pm; weekends 8.00am-6.00pm; public holidays 8.00am-8.00pm.",
+        "features": ["Lap pool", "Leisure pool", "Hydroslides", "Swim school", "Lane availability and bookings"],
+    },
+    {
+        "name": "Wānaka Recreation Centre",
+        "id": "wanaka-recreation-centre",
+        "type": "leisure-centre",
+        "facility_types": ["pool", "leisure-centre"],
+        "council": "qldc",
+        "council_name": "Queenstown Lakes",
+        "source": "queenstown-lakes-district-council",
+        "source_url": QLDC_BASE + "/recreation/wanaka-recreation-centre/",
+        "listing_source_url": QLDC_RECREATION_SOURCE,
+        "description": "Three-pool complex with lap, leisure and hot pools, plus courts and sport programmes.",
+        "address": "41 Sir Tim Wallis Drive (off Ballantyne Road), Wānaka",
+        "operator": "QLDC Sport and Recreation",
+        "phone": "03-443-9334",
+        "email": "wrc@qldc.govt.nz",
+        "status": None,
+        "hours": [
+            {"label": "Weekdays", "text": "6.00am-9.00pm"},
+            {"label": "Saturdays and Sundays", "text": "8.00am-8.00pm; stadium 8.00am-8.00pm; pool 8.00am-6.00pm"},
+            {"label": "Public holidays", "text": "8.00am-8.00pm"},
+            {"label": "ANZAC Day", "text": "1.00pm-8.00pm"},
+            {"label": "Christmas Day and New Year's Day", "text": "Closed"},
+        ],
+        "hours_summary": "Weekdays 6.00am-9.00pm; weekends 8.00am-8.00pm, with pool hours listed as 8.00am-6.00pm.",
+        "features": ["Lap pool", "Leisure pool", "Hot pool", "Courts", "Stadium", "Swim school"],
+    },
+    {
+        "name": "Arrowtown Memorial Pool",
+        "id": "arrowtown-memorial-pool",
+        "type": "pool",
+        "facility_types": ["pool"],
+        "council": "qldc",
+        "council_name": "Queenstown Lakes",
+        "source": "queenstown-lakes-district-council",
+        "source_url": QLDC_BASE + "/recreation/swim/arrowtown-memorial-pool/",
+        "listing_source_url": QLDC_SWIM_SOURCE,
+        "description": "Seasonal heated outdoor pool in historic Arrowtown.",
+        "address": "4 Hertford Street, Arrowtown 9302",
+        "operator": "QLDC Sport and Recreation",
+        "phone": "03-442-0145",
+        "email": None,
+        "status": "Seasonal outdoor pool; check the linked QLDC page before travel.",
+        "hours": [
+            {"label": "Normal summer season", "text": "11.00am-6.00pm daily"},
+            {"label": "Christmas Day and New Year's Day", "text": "Closed"},
+        ],
+        "hours_summary": "Seasonal summer pool; normal opening hours 11.00am-6.00pm daily.",
+        "features": ["Heated outdoor pool", "Lane bookings", "Summer season passes"],
+    },
+    {
+        "name": "Glenorchy Community Pool",
+        "id": "glenorchy-community-pool",
+        "type": "pool",
+        "facility_types": ["pool"],
+        "council": "qldc",
+        "council_name": "Queenstown Lakes",
+        "source": "queenstown-lakes-district-council",
+        "source_url": QLDC_SWIM_SOURCE,
+        "listing_source_url": QLDC_SWIM_SOURCE,
+        "description": "Community pool listed by QLDC as grant-assisted.",
+        "address": "Cantire Street, Glenorchy",
+        "operator": "Community pool",
+        "phone": None,
+        "email": None,
+        "status": "Community-operated; QLDC lists grant support rather than direct operation.",
+        "hours": [{"label": "Season", "text": "Open Labour weekend until Easter weekend"}],
+        "hours_summary": "Open Labour weekend until Easter weekend.",
+        "features": ["Community pool"],
+    },
+    {
+        "name": "Hāwea Community Pool",
+        "id": "hawea-community-pool",
+        "type": "pool",
+        "facility_types": ["pool"],
+        "council": "qldc",
+        "council_name": "Queenstown Lakes",
+        "source": "queenstown-lakes-district-council",
+        "source_url": QLDC_SWIM_SOURCE,
+        "listing_source_url": QLDC_SWIM_SOURCE,
+        "description": "Community pool listed by QLDC as grant-assisted.",
+        "address": "Hāwea Flat School, Camp Hill Road",
+        "operator": "Community pool",
+        "phone": None,
+        "email": None,
+        "status": "Community-operated; weather permitting.",
+        "hours": [{"label": "Season", "text": "Open Labour weekend until early March; weather permitting"}],
+        "hours_summary": "Open Labour weekend until early March; weather permitting.",
+        "features": ["Community pool"],
+    },
+    {
+        "name": "Queenstown Events Centre",
+        "id": "queenstown-events-centre",
+        "type": "leisure-centre",
+        "facility_types": ["leisure-centre"],
+        "council": "qldc",
+        "council_name": "Queenstown Lakes",
+        "source": "queenstown-lakes-district-council",
+        "source_url": QLDC_BASE + "/recreation/queenstown-events-centre/",
+        "listing_source_url": QLDC_RECREATION_SOURCE,
+        "description": "Multi-purpose indoor sports and events centre with aquatic, gym, court, field, climbing and golf facilities.",
+        "address": "Joe O'Connell Drive, Frankton, Queenstown",
+        "operator": "QLDC Sport and Recreation",
+        "phone": "03-450-9005",
+        "email": "qec@qldc.govt.nz",
+        "status": None,
+        "hours": None,
+        "hours_summary": None,
+        "features": ["Alpine Aqualand", "Alpine Health and Fitness", "Indoor courts", "Outdoor fields", "Rockatipu Climbing Wall", "Frankton Golf Centre"],
+    },
+    {
+        "name": "Alpine Health and Fitness",
+        "id": "alpine-health-and-fitness",
+        "type": "gym",
+        "facility_types": ["gym"],
+        "council": "qldc",
+        "council_name": "Queenstown Lakes",
+        "source": "queenstown-lakes-district-council",
+        "source_url": QLDC_BASE + "/recreation/queenstown-events-centre/gym-group-fitness/",
+        "listing_source_url": QLDC_BASE + "/recreation/queenstown-events-centre/",
+        "description": "Full-service gym at Queenstown Events Centre with weights, cycle studio and group fitness studio.",
+        "address": "Joe O'Connell Drive, Frankton, Queenstown",
+        "operator": "QLDC Sport and Recreation",
+        "phone": "03-450-9005",
+        "email": "qec@qldc.govt.nz",
+        "status": None,
+        "hours": None,
+        "hours_summary": None,
+        "features": ["Weights", "Cycle studio", "Group fitness studio"],
+    },
+    {
+        "name": "Paetara Aspiring Central",
+        "id": "paetara-aspiring-central",
+        "type": "leisure-centre",
+        "facility_types": ["leisure-centre"],
+        "council": "qldc",
+        "council_name": "Queenstown Lakes",
+        "source": "queenstown-lakes-district-council",
+        "source_url": QLDC_BASE + "/recreation/paetara-aspiring-central/",
+        "listing_source_url": QLDC_RECREATION_SOURCE,
+        "description": "Community recreation space with two multi-use indoor courts, a studio, and community areas.",
+        "address": "35 Plantation Road, Wānaka",
+        "operator": "QLDC Sport and Recreation",
+        "phone": "03-450-1721",
+        "email": "pac@qldc.govt.nz",
+        "status": None,
+        "hours": [
+            {"label": "Sunday", "text": "Closed"},
+            {"label": "Monday-Friday", "text": "9.00am-9.00pm"},
+            {"label": "Saturday", "text": "9.00am-3.00pm"},
+        ],
+        "hours_summary": "Monday-Friday 9.00am-9.00pm; Saturday 9.00am-3.00pm; Sunday closed.",
+        "features": ["Two multi-use indoor courts", "Studio", "Community space", "Kahu Youth", "Aspiring Gymsports"],
+    },
+]
 
 EVENT_TYPES = {
     "Event",
@@ -1210,7 +1416,8 @@ def meta_content(page_html: str, key: str) -> str | None:
 
 
 def slug_text(value: str) -> str:
-    value = html.unescape(value).lower()
+    value = unicodedata.normalize("NFKD", html.unescape(value).lower())
+    value = value.encode("ascii", "ignore").decode("ascii")
     value = re.sub(r"[^a-z0-9]+", "-", value)
     return value.strip("-")
 
@@ -2832,6 +3039,33 @@ def fetch_tga_facilities(kind: str) -> tuple[list[dict[str, Any]], str]:
     return facilities, final_url
 
 
+def clone_qldc_facility(item: dict[str, Any], requested_type: str | None = None) -> dict[str, Any]:
+    facility = dict(item)
+    for key in ("facility_types", "features"):
+        if isinstance(facility.get(key), list):
+            facility[key] = list(facility[key])
+    if isinstance(facility.get("hours"), list):
+        facility["hours"] = [dict(x) for x in facility["hours"]]
+    if requested_type and requested_type in facility.get("facility_types", []):
+        facility["type"] = requested_type
+    return facility
+
+
+def fetch_qldc_facilities(kind: str) -> tuple[list[dict[str, Any]], str, str | None]:
+    if kind == "library":
+        return [], QLDC_RECREATION_SOURCE, "Libraries are outside this skill's recreation-focused data source."
+    source_url = QLDC_SWIM_SOURCE if kind == "pool" else QLDC_RECREATION_SOURCE
+    facilities = [
+        clone_qldc_facility(item, kind)
+        for item in QLDC_FACILITIES
+        if kind in item.get("facility_types", [])
+    ]
+    note = None
+    if kind == "pool":
+        note = "QLDC operates three aquatic facilities; community pools listed here are grant-assisted and community-operated."
+    return facilities, source_url, note
+
+
 def parse_time_label(value: str) -> dt.datetime | None:
     for fmt in ("%I:%M %p", "%I %p"):
         try:
@@ -3282,6 +3516,15 @@ def pool_detail_for_council(council: str, name: str) -> tuple[dict[str, Any] | N
             "facility": card,
             "lane_availability_today": None,
         }, listing_url, []
+    if council == "qldc":
+        cards, listing_url, _ = fetch_qldc_facilities("pool")
+        card = find_facility(cards, name)
+        if not card:
+            return None, listing_url, [c["name"] for c in cards[:10]]
+        return {
+            "facility": clone_qldc_facility(card, "pool"),
+            "lane_availability_today": None,
+        }, listing_url, []
     if council == "ham":
         cards, listing_url = fetch_ham_facilities("pool")
         card = find_facility(cards, name)
@@ -3375,6 +3618,11 @@ def cmd_pools(args: argparse.Namespace) -> None:
             die("--region is only supported for Auckland pools")
         pools, source_url = fetch_tga_facilities("pool")
         pools = pools[: args.limit]
+    elif args.council == "qldc":
+        if args.region:
+            die("--region is only supported for Auckland pools")
+        pools, source_url, note = fetch_qldc_facilities("pool")
+        pools = pools[: args.limit]
     else:
         if args.region:
             die("--region is only supported for Auckland pools")
@@ -3394,7 +3642,7 @@ def cmd_pools(args: argparse.Namespace) -> None:
 
 def cmd_pool(args: argparse.Namespace) -> None:
     started = time.perf_counter()
-    councils = [args.council] if args.council else ["whg", "npr", "has", "npl", "rot", "akl", "tga", "wlg", "ham", "hutt", "porirua", "uhutt", "kapiti", "chc", "pmn"]
+    councils = [args.council] if args.council else ["qldc", "whg", "npr", "has", "npl", "rot", "akl", "tga", "wlg", "ham", "hutt", "porirua", "uhutt", "kapiti", "chc", "pmn"]
     suggestions_by_council: list[str] = []
     for council in councils:
         detail, listing_url, suggestions = pool_detail_for_council(council, args.name)
@@ -3528,6 +3776,11 @@ def cmd_facilities(args: argparse.Namespace) -> None:
         else:
             facilities, source_url = fetch_tga_facilities(args.type)
             note = None
+        facilities = facilities[: args.limit]
+    elif args.council == "qldc":
+        if args.region:
+            die("--region is only supported for Auckland facilities")
+        facilities, source_url, note = fetch_qldc_facilities(args.type)
         facilities = facilities[: args.limit]
     else:
         if args.region:
