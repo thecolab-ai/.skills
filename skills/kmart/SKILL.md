@@ -1,0 +1,74 @@
+---
+name: kmart
+description: Query Kmart NZ and AU public read-only product search, SKU lookup, specials-style product metadata, and store-location sitemap data through a lightweight no-login CLI. Use when the task involves Kmart NZ or AU product lookup, prices, product SKUs, clearance/promotional snapshots, store URL discovery, or machine-readable Kmart product data. Read-only; no login, cart, checkout, or account actions.
+---
+
+# Kmart
+
+## Goal
+
+Query live Kmart NZ and AU public product data through a small deterministic CLI with human-readable and JSON output, without browser automation or account login.
+
+## Use this when
+
+- A user asks for Kmart NZ or AU product prices
+- A user wants to search Kmart products by keyword
+- A user has Kmart SKUs and wants product details
+- A user wants a lightweight clearance or promotional product snapshot
+- A user needs public Kmart store-location URLs from the site sitemaps
+- A workflow needs fast read-only Kmart data for comparisons or reports
+
+## Do not use this for
+
+- Authenticated account, OnePass, personalised, cart, checkout, delivery-slot, payment, order, or review actions
+- High-volume scraping or redistributing scraped Kmart product data as a dataset
+- Historical pricing or price-change claims unless another dataset provides history
+- Canonical store trading-hour or stock-availability claims; verify store pages or official locator output before publishing
+
+## Preferred workflow
+
+1. Run `scripts/cli.py` with the narrowest subcommand that answers the task
+2. Default to NZ unless the user asks for AU; pass `--country au` for Australia
+3. Use `search` for keyword product lookup and `product` when an exact SKU is known
+4. Use `specials` for a clearance/promotional snapshot based on product metadata
+5. Use `stores` for public store-detail URL discovery from Kmart sitemaps
+6. Use `--json` for agent chaining, comparisons, or structured reports
+7. Mention that prices and specials are live online Kmart snapshots and the source is unofficial
+
+## CLI
+
+Run with:
+
+```bash
+python3 skills/kmart/scripts/cli.py <command> [flags]
+```
+
+### Commands
+
+- `search <query> [--country nz|au] [--limit N] [--page N] [--json]` — product search with prices
+- `product <sku> [--country nz|au] [--json]` — fetch exact SKU details via product search metadata
+- `stores [--region text] [--country nz|au] [--limit N] [--json]` — list store-detail URLs from public sitemaps
+- `specials [query] [--country nz|au] [--limit N] [--page N] [--json]` — clearance/promotional products inferred from product metadata
+
+Examples:
+
+```bash
+python3 skills/kmart/scripts/cli.py search lego --limit 10
+python3 skills/kmart/scripts/cli.py search "air fryer" --country au --limit 5 --json
+python3 skills/kmart/scripts/cli.py product 43684687 --json
+python3 skills/kmart/scripts/cli.py specials sale --limit 10 --json
+python3 skills/kmart/scripts/cli.py stores --country au --region melbourne --limit 5 --json
+```
+
+## Resources
+
+- CLI entrypoint: `scripts/cli.py`
+- API and stability notes: `references/api-notes.md`
+
+## Notes
+
+- No API key, username, password, account cookie, or browser automation is required for the implemented read-only operations
+- Product search and SKU lookup use the public Constructor.io search endpoints configured by the Kmart web app
+- Store discovery uses public Kmart XML sitemaps because direct store GraphQL calls were protected by Akamai during discovery
+- Specials are a best-effort live snapshot from public product metadata such as clearance badges, sale badges, save-price text, and non-list price types
+- Endpoint shapes can change; verify with a small live query before relying on large workflows
