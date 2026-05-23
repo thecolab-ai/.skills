@@ -11,6 +11,14 @@ CLI = SKILL_DIR / "scripts" / "cli.py"
 REGRESSION_ADDRESS = "65 Riverside Drive Whangarei"
 REGRESSION_PROPERTY_ID = "c1bf1078-9c44-4f03-b9e0-b2ada7a4f992"
 
+# Suburb regression tests: these use "SuburbName CityName" format which
+# previously triggered a bug where resolve_suburb returned no results.
+SUBURB_TESTS = [
+    ("Riverside Whangarei", 1413),
+    ("Ponsonby Auckland", 1279),
+    ("Kelburn Wellington", 670),
+]
+
 
 def run(args: list) -> subprocess.CompletedProcess:
     return subprocess.run(
@@ -111,6 +119,44 @@ def test_nearby():
 
 
 results.append(test(f"nearby {REGRESSION_PROPERTY_ID} returns comparables[]", test_nearby))
+
+
+def make_suburb_test(name_or_id: str, expected_suburb_id: int):
+    def _test():
+        result = run(["suburb", name_or_id, "--json"])
+        if result.returncode != 0:
+            print(f"  stderr: {result.stderr[:200]}")
+            return False
+        data = json.loads(result.stdout)
+        sub = data.get("suburb")
+        if not isinstance(sub, dict):
+            print(f"  stdout: {result.stdout[:200]}")
+            print("  Expected suburb{} in response")
+            return False
+        got_id = sub.get("suburb_id")
+        if got_id != expected_suburb_id:
+            print(f"  Expected suburb_id {expected_suburb_id}, got {got_id}")
+            return False
+        if not sub.get("title"):
+            print("  Missing suburb title")
+            return False
+        latest = data.get("latest_median_estimate") or {}
+        if latest.get("estimate") is None:
+            print("  Missing latest_median_estimate.estimate")
+            return False
+        rent = data.get("median_rent_estimate") or {}
+        if rent.get("estimate") is None:
+            print("  Missing median_rent_estimate.estimate")
+            return False
+        return True
+    return _test
+
+
+for suburb_name, suburb_id in SUBURB_TESTS:
+    results.append(test(
+        f"suburb '{suburb_name}' returns suburb_id={suburb_id} with estimate and rent",
+        make_suburb_test(suburb_name, suburb_id),
+    ))
 
 if all(results):
     print("All tests passed.")

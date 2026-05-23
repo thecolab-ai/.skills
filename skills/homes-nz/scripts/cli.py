@@ -465,16 +465,42 @@ def cmd_property(args: argparse.Namespace) -> None:
 
 
 def resolve_suburb(value: str) -> dict[str, Any]:
+    """Resolve a suburb name (or numeric id) to its search result dict.
+
+    When the query includes a city qualifier (e.g. "Ponsonby Auckland") the
+    address/search endpoint often returns only Type=1 city-level rows.  We
+    apply the same trailing-word-stripping fallback used by the address command:
+    strip the last word iteratively until we get a Type=2 suburb row, or until
+    only a single word remains.
+    """
     if value.isdigit():
         return {"SuburbID": int(value), "Title": value}
-    payload = request_json(BASE_GATEWAY, "/address/search", {"Address": value})
-    results = [x for x in (payload or {}).get("Results") or [] if isinstance(x, dict)]
-    for item in results:
-        if item.get("Type") == 2 and item.get("SuburbID"):
-            return item
-    for item in results:
-        if item.get("SuburbID"):
-            return item
+
+    def _search_for_suburb(query: str) -> dict[str, Any] | None:
+        payload = request_json(BASE_GATEWAY, "/address/search", {"Address": query})
+        results = [x for x in (payload or {}).get("Results") or [] if isinstance(x, dict)]
+        for item in results:
+            if item.get("Type") == 2 and item.get("SuburbID"):
+                return item
+        for item in results:
+            if item.get("SuburbID"):
+                return item
+        return None
+
+    # First attempt with the full query.
+    result = _search_for_suburb(value)
+    if result:
+        return result
+
+    # If that failed (e.g. all results were Type=1 city rows), progressively
+    # strip trailing words and retry — same strategy as address command.
+    words = value.split()
+    while len(words) > 1:
+        words = words[:-1]
+        result = _search_for_suburb(" ".join(words))
+        if result:
+            return result
+
     die(f"no suburb id found for {value!r}")
 
 

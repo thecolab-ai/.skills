@@ -35,6 +35,7 @@ The CLI sends browser-like `Accept`, `Referer`, `Origin`, and `User-Agent` heade
 - `GET /map/radius/addresses` was present in the bundle but returned `could not parse request body` for direct no-login reproduction, so `nearby` uses `GET /map/items` with a bounding box instead.
 - `GET /suburb/estimate_history/{id}` was present in the bundle and returned JSON, but direct live checks produced inconsistent values for known suburbs. The CLI uses the query form, which matched the expected suburb market levels in live verification.
 - No no-login suburb sales-volume aggregate was verified. The `suburb` command reports the available suburb property count from typeahead, HomesEstimate trend, and median rent estimate.
+- **API drift (observed ~mid-2025, suburb resolution):** `GET /address/search` returns only `Type: 1` (city-level) rows when the query combines a suburb name with a city name (e.g. "Ponsonby Auckland", "Kelburn Wellington"). This broke `resolve_suburb`, which could not find a `SuburbID` in results. The fix applies the same trailing-word-stripping fallback already used by the `address` command: if the full query yields no result with a `SuburbID`, progressively strip trailing words and retry until a `Type: 2` suburb row is returned or a single word remains. `GET /median_suburb_rent_estimate?id={suburb_id}` was also reported as intermittently returning HTTP 500 around the same period but has since recovered; it remains the live rent-estimate endpoint and is verified working as of May 2026.
 
 ## Stability and safety
 
