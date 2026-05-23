@@ -191,7 +191,18 @@ def cmd_search(args: argparse.Namespace) -> None:
 
 
 def cmd_specials(args: argparse.Namespace) -> None:
-    data = products_query("specials", search=args.query, limit=args.limit, page=args.page, in_stock_only=args.in_stock_only)
+    if args.query:
+        # The upstream specials endpoint ignores the search parameter, so when the
+        # user supplies a query we use the search target and filter to specials
+        # client-side. Fetch up to the API max so the filter has enough to work with.
+        fetch_size = max(args.limit * 4, 24)
+        data = products_query("search", search=args.query, limit=fetch_size, page=args.page, in_stock_only=args.in_stock_only)
+        specials_only = [p for p in data["products"] if p.get("is_special")]
+        data["products"] = specials_only[:args.limit]
+        data["count"] = len(data["products"])
+        data["target"] = "specials"
+    else:
+        data = products_query("specials", limit=args.limit, page=args.page, in_stock_only=args.in_stock_only)
     emit(data, args.json)
 
 
