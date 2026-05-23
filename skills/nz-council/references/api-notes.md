@@ -21,6 +21,8 @@ Implemented as the primary event source.
 - List Wellington: `https://www.eventfinda.co.nz/whatson/events/wellington`
 - List Christchurch: `https://www.eventfinda.co.nz/whatson/events/christchurch`
 - List New Plymouth: `https://www.eventfinda.co.nz/whatson/events/new-plymouth`
+- List Nelson: `https://www.eventfinda.co.nz/whatson/events/nelson-region`
+- List Tasman: `https://www.eventfinda.co.nz/whatson/events/tasman-district`
 - List Whangarei: `https://www.eventfinda.co.nz/whatson/events/whangarei`
 - List Tauranga: `https://www.eventfinda.co.nz/whatson/events/tauranga`
 - List Queenstown Lakes: `https://www.eventfinda.co.nz/whatson/events/queenstown`
@@ -603,6 +605,43 @@ Useful fields observed:
 - QLDC pages link users to lane availability/bookings, but no anonymous public lane-availability payload is wired in v1.
 
 Freshness: source-linked snapshot from public QLDC pages. Users should follow the `source_url` before travel, especially for seasonal Arrowtown Memorial Pool and community pools.
+
+### Nelson City pools
+
+Implemented as council-sourced static facility records.
+
+- Council listing: `https://www.nelson.govt.nz/5community/2recreation/swimming-pools`
+- Operator detail pages linked by council:
+  - `https://www.clmnz.co.nz/riverside-swimming-pool/`
+  - `https://www.clmnz.co.nz/nayland-park-pool/`
+
+Observed pools:
+
+- Riverside Pool
+- Nayland Park Pool
+
+The Nelson council page states there are two council-owned pools. Riverside Pool is described as an indoor, all-year pool in central Nelson on Riverside Drive. Nayland Park Pool is described as a Stoke summer-season pool adjacent to Nayland College. CLM operator pages provide current opening hours, contact details, and facility features.
+
+Freshness: static records seeded from the council page and linked CLM detail pages. This avoids turning the CLI into a browser automation client while keeping links to current hours.
+
+### Tasman District recreation facilities
+
+Implemented as council-sourced static facility records.
+
+- Swimming listing: `https://www.tasman.govt.nz/my-region/recreation/beaches-and-swimming`
+- Sport/recreation listing: `https://www.tasman.govt.nz/my-region/recreation/sport-and-recreation-centres`
+- Richmond detail: `https://www.tasman.govt.nz/my-region/recreation/sport-and-recreation-centres/richmond-aquatic-centre`
+- Motueka detail: `https://www.tasman.govt.nz/my-region/recreation/sport-and-recreation-centres/motueka-recreation-centre`
+- Richmond operator page linked by council: `https://www.clmnz.co.nz/richmond/`
+
+Observed scoped facilities:
+
+- Richmond Aquatic Centre
+- Motueka Recreation Centre
+
+Direct `curl` fetches to `tasman.govt.nz` returned a Cloudflare interstitial during discovery. The content above was checked with the local CDP fallback browser at `127.0.0.1:5100`. The CLI intentionally does not depend on CDP or non-stdlib browser automation at runtime.
+
+Freshness: static records seeded from the council pages and linked operator page. Opening hours remain on linked detail/operator pages.
 
 ### Christchurch recreation and sport
 
