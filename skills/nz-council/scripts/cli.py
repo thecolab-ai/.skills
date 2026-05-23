@@ -26,6 +26,10 @@ AKL_LOCATION_ENDPOINT = AKL_LEISURE_BASE + "/umbraco/surface/LocationListing/Ren
 WLG_BASE = "https://wellington.govt.nz"
 ROT_BASE = "https://www.rotorualakescouncil.nz"
 ROT_AQUATIC_BASE = "https://www.clmnz.co.nz/rotorua-aquatic-centre"
+NPL_BASE = "https://www.npdc.govt.nz"
+NPL_COMMUNITY_POOLS_URL = NPL_BASE + "/leisure-and-culture/community-swimming-pools/"
+NPL_TEAC_URL = NPL_BASE + "/leisure-and-culture/todd-energy-aquatic-centre/"
+BELL_BLOCK_POOL_URL = "https://www.bellblockaquaticcentre.co.nz/"
 
 UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146 Safari/537.36"
 
@@ -34,6 +38,7 @@ COUNCIL_LOCATIONS = {
     "wlg": "wellington",
     "chc": "christchurch",
     "rot": "rotorua",
+    "npl": "new-plymouth",
 }
 
 COUNCIL_NAMES = {
@@ -41,6 +46,7 @@ COUNCIL_NAMES = {
     "wlg": "Wellington",
     "chc": "Christchurch",
     "rot": "Rotorua Lakes",
+    "npl": "New Plymouth",
 }
 
 AKL_AREA_IDS = {
@@ -55,6 +61,8 @@ AKL_FACILITY_IDS = {
     "pool": "1126",
     "gym": "1119",
 }
+
+RECREATION_COUNCILS = ("akl", "wlg", "chc", "rot", "npl")
 
 ROT_RECREATION_SOURCE_URL = ROT_BASE + "/parks-lakes-recreation"
 ROT_PARK_RESERVES_SOURCE_URL = ROT_BASE + "/parks-lakes-recreation/park-reserves"
@@ -149,6 +157,101 @@ ROT_FACILITIES: list[dict[str, Any]] = [
         "phone": None,
         "email": None,
         "features": ["Foot pools", "Paddling pool", "BBQs", "Picnic tables", "Playground", "Public toilets"],
+    },
+]
+
+NPL_POOL_FACILITIES = [
+    {
+        "name": "Todd Energy Aquatic Centre",
+        "id": "todd-energy-aquatic-centre",
+        "aliases": ["Todd Energy", "TEAC"],
+        "type": "pool",
+        "council": "npl",
+        "council_name": "New Plymouth",
+        "source": "new-plymouth-district-council",
+        "source_url": NPL_TEAC_URL,
+        "listing_source_url": NPL_COMMUNITY_POOLS_URL,
+        "description": "Indoor and outdoor aquatic centre at Kawaroa Park with pools, hydroslides, sauna, spa, and fitness centre.",
+        "address": "8-10 Tisch Avenue, New Plymouth",
+        "operator": "New Plymouth District Council",
+        "status": None,
+        "seasonal": False,
+        "hours": [
+            {"label": "Monday to Friday", "text": "5:30am - 7:15pm"},
+            {"label": "Saturday and Sunday", "text": "7:00am - 6:45pm"},
+        ],
+        "hours_summary": "Mon-Fri 5:30am-7:15pm; Sat-Sun 7:00am-6:45pm",
+        "hours_note": "Opening hours can change; verify the linked NPDC page before travel.",
+        "phone": "06 759 6060",
+        "email": "enquiries@npdc.govt.nz",
+        "features": ["Indoor pools", "Outdoor pools", "Hydroslides", "Sauna", "Spa", "Fitness centre", "Programmes"],
+    },
+    {
+        "name": "Methanex Bell Block Aquatic Centre",
+        "id": "bell-block-pool",
+        "aliases": ["Bell Block Pool", "Bell Block Swimming Pool"],
+        "type": "pool",
+        "council": "npl",
+        "council_name": "New Plymouth",
+        "source": "bell-block-aquatic-centre",
+        "source_url": BELL_BLOCK_POOL_URL,
+        "listing_source_url": BELL_BLOCK_POOL_URL,
+        "description": "Community aquatic centre with a 25 metre six-lane indoor pool and a seasonal outdoor summer pool.",
+        "address": "10 Murray Street, Bell Block",
+        "operator": "Bell Block Community Pool Charitable Trust",
+        "status": None,
+        "seasonal": True,
+        "hours": [
+            {"label": "Monday to Friday", "text": "5:30am - 6:30pm"},
+            {"label": "Saturday and Sunday", "text": "8:00am - 3:00pm"},
+        ],
+        "hours_summary": "Mon-Fri 5:30am-6:30pm; Sat-Sun 8:00am-3:00pm",
+        "hours_note": "Outdoor pool is seasonal; the linked pool site asks visitors to check Facebook for schedule updates.",
+        "phone": "06 755 3993",
+        "email": "Poolmanager@bellblockaquaticcentre.co.nz",
+        "features": ["25m six-lane indoor pool", "Seasonal outdoor pool", "Aqua aerobics", "Aquabikes", "Weekend inflatables"],
+    },
+    {
+        "name": "Inglewood Pool",
+        "id": "inglewood-pool",
+        "type": "pool",
+        "council": "npl",
+        "council_name": "New Plymouth",
+        "source": "new-plymouth-district-council",
+        "source_url": NPL_COMMUNITY_POOLS_URL + "inglewood-pool/",
+        "listing_source_url": NPL_COMMUNITY_POOLS_URL,
+        "description": "Seasonal community pool with a six-lane outdoor pool and a toddlers' pool.",
+        "address": "Corner of Elliot and Rata Streets, Inglewood",
+        "operator": "New Plymouth District Council",
+        "status": "Closed for the season",
+        "seasonal": True,
+        "hours": [],
+        "hours_summary": "Closed for the season",
+        "hours_note": "Seasonal 2025/26 opening hours are published on the linked NPDC page when available.",
+        "phone": "06 759 6060",
+        "email": "enquiries@npdc.govt.nz",
+        "features": ["Six-lane outdoor pool", "Toddlers' pool"],
+    },
+    {
+        "name": "Waitara Pool",
+        "id": "waitara-pool",
+        "type": "pool",
+        "council": "npl",
+        "council_name": "New Plymouth",
+        "source": "new-plymouth-district-council",
+        "source_url": NPL_COMMUNITY_POOLS_URL + "waitara-pool/",
+        "listing_source_url": NPL_COMMUNITY_POOLS_URL,
+        "description": "Seasonal community pool with a 33m six-lane outdoor pool, learners' pool, toddlers' pool, and deep dive pool.",
+        "address": "1 Leslie Street, Waitara",
+        "operator": "New Plymouth District Council",
+        "status": "Closed for the season",
+        "seasonal": True,
+        "hours": [],
+        "hours_summary": "Closed for the season",
+        "hours_note": "Seasonal 2025/26 opening hours are published on the linked NPDC page when available.",
+        "phone": "06 759 6060",
+        "email": "enquiries@npdc.govt.nz",
+        "features": ["33m six-lane outdoor pool", "Learners' pool", "Toddlers' pool", "Deep dive pool"],
     },
 ]
 
@@ -656,6 +759,12 @@ def fetch_rot_facilities(kind: str | None = "pool") -> tuple[list[dict[str, Any]
     return facilities, ROT_RECREATION_SOURCE_URL
 
 
+def fetch_npl_facilities(kind: str) -> tuple[list[dict[str, Any]], str]:
+    if kind != "pool":
+        return [], NPL_COMMUNITY_POOLS_URL
+    return [dict(item) for item in NPL_POOL_FACILITIES], NPL_COMMUNITY_POOLS_URL
+
+
 def parse_time_label(value: str) -> dt.datetime | None:
     for fmt in ("%I:%M %p", "%I %p"):
         try:
@@ -735,10 +844,15 @@ def parse_akl_availability(url: str) -> dict[str, Any]:
 
 def find_facility(cards: list[dict[str, Any]], query: str) -> dict[str, Any] | None:
     needle = slug_text(query)
-    exact = [c for c in cards if c.get("id") == needle]
+    exact = [c for c in cards if c.get("id") == needle or slug_text(str(c.get("name") or "")) == needle]
     if exact:
         return exact[0]
-    contains = [c for c in cards if needle in c.get("id", "") or c.get("id", "") in needle]
+    contains: list[dict[str, Any]] = []
+    for card in cards:
+        haystacks = [str(card.get("id") or ""), slug_text(str(card.get("name") or ""))]
+        haystacks.extend(slug_text(str(alias)) for alias in card.get("aliases") or [])
+        if any(needle in value or value in needle for value in haystacks if value):
+            contains.append(card)
     return contains[0] if contains else None
 
 
@@ -757,6 +871,11 @@ def cmd_pools(args: argparse.Namespace) -> None:
         if args.region:
             die("--region is only supported for Auckland pools")
         pools, source_url = fetch_rot_facilities("pool")
+        pools = pools[: args.limit]
+    elif args.council == "npl":
+        pools, source_url = fetch_npl_facilities("pool")
+        if args.region:
+            die("--region is only supported for Auckland pools")
         pools = pools[: args.limit]
     else:
         die("Christchurch pools are not wired in v1 because the public council recreation source is JS/vendor-backed")
@@ -815,12 +934,25 @@ def pool_detail_for_council(council: str, name: str, started: float) -> tuple[di
             "facility": card,
             "lane_availability_today": None,
         }, None
+    if council == "npl":
+        cards, listing_url = fetch_npl_facilities("pool")
+        card = find_facility(cards, name)
+        if not card:
+            suggestions = ", ".join(c["name"] for c in cards[:10])
+            return None, f"New Plymouth: {suggestions}"
+        return {
+            "query": {"council": council, "name": name},
+            "listing_source_url": listing_url,
+            "elapsed_ms": round((time.perf_counter() - started) * 1000),
+            "facility": card,
+            "lane_availability_today": None,
+        }, None
     die("Christchurch pool detail is not wired in v1")
 
 
 def cmd_pool(args: argparse.Namespace) -> None:
     started = time.perf_counter()
-    councils = [args.council] if args.council else ["rot", "akl", "wlg"]
+    councils = [args.council] if args.council else ["npl", "rot", "akl", "wlg"]
     misses: list[str] = []
     for council in councils:
         data, miss = pool_detail_for_council(council, args.name, started)
@@ -833,7 +965,7 @@ def cmd_pool(args: argparse.Namespace) -> None:
         council_name = COUNCIL_NAMES.get(args.council, args.council)
         suggestion = misses[0] if misses else "no suggestions available"
         die(f"no {council_name} pool matched {args.name!r}. Try one of: {suggestion}")
-    suggestion_text = " | ".join(misses) if misses else "use --council akl, wlg, or rot"
+    suggestion_text = " | ".join(misses) if misses else "use --council akl, wlg, rot, or npl"
     die(f"no pool matched {args.name!r}. Try one of: {suggestion_text}")
 
 
@@ -870,6 +1002,16 @@ def cmd_facilities(args: argparse.Namespace) -> None:
             note = None
             if args.type == "gym":
                 note = "Rotorua Aquatic Centre includes a gym; linked operator pages have current programme details."
+        facilities = facilities[: args.limit]
+    elif args.council == "npl":
+        if args.region:
+            die("--region is only supported for Auckland facilities")
+        if args.type == "pool":
+            facilities, source_url = fetch_npl_facilities("pool")
+            note = None
+        else:
+            facilities, source_url = [], NPL_COMMUNITY_POOLS_URL
+            note = "New Plymouth recreation support is scoped to public pools in v1."
         facilities = facilities[: args.limit]
     else:
         facilities, source_url = [], "https://recandsport.ccc.govt.nz/"
@@ -971,7 +1113,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     events = sub.add_parser("events", help="list council-area public events")
-    events.add_argument("--council", choices=sorted(COUNCIL_LOCATIONS), help="council area: akl, wlg, chc, or rot")
+    events.add_argument("--council", choices=sorted(COUNCIL_LOCATIONS), help="council area: akl, wlg, chc, rot, or npl")
     events.add_argument("--from", dest="date_from", help="start date filter, ISO yyyy-mm-dd")
     events.add_argument("--to", dest="date_to", help="end date filter, ISO yyyy-mm-dd")
     events.add_argument("--category", help="Eventfinda category slug, e.g. concerts-gig-guide")
@@ -986,7 +1128,7 @@ def build_parser() -> argparse.ArgumentParser:
     event.set_defaults(func=cmd_event)
 
     pools = sub.add_parser("pools", help="list public pools with available hours where supported")
-    pools.add_argument("--council", choices=["akl", "wlg", "chc", "rot"], default="akl", help="council recreation source")
+    pools.add_argument("--council", choices=RECREATION_COUNCILS, default="akl", help="council recreation source")
     pools.add_argument("--region", choices=sorted(AKL_AREA_IDS), help="Auckland region filter")
     pools.add_argument("--limit", type=int, default=50, help="maximum pools to emit")
     pools.add_argument("--json", action="store_true", help="emit JSON")
@@ -994,12 +1136,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     pool = sub.add_parser("pool", help="show one pool detail and lane availability where supported")
     pool.add_argument("name", help="pool name or slug, e.g. Tepid Baths")
-    pool.add_argument("--council", choices=["akl", "wlg", "chc", "rot"], help="council recreation source; default searches supported pool sources")
+    pool.add_argument("--council", choices=RECREATION_COUNCILS, help="council recreation source; default searches supported pool sources")
     pool.add_argument("--json", action="store_true", help="emit JSON")
     pool.set_defaults(func=cmd_pool)
 
     facilities = sub.add_parser("facilities", help="list recreation facilities")
-    facilities.add_argument("--council", choices=["akl", "wlg", "chc", "rot"], default="akl", help="council recreation source")
+    facilities.add_argument("--council", choices=RECREATION_COUNCILS, default="akl", help="council recreation source")
     facilities.add_argument("--type", choices=["pool", "gym", "leisure-centre", "library"], default="pool", help="facility type")
     facilities.add_argument("--region", choices=sorted(AKL_AREA_IDS), help="Auckland region filter")
     facilities.add_argument("--limit", type=int, default=50, help="maximum facilities to emit")
