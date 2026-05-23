@@ -42,7 +42,7 @@ This v1 is deliberately narrow. It is not a general council-services skill.
 10. Use `pools --council ham --json` or `pool "Waterworld" --json` for Hamilton Pools facilities, including Waterworld, Gallagher Aquatic Centre, and current seasonal partner pools.
 11. Use Wellington region council codes for aquatic facilities beyond Wellington City: `hutt`, `porirua`, `uhutt`, and `kapiti`.
 12. Use `pools --council whg --json` or `pool "ASB Leisure" --json` for Whangarei Aquatic Centre. ASB Leisure is treated as a legacy/search alias for the current Ewing Road aquatic-centre source.
-13. Treat Christchurch recreation as discovered but not fully wired in v1; the public council page is protected/vendor-backed.
+13. Use `pools --council chc --json`, `facilities --council chc --type pool --json`, or `pool "Jellie Park" --json` for Christchurch Recreation and Sport facilities. The CLI reads public recandsport CCC endpoints and public facility pages; it does not book sessions or use authenticated portals.
 
 ## CLI
 
@@ -90,6 +90,8 @@ python3 skills/nz-council/scripts/cli.py pool "Naenae Pool" --council hutt --jso
 python3 skills/nz-council/scripts/cli.py pools --council kapiti --json
 python3 skills/nz-council/scripts/cli.py pools --council whg --json
 python3 skills/nz-council/scripts/cli.py pool "ASB Leisure" --json
+python3 skills/nz-council/scripts/cli.py pools --council chc --json
+python3 skills/nz-council/scripts/cli.py pool "Jellie Park" --json
 ```
 
 ## Resources
@@ -113,6 +115,7 @@ python3 skills/nz-council/scripts/cli.py pool "ASB Leisure" --json
 - Upper Hutt H2O Xtream uses public H2O Xtream pages. Some direct requests are Akamai-denied in Python, so the CLI can use the same local CDP fallback.
 - Kāpiti Coast pools use public Kāpiti Coast Aquatics pages.
 - Whangarei recreation uses the current WDC parks/recreation landing page plus CLM's Whangarei Aquatic Centre pages. The old `wdc.govt.nz/Services/Sport-and-recreation/Pools-and-leisure` path returned a WDC 404 during discovery, and `asbleisurecentre.co.nz` did not resolve.
-- Christchurch recreation and sport pages were observed at `recandsport.ccc.govt.nz`, but the useful dynamic data is vendor-backed and is documented rather than wired in v1.
 - Napier aquatic recreation uses Napier City Council's current Napier Aquatic Centre page. The centre is also commonly known as Onekawa Pools.
 - Hastings aquatic recreation uses Hastings District Council's current swimming-pools page plus linked Aquatics Hastings and Splash Planet public pages. Frimley Pool is retained as a closed facility because HDC's current page records the September 2024 closure decision.
+- Christchurch recreation and sport facilities use public `recandsport.ccc.govt.nz` filter endpoints plus linked facility detail pages for pools, gyms, centre details, opening-state text, and public swim/lane summaries where exposed.
+- Christchurch supplemental pool entries use public He Puna Taimoana and Wharenui Sports Centre pages when those facilities are not returned by the recandsport listing endpoint.

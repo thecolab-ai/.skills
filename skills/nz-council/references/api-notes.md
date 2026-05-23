@@ -487,10 +487,75 @@ Freshness: static facility metadata captured from current direct-fetchable publi
 
 ### Christchurch recreation and sport
 
-Discovered, documented, not wired in v1.
+Implemented for Christchurch pools, gyms, and recreation/leisure centres.
 
 - Public entry: `https://recandsport.ccc.govt.nz/`
-- The source is public and references a Perfect Gym-backed client portal.
-- The original council recreation page `https://ccc.govt.nz/recreation` returned an Incapsula challenge during discovery.
+- Listing endpoint: `https://recandsport.ccc.govt.nz/api/FilterCardData/getCentres`
+- Detail pages: facility URLs returned by the listing endpoint
+- Lane availability summary page: `https://recandsport.ccc.govt.nz/swim/lane-availability/`
 
-Reason not wired: useful schedules/facility state appear vendor-backed and need more careful endpoint mapping. The CLI returns a clear v1 note for Christchurch recreation commands instead of scraping challenge pages or authenticated surfaces.
+The old direct council recreation path `https://ccc.govt.nz/recreation` was not used for the CLI. It either redirected to a non-useful page or was previously protected by anti-bot middleware. Endpoint discovery was done through CloakBrowser CDP on `127.0.0.1:5100`; the shipped CLI uses only direct read-only public HTTP requests and stdlib parsing.
+
+Observed listing payloads:
+
+```json
+{"DefaultFilters": "", "CustomFilters": []}
+```
+
+Returns all current recandsport centre cards.
+
+```json
+{
+  "DefaultFilters": "1347",
+  "CustomFilters": [
+    {"text": "Summer pool", "value": 1353, "isSelected": false},
+    {"text": "Cafe", "value": 1355, "isSelected": false},
+    {"text": "Steam room & sauna", "value": 1350, "isSelected": false},
+    {"text": "Spa", "value": 1349, "isSelected": false},
+    {"text": "Toddlers pool", "value": 1348, "isSelected": false},
+    {"text": "Lane swimming", "value": 1347, "isSelected": false}
+  ]
+}
+```
+
+Returns pool cards.
+
+```json
+{"DefaultFilters": "1346", "CustomFilters": []}
+```
+
+Returns gym cards.
+
+Card fields parsed:
+
+- `title`: facility name
+- `subTitle`: address/locality
+- `description`: listing description
+- `url`: public detail URL
+- `imageUrl`: card image
+- `timings.state` and `timings.hoursText`: current opening-state text
+
+Observed recandsport pool facilities during implementation:
+
+- Graham Condon Recreation and Sport Centre
+- Jellie Park Recreation and Sport Centre
+- Matatiki Hornby Centre
+- Parakiore Recreation and Sport Centre
+- Pioneer Recreation and Sport Centre
+- Taiora QEII Recreation and Sport Centre
+- Te Pou Toetoe Linwood Pool
+- Norman Kirk Memorial Summer Pool
+- Te Hapua Halswell Summer Pool
+- Templeton Summer Pool
+- Waltham Summer Pool
+
+Supplemental Christchurch public pool pages:
+
+- He Puna Taimoana: `https://www.hepunataimoana.co.nz/`
+- Wharenui Swimming Pool & Sports Centre: `https://www.wharenuisportscentre.co.nz/swimming/`
+
+Those two facilities are not returned by the recandsport pool listing but have public pages with address, phone, hours/session notes, and pool details, so the CLI adds them to Christchurch pool output.
+
+Sockburn Park Aqua Centre was investigated because it appeared in the requested scope. No current live CCC recreation listing or official active public pool page surfaced during implementation, so it is not emitted as an active facility.
+
+Freshness: live public HTTP requests at command time. Facility opening status is the recandsport card text; detailed public swim availability is a summary from the recandsport lane-availability page where present. No HAR, CDP capture, booking, login, or authenticated portal data is committed or used by the shipped CLI.
