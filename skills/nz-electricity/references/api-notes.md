@@ -1,6 +1,6 @@
 # NZ Electricity API Notes
 
-This skill is a read-only wrapper around public New Zealand electricity data sources. It does not use authenticated API products, cookies, browser sessions, or paid feeds.
+This skill is a read-only wrapper around public New Zealand electricity data sources. It does not use authenticated API products, private credentials, cookies, browser sessions, or paid feeds.
 
 ## Sources shipped
 
@@ -58,6 +58,95 @@ Implemented datasets:
   - Data freshness: monthly, historical; latest observed file on 23 May 2026 was `202604_Generation_MD.csv`
   - Units: source columns are kWh by trading period; CLI aggregates to GWh
 
+### NZ lines-company public outage feeds
+
+- Command: `outages`
+- Auth model for implemented feeds: no login, cookies, browser session, or private credentials
+- Default behavior: fetch current/active outage records from every supported company
+- `--all`: include planned, scheduled, or recent records where the company feed exposes them
+- `--region`: case-insensitive text filter over company, location, cause, outage id, and raw record text
+
+Implemented feeds:
+
+- Vector
+  - Current endpoint: `GET https://outagereporter.api.vector.co.nz/outagereporter/outages/shapes`
+  - Planned endpoint used with `--all`: `GET https://outage-centre.api.vector.co.nz/v1/outages/planned-outages/shapes`
+  - Required header: public browser `apikey` value read from `https://help.vector.co.nz/address/config.js`
+  - Response shape: GeoJSON `FeatureCollection`; features include geometry and `properties.outageType`
+  - CLI mapping: location is an approximate geometry centroid; cause/status use `outageType`
+  - Quirks: public shape feed does not expose suburb, customer count, start time, restoration time, or a stable outage id. The more detailed `/outagereporter/outages` endpoint returned `403`, and subscription endpoints returned `401`.
+  - Refresh rate: not documented in the public config; the map fetches the feed on load.
+
+- Wellington Electricity
+  - Endpoint: `GET https://www.welectricity.co.nz/outages/getalloutages`
+  - Response shape: object with `plannedOutages` and `unplannedOutages` arrays
+  - Useful fields: `suburbsText`, `lastUpdatedCustomersAffected`, `lastUpdatedComments`, `lastUpdatedEta`, `timeOfFault`, `timeBasedStatus`, `customersAffected`, `reasonForOutage`, `outageStartDateTime`, `outageEndDateTime`
+  - CLI mapping: default includes unplanned rows with `timeBasedStatus=current` plus planned rows whose start/end window is active; `--all` includes all non-cancelled planned rows and current/recent unplanned rows
+  - Quirks: the page states there may be a short delay and that outages affecting fewer than 10 properties may not appear.
+  - Refresh rate: not documented; the endpoint is called directly by the outage page.
+
+- Orion
+  - Endpoint: `GET https://www.oriongroup.co.nz/outages-and-support/outages/refresh-outages`
+  - Response shape: object with `CurrentOutages`, `PlannedOutages`, `RecentOutages`, and `TimeStamp`
+  - Useful fields: `Areas`, `Streets`, `TotalNumberOff`, `MaxNumberOff`, `OutageCause`, `PublicComments`, `TimeDown`, `EstTimeUp`, `PlannedStart`, `PlannedEnd`, `IncidentRef`, `Latitude`, `Longitude`
+  - CLI mapping: default includes `CurrentOutages`; `--all` also includes non-cancelled `PlannedOutages`
+  - Quirks: the older APIM URL referenced by page JavaScript (`https://apim.oriongroup.co.nz/ws/rest/api/v1/outages`) returned `401`; the same page exposes the clean refresh endpoint above.
+  - Refresh rate: not documented; response includes its own `TimeStamp`.
+
+- Powerco
+  - Endpoint: `GET https://outages.powerco.co.nz/server/rest/services/Hosted/Outages/FeatureServer/1/query`
+  - Query parameters: `f=json`, `where=1=1`, `outFields=*`, `returnGeometry=true`, `orderByFields=interruption_start_date DESC`
+  - Response shape: ArcGIS FeatureServer `features[].attributes`
+  - Useful fields: `suburb`, `town`, `feeder`, `number_of_detail_records`, `interruption_reason`, `interruption_start_date`, `interruption_restore_date`, `distributor_event_number`, `planned_outage`
+  - CLI mapping: ArcGIS epoch millisecond timestamps are converted to ISO UTC; `planned_outage` controls the status label
+  - Quirks: the outage page redirects to an ArcGIS ExperienceBuilder app; the FeatureServer layer URL is in the app config.
+  - Refresh rate: not documented; treated as a live hosted ArcGIS layer.
+
+- Aurora Energy
+  - Current endpoint: `GET https://www.auroraenergy.co.nz/Umbraco/Api/Outage/currentCenterPoints`
+  - Planned endpoint used with `--all`: `GET https://www.auroraenergy.co.nz/Umbraco/Api/Outage/plannedCenterPoints`
+  - Related endpoints observed but not used: `currentPolygons`, `plannedPolygons`, `restoredCenterPoints`, `currentCounts`, `plannedCounts`
+  - Response shape: GeoJSON `FeatureCollection`; useful values live in `features[].properties`
+  - Useful fields: `eventNumber`, `eventStatus`, `suburbsAffected`, `town`, `streetsAffected`, `currentAffectedCustomers`, `plannedAffectedCustomers`, `totalFaultAffectedCustomers`, `groupOutages`, `eventCause`, `startDateTime`, `endDateTime`
+  - CLI mapping: current endpoint is used by default; `--all` also adds planned center points; grouped customer counts are used when the summary count is zero or missing.
+  - Refresh rate: not documented in the public JavaScript.
+
+- WEL Networks
+  - Endpoint: `POST https://server.ourpower.co.nz/api/?FETCH_GROUPED_FAULTS`
+  - Request body: `{"application":"outages","emit":true,"type":"FETCH_GROUPED_FAULTS"}`
+  - Response shape: object with `payload.groupedFaults[].incidents[]`
+  - Useful fields: group `lat`, group `lng`, incident `faultType`, `suburb`, `street`, `propertiesAffected`, `reason`, `start`, `end`, `incidentReference`
+  - CLI mapping: `faultType == 1` is planned; default includes unplanned incidents and planned incidents only when their start/end window is active; `--all` includes all planned rows.
+  - Quirks: `https://wel.co.nz/outages/` embeds `https://outages.wel.co.nz/?embed=true`; the embedded app calls this OurPower endpoint.
+  - Refresh rate: public app JavaScript polls every 60 seconds.
+
+- Unison
+  - Endpoint: `GET https://www.unison.co.nz/api/outages`
+  - Response shape: JSON array of outage objects
+  - Useful fields: `outageID`, `outageState`, `outageStatus`, `outageType`, `networkRegion`, `areaAffected`, `customersOff`, `interruptionReason`, `startTime`, `finishTime`
+  - CLI mapping: default includes states such as `current` and `ongoing`; `--all` also includes other non-cancelled, non-completed, non-recent states.
+  - Quirks: detailed time windows can appear under `outageWindows`; the CLI keeps the top-level fields in normal output and full raw record in JSON.
+  - Refresh rate: public React widget polls every 300,000 ms (5 minutes).
+
+- Counties Energy
+  - Current endpoint: `GET https://api.integration.countiesenergy.co.nz/user/v1.0/outages`
+  - Planned endpoint: `GET https://api.integration.countiesenergy.co.nz/user/v1.0/shutdowns`
+  - Current response shape: object with `service_orders[]`
+  - Planned response shape: object with `planned_outages[]`
+  - Useful fields: current `address`, `customersAffected`, `description`, `crewStatus`, `etrDateTime`, `serviceOrderDateTime`, `no`, `lat`, `lng`; planned `address`, `affectedCustomers`, `projectType`, `latestInformation`, `shutdownPeriods`, `id`, `lat`, `lng`
+  - CLI mapping: current service orders are always current records; planned rows are included by default only when their shutdown window is active, and all planned rows are included with `--all`.
+  - Quirks: `https://countiesenergy.co.nz/outages/` links to `https://app.countiesenergy.co.nz/#/`; the app bundle uses the integration endpoints above.
+  - Refresh rate: public app cache `staleTime` is 300,000 ms (5 minutes).
+
+- Top Energy
+  - Endpoint used by CLI: `GET https://outages.topenergy.co.nz/api/outages/regions`
+  - Related endpoint observed but not used for detail: `GET https://outages.topenergy.co.nz/api/outages`
+  - Response shape: object with `active[]` and `planned[]` arrays
+  - Useful fields: `name`, `circuitName`, `customersCurrentlyOff`, `additionalInformation`, `startDateTime`, `endDateTime`, `isActive`
+  - CLI mapping: active rows are current records; planned rows are included by default only when `isActive` is true, and all planned rows are included with `--all`.
+  - Quirks: the `/api/outages` marker endpoint is useful for map coordinates, but `/api/outages/regions` carries better outage details.
+  - Refresh rate: public app JavaScript checks poll state every 60 seconds.
+
 ## Official vs derived values
 
 - Official values:
@@ -77,4 +166,5 @@ Implemented datasets:
 - EM6 `price/24hrs/{node_id}`, `current_load/{node_id}`, `recent_load/{node_id}`, `current_generation/{node_id}`, `recent_generation/{node_id}`, `generation_type/24hrs/`, `nz/24hrs/`, and regional peak/load endpoints were documented in the EM6 guide but returned unauthorized or forbidden in live no-login testing from the public API base.
 - EMI Azure API products for real-time prices and dispatch require subscription-key access, so they are out of scope for this no-login skill.
 - Powerswitch plan comparison was skipped because it requires user-specific inputs and is not suitable for a stateless read-only market-data CLI.
-- Lines-company outage feeds were not implemented because no single clean national public API surface was identified during this build.
+- Northpower outage data was checked at `https://northpower.com/electricity/current-outages` and `https://outages.northpower.nz`. The public app renders Livewire snapshots and uses Livewire websocket/update calls with snapshot and CSRF state. No clean stable unauthenticated JSON or ArcGIS FeatureServer feed was found, so `outages --company northpower` reports a warning instead of scraping the rendered app state. The page says the outage list refreshes at least every 15 minutes.
+- Bonus distributors from the follow-up list (Mainpower, Marlborough Lines, Network Tasman, Electra, Westpower, Network Waitaki) were not investigated in this pass after nine of the top-ten target companies were wired.

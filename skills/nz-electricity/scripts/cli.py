@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """NZ electricity public-data CLI.
 
-Read-only stdlib wrapper around public EM6 JSON feeds and EMI CSV datasets.
-No login, API key, browser automation, cache, or data mutation.
+Read-only stdlib wrapper around public electricity JSON feeds and EMI CSV datasets.
+No login, private API key, browser automation, cache, or data mutation.
 """
 from __future__ import annotations
 
@@ -106,6 +106,30 @@ def request_json(path: str, params: dict[str, Any] | None = None, timeout: int =
         die(f"network error calling {url}: {e.reason}")
     except json.JSONDecodeError as e:
         die(f"invalid JSON from {url}: {e}")
+
+
+def request_url_json(
+    url: str,
+    params: dict[str, Any] | None = None,
+    headers: dict[str, str] | None = None,
+    method: str = "GET",
+    body: dict[str, Any] | None = None,
+    timeout: int = 20,
+) -> Any:
+    if params:
+        clean = {k: str(v) for k, v in params.items() if v is not None}
+        url += "?" + urllib.parse.urlencode(clean)
+    req_headers = {"User-Agent": UA, "Accept": "application/json, */*"}
+    if headers:
+        req_headers.update(headers)
+    data = None
+    if body is not None:
+        data = json.dumps(body).encode("utf-8")
+        req_headers.setdefault("Content-Type", "application/json")
+    req = urllib.request.Request(url, headers=req_headers, data=data, method=method)
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        raw = resp.read().decode("utf-8", "replace")
+        return json.loads(raw) if raw else None
 
 
 def read_url_text(url: str, timeout: int = 30) -> str:
@@ -608,6 +632,641 @@ def cmd_generation(args: argparse.Namespace) -> None:
     emit(data, args.json, render_generation)
 
 
+def clean_text(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).replace("\r", " ").replace("\n", " ").strip()
+    text = re.sub(r"\s+", " ", text)
+    if len(text) >= 2 and text[0] == text[-1] == '"':
+        text = text[1:-1].strip()
+    return text or None
+
+
+def first_value(*values: Any) -> Any:
+    for value in values:
+        if value is not None and value != "":
+            return value
+    return None
+
+
+def safe_int(value: Any) -> int | str | None:
+    if value is None or value == "":
+        return None
+    if isinstance(value, int):
+        return value
+    try:
+        return int(str(value).replace(",", "").strip())
+    except (TypeError, ValueError):
+        return clean_text(value)
+
+
+def join_parts(*parts: Any) -> str | None:
+    cleaned: list[str] = []
+    seen: set[str] = set()
+    for part in parts:
+        text = clean_text(part)
+        if not text:
+            continue
+        key = text.lower()
+        if key in seen:
+            continue
+        cleaned.append(text)
+        seen.add(key)
+    return ", ".join(cleaned) if cleaned else None
+
+
+def parse_datetime_value(value: Any) -> dt.datetime | None:
+    text = clean_text(value)
+    if not text:
+        return None
+    try:
+        if text.endswith("Z"):
+            return dt.datetime.fromisoformat(text[:-1] + "+00:00")
+        return dt.datetime.fromisoformat(text)
+    except ValueError:
+        pass
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S"):
+        try:
+            return dt.datetime.strptime(text, fmt)
+        except ValueError:
+            continue
+    return None
+
+
+def is_active_window(start: Any, end: Any) -> bool:
+    parsed_start = parse_datetime_value(start)
+    parsed_end = parse_datetime_value(end)
+    if not parsed_start or not parsed_end:
+        return False
+    now = dt.datetime.now(parsed_start.tzinfo) if parsed_start.tzinfo else dt.datetime.now()
+    if parsed_end.tzinfo and not now.tzinfo:
+        now = now.replace(tzinfo=parsed_end.tzinfo)
+    return parsed_start <= now <= parsed_end
+
+
+def epoch_ms_to_iso(value: Any) -> str | None:
+    if value is None or value == "":
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return clean_text(value)
+    if number <= 0:
+        return None
+    return dt.datetime.fromtimestamp(number / 1000, dt.timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def iter_geojson_lonlat(value: Any) -> Iterable[tuple[float, float]]:
+    if not isinstance(value, list):
+        return
+    if len(value) >= 2 and all(isinstance(v, (int, float)) for v in value[:2]):
+        yield float(value[0]), float(value[1])
+        return
+    for item in value:
+        yield from iter_geojson_lonlat(item)
+
+
+def geojson_centroid(geometry: dict[str, Any] | None) -> dict[str, float] | None:
+    if not geometry:
+        return None
+    coords = list(iter_geojson_lonlat(geometry.get("coordinates")))
+    if not coords:
+        return None
+    lon = sum(item[0] for item in coords) / len(coords)
+    lat = sum(item[1] for item in coords) / len(coords)
+    return {"lat": round(lat, 6), "lng": round(lon, 6)}
+
+
+def outage_record(
+    company_key: str,
+    company: str,
+    status: str,
+    location: str | None,
+    customers: Any,
+    cause: Any,
+    estimated_restoration_time: Any,
+    outage_start_time: Any,
+    source_url: str,
+    outage_id: Any = None,
+    coordinates: dict[str, float] | None = None,
+    raw: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    return {
+        "company_key": company_key,
+        "company": company,
+        "status": status,
+        "location": location or "Unknown location",
+        "customers_affected": safe_int(customers),
+        "cause": clean_text(cause),
+        "estimated_restoration_time": clean_text(estimated_restoration_time),
+        "outage_start_time": clean_text(outage_start_time),
+        "outage_id": clean_text(outage_id),
+        "coordinates": coordinates,
+        "source_url": source_url,
+        "raw": raw or {},
+    }
+
+
+def group_customers(properties: dict[str, Any]) -> int | None:
+    groups = properties.get("groupOutages")
+    if not isinstance(groups, list):
+        return None
+    total = 0
+    found = False
+    for group in groups:
+        if not isinstance(group, dict):
+            continue
+        value = safe_int(group.get("AffectedCustomers"))
+        if isinstance(value, int):
+            total += value
+            found = True
+    return total if found else None
+
+
+def fetch_vector_outages(include_all: bool) -> list[dict[str, Any]]:
+    feeds = [
+        (
+            "https://outagereporter.api.vector.co.nz/outagereporter/outages/shapes",
+            "current",
+            {"apikey": "o2AGN2LXeYbNvyE5cytNGX9INtcPLfj7"},
+        )
+    ]
+    if include_all:
+        feeds.append(
+            (
+                "https://outage-centre.api.vector.co.nz/v1/outages/planned-outages/shapes",
+                "planned",
+                {"apikey": "378657d8-674d-4e20-9fcc-4e23fdfdf224"},
+            )
+        )
+    records: list[dict[str, Any]] = []
+    for url, status, headers in feeds:
+        payload = request_url_json(url, headers=headers)
+        for feature in payload.get("features") or []:
+            if not isinstance(feature, dict):
+                continue
+            props = feature.get("properties") or {}
+            centroid = geojson_centroid(feature.get("geometry"))
+            location = None
+            if centroid:
+                location = f"approx {centroid['lat']:.5f}, {centroid['lng']:.5f}"
+            outage_type = clean_text(props.get("outageType")) or status
+            records.append(
+                outage_record(
+                    "vector",
+                    "Vector",
+                    outage_type.lower(),
+                    location,
+                    None,
+                    outage_type,
+                    None,
+                    None,
+                    url,
+                    coordinates=centroid,
+                    raw={"properties": props, "geometry_type": (feature.get("geometry") or {}).get("type")},
+                )
+            )
+    return records
+
+
+def fetch_wellington_outages(include_all: bool) -> list[dict[str, Any]]:
+    url = "https://www.welectricity.co.nz/outages/getalloutages"
+    payload = request_url_json(url)
+    records: list[dict[str, Any]] = []
+    for item in payload.get("unplannedOutages") or []:
+        status = clean_text(item.get("timeBasedStatus") or item.get("status") or "current") or "current"
+        if not include_all and status.lower() != "current":
+            continue
+        records.append(
+            outage_record(
+                "wellington",
+                "Wellington Electricity",
+                status.lower(),
+                item.get("suburbsText"),
+                item.get("lastUpdatedCustomersAffected"),
+                item.get("lastUpdatedComments"),
+                item.get("lastUpdatedEta"),
+                item.get("timeOfFault"),
+                url,
+                outage_id=item.get("id"),
+                coordinates=item.get("location") if isinstance(item.get("location"), dict) else None,
+                raw=item,
+            )
+        )
+    for item in payload.get("plannedOutages") or []:
+        if clean_text(item.get("status")) == "Cancelled":
+            continue
+        start = item.get("alternateStartDateTime") if item.get("useAlternateDate") else item.get("outageStartDateTime")
+        end = item.get("alternateEndDateTime") if item.get("useAlternateDate") else item.get("outageEndDateTime")
+        if not include_all and not is_active_window(start, end):
+            continue
+        records.append(
+            outage_record(
+                "wellington",
+                "Wellington Electricity",
+                clean_text(item.get("timeBasedStatus") or item.get("status") or "planned") or "planned",
+                item.get("suburbsText"),
+                item.get("customersAffected"),
+                item.get("reasonForOutage"),
+                end,
+                start,
+                url,
+                outage_id=item.get("distributorEventNumber") or item.get("id"),
+                coordinates=item.get("location") if isinstance(item.get("location"), dict) else None,
+                raw=item,
+            )
+        )
+    return records
+
+
+def fetch_orion_outages(include_all: bool) -> list[dict[str, Any]]:
+    url = "https://www.oriongroup.co.nz/outages-and-support/outages/refresh-outages"
+    payload = request_url_json(url)
+    groups = [("CurrentOutages", "current")]
+    if include_all:
+        groups.append(("PlannedOutages", "planned"))
+    records: list[dict[str, Any]] = []
+    for key, status in groups:
+        for item in payload.get(key) or []:
+            if clean_text(item.get("JobStatus")) == "Cancelled":
+                continue
+            start = item.get("PlannedStart") if status == "planned" else item.get("TimeDown")
+            end = first_value(item.get("PlannedEnd"), item.get("EstTimeUp"), item.get("TimeUp"))
+            customers = item.get("MaxNumberOff") if status == "planned" else first_value(item.get("TotalNumberOff"), item.get("MaxNumberOff"))
+            records.append(
+                outage_record(
+                    "orion",
+                    "Orion",
+                    status,
+                    join_parts(item.get("Areas"), item.get("Streets")),
+                    customers,
+                    first_value(item.get("OutageCause"), item.get("PublicComments")),
+                    end,
+                    start,
+                    url,
+                    outage_id=item.get("IncidentRef") or item.get("Id"),
+                    coordinates={"lat": item.get("Latitude"), "lng": item.get("Longitude")}
+                    if item.get("Latitude") is not None and item.get("Longitude") is not None
+                    else None,
+                    raw=item,
+                )
+            )
+    return records
+
+
+def fetch_powerco_outages(include_all: bool) -> list[dict[str, Any]]:
+    url = "https://outages.powerco.co.nz/server/rest/services/Hosted/Outages/FeatureServer/1/query"
+    payload = request_url_json(
+        url,
+        params={
+            "f": "json",
+            "where": "1=1",
+            "outFields": "*",
+            "returnGeometry": "true",
+            "orderByFields": "interruption_start_date DESC",
+        },
+    )
+    records: list[dict[str, Any]] = []
+    for feature in payload.get("features") or []:
+        attrs = feature.get("attributes") or {}
+        status = "planned" if attrs.get("planned_outage") else "current"
+        records.append(
+            outage_record(
+                "powerco",
+                "Powerco",
+                status,
+                join_parts(attrs.get("suburb"), attrs.get("town"), attrs.get("feeder")),
+                attrs.get("number_of_detail_records"),
+                attrs.get("interruption_reason"),
+                epoch_ms_to_iso(attrs.get("interruption_restore_date")),
+                epoch_ms_to_iso(attrs.get("interruption_start_date")),
+                url,
+                outage_id=attrs.get("distributor_event_number") or attrs.get("objectid"),
+                raw=attrs,
+            )
+        )
+    return records
+
+
+def fetch_aurora_outages(include_all: bool) -> list[dict[str, Any]]:
+    feeds = [
+        ("https://www.auroraenergy.co.nz/Umbraco/Api/Outage/currentCenterPoints", "current"),
+    ]
+    if include_all:
+        feeds.append(("https://www.auroraenergy.co.nz/Umbraco/Api/Outage/plannedCenterPoints", "planned"))
+    records: list[dict[str, Any]] = []
+    for url, status in feeds:
+        payload = request_url_json(url)
+        for feature in payload.get("features") or []:
+            props = feature.get("properties") or {}
+            if clean_text(props.get("eventStatus")) == "Cancelled":
+                continue
+            customers = first_value(
+                props.get("currentAffectedCustomers"),
+                props.get("plannedAffectedCustomers"),
+                props.get("totalFaultAffectedCustomers"),
+                group_customers(props),
+            )
+            if customers == 0:
+                customers = group_customers(props) or customers
+            records.append(
+                outage_record(
+                    "aurora",
+                    "Aurora Energy",
+                    status,
+                    join_parts(props.get("suburbsAffected"), props.get("town"), props.get("streetsAffected")),
+                    customers,
+                    props.get("eventCause"),
+                    props.get("endDateTime"),
+                    props.get("startDateTime"),
+                    url,
+                    outage_id=props.get("eventNumber"),
+                    coordinates=geojson_centroid(feature.get("geometry")),
+                    raw=props,
+                )
+            )
+    return records
+
+
+def fetch_wel_outages(include_all: bool) -> list[dict[str, Any]]:
+    url = "https://server.ourpower.co.nz/api/?FETCH_GROUPED_FAULTS"
+    payload = request_url_json(
+        url,
+        method="POST",
+        body={"application": "outages", "emit": True, "type": "FETCH_GROUPED_FAULTS"},
+    )
+    grouped = (payload.get("payload") or {}).get("groupedFaults") or []
+    records: list[dict[str, Any]] = []
+    for group in grouped:
+        coordinates = None
+        if group.get("lat") is not None and group.get("lng") is not None:
+            coordinates = {"lat": group.get("lat"), "lng": group.get("lng")}
+        for incident in group.get("incidents") or []:
+            planned = incident.get("faultType") == 1
+            start = incident.get("start")
+            end = incident.get("end")
+            if not include_all and planned and not is_active_window(start, end):
+                continue
+            status = "planned" if planned else "current"
+            records.append(
+                outage_record(
+                    "wel",
+                    "WEL Networks",
+                    status,
+                    join_parts(incident.get("suburb"), incident.get("street")) or (
+                        f"approx {coordinates['lat']:.5f}, {coordinates['lng']:.5f}" if coordinates else None
+                    ),
+                    incident.get("propertiesAffected"),
+                    incident.get("reason"),
+                    end,
+                    start,
+                    url,
+                    outage_id=incident.get("incidentReference"),
+                    coordinates=coordinates,
+                    raw=incident,
+                )
+            )
+    return records
+
+
+def fetch_unison_outages(include_all: bool) -> list[dict[str, Any]]:
+    url = "https://www.unison.co.nz/api/outages"
+    payload = request_url_json(url)
+    records: list[dict[str, Any]] = []
+    for item in payload if isinstance(payload, list) else []:
+        state = clean_text(item.get("outageState") or item.get("outageStatus") or item.get("outageType")) or "unknown"
+        state_key = state.lower()
+        if state_key in ("cancelled", "completed", "recent"):
+            continue
+        if not include_all and state_key not in ("current", "ongoing"):
+            continue
+        records.append(
+            outage_record(
+                "unison",
+                "Unison",
+                state_key,
+                join_parts(item.get("networkRegion"), item.get("areaAffected")),
+                item.get("customersOff"),
+                item.get("interruptionReason"),
+                item.get("finishTime"),
+                item.get("startTime"),
+                url,
+                outage_id=item.get("outageID"),
+                raw={k: v for k, v in item.items() if k != "outageWindows"},
+            )
+        )
+    return records
+
+
+def fetch_counties_outages(include_all: bool) -> list[dict[str, Any]]:
+    unplanned_url = "https://api.integration.countiesenergy.co.nz/user/v1.0/outages"
+    planned_url = "https://api.integration.countiesenergy.co.nz/user/v1.0/shutdowns"
+    records: list[dict[str, Any]] = []
+    unplanned = request_url_json(unplanned_url)
+    for item in unplanned.get("service_orders") or []:
+        records.append(
+            outage_record(
+                "counties",
+                "Counties Energy",
+                "current",
+                item.get("address"),
+                item.get("customersAffected"),
+                first_value(item.get("description"), item.get("crewStatus")),
+                first_value(item.get("etrDateTime"), item.get("estimatedRestoration"), item.get("etrTime")),
+                item.get("serviceOrderDateTime"),
+                unplanned_url,
+                outage_id=item.get("no"),
+                coordinates={"lat": item.get("lat"), "lng": item.get("lng")}
+                if item.get("lat") is not None and item.get("lng") is not None
+                else None,
+                raw={k: v for k, v in item.items() if k != "hull"},
+            )
+        )
+    planned = request_url_json(planned_url)
+    for item in planned.get("planned_outages") or []:
+        periods = item.get("shutdownPeriods") or []
+        start = periods[0].get("start") if periods and isinstance(periods[0], dict) else item.get("shutdownDateTime")
+        end = periods[-1].get("end") if periods and isinstance(periods[-1], dict) else None
+        if not include_all and not is_active_window(start, end):
+            continue
+        records.append(
+            outage_record(
+                "counties",
+                "Counties Energy",
+                "planned",
+                item.get("address"),
+                item.get("affectedCustomers"),
+                first_value(item.get("projectType"), item.get("latestInformation")),
+                end,
+                start,
+                planned_url,
+                outage_id=item.get("id"),
+                coordinates={"lat": item.get("lat"), "lng": item.get("lng")}
+                if item.get("lat") is not None and item.get("lng") is not None
+                else None,
+                raw={k: v for k, v in item.items() if k != "hull"},
+            )
+        )
+    return records
+
+
+def fetch_top_outages(include_all: bool) -> list[dict[str, Any]]:
+    url = "https://outages.topenergy.co.nz/api/outages/regions"
+    payload = request_url_json(url)
+    records: list[dict[str, Any]] = []
+    for item in payload.get("active") or []:
+        records.append(
+            outage_record(
+                "top",
+                "Top Energy",
+                "current",
+                item.get("circuitName") or item.get("name"),
+                item.get("customersCurrentlyOff"),
+                first_value(item.get("additionalInformation"), "Unplanned outage"),
+                item.get("endDateTime"),
+                item.get("startDateTime"),
+                url,
+                outage_id=item.get("name"),
+                raw=item,
+            )
+        )
+    for item in payload.get("planned") or []:
+        if not include_all and not item.get("isActive"):
+            continue
+        records.append(
+            outage_record(
+                "top",
+                "Top Energy",
+                "planned",
+                item.get("circuitName") or item.get("name"),
+                item.get("customersCurrentlyOff"),
+                first_value(item.get("additionalInformation"), "Planned outage"),
+                item.get("endDateTime"),
+                item.get("startDateTime"),
+                url,
+                outage_id=item.get("name"),
+                raw=item,
+            )
+        )
+    return records
+
+
+OUTAGE_FETCHERS: dict[str, tuple[str, Callable[[bool], list[dict[str, Any]]]]] = {
+    "vector": ("Vector", fetch_vector_outages),
+    "wellington": ("Wellington Electricity", fetch_wellington_outages),
+    "orion": ("Orion", fetch_orion_outages),
+    "powerco": ("Powerco", fetch_powerco_outages),
+    "aurora": ("Aurora Energy", fetch_aurora_outages),
+    "wel": ("WEL Networks", fetch_wel_outages),
+    "unison": ("Unison", fetch_unison_outages),
+    "counties": ("Counties Energy", fetch_counties_outages),
+    "top": ("Top Energy", fetch_top_outages),
+}
+
+OUTAGE_COMPANY_ALIASES = {
+    "welectricity": "wellington",
+    "wellington-electricity": "wellington",
+    "wel-networks": "wel",
+    "counties-energy": "counties",
+    "top-energy": "top",
+    "topenergy": "top",
+}
+
+OUTAGE_UNSUPPORTED = {
+    "northpower": "Northpower renders outage data through Livewire snapshots and websocket/update calls; no clean stable public JSON endpoint was found.",
+    "mainpower": "not investigated in this pass",
+    "marlborough": "not investigated in this pass",
+    "marlborough-lines": "not investigated in this pass",
+    "network-tasman": "not investigated in this pass",
+    "electra": "not investigated in this pass",
+    "westpower": "not investigated in this pass",
+    "network-waitaki": "not investigated in this pass",
+}
+
+
+def resolve_outage_company(raw: str) -> str:
+    key = raw.strip().lower().replace("_", "-").replace(" ", "-")
+    return OUTAGE_COMPANY_ALIASES.get(key, key)
+
+
+def fetch_company_outages(company_key: str, include_all: bool) -> tuple[list[dict[str, Any]], str | None]:
+    label, fetcher = OUTAGE_FETCHERS[company_key]
+    try:
+        return fetcher(include_all), None
+    except urllib.error.HTTPError as e:
+        detail = e.read().decode("utf-8", "replace")[:180]
+        return [], f"{label}: HTTP {e.code} {detail}".strip()
+    except urllib.error.URLError as e:
+        return [], f"{label}: network error {e.reason}"
+    except json.JSONDecodeError as e:
+        return [], f"{label}: invalid JSON ({e})"
+    except TimeoutError as e:
+        return [], f"{label}: timeout ({e})"
+    except Exception as e:
+        return [], f"{label}: {type(e).__name__}: {e}"
+
+
+def record_matches_region(record: dict[str, Any], region: str) -> bool:
+    needle = region.strip().lower()
+    haystack = [
+        record.get("company"),
+        record.get("location"),
+        record.get("cause"),
+        record.get("outage_id"),
+        json.dumps(record.get("raw") or {}, ensure_ascii=False),
+    ]
+    return any(needle in str(value).lower() for value in haystack if value)
+
+
+def cmd_outages(args: argparse.Namespace) -> None:
+    started = time.perf_counter()
+    errors: list[str] = []
+    if args.company:
+        company_key = resolve_outage_company(args.company)
+        if company_key in OUTAGE_UNSUPPORTED:
+            data = {
+                "source": "NZ lines-company public outage feeds",
+                "count": 0,
+                "companies_queried": [],
+                "region_filter": args.region,
+                "include_scheduled": args.all,
+                "elapsed_ms": round((time.perf_counter() - started) * 1000),
+                "outages": [],
+                "errors": [f"{args.company}: {OUTAGE_UNSUPPORTED[company_key]}"],
+            }
+            emit(data, args.json, render_outages)
+            return
+        if company_key not in OUTAGE_FETCHERS:
+            valid = ", ".join(sorted(OUTAGE_FETCHERS))
+            die(f"unknown outage company '{args.company}'. Supported companies: {valid}")
+        company_keys = [company_key]
+    else:
+        company_keys = list(OUTAGE_FETCHERS)
+
+    outages: list[dict[str, Any]] = []
+    for company_key in company_keys:
+        company_outages, error = fetch_company_outages(company_key, args.all)
+        if error:
+            errors.append(error)
+        outages.extend(company_outages)
+
+    if args.region:
+        outages = [record for record in outages if record_matches_region(record, args.region)]
+
+    outages.sort(key=lambda item: (item.get("company") or "", item.get("status") or "", item.get("outage_start_time") or ""))
+    data = {
+        "source": "NZ lines-company public outage feeds",
+        "count": len(outages),
+        "companies_queried": [OUTAGE_FETCHERS[key][0] for key in company_keys],
+        "region_filter": args.region,
+        "include_scheduled": args.all,
+        "elapsed_ms": round((time.perf_counter() - started) * 1000),
+        "outages": outages,
+        "errors": errors,
+    }
+    emit(data, args.json, render_outages)
+
+
 def money(value: Any) -> str:
     if value is None:
         return "-"
@@ -718,6 +1377,47 @@ def render_generation(data: dict[str, Any]) -> str:
     return "\n".join(lines).rstrip()
 
 
+def render_outages(data: dict[str, Any]) -> str:
+    outages = data.get("outages") or []
+    mode = "current, scheduled, and recent" if data.get("include_scheduled") else "current"
+    if not outages:
+        lines = [
+            f"No {mode} outages returned from {len(data.get('companies_queried') or [])} supported company feed(s)"
+            f" ({data.get('elapsed_ms')} ms)."
+        ]
+    else:
+        lines = [
+            f"NZ lines-company outages: {len(outages)} {mode} record(s) from "
+            f"{len(data.get('companies_queried') or [])} feed(s) ({data.get('elapsed_ms')} ms)"
+        ]
+        if data.get("region_filter"):
+            lines.append(f"Region filter: {data.get('region_filter')}")
+        lines.append("")
+        for item in outages:
+            parts = [
+                item.get("company") or "Unknown company",
+                item.get("status") or "unknown",
+                item.get("location") or "Unknown location",
+            ]
+            customers = item.get("customers_affected")
+            if customers is not None:
+                parts.append(f"{customers} customers")
+            if item.get("cause"):
+                parts.append(f"cause {item.get('cause')}")
+            if item.get("outage_start_time"):
+                parts.append(f"start {item.get('outage_start_time')}")
+            if item.get("estimated_restoration_time"):
+                parts.append(f"ETR {item.get('estimated_restoration_time')}")
+            if item.get("outage_id"):
+                parts.append(f"id {item.get('outage_id')}")
+            lines.append(" | ".join(str(part) for part in parts if part))
+    if data.get("errors"):
+        lines.append("")
+        lines.append("Warnings:")
+        lines.extend(str(error) for error in data["errors"])
+    return "\n".join(lines).rstrip()
+
+
 def emit(data: dict[str, Any], as_json: bool, render: Callable[[dict[str, Any]], str]) -> None:
     if as_json:
         print(json.dumps(data, indent=2, ensure_ascii=False))
@@ -770,6 +1470,13 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--limit", type=positive_int, help="limit returned top plants; default 20")
     sp.add_argument("--json", action="store_true")
     sp.set_defaults(func=cmd_generation)
+
+    sp = sub.add_parser("outages", help="current public outage records from supported NZ lines companies")
+    sp.add_argument("--company", help="supported company key, e.g. vector, wellington, powerco, aurora, wel")
+    sp.add_argument("--region", help="case-insensitive suburb, town, region, or street text filter")
+    sp.add_argument("--all", action="store_true", help="include planned, scheduled, or recent outage records where feeds expose them")
+    sp.add_argument("--json", action="store_true")
+    sp.set_defaults(func=cmd_outages)
 
     return ap
 
