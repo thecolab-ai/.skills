@@ -8,7 +8,7 @@ on:
 
 jobs:
   discover:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, skills-smoke]
     outputs:
       skills: ${{ steps.list.outputs.skills }}
     steps:
@@ -22,7 +22,7 @@ jobs:
 
   smoke:
     needs: discover
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, skills-smoke]
     continue-on-error: true
     strategy:
       fail-fast: false
@@ -79,7 +79,7 @@ jobs:
 
   report:
     needs: smoke
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, skills-smoke]
     if: always()
     steps:
       - uses: actions/download-artifact@v4
