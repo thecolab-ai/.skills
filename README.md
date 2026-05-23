@@ -1,5 +1,7 @@
 # thecolab-ai/.skills
 
+![Smoke Tests](https://github.com/thecolab-ai/.skills/actions/workflows/smoke-tests.yml/badge.svg)
+
 Community-contributed AI skills for useful New Zealand-specific data and workflows.
 
 Point your agent at real NZ infrastructure, public datasets, market data, industry feeds, transport APIs, pricing sources, weather services, and other useful local information.
