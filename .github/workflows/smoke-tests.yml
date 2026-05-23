@@ -1,0 +1,86 @@
+name: Smoke Tests
+
+on:
+  workflow_dispatch:
+  pull_request:
+  schedule:
+    - cron: "0 19 * * *"  # 07:00 NZST (UTC+12)
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  prepare:
+    name: Discover skills
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.discover.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Discover skills with smoke tests
+        id: discover
+        run: |
+          matrix=$(find skills -path "*/scripts/smoke_test.py" -type f \
+            | sed 's|skills/||;s|/scripts/smoke_test.py||' \
+            | sort \
+            | jq -R . \
+            | jq -cs .)
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          echo "Found skills: $matrix"
+
+  smoke:
+    name: smoke (${{ matrix.skill }})
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        skill: ${{ fromJson(needs.prepare.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run smoke test
+        run: python3 skills/${{ matrix.skill }}/scripts/smoke_test.py
+
+  summary:
+    name: Summary
+    needs: [prepare, smoke]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Write job summary
+        run: |
+          echo "## Smoke Test Results" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Skill | Status |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|-------|--------|" >> "$GITHUB_STEP_SUMMARY"
+
+          matrix='${{ needs.prepare.outputs.matrix }}'
+          overall='${{ needs.smoke.result }}'
+
+          # Emit one row per skill — individual job outcomes are not
+          # available in the summary context, so we report the aggregate
+          # smoke result for each skill and note the limitation.
+          echo "$matrix" | jq -r '.[]' | while read -r skill; do
+            case "$overall" in
+              success)  status="✅ pass" ;;
+              failure)  status="❌ fail" ;;
+              cancelled) status="⏹ cancelled" ;;
+              *)        status="⚠️ $overall" ;;
+            esac
+            echo "| \`$skill\` | $status |" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "> **Note:** Individual per-skill outcomes are not accessible" >> "$GITHUB_STEP_SUMMARY"
+          echo "> from the summary job in GitHub Actions — the status above" >> "$GITHUB_STEP_SUMMARY"
+          echo "> reflects the overall matrix result (\`$overall\`)." >> "$GITHUB_STEP_SUMMARY"
+          echo "> Expand the individual \`smoke (<skill>)\` jobs in the sidebar" >> "$GITHUB_STEP_SUMMARY"
+          echo "> for per-skill pass/fail detail." >> "$GITHUB_STEP_SUMMARY"
