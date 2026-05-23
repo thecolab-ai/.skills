@@ -7,9 +7,11 @@ The standard is simple: narrow skills, strong trigger descriptions, lean `SKILL.
 ## Quick start
 
 ```bash
-npm install  # repo tooling only — not needed to run Python skills
-npm run new-skill -- my-skill --variant minimal
-npm run validate-skill -- skills/my-skill
+# No install step required — this repo has zero Node.js dependencies.
+# Everything is Python stdlib.
+
+python3 scripts/new_skill.py my-skill --variant minimal
+python3 scripts/validate_skill.py skills/my-skill
 
 # Run skill smoke tests (Python, stdlib only — no extra deps)
 python3 skills/<name>/scripts/smoke_test.py
@@ -133,7 +135,7 @@ Bad:
 A script with no invocation guidance is dead weight.
 Reference the script from `SKILL.md` or a linked reference doc.
 
-Python standard-library CLIs are the only accepted format for skill helpers. Do not add TypeScript or Node-based scripts. Document any required runtime, install step, environment variable, or auth assumption in `SKILL.md`.
+Python standard-library CLIs are the only accepted format for skill helpers. Do not add TypeScript or Node-based scripts. This repo has zero Node.js dependencies — no `npm install`, no `package.json`, no TypeScript toolchain. Document any required runtime, environment variable, or auth assumption in `SKILL.md`.
 
 ## Template variants
 
