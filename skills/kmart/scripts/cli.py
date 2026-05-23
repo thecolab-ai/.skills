@@ -27,7 +27,7 @@ COUNTRIES = {
         "constructor_key": "key_EyiTrcbGw7IFH3wR",
         "currency": "NZD",
         "store_sitemap": "https://www.kmart.co.nz/sitemap/nz/storelocation-sitemap.xml",
-        "store_note": "Kmart NZ's public store sitemap currently exposes shared location slugs; verify individual store pages before treating it as canonical NZ store coverage.",
+        "store_note": "Kmart NZ's public store sitemap is contaminated with AU locations; NZ stores are sourced from official store-detail pages instead.",
     },
     "au": {
         "label": "Kmart AU",
@@ -38,6 +38,35 @@ COUNTRIES = {
         "store_note": None,
     },
 }
+NZ_STORE_SEEDS = [
+    {"location_id": "8212", "name": "Albany NZ", "city": "Auckland", "state": "North Island", "postcode": "0632"},
+    {"location_id": "8232", "name": "Ashburton", "city": "Canterbury", "state": "South Island", "postcode": "7700"},
+    {"location_id": "8208", "name": "Bayfair", "city": "Mt Maunganui", "state": "North Island", "postcode": "3118"},
+    {"location_id": "8217", "name": "Bethlehem", "city": "Tauranga", "state": "North Island", "postcode": "3110"},
+    {"location_id": "8224", "name": "Blenheim", "city": "Blenheim", "state": "South Island", "postcode": "7201"},
+    {"location_id": "8213", "name": "Botany", "city": "Auckland", "state": "North Island", "postcode": "2013"},
+    {"location_id": "8235", "name": "Dunedin", "city": "Dunedin South", "state": "South Island", "postcode": "9012"},
+    {"location_id": "8230", "name": "Hamilton", "city": "Hamilton", "state": "North Island", "postcode": "3204"},
+    {"location_id": "8206", "name": "Hastings NZ", "city": "Hastings", "state": "North Island", "postcode": "4122"},
+    {"location_id": "8201", "name": "Henderson", "city": "Auckland", "state": "North Island", "postcode": "0612"},
+    {"location_id": "8226", "name": "Invercargill", "city": "Invercargill", "state": "South Island", "postcode": "9810"},
+    {"location_id": "8234", "name": "Manukau", "city": "Auckland", "state": "North Island", "postcode": "2104"},
+    {"location_id": "8227", "name": "Napier", "city": "Napier", "state": "North Island", "postcode": "4110"},
+    {"location_id": "8205", "name": "Papatoetoe", "city": "Auckland", "state": "North Island", "postcode": "2025"},
+    {"location_id": "8231", "name": "Papanui", "city": "Christchurch", "state": "South Island", "postcode": "8052"},
+    {"location_id": "8207", "name": "Palmerston North", "city": "Palmerston North", "state": "North Island", "postcode": "4410"},
+    {"location_id": "8222", "name": "Petone", "city": "Petone", "state": "North Island", "postcode": "5012"},
+    {"location_id": "8203", "name": "Porirua", "city": "Porirua", "state": "North Island", "postcode": "5022"},
+    {"location_id": "8225", "name": "Queenstown", "city": "Queenstown", "state": "South Island", "postcode": "9371"},
+    {"location_id": "8210", "name": "Riccarton", "city": "Christchurch", "state": "South Island", "postcode": "8041"},
+    {"location_id": "8218", "name": "Richmond NZ", "city": "Richmond", "state": "South Island", "postcode": "7020"},
+    {"location_id": "8220", "name": "Rotorua", "city": "Bay Of Plenty", "state": "North Island", "postcode": "3013"},
+    {"location_id": "8204", "name": "St Lukes", "city": "Auckland", "state": "North Island", "postcode": "1025"},
+    {"location_id": "8229", "name": "Sylvia Park Nz", "city": "Auckland", "state": "North Island", "postcode": "1060"},
+    {"location_id": "8219", "name": "Te Rapa", "city": "Hamilton", "state": "North Island", "postcode": "3200"},
+    {"location_id": "8216", "name": "Whakatane", "city": "Whakatane", "state": "North Island", "postcode": "3120"},
+    {"location_id": "8221", "name": "Whangarei", "city": "Whangarei", "state": "North Island", "postcode": "0110"},
+]
 UA = os.environ.get(
     "KMART_USER_AGENT",
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
@@ -71,6 +100,19 @@ def request_url(url: str, *, accept: str, timeout: int = 25) -> str:
         die(f"HTTP {e.code} from {url}: {detail}")
     except urllib.error.URLError as e:
         die(f"network error calling {url}: {e.reason}")
+
+
+def request_url_optional(url: str, *, accept: str, timeout: int = 15) -> str | None:
+    headers = {
+        "Accept": accept,
+        "User-Agent": UA,
+    }
+    req = urllib.request.Request(url, headers=headers, method="GET")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return resp.read().decode("utf-8", "replace")
+    except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError):
+        return None
 
 
 def request_json(url: str, timeout: int = 25) -> Any:
@@ -307,6 +349,9 @@ def cmd_specials(args: argparse.Namespace) -> None:
 
 
 def parse_sitemap_locations(country: str, region: str | None = None, limit: int = 50) -> dict[str, Any]:
+    if country == "nz":
+        return parse_nz_store_locations(region=region, limit=limit)
+
     cfg = country_config(country)
     sitemap = str(cfg["store_sitemap"])
     started = time.perf_counter()
@@ -340,6 +385,118 @@ def parse_sitemap_locations(country: str, region: str | None = None, limit: int 
         "note": cfg.get("store_note"),
         "stores": stores[: max(1, limit)],
     }
+
+
+def parse_nz_store_locations(region: str | None = None, limit: int = 50) -> dict[str, Any]:
+    cfg = country_config("nz")
+    started = time.perf_counter()
+    max_results = max(1, limit)
+    stores = [seed_store(seed) for seed in NZ_STORE_SEEDS]
+    if region:
+        needle = region.lower()
+        stores = [
+            store
+            for store in stores
+            if needle in (store.get("location_id") or "").lower()
+            or needle in (store.get("slug") or "").lower()
+            or needle in (store.get("name") or "").lower()
+            or needle in (store.get("city") or "").lower()
+            or needle in (store.get("state") or "").lower()
+            or needle in (store.get("postcode") or "").lower()
+            or needle in (store.get("url") or "").lower()
+        ]
+    count = len(stores)
+    shown = stores[:max_results]
+    stores = [fetch_nz_store_detail(store) for store in shown]
+    elapsed_ms = round((time.perf_counter() - started) * 1000)
+    return {
+        "country": "nz",
+        "source": "https://www.kmart.co.nz/store-detail/{locationId}/",
+        "region": region,
+        "count": count,
+        "shown": len(stores),
+        "elapsed_ms": elapsed_ms,
+        "note": cfg.get("store_note"),
+        "stores": stores,
+    }
+
+
+def seed_store(seed: dict[str, str]) -> dict[str, Any]:
+    location_id = seed["location_id"]
+    slug = slugify_store_name(seed["name"])
+    return {
+        "location_id": location_id,
+        "slug": slug,
+        "name": seed["name"],
+        "country": "nz",
+        "city": seed.get("city"),
+        "state": seed.get("state"),
+        "postcode": seed.get("postcode"),
+        "url": f"{country_config('nz')['web']}/store-detail/{location_id}/",
+    }
+
+
+def slugify_store_name(name: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+    return slug or name.lower()
+
+
+def fetch_nz_store_detail(store: dict[str, Any]) -> dict[str, Any]:
+    raw = request_url_optional(str(store["url"]), accept="text/html, application/xhtml+xml, */*")
+    if not raw:
+        return store
+    location = parse_next_location(raw)
+    if not location:
+        return store
+    address = ", ".join(
+        str(x)
+        for x in [
+            location.get("address1"),
+            location.get("address2"),
+            location.get("address3"),
+            location.get("city"),
+            location.get("state"),
+            location.get("postcode"),
+        ]
+        if x
+    )
+    name = str(location.get("publicName") or store.get("name") or "")
+    store.update(
+        {
+            "location_id": str(location.get("locationId") or store.get("location_id") or ""),
+            "slug": slugify_store_name(name),
+            "name": name,
+            "phone": location.get("phoneNumber"),
+            "address": address or None,
+            "city": location.get("city"),
+            "state": location.get("state"),
+            "postcode": location.get("postcode"),
+            "latitude": location.get("latitude"),
+            "longitude": location.get("longitude"),
+            "trading_hours": [
+                {"day": item.get("weekDay"), "hours": item.get("hours")}
+                for item in as_list(location.get("tradingHours"))
+                if isinstance(item, dict)
+            ],
+        }
+    )
+    return store
+
+
+def parse_next_location(raw: str) -> dict[str, Any] | None:
+    match = re.search(r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>', raw, flags=re.S)
+    if not match:
+        return None
+    try:
+        data = json.loads(html.unescape(match.group(1)))
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(data, dict):
+        return None
+    props = data.get("props") if isinstance(data.get("props"), dict) else {}
+    page_props = props.get("pageProps") if isinstance(props.get("pageProps"), dict) else data.get("pageProps", {})
+    location = page_props.get("location") if isinstance(page_props, dict) else None
+    return location if isinstance(location, dict) and location.get("locationId") else None
 
 
 def parse_store_url(url: str, country: str) -> dict[str, Any]:
@@ -384,7 +541,15 @@ def print_stores(data: dict[str, Any]) -> None:
         print(f"Note: {data.get('note')}")
     print()
     for store in data.get("stores") or []:
-        print(f"{store.get('slug'):>24}  {store.get('name')}")
+        key = store.get("location_id") or store.get("slug")
+        print(f"{str(key or '-'):>24}  {store.get('name')}")
+        details = store.get("address")
+        if not details:
+            details = ", ".join(str(x) for x in [store.get("city"), store.get("state"), store.get("postcode")] if x)
+        if details:
+            print(f"                          {details}")
+        if store.get("phone"):
+            print(f"                          {store.get('phone')}")
         print(f"                          {store.get('url')}")
         print()
 
@@ -417,7 +582,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--json", action="store_true")
     sp.set_defaults(func=cmd_product)
 
-    sp = sub.add_parser("stores", help="list public Kmart store-detail URLs from sitemaps")
+    sp = sub.add_parser("stores", help="list public Kmart store-detail URLs and metadata")
     sp.add_argument("--region", help="filter sitemap store slugs/names by text")
     sp.add_argument("--country", choices=sorted(COUNTRIES), default="nz")
     sp.add_argument("--limit", type=int, default=50)

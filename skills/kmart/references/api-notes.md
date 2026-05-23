@@ -17,7 +17,7 @@ No username, password, account cookie, private token, browser session, or packag
 
 - `GET https://ac.cnstrc.com/search/{query}?key={key}&num_results_per_page={limit}&page={page}&section=Products` for product search
 - The same Constructor.io search endpoint with an exact SKU query for `product <sku>`, filtered client-side to exact `variation_id`, `id`, or `apn`
-- `GET https://www.kmart.co.nz/sitemap/nz/storelocation-sitemap.xml` for NZ-site store-detail URL discovery
+- `GET https://www.kmart.co.nz/store-detail/{locationId}/` for NZ official store-detail page discovery from verified current location IDs
 - `GET https://www.kmart.com.au/sitemap/au/storelocation-sitemap.xml` for AU store-detail URL discovery
 
 Constructor product records include fields such as `variation_id`, `id`, `Brand`, `price`, `prices`, `SavePrice`, `badges`, `variant_badges`, `Seller`, `Size`, `Colour`, `image_url`, `url`, and product descriptions. The CLI normalises those fields into stable JSON keys.
@@ -46,7 +46,7 @@ Treat this as a live promotional/clearance snapshot, not a complete catalogue of
 
 ## Store-location caveat
 
-The AU store sitemap returned AU store-detail URLs as expected. The NZ store sitemap was reachable but appeared to expose shared/AU-style location slugs during discovery. The `stores` command therefore reports the sitemap source and includes a note for NZ output. Use it for public URL discovery, not as the canonical source of current NZ store coverage, trading hours, or stock availability.
+The AU store sitemap returned AU store-detail URLs as expected. The NZ store sitemap was reachable but exposed shared/AU-style location slugs such as `airport-west` and `albury` under the `kmart.co.nz` domain. The `stores` command therefore does not use the NZ store sitemap. For NZ, it uses verified official Kmart NZ store-detail IDs and parses the live store-detail pages for shown results. Use store output for public URL discovery and lightweight metadata, not as a canonical trading-hours or stock-availability source.
 
 ## Stability and safety
 

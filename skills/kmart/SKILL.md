@@ -47,7 +47,7 @@ python3 skills/kmart/scripts/cli.py <command> [flags]
 
 - `search <query> [--country nz|au] [--limit N] [--page N] [--json]` — product search with prices
 - `product <sku> [--country nz|au] [--json]` — fetch exact SKU details via product search metadata
-- `stores [--region text] [--country nz|au] [--limit N] [--json]` — list store-detail URLs from public sitemaps
+- `stores [--region text] [--country nz|au] [--limit N] [--json]` — list store-detail URLs and public store metadata
 - `specials [query] [--country nz|au] [--limit N] [--page N] [--json]` — clearance/promotional products inferred from product metadata
 
 Examples:
@@ -69,6 +69,6 @@ python3 skills/kmart/scripts/cli.py stores --country au --region melbourne --lim
 
 - No API key, username, password, account cookie, or browser automation is required for the implemented read-only operations
 - Product search and SKU lookup use the public Constructor.io search endpoints configured by the Kmart web app
-- Store discovery uses public Kmart XML sitemaps because direct store GraphQL calls were protected by Akamai during discovery
+- AU store discovery uses the public Kmart XML sitemap. NZ store discovery uses official store-detail pages because the NZ store sitemap currently returns AU locations.
 - Specials are a best-effort live snapshot from public product metadata such as clearance badges, sale badges, save-price text, and non-list price types
 - Endpoint shapes can change; verify with a small live query before relying on large workflows
