@@ -1,0 +1,105 @@
+#!/usr/bin/env python3
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+SKILL_DIR = Path(__file__).parent.parent
+CLI = SKILL_DIR / "scripts" / "cli.py"
+
+
+def run(args: list) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        [sys.executable, str(CLI)] + args,
+        capture_output=True,
+        text=True,
+        cwd=str(SKILL_DIR),
+        timeout=45,
+    )
+
+
+def test(name: str, fn):
+    try:
+        ok = fn()
+        status = "PASS" if ok else "FAIL"
+        print(f"[{status}] {name}")
+        return ok
+    except Exception as e:
+        print(f"[FAIL] {name}")
+        print(f"  error: {e}")
+        return False
+
+
+results = []
+
+
+def test_help():
+    result = run(["--help"])
+    return result.returncode == 0
+
+
+results.append(test("--help exits 0", test_help))
+
+_search_sku = "705692"
+
+
+def test_search():
+    global _search_sku
+    result = run(["search", "milk", "--limit", "3", "--json"])
+    if result.returncode != 0:
+        print(f"  stderr: {result.stderr[:200]}")
+        return False
+    search = json.loads(result.stdout)
+    if not isinstance(search.get("products"), list) or len(search["products"]) < 1:
+        print(f"  stdout: {result.stdout[:200]}")
+        print("  Expected Woolworths search JSON to include products[]")
+        return False
+    sku = search["products"][0].get("sku")
+    if sku:
+        _search_sku = str(sku)
+    return True
+
+
+results.append(test("search milk returns products[]", test_search))
+
+
+def test_product():
+    result = run(["product", _search_sku, "--json"])
+    if result.returncode != 0:
+        print(f"  stderr: {result.stderr[:200]}")
+        return False
+    product = json.loads(result.stdout)
+    if not isinstance(product.get("products"), list) or len(product["products"]) < 1:
+        print(f"  stdout: {result.stdout[:200]}")
+        print("  Expected Woolworths product JSON to include a SKU product")
+        return False
+    if not product["products"][0].get("sku"):
+        print("  Expected Woolworths product JSON to include a SKU product")
+        return False
+    return True
+
+
+results.append(test("product <sku> returns products[].sku", test_product))
+
+
+def test_specials():
+    result = run(["specials", "cheese", "--limit", "3", "--json"])
+    if result.returncode != 0:
+        print(f"  stderr: {result.stderr[:200]}")
+        return False
+    specials = json.loads(result.stdout)
+    if not isinstance(specials.get("products"), list):
+        print(f"  stdout: {result.stdout[:200]}")
+        print("  Expected Woolworths specials JSON to include products[]")
+        return False
+    return True
+
+
+results.append(test("specials cheese returns products[]", test_specials))
+
+if all(results):
+    print("All tests passed.")
+    sys.exit(0)
+else:
+    print(f"{results.count(False)} test(s) failed.")
+    sys.exit(1)
