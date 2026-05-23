@@ -4,18 +4,26 @@ This skill is an unofficial lightweight wrapper around public ferry operator web
 
 ## Source and auth
 
-No username, password, API key, private token, account cookie, browser session, or payment credential is required for the implemented operations.
+No operator username, operator password, private token, account cookie, browser session, booking credential, or payment credential is required for the implemented operations.
+
+Fullers/AT Metro service alerts use Auckland Transport's public API gateway with the same public subscription key pattern already used by the `at-transport` skill. Override it with `AT_API_KEY` if needed. Fullers scheduled sailings use the unauthenticated public static GTFS zip at `https://gtfs.at.govt.nz/gtfs.zip`.
 
 Implemented live surfaces:
 
 - SeaLink: `https://www.sealink.co.nz`
 - Interislander: `https://www.interislander.co.nz`
 - Bluebridge: `https://www.bluebridge.co.nz`
+- Fullers360/AT Metro scheduled ferry sailings: `https://gtfs.at.govt.nz/gtfs.zip`
+- Fullers360/AT Metro ferry service alerts: `https://api.at.govt.nz/realtime/legacy/servicealerts`
 
-Documented but not duplicated:
+Reverse-engineered but not used directly by the shipped CLI:
 
 - Fullers360: `https://www.fullers.co.nz`
-- Auckland Transport ferry GTFS/GTFS-RT: use the existing `at-transport` skill for AT Metro live ferry positions/departures. AT routes include GTFS `route_type=4` ferries.
+- Fullers360 mobile app shell/API: `https://pim-mobile.fullers.co.nz`
+
+Still delegated to `at-transport`:
+
+- AT Metro ferry vehicle positions and full stop-departure workflows. AT routes include GTFS `route_type=4` ferries.
 
 ## Endpoint families used
 
@@ -163,17 +171,97 @@ GET https://www.bluebridge.co.nz/service-alerts/
 
 The CLI parses public headings and paragraphs from the service-alert page. During implementation testing it contained fare/fuel and roadworks notices rather than a structured JSON feed.
 
-## Fullers360 and AT boundary
+## Fullers360 schedules and alerts
 
-Fullers360 is intentionally not implemented as a live Auckland Metro ferry tracker in this skill.
+The shipped Fullers implementation uses Auckland Transport public GTFS static schedules plus AT GTFS-RT service alerts. This covers the common Auckland ferry questions that need timetable data, including:
 
-Reasons:
+- `sailings auckland-devonport --operator fullers`
+- `sailings auckland-waiheke --operator fullers`
+- `next auckland-devonport --operator fullers`
+- `alerts --operator fullers`
 
-- The existing `at-transport` skill already covers Auckland Transport GTFS static routes and GTFS-RT real-time feeds. AT's route list includes ferry `route_type=4` routes, including Fullers/AT Metro routes such as Devonport, Half Moon Bay, Hobsonville, Bayswater, Birkenhead, Pine Harbour, Rangitoto-related services, and others.
-- `nz-ferries` should not duplicate AT Metro live vehicle positions or stop departures.
-- Direct Fullers360 timetable query pages with `from`/`to` parameters and customer-update pages returned hCaptcha/PerfDrive validation pages from this CLI environment. The route directory page without query parameters was reachable.
+Static schedule zip:
 
-Use `at-transport` for Auckland Metro ferry live departures, alerts, vehicle positions, stops, and route data. Use Fullers360 web/app for any Fullers tourism timetable surfaces that are not exposed through AT.
+```text
+GET https://gtfs.at.govt.nz/gtfs.zip
+```
+
+The CLI reads these GTFS files from the zip:
+
+- `agency.txt`
+- `routes.txt`
+- `stops.txt`
+- `calendar.txt`
+- `calendar_dates.txt`
+- `trips.txt`
+- `stop_times.txt`
+
+It filters active services for the requested local `Pacific/Auckland` date, selects mapped ferry `route_id` values, and then extracts the first matching from-stop to later to-stop leg within each trip. GTFS times greater than `24:00:00` are normalized onto the next local day.
+
+Mapped Fullers/metro ferry route IDs:
+
+- `DEV-209`: Downtown to Devonport
+- `MTIA-209`: Downtown to Waiheke/Matiatia
+- `HMB-209`: Downtown to Half Moon Bay
+- `HOBS-209`: Downtown to Hobsonville Point and Beach Haven
+- `RANG-209`: Downtown/Devonport to Rangitoto
+- `BAYS-240`: Downtown to Bayswater
+- `BIRK-240`: Downtown to Birkenhead/Northcote/Bayswater
+- `PINE-210`: Downtown to Pine Harbour
+- `WSTH-211`: Downtown to West Harbour
+
+Some Auckland ferry services requested under the user-facing Fullers coverage are represented in AT GTFS under non-`FGL` agency IDs because they are contracted metro ferry services. The normalized CLI operator remains `fullers360` for this route family, while JSON keeps the raw `gtfs_agency_id`, `gtfs_agency_name`, and `gtfs_route_id` for traceability.
+
+Service alerts:
+
+```text
+GET https://api.at.govt.nz/realtime/legacy/servicealerts
+Ocp-Apim-Subscription-Key: <AT_API_KEY>
+```
+
+The CLI filters GTFS-RT alert `informed_entity.route_id` values to the Fullers/metro ferry route IDs above and keeps alerts active now or overlapping the current NZ local day. The default key is the public AT developer key already used in the `at-transport` skill; override with `AT_API_KEY` if the gateway rotates.
+
+### Fullers app/site discovery
+
+The Fullers360 Android app reverse-engineering path was attempted first because mobile apps often expose less-guarded APIs.
+
+Current app:
+
+- Package: `nz.co.fullers.fullers360`
+- App shell: `https://pim-mobile.fullers.co.nz/mobile-app/`
+- Mobile API base observed in the web bundle: `https://pim-mobile.fullers.co.nz/`
+
+Observed mobile endpoints:
+
+```text
+GET  api/public/app/version
+GET  api/public/app
+GET  api/public/app/content?id=<id>
+GET  api/public/products
+GET  api/public/products?from=<from>&to=<to>
+GET  api/public/timetables/<from>/<to>
+POST api/public/device
+DELETE api/public/device
+```
+
+The APK includes a public Basic authorization header for the app's device-registration calls:
+
+```text
+Authorization: Basic YXBpLXVzZXI6RlVWeVpMUGtlcVlV
+```
+
+That decodes to a public app credential pattern used by the APK for `api/public/device`; it did not make the timetable/product endpoints usable from direct stdlib requests and is not used by the shipped CLI.
+
+Website timetable discovery:
+
+```text
+GET https://www.fullers.co.nz/timetables-and-fares/?from=<from>&to=<to>&date=<MM/DD/YYYY>
+X-Requested-With: XMLHttpRequest
+```
+
+The website `timetable-widget.js` requests this URL and parses the `.js.timetable-fares` fragment. CloakBrowser could load some fragments in a full browser context, but direct CLI requests to Fullers app/site endpoints returned Radware/hCaptcha/PerfDrive validation. Because the skill must remain stdlib-only and not depend on browser automation, those endpoints are documented as discovery context rather than shipped as a data source.
+
+Use `at-transport` for Auckland Metro ferry vehicle positions and full stop-departure workflows. Use this skill for the normalized Fullers/AT Metro scheduled sailings and service alerts listed above.
 
 ## Normalized CLI schema
 

@@ -7,16 +7,20 @@ No login, booking mutation, payment, browser automation, or third-party deps.
 from __future__ import annotations
 
 import argparse
+import csv
 import http.cookiejar
 import html
+import io
 import json
 import os
 import re
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import zipfile
 from datetime import date, datetime, time as dtime, timedelta, timezone
 from html.parser import HTMLParser
 from typing import Any
@@ -53,11 +57,37 @@ BLUEBRIDGE_ALERTS = BLUEBRIDGE_BASE + "/service-alerts/"
 
 FULLERS_TIMETABLE = "https://www.fullers.co.nz/timetables-and-fares/"
 FULLERS_UPDATES = "https://www.fullers.co.nz/news-updates/customer-updates/"
+FULLERS_APP_BASE = "https://pim-mobile.fullers.co.nz"
+
+AT_API_BASE = "https://api.at.govt.nz"
+AT_API_KEY = os.environ.get("AT_API_KEY", "de42128902d24a7a86a013633f7aa832")
+AT_GTFS_ZIP = os.environ.get("NZ_FERRIES_AT_GTFS_ZIP", "https://gtfs.at.govt.nz/gtfs.zip")
+AT_GTFS_CACHE = os.environ.get("NZ_FERRIES_AT_GTFS_CACHE", os.path.join(tempfile.gettempdir(), "nz-ferries-at-gtfs.zip"))
+AT_GTFS_CACHE_TTL_SECONDS = int(os.environ.get("NZ_FERRIES_AT_GTFS_CACHE_TTL_SECONDS", str(6 * 60 * 60)))
 
 AT_SKILL_HINT = (
-    "Auckland Metro ferry live positions and departures are already covered by "
-    "the at-transport skill via AT GTFS/GTFS-RT route_type=4."
+    "Fullers360 Auckland metro ferry schedules are fetched here from AT public GTFS static data; "
+    "service alerts are fetched from AT GTFS-RT."
 )
+
+FULLERS_SOURCE_NOTE = (
+    "Fullers360 app/site endpoints were reverse-engineered but direct stdlib requests are Radware-gated; "
+    "this CLI uses AT public GTFS/GTFS-RT for Fullers-operated metro ferry schedules and alerts."
+)
+
+FULLERS_ALERT_ROUTE_IDS = {
+    "DEV-209",
+    "MTIA-209",
+    "GULF-209",
+    "HCRU-209",
+    "HMB-209",
+    "HOBS-209",
+    "RANG-209",
+    "BAYS-240",
+    "BIRK-240",
+    "PINE-210",
+    "WSTH-211",
+}
 
 
 OPERATORS: dict[str, dict[str, Any]] = {
@@ -86,9 +116,9 @@ OPERATORS: dict[str, dict[str, Any]] = {
         "name": "Fullers360",
         "website": "https://www.fullers.co.nz",
         "coverage": "Auckland Harbour and Hauraki Gulf passenger ferries",
-        "live": ["route directory only in this skill"],
-        "source": "fullers.co.nz public timetable route page; live AT Metro overlap belongs in at-transport",
-        "scope_note": AT_SKILL_HINT,
+        "live": ["scheduled sailings", "service alerts"],
+        "source": "AT public GTFS static schedules and GTFS-RT service alerts for Fullers/metro ferry routes",
+        "scope_note": FULLERS_SOURCE_NOTE,
     },
 }
 
@@ -124,18 +154,24 @@ ROUTES: dict[str, dict[str, Any]] = {
         "name": "Auckland to Waiheke Island",
         "from": "Auckland",
         "to": "Waiheke Island",
-        "operators": ["sealink"],
+        "operators": ["sealink", "fullers360"],
         "sealink_from_code": "AKL",
         "sealink_to_code": "WHK",
+        "fullers_gtfs_route_ids": ["MTIA-209"],
+        "fullers_from_stop_ids": ["9711-113c104a"],
+        "fullers_to_stop_ids": ["9790-3b0a55c0"],
         "aliases": ["akl-waiheke", "auckland-to-waiheke", "waiheke"],
     },
     "waiheke-auckland": {
         "name": "Waiheke Island to Auckland",
         "from": "Waiheke Island",
         "to": "Auckland",
-        "operators": ["sealink"],
+        "operators": ["sealink", "fullers360"],
         "sealink_from_code": "WHK",
         "sealink_to_code": "AKL",
+        "fullers_gtfs_route_ids": ["MTIA-209"],
+        "fullers_from_stop_ids": ["9790-3b0a55c0"],
+        "fullers_to_stop_ids": ["9711-113c104a"],
         "aliases": ["waiheke-akl", "waiheke-to-auckland"],
     },
     "half-moon-bay-waiheke": {
@@ -183,7 +219,9 @@ ROUTES: dict[str, dict[str, Any]] = {
         "from": "Auckland Downtown",
         "to": "Devonport",
         "operators": ["fullers360"],
-        "coverage": "at-transport",
+        "fullers_gtfs_route_ids": ["DEV-209"],
+        "fullers_from_stop_ids": ["9702-e5f42777"],
+        "fullers_to_stop_ids": ["9670-6a81c363"],
         "aliases": ["devonport", "auckland-to-devonport"],
     },
     "devonport-auckland": {
@@ -191,7 +229,9 @@ ROUTES: dict[str, dict[str, Any]] = {
         "from": "Devonport",
         "to": "Auckland Downtown",
         "operators": ["fullers360"],
-        "coverage": "at-transport",
+        "fullers_gtfs_route_ids": ["DEV-209"],
+        "fullers_from_stop_ids": ["9670-6a81c363"],
+        "fullers_to_stop_ids": ["9702-e5f42777"],
         "aliases": ["devonport-to-auckland"],
     },
     "auckland-rangitoto": {
@@ -199,40 +239,200 @@ ROUTES: dict[str, dict[str, Any]] = {
         "from": "Auckland Downtown",
         "to": "Rangitoto Island",
         "operators": ["fullers360"],
-        "coverage": "fullers-public-page-blocked",
+        "fullers_gtfs_route_ids": ["RANG-209"],
+        "fullers_from_stop_ids": ["9714-be8c2752"],
+        "fullers_to_stop_ids": ["9760-bfdc6415"],
         "aliases": ["rangitoto", "auckland-to-rangitoto"],
+    },
+    "rangitoto-auckland": {
+        "name": "Rangitoto Island to Auckland",
+        "from": "Rangitoto Island",
+        "to": "Auckland Downtown",
+        "operators": ["fullers360"],
+        "fullers_gtfs_route_ids": ["RANG-209"],
+        "fullers_from_stop_ids": ["9760-bfdc6415"],
+        "fullers_to_stop_ids": ["9714-be8c2752"],
+        "aliases": ["rangitoto-to-auckland"],
+    },
+    "devonport-rangitoto": {
+        "name": "Devonport to Rangitoto Island",
+        "from": "Devonport",
+        "to": "Rangitoto Island",
+        "operators": ["fullers360"],
+        "fullers_gtfs_route_ids": ["RANG-209"],
+        "fullers_from_stop_ids": ["9672-722c912c"],
+        "fullers_to_stop_ids": ["9760-bfdc6415"],
+        "aliases": ["devonport-to-rangitoto"],
+    },
+    "rangitoto-devonport": {
+        "name": "Rangitoto Island to Devonport",
+        "from": "Rangitoto Island",
+        "to": "Devonport",
+        "operators": ["fullers360"],
+        "fullers_gtfs_route_ids": ["RANG-209"],
+        "fullers_from_stop_ids": ["9760-bfdc6415"],
+        "fullers_to_stop_ids": ["9672-722c912c"],
+        "aliases": ["rangitoto-to-devonport"],
+    },
+    "auckland-half-moon-bay": {
+        "name": "Auckland to Half Moon Bay",
+        "from": "Auckland Downtown",
+        "to": "Half Moon Bay",
+        "operators": ["fullers360"],
+        "fullers_gtfs_route_ids": ["HMB-209"],
+        "fullers_from_stop_ids": ["9705-54050269"],
+        "fullers_to_stop_ids": ["9700-2589eeb8"],
+        "aliases": ["auckland-to-half-moon-bay"],
+    },
+    "half-moon-bay-auckland": {
+        "name": "Half Moon Bay to Auckland",
+        "from": "Half Moon Bay",
+        "to": "Auckland Downtown",
+        "operators": ["fullers360"],
+        "fullers_gtfs_route_ids": ["HMB-209"],
+        "fullers_from_stop_ids": ["9700-2589eeb8"],
+        "fullers_to_stop_ids": ["9705-54050269"],
+        "aliases": ["hmb-auckland", "half-moon-bay-to-auckland"],
+    },
+    "auckland-bayswater": {
+        "name": "Auckland to Bayswater",
+        "from": "Auckland Downtown",
+        "to": "Bayswater",
+        "operators": ["fullers360"],
+        "fullers_gtfs_route_ids": ["BAYS-240", "BIRK-240"],
+        "fullers_from_stop_ids": ["9701-8d24d4bc"],
+        "fullers_to_stop_ids": ["9640-24d53d9c"],
+        "aliases": ["auckland-to-bayswater"],
     },
     "bayswater-auckland": {
         "name": "Bayswater to Auckland",
         "from": "Bayswater",
         "to": "Auckland Downtown",
         "operators": ["fullers360"],
-        "coverage": "at-transport",
-        "aliases": ["bayswater"],
+        "fullers_gtfs_route_ids": ["BAYS-240", "BIRK-240"],
+        "fullers_from_stop_ids": ["9640-24d53d9c"],
+        "fullers_to_stop_ids": ["9701-8d24d4bc"],
+        "aliases": ["bayswater", "bayswater-to-auckland"],
+    },
+    "auckland-hobsonville": {
+        "name": "Auckland to Hobsonville Point",
+        "from": "Auckland Downtown",
+        "to": "Hobsonville Point",
+        "operators": ["fullers360"],
+        "fullers_gtfs_route_ids": ["HOBS-209"],
+        "fullers_from_stop_ids": ["9707-62737f23"],
+        "fullers_to_stop_ids": ["9720-9e1a95ac"],
+        "aliases": ["auckland-to-hobsonville"],
     },
     "hobsonville-auckland": {
         "name": "Hobsonville Point to Auckland",
         "from": "Hobsonville Point",
         "to": "Auckland Downtown",
         "operators": ["fullers360"],
-        "coverage": "at-transport",
-        "aliases": ["hobsonville"],
+        "fullers_gtfs_route_ids": ["HOBS-209"],
+        "fullers_from_stop_ids": ["9720-9e1a95ac"],
+        "fullers_to_stop_ids": ["9707-62737f23"],
+        "aliases": ["hobsonville", "hobsonville-to-auckland"],
+    },
+    "auckland-beach-haven": {
+        "name": "Auckland to Beach Haven",
+        "from": "Auckland Downtown",
+        "to": "Beach Haven",
+        "operators": ["fullers360"],
+        "fullers_gtfs_route_ids": ["HOBS-209"],
+        "fullers_from_stop_ids": ["9707-62737f23"],
+        "fullers_to_stop_ids": ["9650-5adb86d3"],
+        "aliases": ["auckland-to-beach-haven"],
+    },
+    "beach-haven-auckland": {
+        "name": "Beach Haven to Auckland",
+        "from": "Beach Haven",
+        "to": "Auckland Downtown",
+        "operators": ["fullers360"],
+        "fullers_gtfs_route_ids": ["HOBS-209"],
+        "fullers_from_stop_ids": ["9650-5adb86d3"],
+        "fullers_to_stop_ids": ["9707-62737f23"],
+        "aliases": ["beach-haven", "beach-haven-to-auckland"],
+    },
+    "auckland-birkenhead": {
+        "name": "Auckland to Birkenhead",
+        "from": "Auckland Downtown",
+        "to": "Birkenhead",
+        "operators": ["fullers360"],
+        "fullers_gtfs_route_ids": ["BIRK-240"],
+        "fullers_from_stop_ids": ["9701-8d24d4bc"],
+        "fullers_to_stop_ids": ["9660-33a61833"],
+        "aliases": ["auckland-to-birkenhead"],
     },
     "birkenhead-auckland": {
         "name": "Birkenhead to Auckland",
         "from": "Birkenhead",
         "to": "Auckland Downtown",
         "operators": ["fullers360"],
-        "coverage": "at-transport",
-        "aliases": ["birkenhead"],
+        "fullers_gtfs_route_ids": ["BIRK-240"],
+        "fullers_from_stop_ids": ["9660-33a61833"],
+        "fullers_to_stop_ids": ["9701-8d24d4bc"],
+        "aliases": ["birkenhead", "birkenhead-to-auckland"],
+    },
+    "auckland-northcote": {
+        "name": "Auckland to Northcote Point",
+        "from": "Auckland Downtown",
+        "to": "Northcote Point",
+        "operators": ["fullers360"],
+        "fullers_gtfs_route_ids": ["BIRK-240"],
+        "fullers_from_stop_ids": ["9701-8d24d4bc"],
+        "fullers_to_stop_ids": ["9730-4fb1fd18"],
+        "aliases": ["auckland-to-northcote", "auckland-northcote-point"],
+    },
+    "northcote-auckland": {
+        "name": "Northcote Point to Auckland",
+        "from": "Northcote Point",
+        "to": "Auckland Downtown",
+        "operators": ["fullers360"],
+        "fullers_gtfs_route_ids": ["BIRK-240"],
+        "fullers_from_stop_ids": ["9730-4fb1fd18"],
+        "fullers_to_stop_ids": ["9701-8d24d4bc"],
+        "aliases": ["northcote", "northcote-to-auckland", "northcote-point-auckland"],
+    },
+    "auckland-pine-harbour": {
+        "name": "Auckland to Pine Harbour",
+        "from": "Auckland Downtown",
+        "to": "Pine Harbour",
+        "operators": ["fullers360"],
+        "fullers_gtfs_route_ids": ["PINE-210"],
+        "fullers_from_stop_ids": ["9703-949ea191"],
+        "fullers_to_stop_ids": ["9740-da781e65"],
+        "aliases": ["auckland-to-pine-harbour"],
     },
     "pine-harbour-auckland": {
         "name": "Pine Harbour to Auckland",
         "from": "Pine Harbour",
         "to": "Auckland Downtown",
         "operators": ["fullers360"],
-        "coverage": "at-transport",
-        "aliases": ["pine-harbour"],
+        "fullers_gtfs_route_ids": ["PINE-210"],
+        "fullers_from_stop_ids": ["9740-da781e65"],
+        "fullers_to_stop_ids": ["9703-949ea191"],
+        "aliases": ["pine-harbour", "pine-harbour-to-auckland"],
+    },
+    "auckland-west-harbour": {
+        "name": "Auckland to West Harbour",
+        "from": "Auckland Downtown",
+        "to": "West Harbour",
+        "operators": ["fullers360"],
+        "fullers_gtfs_route_ids": ["WSTH-211"],
+        "fullers_from_stop_ids": ["9706-b652da2b"],
+        "fullers_to_stop_ids": ["9810-c3dbb67c"],
+        "aliases": ["auckland-to-west-harbour"],
+    },
+    "west-harbour-auckland": {
+        "name": "West Harbour to Auckland",
+        "from": "West Harbour",
+        "to": "Auckland Downtown",
+        "operators": ["fullers360"],
+        "fullers_gtfs_route_ids": ["WSTH-211"],
+        "fullers_from_stop_ids": ["9810-c3dbb67c"],
+        "fullers_to_stop_ids": ["9706-b652da2b"],
+        "aliases": ["west-harbour", "west-harbour-to-auckland"],
     },
 }
 
@@ -413,6 +613,28 @@ def local_dt(day: date, time_text: str) -> datetime:
     return datetime.combine(day, parse_time_text(time_text), tzinfo=NZ_TZ)
 
 
+def gtfs_time_to_local(day: date, value: str | None) -> datetime | None:
+    text = clean(value)
+    if not text:
+        return None
+    parts = text.split(":")
+    if len(parts) < 2:
+        return None
+    try:
+        hour = int(parts[0])
+        minute = int(parts[1])
+        second = int(parts[2]) if len(parts) > 2 else 0
+    except ValueError:
+        return None
+    return datetime.combine(day, dtime(0, 0), tzinfo=NZ_TZ) + timedelta(hours=hour, minutes=minute, seconds=second)
+
+
+def format_local_time(value: datetime) -> str:
+    hour = value.hour % 12 or 12
+    suffix = "AM" if value.hour < 12 else "PM"
+    return f"{hour}:{value.minute:02d} {suffix}"
+
+
 def iso_local(dt: datetime) -> str:
     return dt.replace(microsecond=0).isoformat()
 
@@ -491,6 +713,202 @@ def route_handoff_payload(route_id: str, route: dict[str, Any], command: str) ->
             "skill": "at-transport" if route.get("coverage") == "at-transport" else None,
             "source_url": FULLERS_TIMETABLE,
         },
+    }
+
+
+def at_request_json(path: str, *, timeout: int = 25) -> Any:
+    url = AT_API_BASE + path
+    headers = {
+        "Accept": "application/json",
+        "Ocp-Apim-Subscription-Key": AT_API_KEY,
+        "User-Agent": UA,
+    }
+    req = urllib.request.Request(url, headers=headers, method="GET")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            raw = resp.read().decode("utf-8", "replace")
+            return json.loads(raw) if raw else None
+    except urllib.error.HTTPError as e:
+        raw = e.read().decode("utf-8", "replace")
+        detail = raw[:300]
+        try:
+            payload = json.loads(raw)
+            detail = payload.get("message") or payload.get("title") or detail
+        except Exception:
+            detail = clean(strip_html(raw) or detail)
+        die(f"AT API HTTP {e.code} from {url}: {detail}")
+    except urllib.error.URLError as e:
+        die(f"network error calling {url}: {e.reason}")
+    except json.JSONDecodeError as e:
+        die(f"invalid JSON from {url}: {e}")
+
+
+def at_gtfs_zip_bytes() -> bytes:
+    if AT_GTFS_CACHE:
+        try:
+            if os.path.exists(AT_GTFS_CACHE):
+                age = time.time() - os.path.getmtime(AT_GTFS_CACHE)
+                if age < AT_GTFS_CACHE_TTL_SECONDS and os.path.getsize(AT_GTFS_CACHE) > 0:
+                    with open(AT_GTFS_CACHE, "rb") as fh:
+                        return fh.read()
+        except OSError:
+            pass
+
+    req = urllib.request.Request(AT_GTFS_ZIP, headers={"User-Agent": UA, "Accept": "application/zip,*/*"}, method="GET")
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            data = resp.read()
+    except urllib.error.HTTPError as e:
+        die(f"HTTP {e.code} fetching AT GTFS zip from {AT_GTFS_ZIP}")
+    except urllib.error.URLError as e:
+        die(f"network error fetching AT GTFS zip: {e.reason}")
+
+    if AT_GTFS_CACHE:
+        try:
+            os.makedirs(os.path.dirname(AT_GTFS_CACHE), exist_ok=True)
+            with open(AT_GTFS_CACHE, "wb") as fh:
+                fh.write(data)
+        except OSError:
+            pass
+    return data
+
+
+def gtfs_rows(zf: zipfile.ZipFile, name: str) -> list[dict[str, str]]:
+    with zf.open(name) as fh:
+        text = io.TextIOWrapper(fh, encoding="utf-8-sig", newline="")
+        return list(csv.DictReader(text))
+
+
+def active_gtfs_services(zf: zipfile.ZipFile, day: date) -> set[str]:
+    ymd = day.strftime("%Y%m%d")
+    weekday = day.strftime("%A").lower()
+    active: set[str] = set()
+    for row in gtfs_rows(zf, "calendar.txt"):
+        if row.get("start_date", "") <= ymd <= row.get("end_date", "") and row.get(weekday) == "1":
+            active.add(row["service_id"])
+    for row in gtfs_rows(zf, "calendar_dates.txt"):
+        if row.get("date") != ymd:
+            continue
+        if row.get("exception_type") == "1":
+            active.add(row["service_id"])
+        elif row.get("exception_type") == "2":
+            active.discard(row["service_id"])
+    return active
+
+
+def stop_time_value(row: dict[str, str], key: str) -> str:
+    return clean(row.get(key) or row.get("departure_time") or row.get("arrival_time"))
+
+
+def fullers_leg_from_stop_times(
+    rows: list[dict[str, str]],
+    from_stop_ids: set[str],
+    to_stop_ids: set[str],
+) -> tuple[dict[str, str], dict[str, str]] | None:
+    rows.sort(key=lambda item: int(item.get("stop_sequence") or "0"))
+    for idx, row in enumerate(rows):
+        if row.get("stop_id") not in from_stop_ids:
+            continue
+        for later in rows[idx + 1 :]:
+            if later.get("stop_id") in to_stop_ids:
+                return row, later
+    return None
+
+
+def fullers_sailings(route_id: str, route: dict[str, Any], day: date) -> dict[str, Any]:
+    route_ids = route.get("fullers_gtfs_route_ids") or []
+    from_stop_ids = set(route.get("fullers_from_stop_ids") or [])
+    to_stop_ids = set(route.get("fullers_to_stop_ids") or [])
+    if not route_ids or not from_stop_ids or not to_stop_ids:
+        die(f"Fullers route {route_id} is missing AT GTFS mapping", 2)
+
+    started = time.perf_counter()
+    try:
+        zf = zipfile.ZipFile(io.BytesIO(at_gtfs_zip_bytes()))
+    except zipfile.BadZipFile:
+        die("AT GTFS zip could not be read")
+
+    with zf:
+        agencies = {row["agency_id"]: row for row in gtfs_rows(zf, "agency.txt")}
+        routes = {row["route_id"]: row for row in gtfs_rows(zf, "routes.txt")}
+        stops = {row["stop_id"]: row for row in gtfs_rows(zf, "stops.txt")}
+        active_services = active_gtfs_services(zf, day)
+
+        selected_trips: dict[str, dict[str, str]] = {}
+        for trip in gtfs_rows(zf, "trips.txt"):
+            if trip.get("route_id") in route_ids and trip.get("service_id") in active_services:
+                selected_trips[trip["trip_id"]] = trip
+
+        stop_times_by_trip: dict[str, list[dict[str, str]]] = {trip_id: [] for trip_id in selected_trips}
+        with zf.open("stop_times.txt") as fh:
+            text = io.TextIOWrapper(fh, encoding="utf-8-sig", newline="")
+            for row in csv.DictReader(text):
+                trip_id = row.get("trip_id")
+                if trip_id in stop_times_by_trip:
+                    stop_times_by_trip[trip_id].append(row)
+
+        sailings: list[dict[str, Any]] = []
+        seen: set[tuple[str, str, str]] = set()
+        for trip_id, trip in selected_trips.items():
+            leg = fullers_leg_from_stop_times(stop_times_by_trip.get(trip_id, []), from_stop_ids, to_stop_ids)
+            if not leg:
+                continue
+            dep_row, arr_row = leg
+            dep = gtfs_time_to_local(day, stop_time_value(dep_row, "departure_time"))
+            arr = gtfs_time_to_local(day, stop_time_value(arr_row, "arrival_time"))
+            if not dep or not arr:
+                continue
+            dedupe = (trip_id, dep_row.get("stop_sequence", ""), arr_row.get("stop_sequence", ""))
+            if dedupe in seen:
+                continue
+            seen.add(dedupe)
+            route_info = routes.get(trip.get("route_id", ""), {})
+            agency = agencies.get(route_info.get("agency_id", ""), {})
+            from_stop = stops.get(dep_row.get("stop_id", ""), {})
+            to_stop = stops.get(arr_row.get("stop_id", ""), {})
+            sailings.append(
+                {
+                    "operator": "fullers360",
+                    "operator_name": OPERATORS["fullers360"]["name"],
+                    "route": route_id,
+                    "route_name": route["name"],
+                    "date": day.isoformat(),
+                    "departure_location": clean(from_stop.get("stop_name") or route["from"]),
+                    "arrival_location": clean(to_stop.get("stop_name") or route["to"]),
+                    "departure_time": format_local_time(dep),
+                    "arrival_time": format_local_time(arr),
+                    "departure_datetime": iso_local(dep),
+                    "arrival_datetime": iso_local(arr),
+                    "vessel": "",
+                    "status": "scheduled",
+                    "trip_id": trip_id,
+                    "gtfs_route_id": trip.get("route_id"),
+                    "gtfs_route_short_name": route_info.get("route_short_name"),
+                    "gtfs_agency_id": route_info.get("agency_id"),
+                    "gtfs_agency_name": agency.get("agency_name"),
+                    "headsign": clean(trip.get("trip_headsign")),
+                    "source": "AT public GTFS static schedule",
+                    "source_url": AT_GTFS_ZIP,
+                }
+            )
+
+    sailings.sort(key=lambda item: item["departure_datetime"])
+    warnings = []
+    if not sailings:
+        warnings.append("No active AT GTFS trips matched this Fullers route/date and stop pair.")
+    return {
+        "operator": "fullers360",
+        "route": route_id,
+        "route_name": route["name"],
+        "date": day.isoformat(),
+        "source_url": AT_GTFS_ZIP,
+        "source_fetched_at": now_iso(),
+        "source_note": FULLERS_SOURCE_NOTE,
+        "gtfs_route_ids": route_ids,
+        "count": len(sailings),
+        "elapsed_ms": round((time.perf_counter() - started) * 1000),
+        "warnings": warnings,
+        "sailings": sailings,
     }
 
 
@@ -850,10 +1268,14 @@ def fetch_sailings(route_id: str, route: dict[str, Any], day: date, operator: st
         return route_handoff_payload(route_id, route, "sailings")
     if operator and operator not in route["operators"]:
         die(f"operator {operator} does not serve route {route_id}", 2)
-    if "sealink" in route["operators"]:
+    if operator == "fullers360":
+        return fullers_sailings(route_id, route, day)
+    if "sealink" in route["operators"] and (operator is None or operator == "sealink"):
         if operator and operator != "sealink":
             die(f"operator {operator} does not serve route {route_id}", 2)
         return sealink_sailings(route_id, route, day)
+    if "fullers360" in route["operators"]:
+        return fullers_sailings(route_id, route, day)
     requested = [operator] if operator else [op for op in route["operators"] if op in {"interislander", "bluebridge"}]
     results = []
     for op in requested:
@@ -1015,6 +1437,65 @@ def bluebridge_alerts() -> list[dict[str, Any]]:
     return alerts
 
 
+def at_translation_text(field: Any) -> str:
+    translations = (field or {}).get("translation") if isinstance(field, dict) else None
+    if isinstance(translations, list) and translations:
+        return clean(translations[0].get("text"))
+    return ""
+
+
+def at_alert_is_active_today(periods: list[dict[str, Any]]) -> bool:
+    if not periods:
+        return True
+    now = datetime.now(timezone.utc)
+    today_start = datetime.combine(nz_now().date(), dtime(0, 0), tzinfo=NZ_TZ).astimezone(timezone.utc)
+    today_end = today_start + timedelta(days=1)
+    for period in periods:
+        start_raw = period.get("start")
+        end_raw = period.get("end")
+        start = datetime.fromtimestamp(int(start_raw), timezone.utc) if start_raw else datetime.min.replace(tzinfo=timezone.utc)
+        end = datetime.fromtimestamp(int(end_raw), timezone.utc) if end_raw else datetime.max.replace(tzinfo=timezone.utc)
+        if start <= now <= end:
+            return True
+        if start < today_end and end > today_start:
+            return True
+    return False
+
+
+def fullers_alerts() -> list[dict[str, Any]]:
+    payload = at_request_json("/realtime/legacy/servicealerts")
+    entities = (((payload or {}).get("response") or {}).get("entity") or [])
+    alerts: list[dict[str, Any]] = []
+    for entity in entities:
+        alert = entity.get("alert") or {}
+        informed = alert.get("informed_entity") or []
+        route_ids = sorted(
+            {
+                item.get("route_id")
+                for item in informed
+                if item.get("route_id") in FULLERS_ALERT_ROUTE_IDS
+            }
+        )
+        if not route_ids:
+            continue
+        periods = alert.get("active_period") or []
+        if not at_alert_is_active_today(periods):
+            continue
+        title = at_translation_text(alert.get("header_text")) or entity.get("id") or "AT ferry service alert"
+        summary = at_translation_text(alert.get("description_text"))
+        item = alert_from(title, summary, "fullers360", "https://at.govt.nz/bus-train-ferry/service-announcements/", kind="alert")
+        item["id"] = entity.get("id")
+        item["route_ids"] = route_ids
+        item["cause"] = alert.get("cause")
+        item["effect"] = alert.get("effect")
+        item["severity_level"] = alert.get("severity_level")
+        item["active_period"] = periods
+        item["source"] = "AT GTFS-RT servicealerts"
+        alerts.append(item)
+    alerts.sort(key=lambda item: (item.get("severity_level") or "", item.get("title") or ""))
+    return alerts
+
+
 def fetch_alerts(operator: str | None) -> dict[str, Any]:
     operators = [operator] if operator else ["sealink", "interislander", "bluebridge", "fullers360"]
     alerts: list[dict[str, Any]] = []
@@ -1027,14 +1508,12 @@ def fetch_alerts(operator: str | None) -> dict[str, Any]:
         elif op == "bluebridge":
             alerts.extend(bluebridge_alerts())
         elif op == "fullers360":
-            warnings.append(
-                "Fullers360 customer updates are not fetched by this CLI because the public updates page currently "
-                "requires hCaptcha/PerfDrive validation from direct CLI requests. For AT Metro ferry live alerts, use at-transport."
-            )
+            alerts.extend(fullers_alerts())
     return {
         "operator": operator or "all",
         "source_fetched_at": now_iso(),
         "count": len(alerts),
+        "source_note": FULLERS_SOURCE_NOTE if operator == "fullers360" else None,
         "warnings": warnings,
         "alerts": alerts,
     }
@@ -1046,18 +1525,24 @@ def render_sailings(data: dict[str, Any]) -> str:
         lines = [f"{data['route_name']}: no sailings returned by nz-ferries."]
         lines.extend(f"Note: {warning}" for warning in warnings)
         return "\n".join(lines)
-    lines = [f"{data.get('route_name', data.get('route'))} on {data.get('date', '')}: {data.get('count', 0)} sailings"]
+    date_label = data.get("date")
+    if not date_label and data.get("checked_dates"):
+        checked_dates = data["checked_dates"]
+        date_label = checked_dates[0] if len(checked_dates) == 1 else f"{checked_dates[0]} to {checked_dates[-1]}"
+    lines = [f"{data.get('route_name', data.get('route'))} on {date_label or 'next'}: {data.get('count', 0)} sailings"]
     if data.get("operators_returned"):
         lines.append("Operators: " + ", ".join(data["operators_returned"]))
     if data.get("skipped_by_day_restriction"):
         lines.append(f"Skipped by day restriction: {data['skipped_by_day_restriction']}")
+    for warning in warnings:
+        lines.append(f"Note: {warning}")
     lines.append("")
     for sailing in data.get("sailings") or []:
         status = sailing.get("status") or sailing.get("availability") or ""
         fare = sailing.get("fare_summary", {}).get("adult")
         fare_text = f" adult {money(fare)}" if fare is not None else ""
         note = f" | {sailing['note']}" if sailing.get("note") else ""
-        status_text = f" | {status}" if status and status != "available" else ""
+        status_text = f" | {status}" if status and status not in {"available", "scheduled"} else ""
         lines.append(
             f"{sailing['departure_time']:>7} {sailing['departure_location']} -> {sailing['arrival_location']} "
             f"(arr {sailing['arrival_time']}) {sailing.get('operator_name', sailing.get('operator'))} "
@@ -1120,6 +1605,7 @@ def cmd_routes(args: argparse.Namespace) -> None:
                 "to": route["to"],
                 "operators": route["operators"],
                 "coverage": route.get("coverage"),
+                "fullers_gtfs_route_ids": route.get("fullers_gtfs_route_ids"),
                 "aliases": route.get("aliases", []),
             }
         )
