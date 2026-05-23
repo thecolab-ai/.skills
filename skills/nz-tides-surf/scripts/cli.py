@@ -476,6 +476,10 @@ def normalize_surf_forecast(info: dict[str, Any], days: int, source_url: str) ->
         if not local or not (today <= local.date() < end):
             continue
         sea_temp = value_at(forecast.get("sea_temp"), idx)
+        sea_temp_value = (sea_temp or {}).get("value") if isinstance(sea_temp, dict) else None
+        wetsuit = (sea_temp or {}).get("recomendation") if isinstance(sea_temp, dict) else None
+        wind_kmh = round_or_none(value_at(forecast.get("wind_sp"), idx), 1)
+        gust_kmh = round_or_none(value_at(forecast.get("wind_gust"), idx), 1)
         rows.append(
             {
                 "time": local.isoformat(),
@@ -488,12 +492,16 @@ def normalize_surf_forecast(info: dict[str, Any], days: int, source_url: str) ->
                 "swell_period_s": round_or_none(value_at(forecast.get("period"), idx), 1),
                 "swell_direction_deg": round_or_none(value_at(forecast.get("swell_dir"), idx), 0),
                 "swell_direction": cardinal(value_at(forecast.get("swell_dir"), idx)),
-                "wind_speed_source": round_or_none(value_at(forecast.get("wind_sp"), idx), 2),
-                "wind_gust_source": round_or_none(value_at(forecast.get("wind_gust"), idx), 2),
+                "wind_speed_kmh": wind_kmh,
+                "wind_speed_knots": round(wind_kmh / 1.852, 1) if wind_kmh is not None else None,
+                "wind_gust_kmh": gust_kmh,
+                "wind_gust_knots": round(gust_kmh / 1.852, 1) if gust_kmh is not None else None,
                 "wind_direction_deg": round_or_none(value_at(forecast.get("wind_dir"), idx), 0),
                 "wind_direction": cardinal(value_at(forecast.get("wind_dir"), idx)),
                 "summary": value_at(forecast.get("summary_description"), idx),
-                "sea_temp_c": round_or_none((sea_temp or {}).get("value") if isinstance(sea_temp, dict) else None, 1),
+                "summary_icon": value_at(forecast.get("summary_icon"), idx),
+                "sea_temp_c": round_or_none(sea_temp_value, 1),
+                "wetsuit_recommendation": wetsuit,
             }
         )
     tide_rows = []
@@ -512,6 +520,15 @@ def normalize_surf_forecast(info: dict[str, Any], days: int, source_url: str) ->
                 "height_m": round_or_none(tide.get("depth"), 3),
             }
         )
+    sun_rows = []
+    sunrise_series = forecast.get("sunrise") or []
+    sunset_series = forecast.get("sunset") or []
+    for offset_days in range(max(1, min(days, 7))):
+        day = today + timedelta(days=offset_days)
+        sr = value_at(sunrise_series, offset_days)
+        ss = value_at(sunset_series, offset_days)
+        if sr or ss:
+            sun_rows.append({"date": day.isoformat(), "sunrise": sr, "sunset": ss})
     return {
         "spot": location.get("name") or forecast.get("title") or "",
         "slug": location.get("id") or forecast.get("title") or "",
@@ -525,6 +542,7 @@ def normalize_surf_forecast(info: dict[str, Any], days: int, source_url: str) ->
         "last_updated": forecast_state.get("lastUpdated"),
         "forecast": rows,
         "tides": tide_rows,
+        "sun": sun_rows,
     }
 
 
@@ -587,19 +605,39 @@ def print_surf(data: dict[str, Any]) -> None:
     print(f"SwellMap surf: {data['spot']} ({data['region']})")
     print(f"Last updated: {data.get('last_updated') or 'unknown'}")
     print(f"LINZ tide companion: {data['linz_tide_port']}")
+    first = next((r for r in data["forecast"] if r.get("sea_temp_c") is not None), None)
+    if first:
+        bits = [f"Sea temp {first['sea_temp_c']:.1f}°C"]
+        if first.get("wetsuit_recommendation"):
+            bits.append(first["wetsuit_recommendation"])
+        print(" | ".join(bits))
+    sun_by_date = {row["date"]: row for row in data.get("sun") or []}
     current_date = None
     for row in data["forecast"]:
         if row["date"] != current_date:
             current_date = row["date"]
+            sun = sun_by_date.get(current_date)
             print()
-            print(current_date)
+            if sun and (sun.get("sunrise") or sun.get("sunset")):
+                print(f"{current_date}  sunrise {sun.get('sunrise') or '-'}  sunset {sun.get('sunset') or '-'}")
+            else:
+                print(current_date)
         rating = "-" if row["rating"] is None else f"{row['rating']:.1f}/10"
         wave = "-" if row["wave_m"] is None else f"{row['wave_m']:.1f} m"
+        face = f" face {row['surf_face_m']:.1f} m" if row.get("surf_face_m") is not None else ""
         period = "-" if row["swell_period_s"] is None else f"{row['swell_period_s']:.0f} s"
         direction = row["swell_direction"] or "-"
-        wind = row["wind_direction"] or "-"
+        wind_dir = row["wind_direction"] or "-"
+        wind_kt = row.get("wind_speed_knots")
+        gust_kt = row.get("wind_gust_knots")
+        if wind_kt is not None and gust_kt is not None:
+            wind = f"{wind_dir} {wind_kt:.0f}kt (g {gust_kt:.0f})"
+        elif wind_kt is not None:
+            wind = f"{wind_dir} {wind_kt:.0f}kt"
+        else:
+            wind = wind_dir
         summary = row["summary"] or ""
-        print(f"  {row['time_local']}  rating {rating}  wave {wave}  period {period}  swell {direction}  wind {wind}  {summary}")
+        print(f"  {row['time_local']}  rating {rating}  wave {wave}{face}  period {period}  swell {direction}  wind {wind}  {summary}")
 
 
 def score_rows(rows: list[dict[str, Any]], target_date: date) -> dict[str, Any] | None:
