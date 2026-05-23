@@ -37,9 +37,26 @@ const stores = JSON.parse(storesRaw) as { stores?: Array<Record<string, unknown>
 if (!Array.isArray(stores.stores) || stores.stores.length < 1) {
   throw new Error('Expected Briscoes stores JSON to include Auckland stores[]');
 }
+const wellingtonStoresRaw = run(['stores', '--region', 'wellington', '--json']);
+const wellingtonStores = JSON.parse(wellingtonStoresRaw) as { stores?: Array<Record<string, unknown>> };
+if (!Array.isArray(wellingtonStores.stores) || wellingtonStores.stores.some((store) => String(store.city || '').toLowerCase() === 'auckland')) {
+  throw new Error('Expected Wellington store filter not to include Auckland street-address matches');
+}
 const specialsRaw = run(['specials', 'towel', '--limit', '3', '--json']);
 const specials = JSON.parse(specialsRaw) as { products?: Array<Record<string, unknown>> };
 if (!Array.isArray(specials.products)) {
   throw new Error('Expected Briscoes specials JSON to include products[]');
+}
+for (const product of specials.products) {
+  const price = Number(product.price);
+  const salePrice = Number(product.sale_price);
+  const savePrice = Number(product.save_price);
+  if (!(Number.isFinite(price) && Number.isFinite(salePrice) && salePrice < price && savePrice > 0)) {
+    throw new Error('Expected every Briscoes specials product to have a verified discount');
+  }
+  const haystack = `${product.name || ''} ${product.category || ''} ${product.source_url || ''}`.toLowerCase();
+  if (!haystack.includes('towel')) {
+    throw new Error('Expected Briscoes specials towel query to constrain returned products');
+  }
 }
 console.log('briscoes-nz smoke ok');

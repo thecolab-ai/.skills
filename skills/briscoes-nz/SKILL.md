@@ -28,7 +28,7 @@ Query live Briscoes NZ product and store data through a small deterministic CLI 
 
 1. Run `scripts/cli.py` with the narrowest subcommand that answers the task
 2. Use `search` for keyword price/product lookup
-3. Use `specials` for sale/deal-flagged products; this is a search-derived view, not a dedicated Briscoes specials API
+3. Use `specials` for sale/deal-flagged products; this is a search-derived view verified against Magento product pricing, not a dedicated Briscoes specials API
 4. Use `product` when an exact SKU is known and full Magento price-range detail matters
 5. Use `stores --region` to narrow store-finder results by city, region, suburb, or name
 6. Use `--json` for agent chaining, comparisons, alerts, or structured reports
@@ -47,7 +47,7 @@ python3 skills/briscoes-nz/scripts/cli.py <command> [flags]
 - `search <query> [--limit N] [--page N] [--json]` - product search with current prices
 - `product <sku> [--json]` - fetch exact SKU detail
 - `stores [--region text] [--json]` - list public Briscoes store-finder locations
-- `specials [query] [--limit N] [--page N] [--json]` - sale/deal-flagged products, optionally filtered by query
+- `specials [query] [--limit N] [--page N] [--json]` - sale/deal-flagged products verified to have a sale price below regular price, optionally filtered by query
 
 Examples:
 
@@ -69,6 +69,6 @@ python3 skills/briscoes-nz/scripts/cli.py specials bedding --limit 10 --json
 
 - No API key secret, username, password, account cookie, or browser automation is required for supported read-only operations
 - Briscoes uses an Adobe Commerce/Magento PWA backed by Klevu for product search/listing
-- `search` and `specials` use Klevu search data; `product` and `stores` use Briscoes Magento GraphQL
+- `search` uses Klevu search data; `specials` uses Klevu discovery plus Magento price verification; `product` and `stores` use Briscoes Magento GraphQL
 - Endpoint shapes can change; verify with a small live query before relying on large workflows
 - Keep usage narrow and respectful

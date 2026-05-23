@@ -50,7 +50,7 @@ The CLI implements `specials` as a sale/deal-flagged search view:
 - current sale price is below base price when both values are present
 - category labels contain sale, clearance, or deal terms
 
-Klevu search records often expose the current sale price but not the original crossed-out price. Use `product <sku> --json` for exact Magento `price_range` discount details after selecting a SKU.
+Klevu search records often expose the current sale price but not the original crossed-out price. For this reason, `specials` treats Klevu as discovery only, then fetches each candidate SKU through Magento `products(filter: { sku: { eq } })` and returns only products whose `price_range.minimum_price.final_price` is below `regular_price`. Use `product <sku> --json` for exact Magento `price_range` discount details after selecting a SKU.
 
 ## Stability and safety
 

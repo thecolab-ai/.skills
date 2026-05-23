@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 import time
 import urllib.error
@@ -57,6 +58,18 @@ KLEVU_FIELDS = [
     "category",
     "manualBadge",
 ]
+
+PROMO_CATEGORY_PREFIXES = (
+    "buying-guides-inspiration",
+    "clearance",
+    "gift-guides",
+    "hot-home-deals",
+    "new-in",
+    "online-only",
+    "sale",
+    "sale-backup",
+    "shop-by-brand",
+)
 
 KLEVU_CONFIG_QUERY = """
 query KlevuData {
@@ -245,6 +258,18 @@ def category_label(raw: Any) -> str:
     return text
 
 
+def has_price_discount(product: dict[str, Any]) -> bool:
+    regular = to_number(product.get("price"))
+    sale = to_number(product.get("sale_price"))
+    save = to_number(product.get("save_price"))
+    return (regular is not None and sale is not None and sale < regular) or bool(save and save > 0)
+
+
+def placeholder_image(url: Any) -> bool:
+    text = str(url or "").lower()
+    return not text or "placeholder" in text
+
+
 def sale_tagged(category: str) -> bool:
     text = category.lower()
     tokens = {p.strip().lower() for p in text.replace(">", ";;").split(";;")}
@@ -331,16 +356,31 @@ def parse_category(cat: dict[str, Any]) -> dict[str, Any]:
     return {"uid": cat.get("uid"), "name": cat.get("name"), "url_path": cat.get("url_path")}
 
 
+def category_depth(cat: dict[str, Any]) -> int:
+    path = str(cat.get("url_path") or "").strip("/")
+    return len([p for p in path.split("/") if p])
+
+
+def preferred_category(categories: list[dict[str, Any]]) -> str:
+    if not categories:
+        return ""
+
+    def is_promo(cat: dict[str, Any]) -> bool:
+        path = str(cat.get("url_path") or "").strip("/").lower()
+        return any(path == prefix or path.startswith(prefix + "/") for prefix in PROMO_CATEGORY_PREFIXES)
+
+    candidates = [c for c in categories if not is_promo(c)] or categories
+    best = max(candidates, key=lambda c: (category_depth(c), len(str(c.get("url_path") or ""))))
+    return str(best.get("name") or "")
+
+
 def parse_graphql_product(item: dict[str, Any]) -> dict[str, Any]:
     minimum = price_node(item)
     regular = ((minimum.get("regular_price") or {}).get("value"))
     final = ((minimum.get("final_price") or {}).get("value"))
     discount = minimum.get("discount") or {}
     categories = [parse_category(c) for c in item.get("categories") or [] if isinstance(c, dict)]
-    category = ""
-    if categories:
-        best = max(categories, key=lambda c: len(str(c.get("url_path") or "")))
-        category = str(best.get("name") or "")
+    category = preferred_category(categories)
     url_key = str(item.get("url_key") or "").lstrip("/")
     url_suffix = str(item.get("url_suffix") or "")
     return {
@@ -365,6 +405,32 @@ def parse_graphql_product(item: dict[str, Any]) -> dict[str, Any]:
         "image": first_non_empty((item.get("small_image") or {}).get("url"), (item.get("image") or {}).get("url")),
         "source_url": BASE_WEB + "/" + url_key + url_suffix,
     }
+
+
+def product_details(sku: str) -> list[dict[str, Any]]:
+    payload = graphql(PRODUCT_QUERY, {"sku": sku})
+    products_raw = ((payload.get("products") or {}).get("items") or [])
+    return [parse_graphql_product(p) for p in products_raw if isinstance(p, dict)]
+
+
+def exact_klevu_match(sku: str) -> dict[str, Any] | None:
+    data = klevu_search(sku, limit=5)
+    for product in data.get("products") or []:
+        if str(product.get("sku") or "").strip() == str(sku).strip():
+            return product
+    return None
+
+
+def enrich_from_klevu(product: dict[str, Any], klevu_product: dict[str, Any] | None) -> dict[str, Any]:
+    if not klevu_product:
+        return product
+    if placeholder_image(product.get("image")) and not placeholder_image(klevu_product.get("image")):
+        product["image"] = klevu_product.get("image")
+    if not product.get("category") and klevu_product.get("category"):
+        product["category"] = klevu_product.get("category")
+    if not product.get("source_url") and klevu_product.get("source_url"):
+        product["source_url"] = klevu_product.get("source_url")
+    return product
 
 
 def parse_hours(value: Any) -> list[dict[str, Any]]:
@@ -415,12 +481,28 @@ def parse_store(item: dict[str, Any]) -> dict[str, Any]:
 
 
 def store_matches(store: dict[str, Any], region: str) -> bool:
-    needle = region.strip().lower()
-    haystack = " ".join(
-        str(store.get(k) or "")
-        for k in ("name", "address", "city", "region", "postcode", "line1", "line2")
-    ).lower()
-    return needle in haystack
+    needle = re.sub(r"\s+", " ", region.strip().lower())
+    if not needle:
+        return True
+
+    def clean(value: Any) -> str:
+        return re.sub(r"\s+", " ", str(value or "").strip().lower())
+
+    primary = [clean(store.get(k)) for k in ("name", "city", "region", "postcode")]
+    if any(needle in value for value in primary):
+        return True
+
+    # Suburb lives in line2 for most stores. Keep this exact so a broad region
+    # query like "wellington" does not match Auckland's "Mt Wellington" address.
+    suburb = clean(store.get("line2"))
+    if suburb and needle == suburb:
+        return True
+
+    # Address matching is useful for postcode or street-number lookups, but not
+    # for broad city/region filters because road names can contain other cities.
+    if any(ch.isdigit() for ch in needle):
+        return needle in clean(store.get("address"))
+    return False
 
 
 def cmd_search(args: argparse.Namespace) -> None:
@@ -429,28 +511,44 @@ def cmd_search(args: argparse.Namespace) -> None:
 
 def cmd_specials(args: argparse.Namespace) -> None:
     term = args.query or "*"
-    fetch_size = min(max(args.limit * 4, 24), 100)
+    limit = min(max(1, args.limit), 100)
+    fetch_size = min(max(limit * 6, 30), 100)
     data = klevu_search(term, limit=fetch_size, page=args.page)
-    specials = [p for p in data["products"] if p.get("is_special")]
-    data["source"] = "klevu-sale-filter"
+    specials = []
+    for candidate in data["products"]:
+        if not candidate.get("is_special") or not candidate.get("sku"):
+            continue
+        detail_products = product_details(str(candidate["sku"]))
+        if not detail_products:
+            continue
+        detail = enrich_from_klevu(detail_products[0], candidate)
+        if not has_price_discount(detail):
+            continue
+        specials.append(detail)
+        if len(specials) >= limit:
+            break
+
+    data["source"] = "klevu-sale-filter+magento-price-verify"
     data["query"] = args.query
-    data["framing"] = "sale/deal-flagged Klevu search results; Briscoes does not expose a dedicated public specials endpoint"
-    data["products"] = specials[: args.limit]
+    data["framing"] = "Klevu sale/deal discovery verified against Magento price_range; Briscoes does not expose a dedicated public specials endpoint"
+    data["verification"] = "Each returned product has Magento final_price below regular_price."
+    data["products"] = specials
     data["count"] = len(data["products"])
-    data["page_size"] = args.limit
+    data["page_size"] = limit
     emit_products(data, args.json)
 
 
 def cmd_product(args: argparse.Namespace) -> None:
     started = time.perf_counter()
-    payload = graphql(PRODUCT_QUERY, {"sku": args.sku})
-    products_raw = ((payload.get("products") or {}).get("items") or [])
-    products = [parse_graphql_product(p) for p in products_raw if isinstance(p, dict)]
+    products = product_details(args.sku)
+    if products and any(placeholder_image(p.get("image")) for p in products):
+        match = exact_klevu_match(args.sku)
+        products = [enrich_from_klevu(p, match) for p in products]
     data = {
         "source": "magento-graphql",
         "sku": args.sku,
         "count": len(products),
-        "total_count": (payload.get("products") or {}).get("total_count"),
+        "total_count": len(products),
         "elapsed_ms": round((time.perf_counter() - started) * 1000),
         "products": products,
     }
@@ -513,6 +611,8 @@ def print_products(data: dict[str, Any]) -> None:
         print("          " + " | ".join(x for x in bits if x))
         if p.get("source_url"):
             print(f"          {p.get('source_url')}")
+        if p.get("image"):
+            print(f"          image: {p.get('image')}")
         print()
 
 
