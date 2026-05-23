@@ -18,7 +18,8 @@ npm run validate-skill -- skills/my-skill
 - Make the `description` field do the retrieval work
 - Keep `SKILL.md` operational, not essay-like
 - Move deep reference material into `references/`
-- Put deterministic operations into `scripts/`
+- Put deterministic operations into `scripts/` as Python standard-library CLIs or TypeScript/Node CLIs
+- Keep helper CLI dependencies minimal: prefer Python stdlib or zero/few-dependency Node packages
 - Avoid per-skill doc clutter
 
 ## Definition of done
@@ -127,6 +128,8 @@ Bad:
 
 A script with no invocation guidance is dead weight.
 Reference the script from `SKILL.md` or a linked reference doc.
+
+Python and TypeScript/Node CLIs are both accepted for skill helpers. Prefer Python standard-library scripts or TypeScript/Node CLIs with zero or few dependencies, and document any required runtime, install step, environment variable, or auth assumption.
 
 ## Template variants
 
