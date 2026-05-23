@@ -8,11 +8,15 @@ submits forms.
 from __future__ import annotations
 
 import argparse
+import base64
 import concurrent.futures
+import copy
 import datetime as dt
 import html
 import json
+import os
 import re
+import socket
 import sys
 import time
 import urllib.error
@@ -33,6 +37,11 @@ BELL_BLOCK_POOL_URL = "https://www.bellblockaquaticcentre.co.nz/"
 NPR_BASE = "https://www.napier.govt.nz"
 HAS_BASE = "https://www.hastingsdc.govt.nz"
 HAM_POOLS_BASE = "https://www.hamiltonpools.co.nz"
+HUTT_POOLS_BASE = "https://pools.huttcity.govt.nz"
+PORIRUA_ARENA_BASE = "https://terauparaha-arena.co.nz"
+UHUTT_H2O_BASE = "https://www.h2oxtream.com"
+KAPITI_AQUATICS_BASE = "https://www.kapiticoastaquatics.co.nz"
+CDP_HTTP_BASE = "http://127.0.0.1:5100"
 
 UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146 Safari/537.36"
 
@@ -56,7 +65,13 @@ COUNCIL_NAMES = {
     "npr": "Napier",
     "has": "Hastings",
     "ham": "Hamilton",
+    "hutt": "Hutt City",
+    "porirua": "Porirua City",
+    "uhutt": "Upper Hutt City",
+    "kapiti": "Kāpiti Coast",
 }
+
+RECREATION_COUNCILS = ("akl", "wlg", "chc", "rot", "npl", "npr", "has", "ham", "hutt", "porirua", "uhutt", "kapiti")
 
 AKL_AREA_IDS = {
     "central": "1134",
@@ -70,8 +85,6 @@ AKL_FACILITY_IDS = {
     "pool": "1126",
     "gym": "1119",
 }
-
-RECREATION_COUNCILS = ("akl", "wlg", "chc", "rot", "npl", "npr", "has", "ham")
 
 ROT_RECREATION_SOURCE_URL = ROT_BASE + "/parks-lakes-recreation"
 ROT_PARK_RESERVES_SOURCE_URL = ROT_BASE + "/parks-lakes-recreation/park-reserves"
@@ -502,19 +515,290 @@ EVENT_TYPES = {
     "VisualArtsEvent",
 }
 
+REGIONAL_LISTING_URLS = {
+    "hutt": HUTT_POOLS_BASE + "/our-pools",
+    "porirua": PORIRUA_ARENA_BASE + "/aquatics/",
+    "uhutt": UHUTT_H2O_BASE + "/Facility/hours-and-prices",
+    "kapiti": KAPITI_AQUATICS_BASE + "/our-pools/",
+}
+
+REGIONAL_POOL_CATALOG: dict[str, list[dict[str, Any]]] = {
+    "hutt": [
+        {
+            "name": "Huia Pool + Fitness",
+            "aliases": ["Huia Pool"],
+            "id": "huia-pool-fitness",
+            "type": "pool",
+            "council": "hutt",
+            "council_name": "Hutt City",
+            "source": "hutt-city-pools-and-fitness",
+            "source_url": HUTT_POOLS_BASE + "/our-pools/huia-pool",
+            "listing_source_url": REGIONAL_LISTING_URLS["hutt"],
+            "description": "Year-round central Lower Hutt aquatic and fitness facility, home of Swim City.",
+            "address": "Huia Street, Lower Hutt",
+            "phone": "04 570 6655",
+            "email": None,
+            "contact": {"phone": "04 570 6655 (Pool); 04 560 1053 (Fitness Suite)", "email": None},
+            "hours_summary": "Main pool and spa: Mon 5:30am-8pm, Tue 5:30am-6:30pm, Wed-Thu 5:30am-8pm, Fri 5:30am-7pm, Sat-Sun 8am-6pm, public holidays 9am-6pm.",
+            "hours": [
+                {"label": "Main pool and spa pool", "text": "Mon 5:30am-8pm; Tue 5:30am-6:30pm; Wed-Thu 5:30am-8pm; Fri 5:30am-7pm; Sat-Sun 8am-6pm; public holidays 9am-6pm."},
+                {"label": "Children's pool", "text": "Mon 8am-8pm; Tue 8am-6:15pm; Wed-Thu 8am-8pm; Fri 8am-7pm; Sat-Sun 8am-6pm; public holidays 9am-6pm."},
+                {"label": "Hydro pool", "text": "Varies around programmes; generally weekday morning/afternoon/evening blocks and Sat-Sun 1pm-6pm."},
+            ],
+            "features": ["25m main pool with movable floor", "spa pool", "children's pool", "hydrotherapy pool", "sauna", "fitness suite", "family change rooms"],
+            "pool_details": [
+                {"name": "Main pool and spa pool", "description": "25m main pool with a movable floor and ladder access for lane swimming, aquatic sport, aquajogging and recreation."},
+                {"name": "Children's pool", "description": "Kids pool heated to about 31C with ramp access, for recreational swimming by children under 10."},
+                {"name": "Hydro pool", "description": "25m hydrotherapy pool heated to about 32.5-33C, with therapy bench, 15m ramp and hoist."},
+            ],
+        },
+        {
+            "name": "Te Ngaengae Pool + Fitness",
+            "aliases": ["Naenae Pool", "Naenae Pool and Fitness", "Te Ngaengae Pool"],
+            "id": "te-ngaengae-pool-fitness",
+            "type": "pool",
+            "council": "hutt",
+            "council_name": "Hutt City",
+            "source": "hutt-city-pools-and-fitness",
+            "source_url": HUTT_POOLS_BASE + "/our-pools/te-ngaengae-pool",
+            "listing_source_url": REGIONAL_LISTING_URLS["hutt"],
+            "description": "Naenae aquatic and fitness centre with a 50m pool, leisure/kids pool and hydroslides.",
+            "address": "12 Everest Avenue, Naenae",
+            "phone": "04 567 5043",
+            "email": None,
+            "contact": {"phone": "04 567 5043 (Pool); 04 567 5431 (Fitness)", "email": None},
+            "hours_summary": "Main pool: Mon-Tue 5:30am-6:30pm, Wed term-dependent, Thu-Fri 5:30am-8pm, Sat-Sun 8am-6pm, public holidays 9am-6pm.",
+            "hours": [
+                {"label": "Main pool", "text": "Mon-Tue 5:30am-6:30pm; Wed varies by term and school holidays; Thu-Fri 5:30am-8pm; Sat-Sun 8am-6pm; public holidays 9am-6pm."},
+                {"label": "Kids pool", "text": "Mon-Tue 7am-6pm; Wed-Fri 7am-8pm; Sat-Sun 8am-6pm; public holidays 9am-6pm."},
+                {"label": "Zoom Tubes", "text": "Term weekdays 4pm-6pm; weekends, public holidays and school holidays 11:30am-5:30pm."},
+            ],
+            "features": ["50m main pool", "two hydroslides", "kids pool", "fitness centre", "pool-side party room", "movable bulkheads", "family change rooms"],
+            "pool_details": [
+                {"name": "Main pool", "description": "50m pool with two moveable bulkheads for flexible lane and event layouts."},
+                {"name": "Kids pool", "description": "Family-friendly leisure pool for recreational use and younger swimmers."},
+                {"name": "Zoom Tubes", "description": "Hydroslides with published operating blocks and height/weight rules."},
+            ],
+        },
+        {
+            "name": "Stokes Valley Pool + Fitness",
+            "aliases": ["Stokes Valley Pool"],
+            "id": "stokes-valley-pool-fitness",
+            "type": "pool",
+            "council": "hutt",
+            "council_name": "Hutt City",
+            "source": "hutt-city-pools-and-fitness",
+            "source_url": HUTT_POOLS_BASE + "/our-pools/stokes-valley-pool",
+            "listing_source_url": REGIONAL_LISTING_URLS["hutt"],
+            "description": "Small year-round indoor pool and fitness facility with outdoor recreation space.",
+            "address": "Bowers Street, Stokes Valley",
+            "phone": "04 562 9030",
+            "email": None,
+            "contact": {"phone": "04 562 9030 (Pool + Fitness)", "email": None},
+            "hours_summary": "Main pool: Mon 6am-7pm, Tue 6am-8pm, Wed 6am-3:30pm, Thu-Fri 6am-8pm, Sat 9am-6pm, Sun 10am-6pm, public holidays 10am-6pm.",
+            "hours": [
+                {"label": "Main pool", "text": "Mon 6am-7pm; Tue 6am-8pm; Wed 6am-3:30pm; Thu-Fri 6am-8pm; Sat 9am-6pm; Sun 10am-6pm; public holidays 10am-6pm."},
+                {"label": "Learners pool", "text": "Mon 6am-6pm; Tue 6am-8pm; Wed 6am-6:30pm; Thu 6am-3:15pm; Fri 6am-8pm; Sat 9am-6pm; Sun/public holidays 10am-6pm."},
+            ],
+            "features": ["25m indoor pool", "learners pool", "sauna", "fitness suite", "BBQ", "family change rooms"],
+            "pool_details": [
+                {"name": "Main pool", "description": "25m indoor pool with ramp access through the learners pool and facilities for people with disabilities."},
+                {"name": "Learners pool", "description": "Learners pool with ramp access; space can be limited during school bookings."},
+            ],
+        },
+        {
+            "name": "McKenzie Baths Summer Pool",
+            "aliases": ["McKenzie Baths", "McKenzie Baths Pool"],
+            "id": "mckenzie-baths-summer-pool",
+            "type": "pool",
+            "council": "hutt",
+            "council_name": "Hutt City",
+            "source": "hutt-city-pools-and-fitness",
+            "source_url": HUTT_POOLS_BASE + "/our-pools/mckenzie-baths-summer-pool",
+            "listing_source_url": REGIONAL_LISTING_URLS["hutt"],
+            "description": "Historic heated summer pool opposite Petone Recreation Ground.",
+            "address": "79 Udy Street, Petone",
+            "phone": "04 568 6563",
+            "email": None,
+            "contact": {"phone": "04 568 6563 (Nov-Mar); 04 570 6655 (Apr-Oct)", "email": None},
+            "status": "Summer season facility; 2025-26 season listed as 15 November 2025 to 8 March 2026.",
+            "hours_summary": "Seasonal. 26 Jan-8 Mar 2026: Mon-Fri noon-6pm, Sat-Sun/public holidays 11am-6pm.",
+            "hours": [
+                {"label": "15 Nov-21 Dec", "text": "Mon-Fri noon-6pm; Sat-Sun 11am-6pm."},
+                {"label": "5-25 Jan", "text": "Mon-Wed 11am-7pm; Thu 11am-6pm; Fri 11am-7pm; Sat-Sun/public holidays 11am-6pm."},
+                {"label": "26 Jan-8 Mar 2026", "text": "Mon-Fri noon-6pm; Sat-Sun/public holidays 11am-6pm."},
+            ],
+            "features": ["25m heated outdoor main pool", "learners pool", "toddler play area", "splash pad", "Splash Zone", "after-hours hire"],
+            "pool_details": [
+                {"name": "Main pool", "description": "25m heated pool with built-in access ramp, used for lanes, aquajogging, school programmes and recreation."},
+                {"name": "Learners pool", "description": "Space for children under 10 or non-swimmers, lessons and recreational play."},
+                {"name": "Splash Pad", "description": "Interactive water play area."},
+            ],
+        },
+    ],
+    "porirua": [
+        {
+            "name": "Arena Aquatic Centre",
+            "aliases": ["Arena Aquatics", "Te Rauparaha Arena Aquatics"],
+            "id": "arena-aquatic-centre",
+            "type": "pool",
+            "council": "porirua",
+            "council_name": "Porirua City",
+            "source": "te-rauparaha-arena",
+            "source_url": PORIRUA_ARENA_BASE + "/aquatics/visit-arena-pool/",
+            "listing_source_url": REGIONAL_LISTING_URLS["porirua"],
+            "description": "Indoor heated aquatic centre at Te Rauparaha Arena.",
+            "address": "Te Rauparaha Arena Aquatics, 17 Parumoana Street, Porirua",
+            "phone": "04 237 1521",
+            "email": "aquaticsbooking@poriruacity.govt.nz",
+            "contact": {"phone": "(04) 237 1521", "email": "aquaticsbooking@poriruacity.govt.nz"},
+            "hours_summary": "Mon-Fri 5:30am-9pm; Sat-Sun/public holidays 8am-7pm; Anzac Day noon-7pm. Last pool entry 30 minutes before close.",
+            "hours": [
+                {"label": "Arena Aquatics", "text": "Mon-Fri 5:30am-9pm; Sat-Sun 8am-7pm; public holidays 8am-7pm; Anzac Day noon-7pm."},
+            ],
+            "features": ["lane pool", "leisure pool", "toddlers pool", "lazy river", "wave pool", "hydroslide", "spa pools", "sauna", "steam room", "cafe"],
+            "pool_details": [
+                {"name": "Aquatic centre", "description": "Indoor heated facility with lane pool, leisure pool, toddlers pool, lazy river, wave pool, hydroslide, spa pools, sauna and steam room."},
+                {"name": "Lane availability", "description": "Regular term bookings are published separately; call customer services for live lane availability."},
+            ],
+        },
+    ],
+    "uhutt": [
+        {
+            "name": "H2O Xtream Aquatic Centre",
+            "aliases": ["H2O Xtream", "H₂O Xtream"],
+            "id": "h2o-xtream-aquatic-centre",
+            "type": "pool",
+            "council": "uhutt",
+            "council_name": "Upper Hutt City",
+            "source": "h2o-xtream",
+            "source_url": UHUTT_H2O_BASE + "/Facility/hours-and-prices",
+            "listing_source_url": REGIONAL_LISTING_URLS["uhutt"],
+            "description": "Upper Hutt aquatic centre with lane swimming, wave/leisure areas, slides and wellness spaces.",
+            "address": "26 Brown Street, Upper Hutt",
+            "phone": "04 527 2113",
+            "email": "h2oxtream@uhcc.govt.nz",
+            "contact": {"phone": "(04) 527 2113", "email": "h2oxtream@uhcc.govt.nz"},
+            "hours_summary": "Mon-Fri 5:30am-9pm; Sat 8am-7pm; Sun 8am-6:30pm; Women's Only Swim Night Sun 7pm-9pm; most public holidays 8am-7pm.",
+            "hours": [
+                {"label": "Standard opening hours", "text": "Mon-Fri 5:30am-9pm; Sat 8am-7pm; Sun 8am-6:30pm; Women's Only Swim Night Sun 7pm-9pm."},
+                {"label": "Public holidays", "text": "Most public holidays 8am-7pm; Anzac Day noon-7pm; Christmas Day closed."},
+            ],
+            "features": ["25m lane pool", "leisure pool", "wave pool", "rapid river ride", "hydroslides", "junior leisure area", "spa", "sauna", "steam room"],
+            "pool_details": [
+                {"name": "Lane pool", "description": "25m lane pool for lane swimming and fitness swimming."},
+                {"name": "Leisure pool", "description": "Wave Pool and Rapid River Ride; wave pool reaches 1.8m and rapid river is 1.2m."},
+                {"name": "Junior Leisure Area", "description": "Splash pad, mini playground and slide, toddler pool and junior play pool for young children."},
+                {"name": "Spa, steam and sauna", "description": "Spa pool around 38.5-39.5C plus cedar sauna and steam room for users over 16."},
+            ],
+        },
+    ],
+    "kapiti": [
+        {
+            "name": "Coastlands Aquatic Centre",
+            "aliases": ["Coastlands Pool"],
+            "id": "coastlands-aquatic-centre",
+            "type": "pool",
+            "council": "kapiti",
+            "council_name": "Kāpiti Coast",
+            "source": "kapiti-coast-aquatics",
+            "source_url": KAPITI_AQUATICS_BASE + "/our-pools/coastlands-aquatic-centre/",
+            "listing_source_url": REGIONAL_LISTING_URLS["kapiti"],
+            "description": "Paraparaumu aquatic centre with lane, programmes and leisure facilities.",
+            "address": "10 Brett Ambler Way, Paraparaumu, Kāpiti Coast",
+            "phone": "04 296 4746",
+            "email": "swim@kapiticoast.govt.nz",
+            "contact": {"phone": "04 296 4746", "email": "swim@kapiticoast.govt.nz"},
+            "hours_summary": "Mon/Wed/Thu/Fri 5:30am-9pm; Tue 5:30am-8pm; weekends 8am-8pm, with some programme-pool closures for lessons.",
+            "hours": [
+                {"label": "Opening hours", "text": "Mon 5:30am-9pm; Tue 5:30am-8pm; Wed-Fri 5:30am-9pm; weekends 8am-8pm."},
+                {"label": "Notes", "text": "Programmes pool has lesson closures; all pools and spa must be vacated 15 minutes before closing."},
+            ],
+            "features": ["25 x 25m lane pool", "programmes pool", "toddler pool", "hydroslide", "Te Manu Rere flying fox", "spa", "sauna", "cafe", "meeting room"],
+            "pool_details": [
+                {"name": "Main pool", "description": "25 x 25m lane pool with moveable floor, heated to about 28C, with removable ramp access."},
+                {"name": "Programmes pool", "description": "Smaller 1.2m-deep pool with ramp access, heated to about 32C for lessons, hydrotherapy-style activities and SPLASH sessions."},
+                {"name": "Toddler pool", "description": "Toddler pool with water features and waterfall wall."},
+            ],
+        },
+        {
+            "name": "Waikanae Pool",
+            "aliases": ["Waikanae Outdoor Pool"],
+            "id": "waikanae-pool",
+            "type": "pool",
+            "council": "kapiti",
+            "council_name": "Kāpiti Coast",
+            "source": "kapiti-coast-aquatics",
+            "source_url": KAPITI_AQUATICS_BASE + "/our-pools/waikanae-pool/",
+            "listing_source_url": REGIONAL_LISTING_URLS["kapiti"],
+            "description": "Seasonal outdoor summer pool in Waikanae.",
+            "address": "52 Ngarara Road, Waikanae, Kāpiti Coast",
+            "phone": "04 296 4789",
+            "email": "swim@kapiticoast.govt.nz",
+            "contact": {"phone": "04 296 4789", "email": "swim@kapiticoast.govt.nz"},
+            "status": "Closed for the season as listed on the public page; summer season hours are published for next opening.",
+            "hours_summary": "Seasonal. Summer hours: Mon/Thu 6am-6pm (8pm school holidays), Tue/Wed/Fri 6am-8pm, Sat-Sun 8am-8pm.",
+            "hours": [
+                {"label": "Summer season", "text": "Mon 6am-6pm (8pm school holidays); Tue-Wed 6am-8pm; Thu 6am-6pm (8pm school holidays); Fri 6am-8pm; Sat-Sun 8am-8pm."},
+            ],
+            "features": ["33.5m outdoor heated main pool", "toddler pool", "hydroslide", "BBQ bookings", "gazebo bookings", "general store", "swim shop"],
+            "pool_details": [
+                {"name": "Main pool", "description": "33.5m outdoor heated pool, heated to about 29C, for lane swimming, learn to swim, AquaFit and SPLASH."},
+                {"name": "Toddler pool", "description": "Warm outdoor toddler pool heated to about 32C with shade sails."},
+                {"name": "Hydroslide", "description": "Can be opened on request; use rules vary by age."},
+            ],
+        },
+        {
+            "name": "Ōtaki Pool",
+            "aliases": ["Otaki Pool"],
+            "id": "otaki-pool",
+            "type": "pool",
+            "council": "kapiti",
+            "council_name": "Kāpiti Coast",
+            "source": "kapiti-coast-aquatics",
+            "source_url": KAPITI_AQUATICS_BASE + "/our-pools/otaki-pool/",
+            "listing_source_url": REGIONAL_LISTING_URLS["kapiti"],
+            "description": "Haruātai Park aquatic facility for swimming, programmes and SPLASH sessions.",
+            "address": "Haruātai Park, 200 Mill Road, Ōtaki, Kāpiti Coast",
+            "phone": "06 364 5542",
+            "email": "swim@kapiticoast.govt.nz",
+            "contact": {"phone": "06 364 5542", "email": "swim@kapiticoast.govt.nz"},
+            "hours_summary": "Mon/Wed/Thu/Fri 5:30am-8pm; Tue 5:30am-7pm; Sat 8am-6pm; Sun 8am-4:30pm.",
+            "hours": [
+                {"label": "Opening hours", "text": "Mon 5:30am-8pm; Tue 5:30am-7pm; Wed-Fri 5:30am-8pm; Sat 8am-6pm; Sun 8am-4:30pm."},
+                {"label": "Notes", "text": "All pools and spa must be vacated 15 minutes before closing; spa closes at 6pm Tuesdays and Fridays for cleaning."},
+            ],
+            "features": ["33.5m lane pool", "toddler pool", "spa", "sauna", "Te Mania Auheke slippery slope", "splashpad", "swim shop"],
+            "pool_details": [
+                {"name": "Main pool", "description": "33.5m lane pool with removable ramp and hoist access; at least three public lanes when bookings/programmes are in the main pool."},
+                {"name": "Toddler pool", "description": "Toddler pool for babies and young children."},
+                {"name": "Spa and sauna", "description": "Adult-only spa heated to about 38C, plus sauna; both restricted to 16+ years."},
+            ],
+        },
+    ],
+}
+
 
 def die(message: str, code: int = 1) -> None:
     print(f"nz-council: {message}", file=sys.stderr)
     raise SystemExit(code)
 
 
-def fetch_text(url_or_path: str, base: str = "", headers: dict[str, str] | None = None, timeout: int = 30) -> tuple[str, str, int]:
+def resolve_url(url_or_path: str, base: str = "") -> str:
     if url_or_path.startswith("http://") or url_or_path.startswith("https://"):
-        url = url_or_path
-    elif base:
-        url = urllib.parse.urljoin(base, url_or_path)
-    else:
-        die(f"relative URL without base: {url_or_path}")
+        return url_or_path
+    if base:
+        return urllib.parse.urljoin(base, url_or_path)
+    die(f"relative URL without base: {url_or_path}")
+
+
+def fetch_text_result(
+    url_or_path: str,
+    base: str = "",
+    headers: dict[str, str] | None = None,
+    timeout: int = 30,
+) -> tuple[str | None, str, int | None, str | None]:
+    url = resolve_url(url_or_path, base)
 
     req_headers = {
         "User-Agent": UA,
@@ -526,13 +810,20 @@ def fetch_text(url_or_path: str, base: str = "", headers: dict[str, str] | None 
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             body = resp.read().decode("utf-8", "replace")
-            return body, resp.geturl(), resp.status
+            return body, resp.geturl(), resp.status, None
     except urllib.error.HTTPError as e:
         raw = e.read().decode("utf-8", "replace")
         message = strip_tags(raw)[:240] or e.reason
-        die(f"HTTP {e.code} from {url}: {message}")
+        return raw, url, e.code, f"HTTP {e.code} from {url}: {message}"
     except urllib.error.URLError as e:
-        die(f"network error calling {url}: {e.reason}")
+        return None, url, None, f"network error calling {url}: {e.reason}"
+
+
+def fetch_text(url_or_path: str, base: str = "", headers: dict[str, str] | None = None, timeout: int = 30) -> tuple[str, str, int]:
+    body, final_url, status, error = fetch_text_result(url_or_path, base, headers, timeout)
+    if error:
+        die(error)
+    return body or "", final_url, status or 0
 
 
 def strip_tags(value: str, br: str = " ") -> str:
@@ -559,6 +850,192 @@ def slug_text(value: str) -> str:
     value = html.unescape(value).lower()
     value = re.sub(r"[^a-z0-9]+", "-", value)
     return value.strip("-")
+
+
+def is_bot_wall(page_html: str | None) -> bool:
+    if not page_html:
+        return False
+    lowered = page_html.lower()
+    return any(
+        marker in lowered
+        for marker in (
+            "just a moment...",
+            "cf_chl",
+            "challenge-platform",
+            "enable javascript and cookies",
+        )
+    )
+
+
+def is_missing_page(page_html: str | None) -> bool:
+    if not page_html:
+        return True
+    title_m = re.search(r"<title[^>]*>(.*?)</title>", page_html, flags=re.I | re.S)
+    title = strip_tags(title_m.group(1)).lower() if title_m else ""
+    return "404" in title or "page not found" in title or "content error" in title
+
+
+def cdp_json(path: str, method: str = "GET", timeout: int = 3) -> dict[str, Any] | None:
+    try:
+        req = urllib.request.Request(CDP_HTTP_BASE + path, method=method)
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            raw = resp.read().decode("utf-8", "replace")
+        parsed = json.loads(raw)
+        return parsed if isinstance(parsed, dict) else None
+    except (OSError, urllib.error.URLError, json.JSONDecodeError):
+        return None
+
+
+def ws_read_exact(sock: socket.socket, size: int) -> bytes:
+    chunks: list[bytes] = []
+    remaining = size
+    while remaining > 0:
+        chunk = sock.recv(remaining)
+        if not chunk:
+            raise OSError("websocket closed")
+        chunks.append(chunk)
+        remaining -= len(chunk)
+    return b"".join(chunks)
+
+
+def ws_connect(ws_url: str, timeout: int = 5) -> socket.socket:
+    parsed = urllib.parse.urlparse(ws_url)
+    if parsed.scheme != "ws" or not parsed.hostname or not parsed.port:
+        raise OSError(f"unsupported CDP websocket URL: {ws_url}")
+    path = parsed.path or "/"
+    if parsed.query:
+        path += "?" + parsed.query
+    key = base64.b64encode(os.urandom(16)).decode("ascii")
+    sock = socket.create_connection((parsed.hostname, parsed.port), timeout=timeout)
+    request = (
+        f"GET {path} HTTP/1.1\r\n"
+        f"Host: {parsed.hostname}:{parsed.port}\r\n"
+        "Upgrade: websocket\r\n"
+        "Connection: Upgrade\r\n"
+        f"Sec-WebSocket-Key: {key}\r\n"
+        "Sec-WebSocket-Version: 13\r\n\r\n"
+    )
+    sock.sendall(request.encode("ascii"))
+    response = b""
+    while b"\r\n\r\n" not in response:
+        response += sock.recv(4096)
+        if len(response) > 65536:
+            raise OSError("websocket handshake too large")
+    if b" 101 " not in response.split(b"\r\n", 1)[0]:
+        raise OSError("websocket handshake failed")
+    return sock
+
+
+def ws_send(sock: socket.socket, payload: str, opcode: int = 1) -> None:
+    data = payload.encode("utf-8")
+    header = bytearray([0x80 | opcode])
+    if len(data) < 126:
+        header.append(0x80 | len(data))
+    elif len(data) < 65536:
+        header.extend([0x80 | 126, (len(data) >> 8) & 0xFF, len(data) & 0xFF])
+    else:
+        header.append(0x80 | 127)
+        header.extend(len(data).to_bytes(8, "big"))
+    mask = os.urandom(4)
+    masked = bytes(byte ^ mask[idx % 4] for idx, byte in enumerate(data))
+    sock.sendall(bytes(header) + mask + masked)
+
+
+def ws_recv(sock: socket.socket) -> str:
+    while True:
+        first, second = ws_read_exact(sock, 2)
+        opcode = first & 0x0F
+        length = second & 0x7F
+        masked = bool(second & 0x80)
+        if length == 126:
+            length = int.from_bytes(ws_read_exact(sock, 2), "big")
+        elif length == 127:
+            length = int.from_bytes(ws_read_exact(sock, 8), "big")
+        mask = ws_read_exact(sock, 4) if masked else b""
+        payload = ws_read_exact(sock, length) if length else b""
+        if masked:
+            payload = bytes(byte ^ mask[idx % 4] for idx, byte in enumerate(payload))
+        if opcode == 8:
+            raise OSError("websocket closed")
+        if opcode == 9:
+            ws_send(sock, payload.decode("utf-8", "replace"), opcode=10)
+            continue
+        if opcode in (1, 2, 0):
+            return payload.decode("utf-8", "replace")
+
+
+def fetch_text_via_cdp(url: str, timeout: int = 8) -> str | None:
+    target_id = None
+    sock: socket.socket | None = None
+    try:
+        encoded_url = urllib.parse.quote(url, safe="")
+        target = cdp_json("/json/new?" + encoded_url, method="PUT")
+        if not target or not target.get("webSocketDebuggerUrl"):
+            return None
+        target_id = target.get("id")
+        sock = ws_connect(str(target["webSocketDebuggerUrl"]))
+        msg_id = 0
+
+        def call(method: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+            nonlocal msg_id
+            msg_id += 1
+            ws_send(sock, json.dumps({"id": msg_id, "method": method, "params": params or {}}))
+            while True:
+                message = json.loads(ws_recv(sock))
+                if message.get("id") == msg_id:
+                    return message
+
+        call("Page.enable")
+        call("Runtime.enable")
+        deadline = time.time() + timeout
+        best_html = None
+        while time.time() < deadline:
+            response = call(
+                "Runtime.evaluate",
+                {
+                    "expression": "document.documentElement ? document.documentElement.outerHTML : ''",
+                    "returnByValue": True,
+                },
+            )
+            result = response.get("result", {}).get("result", {})
+            value = result.get("value") if isinstance(result, dict) else None
+            if isinstance(value, str) and value:
+                best_html = value
+                if not is_bot_wall(value) and not is_missing_page(value):
+                    return value
+            time.sleep(0.5)
+        return best_html
+    except (OSError, json.JSONDecodeError, KeyError, TypeError):
+        return None
+    finally:
+        if sock:
+            try:
+                sock.close()
+            except OSError:
+                pass
+        if target_id:
+            cdp_json("/json/close/" + urllib.parse.quote(str(target_id), safe=""), method="GET")
+
+
+def try_fetch_live_page(url: str, use_cdp: bool = True) -> tuple[str | None, str, int | None, str]:
+    body, final_url, status, error = fetch_text_result(url)
+    if body and (status is None or status < 400) and not is_bot_wall(body) and not is_missing_page(body):
+        return body, final_url, status, "direct"
+    if use_cdp and ((body and is_bot_wall(body)) or error or (status is not None and status >= 400)):
+        cdp_body = fetch_text_via_cdp(final_url)
+        if cdp_body and not is_bot_wall(cdp_body) and not is_missing_page(cdp_body):
+            return cdp_body, final_url, 200, "cdp"
+    if error:
+        return None, final_url, status, error
+    if body and is_bot_wall(body):
+        return None, final_url, status, "bot-wall"
+    return None, final_url, status, "missing-page"
+
+
+def source_probe(url: str) -> dict[str, Any]:
+    _, final_url, status, method = try_fetch_live_page(url)
+    ok = method in {"direct", "cdp"}
+    return {"ok": ok, "method": method, "status": status, "url": final_url}
 
 
 def parse_date_arg(value: str | None, label: str) -> dt.date | None:
@@ -1365,6 +1842,26 @@ def find_facility(cards: list[dict[str, Any]], query: str) -> dict[str, Any] | N
     return contains[0] if contains else None
 
 
+def regional_pool_cards(council: str) -> tuple[list[dict[str, Any]], str, dict[str, Any]]:
+    if council not in REGIONAL_POOL_CATALOG:
+        return [], "", {"ok": False, "method": "unsupported", "status": None, "url": None}
+    source_url = REGIONAL_LISTING_URLS[council]
+    probe = source_probe(source_url)
+    cards = copy.deepcopy(REGIONAL_POOL_CATALOG[council])
+    for card in cards:
+        card["source_status"] = "live source checked" if probe["ok"] else "catalog fallback; source probe failed"
+        card["source_probe"] = probe
+    return cards, source_url, probe
+
+
+def regional_pool_detail(card: dict[str, Any]) -> dict[str, Any]:
+    facility = copy.deepcopy(card)
+    probe = source_probe(str(card.get("source_url") or ""))
+    facility["source_probe"] = probe
+    facility["source_status"] = "live source checked" if probe["ok"] else "catalog fallback; source probe failed"
+    return facility
+
+
 def pool_detail_for_council(council: str, name: str) -> tuple[dict[str, Any] | None, str, list[str]]:
     if council == "akl":
         cards, listing_url = akl_location_listing("pool", None)
@@ -1425,6 +1922,15 @@ def pool_detail_for_council(council: str, name: str) -> tuple[dict[str, Any] | N
             "facility": card,
             "lane_availability_today": None,
         }, listing_url, []
+    if council in REGIONAL_POOL_CATALOG:
+        cards, listing_url, _ = regional_pool_cards(council)
+        card = find_facility(cards, name)
+        if not card:
+            return None, listing_url, [c["name"] for c in cards[:10]]
+        return {
+            "facility": regional_pool_detail(card),
+            "lane_availability_today": None,
+        }, listing_url, []
     die("Christchurch pool detail is not wired in v1")
 
 
@@ -1459,6 +1965,11 @@ def cmd_pools(args: argparse.Namespace) -> None:
             die("--region is only supported for Auckland pools")
         pools, source_url = fetch_ham_facilities("pool")
         pools = pools[: args.limit]
+    elif args.council in REGIONAL_POOL_CATALOG:
+        if args.region:
+            die("--region is only supported for Auckland pools")
+        pools, source_url, _ = regional_pool_cards(args.council)
+        pools = pools[: args.limit]
     else:
         die("Christchurch pools are not wired in v1 because the public council recreation source is JS/vendor-backed")
 
@@ -1474,7 +1985,7 @@ def cmd_pools(args: argparse.Namespace) -> None:
 
 def cmd_pool(args: argparse.Namespace) -> None:
     started = time.perf_counter()
-    councils = [args.council] if args.council else ["npr", "has", "npl", "rot", "akl", "wlg", "ham"]
+    councils = [args.council] if args.council else ["npr", "has", "npl", "rot", "akl", "wlg", "ham", "hutt", "porirua", "uhutt", "kapiti"]
     suggestions_by_council: list[str] = []
     for council in councils:
         detail, listing_url, suggestions = pool_detail_for_council(council, args.name)
@@ -1530,6 +2041,7 @@ def cmd_facilities(args: argparse.Namespace) -> None:
             note = None
             if args.type == "gym":
                 note = "Rotorua Aquatic Centre includes a gym; linked operator pages have current programme details."
+        facilities = facilities[: args.limit]
     elif args.council in {"npr", "has"}:
         if args.region:
             die("--region is only supported for Auckland facilities")
@@ -1564,6 +2076,17 @@ def cmd_facilities(args: argparse.Namespace) -> None:
             facilities, source_url = [], HAM_POOLS_BASE
             note = "Libraries are outside this skill's recreation-focused data source."
         facilities = facilities[: args.limit]
+    elif args.council in REGIONAL_POOL_CATALOG:
+        if args.region:
+            die("--region is only supported for Auckland facilities")
+        source_url = REGIONAL_LISTING_URLS[args.council]
+        if args.type == "pool":
+            facilities, source_url, _ = regional_pool_cards(args.council)
+            facilities = facilities[: args.limit]
+            note = None
+        else:
+            facilities = []
+            note = f"{COUNCIL_NAMES.get(args.council, args.council)} recreation support is currently wired for public aquatic facilities only."
     else:
         facilities, source_url = [], "https://recandsport.ccc.govt.nz/"
         note = "Christchurch recreation uses a vendor-backed source that is documented in references but not wired in v1."
@@ -1648,6 +2171,10 @@ def emit_pool_detail(data: dict[str, Any], as_json: bool) -> None:
             print(f"  {bit}")
     if facility.get("features"):
         print("  features: " + ", ".join(facility["features"][:10]))
+    if facility.get("pool_details"):
+        detail_names = [d.get("name") for d in facility["pool_details"][:5] if d.get("name")]
+        if detail_names:
+            print("  pools: " + ", ".join(detail_names))
     availability = data.get("lane_availability_today")
     if availability and availability.get("resources"):
         print(f"  lane availability date: {availability.get('date')}")

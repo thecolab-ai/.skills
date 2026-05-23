@@ -366,6 +366,75 @@ season as of 29 March 2026.
 Freshness: live static pages at command time. Hamilton Pools controls opening hours,
 facility notices, and partner-pool seasonal updates.
 
+### Wellington region aquatic facilities
+
+Implemented for the following council codes:
+
+- `hutt`: Hutt City Council / Hutt City Pools and Fitness
+- `porirua`: Porirua City Council / Te Rauparaha Arena
+- `uhutt`: Upper Hutt City Council / H2O Xtream
+- `kapiti`: Kāpiti Coast District Council / Kāpiti Coast Aquatics
+
+The CLI stores a small public-page catalogue for these aquatic facilities so that list/detail commands return name, address, hours, contact details, and pool details in a consistent schema. Each command still probes the relevant public source URL at runtime. The probe tries direct HTTP first and falls back to Chrome DevTools Protocol at `http://127.0.0.1:5100` when direct access is bot-walled or denied.
+
+#### Hutt City pools
+
+Implemented facilities:
+
+- Huia Pool + Fitness: `https://pools.huttcity.govt.nz/our-pools/huia-pool`
+- Te Ngaengae Pool + Fitness, with `Naenae Pool` as an alias: `https://pools.huttcity.govt.nz/our-pools/te-ngaengae-pool`
+- Stokes Valley Pool + Fitness: `https://pools.huttcity.govt.nz/our-pools/stokes-valley-pool`
+- McKenzie Baths Summer Pool: `https://pools.huttcity.govt.nz/our-pools/mckenzie-baths-summer-pool`
+
+Direct HTTP result during discovery: Cloudflare challenge. CDP fallback at `127.0.0.1:5100` returned the public pages in the test environment.
+
+#### Porirua Arena Aquatics
+
+Implemented facility:
+
+- Arena Aquatic Centre: `https://terauparaha-arena.co.nz/aquatics/visit-arena-pool/`
+
+Direct HTTP result during discovery: public page loaded.
+
+Data captured:
+
+- Address: Te Rauparaha Arena Aquatics, 17 Parumoana Street, Porirua
+- Contact: `(04) 237 1521`, `aquaticsbooking@poriruacity.govt.nz`
+- Hours: Monday-Friday 5.30am-9pm; Saturday-Sunday and public holidays 8am-7pm; Anzac Day noon-7pm
+- Pool details: lane pool, leisure pool, toddlers pool, lazy river, wave pool, hydroslide, spa pools, sauna, steam room, cafe
+
+#### Upper Hutt H2O Xtream
+
+Implemented facility:
+
+- H2O Xtream Aquatic Centre: `https://www.h2oxtream.com/Facility/hours-and-prices`
+
+Direct Python HTTP result during discovery: Akamai `403 Access Denied`. CDP fallback returned the public page.
+
+Data captured:
+
+- Address: 26 Brown Street, Upper Hutt
+- Contact: `(04) 527 2113`, `h2oxtream@uhcc.govt.nz`
+- Hours: Monday-Friday 5.30am-9pm; Saturday 8am-7pm; Sunday 8am-6.30pm; Women's Only Swim Night Sunday 7pm-9pm; most public holidays 8am-7pm
+- Pool details: 25m lane pool, leisure pool, wave pool, Rapid River Ride, hydroslides, junior leisure area, spa, sauna, steam room
+
+#### Kāpiti Coast Aquatics
+
+Implemented facilities:
+
+- Coastlands Aquatic Centre: `https://www.kapiticoastaquatics.co.nz/our-pools/coastlands-aquatic-centre/`
+- Waikanae Pool: `https://www.kapiticoastaquatics.co.nz/our-pools/waikanae-pool/`
+- Ōtaki Pool: `https://www.kapiticoastaquatics.co.nz/our-pools/otaki-pool/`
+
+Direct HTTP result during discovery: public pages loaded.
+
+Data captured:
+
+- Coastlands: 10 Brett Ambler Way, Paraparaumu; 04 296 4746; main pool, programmes pool, toddler pool, hydroslide, flying fox, spa/sauna
+- Waikanae: 52 Ngarara Road, Waikanae; 04 296 4789; seasonal outdoor 33.5m pool, toddler pool, hydroslide, BBQ/gazebo bookings
+- Ōtaki: Haruātai Park, 200 Mill Road, Ōtaki; 06 364 5542; 33.5m lane pool, toddler pool, spa/sauna, slippery slope, splashpad
+- Shared email: `swim@kapiticoast.govt.nz`
+
 ### Christchurch recreation and sport
 
 Discovered, documented, not wired in v1.
