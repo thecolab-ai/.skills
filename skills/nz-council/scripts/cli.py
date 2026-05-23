@@ -48,6 +48,10 @@ WHG_RECREATION_URL = WHG_WDC_BASE + "/Community/Parks-and-recreation"
 WHG_AQUATIC_URL = WHG_CLM_BASE + "/whangarei-aquatic-centre/"
 WHG_AQUATIC_POOLS_URL = WHG_AQUATIC_URL + "pools/"
 WHG_AQUATIC_CONTACT_URL = WHG_AQUATIC_URL + "contact/"
+CHC_REC_BASE = "https://recandsport.ccc.govt.nz"
+CHC_FILTER_ENDPOINT = CHC_REC_BASE + "/api/FilterCardData/getCentres"
+CHC_HE_PUNA_BASE = "https://www.hepunataimoana.co.nz"
+CHC_WHARENUI_BASE = "https://www.wharenuisportscentre.co.nz"
 
 UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146 Safari/537.36"
 
@@ -562,6 +566,35 @@ WHG_FACILITIES = [
     },
 ]
 
+CHC_FILTERS = {
+    "pool": {
+        "source_path": "/swim/pools/",
+        "payload": {
+            "DefaultFilters": "1347",
+            "CustomFilters": [
+                {"text": "Summer pool", "value": 1353, "isSelected": False},
+                {"text": "Cafe", "value": 1355, "isSelected": False},
+                {"text": "Steam room & sauna", "value": 1350, "isSelected": False},
+                {"text": "Spa", "value": 1349, "isSelected": False},
+                {"text": "Toddlers pool", "value": 1348, "isSelected": False},
+                {"text": "Lane swimming", "value": 1347, "isSelected": False},
+            ],
+        },
+    },
+    "gym": {
+        "source_path": "/workout/gyms/",
+        "payload": {"DefaultFilters": "1346", "CustomFilters": []},
+    },
+    "leisure-centre": {
+        "source_path": "/visit/centres/",
+        "payload": {"DefaultFilters": "", "CustomFilters": []},
+    },
+}
+
+CHC_REC_PHONE = "03 941 8999"
+CHC_LANE_PHONE = "03 941 6446"
+CHC_LANE_EMAIL = "rsebookings@ccc.govt.nz"
+
 EVENT_TYPES = {
     "Event",
     "BusinessEvent",
@@ -894,6 +927,30 @@ def fetch_text(url_or_path: str, base: str = "", headers: dict[str, str] | None 
     if error:
         die(error)
     return body or "", final_url, status or 0
+
+
+def fetch_json_post(url: str, payload: dict[str, Any], headers: dict[str, str] | None = None, timeout: int = 30) -> tuple[Any, str, int]:
+    req_headers = {
+        "User-Agent": UA,
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+    }
+    if headers:
+        req_headers.update(headers)
+    req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), headers=req_headers, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            body = resp.read().decode("utf-8", "replace")
+            try:
+                return json.loads(body), resp.geturl(), resp.status
+            except json.JSONDecodeError as exc:
+                die(f"invalid JSON from {url}: {exc}")
+    except urllib.error.HTTPError as e:
+        raw = e.read().decode("utf-8", "replace")
+        message = strip_tags(raw)[:240] or e.reason
+        die(f"HTTP {e.code} from {url}: {message}")
+    except urllib.error.URLError as e:
+        die(f"network error calling {url}: {e.reason}")
 
 
 def strip_tags(value: str, br: str = " ") -> str:
@@ -1562,6 +1619,412 @@ def fetch_whg_facilities(kind: str) -> tuple[list[dict[str, Any]], str, str | No
     return facilities, WHG_RECREATION_URL, note
 
 
+def chc_hours_from_timings(timings: dict[str, Any] | None) -> tuple[str | None, str | None, list[dict[str, str]]]:
+    if not isinstance(timings, dict):
+        return None, None, []
+    status = strip_tags(str(timings.get("state") or ""))
+    hours_text = strip_tags(str(timings.get("hoursText") or ""))
+    parts = [x for x in (status, hours_text) if x]
+    hours_summary = " | ".join(parts) if parts else None
+    hours = [{"label": "Current opening status", "text": hours_summary}] if hours_summary else []
+    return status or None, hours_summary, hours
+
+
+def parse_chc_card(item: dict[str, Any], kind: str, listing_source_url: str) -> dict[str, Any] | None:
+    name = strip_tags(str(item.get("title") or ""))
+    href = item.get("url")
+    if not name or not isinstance(href, str):
+        return None
+    status, hours_summary, hours = chc_hours_from_timings(item.get("timings"))
+    facility_type = "pool" if kind == "pool" else "gym" if kind == "gym" else "leisure-centre"
+    image = item.get("imageUrl") if isinstance(item.get("imageUrl"), str) else None
+    return {
+        "name": name,
+        "id": slug_text(name),
+        "type": facility_type,
+        "types": [facility_type],
+        "council": "chc",
+        "council_name": "Christchurch",
+        "source": "christchurch-recreation-and-sport",
+        "source_url": absolutize(href, CHC_REC_BASE),
+        "listing_source_url": listing_source_url,
+        "address": strip_tags(str(item.get("subTitle") or "")) or None,
+        "description": strip_tags(str(item.get("description") or "")) or None,
+        "status": status,
+        "hours": hours,
+        "hours_summary": hours_summary,
+        "phone": CHC_REC_PHONE,
+        "image": absolutize(image, CHC_REC_BASE) if image else None,
+        "ccc_id": item.get("id"),
+    }
+
+
+def fetch_chc_filter_cards(kind: str) -> tuple[list[dict[str, Any]], str]:
+    config = CHC_FILTERS.get(kind)
+    if not config:
+        return [], CHC_REC_BASE
+    source_url = urllib.parse.urljoin(CHC_REC_BASE, config["source_path"])
+    data, final_url, _ = fetch_json_post(
+        CHC_FILTER_ENDPOINT,
+        config["payload"],
+        headers={"Referer": source_url, "Origin": CHC_REC_BASE},
+    )
+    if not isinstance(data, dict):
+        die("Christchurch recreation endpoint returned an unexpected JSON shape")
+    cards: list[dict[str, Any]] = []
+    for item in data.get("results") or []:
+        if not isinstance(item, dict):
+            continue
+        card = parse_chc_card(item, kind, source_url)
+        if card:
+            cards.append(card)
+    return cards, final_url or source_url
+
+
+def first_match(text: str, pattern: str) -> str | None:
+    m = re.search(pattern, text, flags=re.I | re.S)
+    if not m:
+        return None
+    return strip_tags(m.group(1))
+
+
+def trim_sentence(value: str | None, limit: int = 700) -> str | None:
+    if not value:
+        return None
+    value = re.sub(r"\s+", " ", value).strip(" ;|")
+    if len(value) <= limit:
+        return value
+    cut = value[:limit].rsplit(" ", 1)[0].strip()
+    return cut + "..."
+
+
+def fetch_he_puna_taimoana() -> dict[str, Any]:
+    body, final_url, _ = fetch_text(CHC_HE_PUNA_BASE + "/")
+    text = strip_tags(body)
+    hours_summary = first_match(text, r"(Open\s+10am\s+.+?)\s+195 Marine Parade") or "Open 10am - 7.30pm, 7 days"
+    feature_text = first_match(text, r"(What we offer\s+-\s+Five.+?)\s+Book your experience")
+    if feature_text:
+        feature_text = feature_text.replace("What we offer - ", "")
+    else:
+        feature_text = "Five hot pools, plunge pool, sauna, steam room, heated changing rooms and cafe."
+    return {
+        "name": "He Puna Taimoana",
+        "id": "he-puna-taimoana",
+        "type": "pool",
+        "types": ["pool"],
+        "council": "chc",
+        "council_name": "Christchurch",
+        "source": "he-puna-taimoana",
+        "source_url": final_url,
+        "listing_source_url": final_url,
+        "address": "195 Marine Parade, New Brighton, Christchurch 8061",
+        "description": "New Brighton hot pools by the sea.",
+        "status": None,
+        "hours": [{"label": "Opening hours", "text": hours_summary}],
+        "hours_summary": hours_summary,
+        "phone": "+64 3 941 7818",
+        "email": "info@hepunataimoana.co.nz",
+        "features": ["Hot pools", "Plunge pool", "Sauna", "Steam room", "Heated changing rooms", "Cafe"],
+        "pool_details": [{"label": "Hot pools", "text": feature_text}],
+        "gym_details": [],
+        "public_swim_availability": {
+            "source_url": final_url,
+            "summary": "Bookings are essential for public hot-pool sessions; the site links to live session availability.",
+        },
+    }
+
+
+def fetch_wharenui_pool() -> dict[str, Any]:
+    body, final_url, _ = fetch_text("/swimming/", CHC_WHARENUI_BASE)
+    contact_body, contact_url, _ = fetch_text("/contact/", CHC_WHARENUI_BASE)
+    text = strip_tags(body)
+    contact_text = strip_tags(contact_body)
+    pool_details = first_match(text, r"(About our Pools\s+Our Main Pool.+?)\s+Prices")
+    hours_summary = first_match(text, r"(Public Swimming Hours\s+.+?)\s+Pool Rules")
+    if not hours_summary:
+        hours_summary = first_match(contact_text, r"(Public Swimming Hours\s+.+?)\s+Contact Us")
+    phone = first_match(contact_text, r"(03\s*348\s*6488)") or "03 348 6488"
+    address = first_match(contact_text, r"(73 Elizabeth Street\s+Riccarton,\s+Christchurch,\s+New Zealand)") or "73 Elizabeth Street, Riccarton, Christchurch"
+    return {
+        "name": "Wharenui Swimming Pool & Sports Centre",
+        "id": "wharenui-pool",
+        "type": "pool",
+        "types": ["pool"],
+        "council": "chc",
+        "council_name": "Christchurch",
+        "source": "wharenui-sports-centre",
+        "source_url": final_url,
+        "listing_source_url": contact_url,
+        "address": address,
+        "description": "Riccarton sports centre with public lane swimming and heated indoor pools.",
+        "status": None,
+        "hours": [{"label": "Public swimming hours", "text": hours_summary}] if hours_summary else [],
+        "hours_summary": hours_summary,
+        "phone": phone,
+        "features": ["Public lane swimming", "Main pool", "Teaching pool", "Toddlers pool", "Sports centre", "Basketball"],
+        "pool_details": [{"label": "About our pools", "text": pool_details}] if pool_details else [],
+        "gym_details": [],
+        "public_swim_availability": {
+            "source_url": final_url,
+            "summary": hours_summary,
+        } if hours_summary else None,
+    }
+
+
+def fetch_chc_supplemental_pools() -> list[dict[str, Any]]:
+    pools: list[dict[str, Any]] = []
+    for getter in (fetch_he_puna_taimoana, fetch_wharenui_pool):
+        try:
+            pools.append(getter())
+        except SystemExit as exc:
+            pools.append(
+                {
+                    "name": getter.__name__.replace("fetch_", "").replace("_", " ").title(),
+                    "id": getter.__name__.replace("fetch_", "").replace("_", "-"),
+                    "type": "pool",
+                    "types": ["pool"],
+                    "council": "chc",
+                    "council_name": "Christchurch",
+                    "source": "supplemental-public-page",
+                    "source_url": None,
+                    "address": None,
+                    "hours": [],
+                    "hours_summary": None,
+                    "detail_error": str(exc),
+                }
+            )
+    return pools
+
+
+def chc_lane_availability_summaries() -> dict[str, dict[str, Any]]:
+    body, final_url, _ = fetch_text("/swim/lane-availability/", CHC_REC_BASE)
+    text = strip_tags(body)
+    start = text.find("Review the sections below")
+    content = text[start:] if start >= 0 else text
+    names = [
+        ("graham-condon", "Graham Condon"),
+        ("jellie-park", "Jellie Park"),
+        ("matatiki-hornby-centre", "Matatiki Hornby Centre"),
+        ("parakiore", "Parakiore"),
+        ("pioneer", "Pioneer"),
+        ("taiora-qeii", "Taiora QEII"),
+        ("te-pou-toetoe-linwood-pool", "Te Pou Toetoe Linwood Pool"),
+    ]
+    positions: list[tuple[int, str, str]] = []
+    for facility_id, name in names:
+        chosen = -1
+        for match in re.finditer(re.escape(name), content):
+            after = content[match.end() : match.end() + len(name) + 40].lstrip()
+            if after.startswith(name) or after.startswith("has ") or after.startswith("is "):
+                chosen = match.start()
+                break
+        if chosen < 0:
+            chosen = content.find(name)
+        if chosen >= 0:
+            positions.append((chosen, facility_id, name))
+    positions.sort()
+    summaries: dict[str, dict[str, Any]] = {}
+    for idx, (pos, facility_id, name) in enumerate(positions):
+        end = positions[idx + 1][0] if idx + 1 < len(positions) else len(content)
+        section = content[pos + len(name) : end]
+        section = re.sub(r"\s+", " ", section).strip()
+        for marker in ("Morning availability", "Afternoon availability", "Evening availability"):
+            marker_pos = section.find(marker)
+            if marker_pos > 0:
+                section = section[:marker_pos]
+                break
+        section = trim_sentence(section, 900)
+        if section:
+            summaries[facility_id] = {
+                "source_url": final_url,
+                "summary": section,
+                "contact_phone": CHC_LANE_PHONE,
+                "contact_email": CHC_LANE_EMAIL,
+            }
+    return summaries
+
+
+def main_html(page_html: str) -> str:
+    m = re.search(r"<main\b[^>]*>(.*?)</main>", page_html, flags=re.I | re.S)
+    return m.group(1) if m else page_html
+
+
+def section_id(label: str) -> str:
+    return re.sub(r"[^A-Za-z0-9]+", "", label)
+
+
+def quick_link_features(page_html: str) -> list[str]:
+    features: list[str] = []
+    nav_m = re.search(r'<ul[^>]*class=["\'][^"\']*c-sticky-in-page-nav-links[^"\']*["\'][^>]*>(.*?)</ul>', page_html, flags=re.I | re.S)
+    if not nav_m:
+        return features
+    for raw in re.findall(r"<span[^>]*>(.*?)</span>", nav_m.group(1), flags=re.I | re.S):
+        text = strip_tags(raw)
+        if text and text not in features and text.lower() != "quick links":
+            features.append(text)
+    return features
+
+
+def extract_chc_html_section(page_html: str, heading: str) -> str | None:
+    sid = section_id(heading)
+    id_m = re.search(rf'id=["\']{re.escape(sid)}["\']', page_html, flags=re.I)
+    if not id_m:
+        return None
+    next_m = re.search(r'<span[^>]*class=["\'][^"\']*c-content-heading[^"\']*["\'][^>]*id=["\']', page_html[id_m.end() :], flags=re.I)
+    end = id_m.end() + next_m.start() if next_m else min(len(page_html), id_m.end() + 25000)
+    block = page_html[id_m.start() : end]
+    text_blocks = re.findall(r'<div[^>]*class=["\'][^"\']*c-text-block-main-text[^"\']*["\'][^>]*>(.*?)</div>', block, flags=re.I | re.S)
+    if text_blocks:
+        text = strip_tags(" ".join(text_blocks), br="; ")
+    else:
+        text = strip_tags(block, br="; ")
+    text = re.sub(r"\s+", " ", text).strip(" ;|")
+    if text.lower().startswith(heading.lower()):
+        text = text[len(heading) :].strip(" ;|")
+    return trim_sentence(text, 900) if len(text) >= 25 else None
+
+
+def detail_text_for_facility(page_html: str, name: str | None) -> str:
+    text = strip_tags(main_html(page_html))
+    if name:
+        start = text.find(f"{name} Quick Links")
+        if start < 0:
+            start = text.find(name)
+        if start >= 0:
+            text = text[start:]
+    end = text.find("Contact us:")
+    if end > 0:
+        text = text[:end]
+    return text
+
+
+def extract_detail_section(detail_text: str, heading: str, stop_headings: list[str]) -> str | None:
+    m = re.search(rf"(?:^|\s){re.escape(heading)}(?:\s|$)", detail_text, flags=re.I)
+    if not m:
+        return None
+    start = m.end()
+    end = len(detail_text)
+    for stop in stop_headings:
+        stop_m = re.search(rf"(?:^|\s){re.escape(stop)}(?:\s|$)", detail_text[start:], flags=re.I)
+        if stop_m and stop_m.start() > 20:
+            end = min(end, start + stop_m.start())
+    text = detail_text[start:end]
+    text = re.sub(r"\s+", " ", text).strip(" .;")
+    if len(text) < 25:
+        return None
+    return trim_sentence(text, 900)
+
+
+def parse_chc_detail(page_html: str, final_url: str, card: dict[str, Any]) -> dict[str, Any]:
+    main = main_html(page_html)
+    title_m = re.search(r"<h1[^>]*>(.*?)</h1>", page_html, flags=re.I | re.S)
+    meta_m = re.search(r'<meta\s+name=["\']description["\']\s+content=["\']([^"\']*)', page_html, flags=re.I)
+    name = strip_tags(title_m.group(1)) if title_m else card.get("name")
+    detail_text = detail_text_for_facility(main, name)
+    phones = [html.unescape(x).strip() for x in re.findall(r'href=["\']tel:([^"\']+)', page_html, flags=re.I)]
+    emails = [html.unescape(x).strip() for x in re.findall(r'href=["\']mailto:([^"?\']+)', page_html, flags=re.I)]
+    feature_candidates = [
+        "Pools",
+        "Indoor pools",
+        "Outdoor summer pools",
+        "Hydroslides",
+        "Hydroslide",
+        "Learn to swim",
+        "Gym",
+        "Group fitness classes",
+        "Indoor stadium",
+        "Stadium/Courts",
+        "Community Courts",
+        "Rooms for hire",
+        "Hydrotherapy Pool",
+        "Sensory Centre",
+        "Sensory Aqua Centre",
+        "Spa",
+        "Sauna",
+        "Steam room",
+        "Cafe",
+    ]
+    detail_lower = detail_text.lower()
+    features = quick_link_features(main) or [feat for feat in feature_candidates if feat.lower() in detail_lower]
+    stop_headings = feature_candidates + [
+        "Centre amenities",
+        "Plan your visit",
+        "View Pricing",
+        "Prices",
+        "Travel by",
+        "Accessibility",
+        "The story of",
+        "Parking",
+        "Contact details",
+        "Contact us",
+    ]
+    pool_details: list[dict[str, str]] = []
+    for heading in ("Indoor pools", "Outdoor summer pools", "Pools", "Hydrotherapy Pool", "Hydroslides", "Sensory Aqua Centre"):
+        section = extract_chc_html_section(main, heading)
+        if section and all(section != item["text"] for item in pool_details):
+            pool_details.append({"label": heading, "text": section})
+    gym_details: list[dict[str, str]] = []
+    for heading in ("Gym",):
+        section = extract_chc_html_section(main, heading)
+        if section and all(section != item["text"] for item in gym_details):
+            gym_details.append({"label": heading, "text": section})
+
+    enriched = dict(card)
+    enriched.update(
+        {
+            "name": name,
+            "id": slug_text(name or card.get("name", "")),
+            "source_url": final_url,
+            "description": html.unescape(meta_m.group(1)).strip() if meta_m else card.get("description"),
+            "phone": card.get("phone") or CHC_REC_PHONE,
+            "email": card.get("email"),
+            "features": features,
+            "pool_details": pool_details,
+            "gym_details": gym_details,
+        }
+    )
+    return enriched
+
+
+def enrich_chc_details(cards: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    lane_summaries: dict[str, dict[str, Any]] = {}
+    pool_ids = {card.get("id") for card in cards if card.get("type") == "pool"}
+    if pool_ids:
+        try:
+            lane_summaries = chc_lane_availability_summaries()
+        except SystemExit:
+            lane_summaries = {}
+
+    def one(card: dict[str, Any]) -> dict[str, Any]:
+        if card.get("source") != "christchurch-recreation-and-sport" or not card.get("source_url"):
+            return card
+        try:
+            body, final_url, _ = fetch_text(str(card["source_url"]), CHC_REC_BASE)
+            detail = parse_chc_detail(body, final_url, card)
+            if detail.get("id") in lane_summaries:
+                detail["public_swim_availability"] = lane_summaries[detail["id"]]
+            return detail
+        except SystemExit as exc:
+            card["detail_error"] = str(exc)
+            return card
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=6) as pool:
+        futures = {pool.submit(one, dict(card)): idx for idx, card in enumerate(cards)}
+        out: list[dict[str, Any] | None] = [None] * len(cards)
+        for future in concurrent.futures.as_completed(futures):
+            out[futures[future]] = future.result()
+    return [x for x in out if x is not None]
+
+
+def fetch_chc_facilities(kind: str) -> tuple[list[dict[str, Any]], str]:
+    if kind == "library":
+        return [], CHC_REC_BASE
+    cards, source_url = fetch_chc_filter_cards(kind)
+    if kind == "pool":
+        cards.extend(fetch_chc_supplemental_pools())
+    return cards, source_url
+
+
 def parse_time_label(value: str) -> dt.datetime | None:
     for fmt in ("%I:%M %p", "%I %p"):
         try:
@@ -2022,7 +2485,17 @@ def pool_detail_for_council(council: str, name: str) -> tuple[dict[str, Any] | N
             "lane_availability_today": None,
             "note": note,
         }, listing_url, []
-    die("Christchurch pool detail is not wired in v1")
+    if council == "chc":
+        cards, listing_url = fetch_chc_facilities("pool")
+        cards = enrich_chc_details(cards)
+        card = find_facility(cards, name)
+        if not card:
+            return None, listing_url, [c["name"] for c in cards[:12]]
+        return {
+            "facility": card,
+            "lane_availability_today": card.get("public_swim_availability"),
+        }, listing_url, []
+    die(f"unsupported council {council!r}")
 
 
 def cmd_pools(args: argparse.Namespace) -> None:
@@ -2069,7 +2542,11 @@ def cmd_pools(args: argparse.Namespace) -> None:
         pools, source_url, note = fetch_whg_facilities("pool")
         pools = pools[: args.limit]
     else:
-        die("Christchurch pools are not wired in v1 because the public council recreation source is JS/vendor-backed")
+        if args.region:
+            die("--region is only supported for Auckland pools")
+        pools, source_url = fetch_chc_facilities("pool")
+        pools = pools[: args.limit]
+        pools = enrich_chc_details(pools)
 
     data = {
         "query": {"council": args.council, "region": args.region, "limit": args.limit},
@@ -2083,13 +2560,17 @@ def cmd_pools(args: argparse.Namespace) -> None:
 
 def cmd_pool(args: argparse.Namespace) -> None:
     started = time.perf_counter()
-    councils = [args.council] if args.council else ["whg", "npr", "has", "npl", "rot", "akl", "wlg", "ham", "hutt", "porirua", "uhutt", "kapiti"]
+    councils = [args.council] if args.council else ["whg", "npr", "has", "npl", "rot", "akl", "wlg", "ham", "hutt", "porirua", "uhutt", "kapiti", "chc"]
     suggestions_by_council: list[str] = []
     for council in councils:
         detail, listing_url, suggestions = pool_detail_for_council(council, args.name)
         if detail:
+            query = {"council": council, "name": args.name}
+            if args.council is None:
+                query["matched_by"] = "auto-council-search"
+                query["searched_councils"] = councils
             data = {
-                "query": {"council": council, "name": args.name},
+                "query": query,
                 "listing_source_url": listing_url,
                 "elapsed_ms": round((time.perf_counter() - started) * 1000),
                 "facility": detail["facility"],
@@ -2100,7 +2581,10 @@ def cmd_pool(args: argparse.Namespace) -> None:
             emit_pool_detail(data, args.json)
             return
         if suggestions:
-            suggestions_by_council.append(f"{COUNCIL_NAMES.get(council, council)}: {', '.join(suggestions)}")
+            suggestion_text = ", ".join(suggestions)
+            if args.council is None:
+                suggestion_text = f"{COUNCIL_NAMES.get(council, council)}: {suggestion_text}"
+            suggestions_by_council.append(suggestion_text)
     searched = ", ".join(COUNCIL_NAMES.get(c, c) for c in councils)
     hint = "; ".join(suggestions_by_council[:3])
     if hint:
@@ -2193,8 +2677,16 @@ def cmd_facilities(args: argparse.Namespace) -> None:
         facilities, source_url, note = fetch_whg_facilities(args.type)
         facilities = facilities[: args.limit]
     else:
-        facilities, source_url = [], "https://recandsport.ccc.govt.nz/"
-        note = "Christchurch recreation uses a vendor-backed source that is documented in references but not wired in v1."
+        if args.region:
+            die("--region is only supported for Auckland facilities")
+        if args.type == "library":
+            facilities, source_url = [], CHC_REC_BASE
+            note = "Libraries are outside this skill's recreation-focused Christchurch data source."
+        else:
+            facilities, source_url = fetch_chc_facilities(args.type)
+            facilities = facilities[: args.limit]
+            facilities = enrich_chc_details(facilities)
+            note = None
 
     data = {
         "query": {"council": args.council, "type": args.type, "region": args.region, "limit": args.limit},
@@ -2280,6 +2772,10 @@ def emit_pool_detail(data: dict[str, Any], as_json: bool) -> None:
         detail_names = [d.get("name") for d in facility["pool_details"][:5] if d.get("name")]
         if detail_names:
             print("  pools: " + ", ".join(detail_names))
+    for detail_key in ("pool_details", "gym_details"):
+        for detail in (facility.get(detail_key) or [])[:3]:
+            if detail.get("label") and detail.get("text"):
+                print(f"  {detail['label']}: {detail['text']}")
     availability = data.get("lane_availability_today")
     if availability and availability.get("resources"):
         print(f"  lane availability date: {availability.get('date')}")
@@ -2288,6 +2784,8 @@ def emit_pool_detail(data: dict[str, Any], as_json: bool) -> None:
             if intervals:
                 first = intervals[0]
                 print(f"  {resource['name']}: {first['start']}-{first['end']} ({first['available_lanes']} lanes)")
+    elif availability and availability.get("summary"):
+        print(f"  public swim: {availability.get('summary')}")
     print(f"  {facility.get('source_url')}")
 
 
