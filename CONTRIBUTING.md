@@ -7,7 +7,7 @@ The standard is simple: narrow skills, strong trigger descriptions, lean `SKILL.
 ## Quick start
 
 ```bash
-npm install
+npm install  # repo tooling only — not needed to run Python skills
 npm run new-skill -- my-skill --variant minimal
 npm run validate-skill -- skills/my-skill
 ```
@@ -18,8 +18,9 @@ npm run validate-skill -- skills/my-skill
 - Make the `description` field do the retrieval work
 - Keep `SKILL.md` operational, not essay-like
 - Move deep reference material into `references/`
-- Put deterministic operations into `scripts/` as Python standard-library CLIs or TypeScript/Node CLIs
-- Keep helper CLI dependencies minimal: prefer Python stdlib or zero/few-dependency Node packages
+- Put deterministic operations into `scripts/cli.py` as Python standard-library CLIs
+- Keep helper CLI dependencies minimal: prefer Python stdlib; declare third-party deps in `requirements.txt` or PEP 723 `# /// script` inline metadata
+- TypeScript/Node skill helpers are **not accepted** — all scripts must be Python
 - Avoid per-skill doc clutter
 
 ## Definition of done
@@ -129,7 +130,7 @@ Bad:
 A script with no invocation guidance is dead weight.
 Reference the script from `SKILL.md` or a linked reference doc.
 
-Python and TypeScript/Node CLIs are both accepted for skill helpers. Prefer Python standard-library scripts or TypeScript/Node CLIs with zero or few dependencies, and document any required runtime, install step, environment variable, or auth assumption.
+Python standard-library CLIs are the only accepted format for skill helpers. Do not add TypeScript or Node-based scripts. Document any required runtime, install step, environment variable, or auth assumption in `SKILL.md`.
 
 ## Template variants
 

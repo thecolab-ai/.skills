@@ -14,16 +14,16 @@ Every skill in this repo is a drop-in connector. Clone the repo, install the ski
 
 ```bash
 git clone https://github.com/thecolab-ai/.skills
-cd .skills && npm install
+cd .skills
 
 # NZ fuel prices, supply, and vessels
-npx tsx skills/fuelclock-nz/scripts/cli.ts summary
+python3 skills/fuelclock-nz/scripts/cli.py summary
 
 # Latest NZ news
-npx tsx skills/nz-news/scripts/cli.ts headlines
+python3 skills/nz-news/scripts/cli.py headlines
 
 # Auckland Transport real-time (needs AT API key)
-npx tsx skills/at-transport/scripts/cli.ts alerts
+python3 skills/at-transport/scripts/cli.py alerts
 ```
 
 No auth needed for `fuelclock-nz`, `metservice-nz`, or `nz-news`. `at-transport` requires a free API key from [dev-portal.at.govt.nz](https://dev-portal.at.govt.nz).
@@ -85,23 +85,32 @@ We are borrowing the shape of the best public skills repos, but not copying thei
 - [./template](./template/SKILL.md) - Minimal starter template
 - [./templates](./templates) - Opinionated scaffold variants for different skill types
 
+## Skill Development Guidelines
+
+All skills in this repository use **Python** as the canonical entrypoint.
+
+- **Entrypoint:** Every skill must have `scripts/cli.py` with `#!/usr/bin/env python3` as its first line.
+- **Python stdlib preferred.** Use `urllib.request`, `json`, `re`, `xml.etree.ElementTree`, `html.parser`, `argparse`, and the standard library where possible. If a third-party dependency is truly necessary, declare it in a `requirements.txt` in the skill directory or via inline `# /// script` PEP 723 metadata.
+- **TypeScript/Node skills are not accepted.** Any existing TS skills must be ported to Python before merging. Do not add new TypeScript or Node-based skill helpers.
+- **Every skill must have:** `SKILL.md`, `scripts/cli.py`, and a `references/` directory if external API documentation is needed.
+- **`--json` flag** for machine-readable output, following the pattern in existing Python skills.
+- **`die()` function** that prints the error to stderr and exits non-zero.
+
 ## Contributing
 
 We’ve made this repo opinionated on purpose.
 
-Don’t freestyle the structure. Generate a scaffold, fill it in properly, then validate it before you open a PR. The repo tooling for this is TypeScript-based.
-
-Skill helper CLIs can be Python or TypeScript/Node. Prefer Python standard-library scripts or zero/few-dependency TypeScript/Node CLIs, and document any runtime, auth, or dependency assumptions in `SKILL.md`.
+Don’t freestyle the structure. Generate a scaffold, fill it in properly, then validate it before you open a PR.
 
 ### Quick start
 
 ```bash
-npm install
+git clone https://github.com/thecolab-ai/.skills
+cd .skills && npm install   # repo tooling only — not required for running skills
+
 npm run new-skill -- my-nz-skill --variant minimal
 npm run validate-skill -- skills/my-nz-skill
 ```
-
-> **Note:** If `NODE_ENV=production` is set in your environment, `npm install` silently skips devDependencies, which breaks `npm run typecheck` and skill smoke tests. Fix this with `NODE_ENV=development npm install` or `npm install --include=dev`.
 
 ### Available scaffold variants
 
@@ -117,19 +126,11 @@ skills/
     SKILL.md
     references/
     scripts/
+      cli.py
     assets/
 ```
 
 Only create the directories the skill actually needs.
-
-### Repo commands
-
-```bash
-npm run new-skill -- <name> --variant minimal
-npm run validate-skill -- skills/<name>
-npm run validate-skill -- skills
-npm run typecheck
-```
 
 ### Contribution rules
 
@@ -138,13 +139,13 @@ npm run typecheck
 - If auth is required, document it clearly in `SKILL.md`, including:
   - How to obtain access
   - Required environment variables
-  - Whether there's a free tier
+  - Whether there’s a free tier
   - Example `.env` entry
 - Skills that scrape public websites or consume open RSS feeds should note rate limits, caching expectations, and source stability concerns
 - `description` must say what the skill does and when to use it
 - Keep `SKILL.md` lean and operational
 - Move deep detail into `references/`
-- Put deterministic helpers in `scripts/` as Python standard-library CLIs or TypeScript/Node CLIs with minimal dependencies
+- Put deterministic helpers in `scripts/cli.py` using Python stdlib
 - Do not add per-skill `README.md`, `CHANGELOG.md`, or junk notes
 
 Full guide: [CONTRIBUTING.md](CONTRIBUTING.md)
