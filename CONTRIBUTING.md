@@ -10,6 +10,9 @@ The standard is simple: narrow skills, strong trigger descriptions, lean `SKILL.
 npm install  # repo tooling only — not needed to run Python skills
 npm run new-skill -- my-skill --variant minimal
 npm run validate-skill -- skills/my-skill
+
+# Run skill smoke tests (Python, stdlib only — no extra deps)
+python3 skills/<name>/scripts/smoke_test.py
 ```
 
 ## Core stance
