@@ -485,6 +485,35 @@ Community pool check:
 
 Freshness: static facility metadata captured from current direct-fetchable public pages during discovery. Availability links are emitted, but PerfectGym availability parsing is not wired for Whangarei v1.
 
+### Palmerston North swimming facilities
+
+Implemented for council-listed swimming facilities.
+
+- Requested source checked first: `https://www.pncc.govt.nz/Recreation-and-leisure/Swimming`
+- Current PNCC source: `https://www.pncc.govt.nz/Parks-recreation/Swimming-pools`
+- Detail pages:
+  - `https://www.pncc.govt.nz/Parks-recreation/Swimming-pools/Freyberg-Community-Pool`
+  - `https://www.pncc.govt.nz/Parks-recreation/Swimming-pools/Lido-Aquatic-Centre`
+  - `https://www.pncc.govt.nz/Parks-recreation/Swimming-pools/Splashhurst-Community-Pool`
+  - `https://www.pncc.govt.nz/Parks-recreation/Swimming-pools/Free-paddling-pools-in-Palmy`
+
+Observed facilities:
+
+- Freyberg Community Pool
+- Lido Aquatic Centre
+- Splashhurst Community Pool
+- Free paddling pools in Palmy
+
+PNCC direct `urllib` requests can return Akamai `403 Access Denied` even when browser and curl requests succeed. The CLI tries direct fetch first, then falls back to the local Chrome DevTools Protocol endpoint at `127.0.0.1:5100` for PNCC `403/429` bot-wall responses. The fallback is stdlib-only and reads rendered `document.documentElement.outerHTML`.
+
+PNCC pages expose:
+
+- listing cards with title, URL, description, and image
+- detail page title, description, facilities/services lists, location, phone, email
+- CLM contact and price links for Lido and Freyberg
+
+Splashhurst redirects from PNCC to the linked public CLM site. CLM contact pages expose phone, email, address, and public opening-hour cards. The CLI follows those public links for current hours without logging in or using booking/payment surfaces.
+
 ### Christchurch recreation and sport
 
 Implemented for Christchurch pools, gyms, and recreation/leisure centres.

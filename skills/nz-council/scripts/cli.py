@@ -12,6 +12,7 @@ import base64
 import concurrent.futures
 import copy
 import datetime as dt
+import hashlib
 import html
 import json
 import os
@@ -41,6 +42,8 @@ HUTT_POOLS_BASE = "https://pools.huttcity.govt.nz"
 PORIRUA_ARENA_BASE = "https://terauparaha-arena.co.nz"
 UHUTT_H2O_BASE = "https://www.h2oxtream.com"
 KAPITI_AQUATICS_BASE = "https://www.kapiticoastaquatics.co.nz"
+PNCC_BASE = "https://www.pncc.govt.nz"
+PNCC_SWIMMING_PATH = "/Parks-recreation/Swimming-pools"
 CDP_HTTP_BASE = "http://127.0.0.1:5100"
 WHG_WDC_BASE = "https://www.wdc.govt.nz"
 WHG_CLM_BASE = "https://www.clmnz.co.nz"
@@ -65,6 +68,7 @@ COUNCIL_LOCATIONS = {
     "has": "hastings",
     "ham": "hamilton",
     "whg": "whangarei",
+    "pmn": "palmerston-north",
 }
 
 COUNCIL_NAMES = {
@@ -81,9 +85,10 @@ COUNCIL_NAMES = {
     "uhutt": "Upper Hutt City",
     "kapiti": "Kāpiti Coast",
     "whg": "Whangarei",
+    "pmn": "Palmerston North",
 }
 
-RECREATION_COUNCILS = ("akl", "wlg", "chc", "rot", "npl", "npr", "has", "ham", "hutt", "porirua", "uhutt", "kapiti", "whg")
+RECREATION_COUNCILS = ("akl", "wlg", "chc", "rot", "npl", "npr", "has", "ham", "hutt", "porirua", "uhutt", "kapiti", "whg", "pmn")
 
 AKL_AREA_IDS = {
     "central": "1134",
@@ -963,14 +968,24 @@ def strip_tags(value: str, br: str = " ") -> str:
 
 
 def attr(tag: str, name: str) -> str | None:
-    m = re.search(rf"\b{name}=['\"]([^'\"]+)['\"]", tag, flags=re.I)
-    return html.unescape(m.group(1)) if m else None
+    m = re.search(rf"\b{name}\s*=\s*(['\"])(.*?)\1", tag, flags=re.I | re.S)
+    return html.unescape(m.group(2)) if m else None
 
 
 def absolutize(url: str | None, base: str) -> str | None:
     if not url:
         return None
     return urllib.parse.urljoin(base, html.unescape(url))
+
+
+def meta_content(page_html: str, key: str) -> str | None:
+    for m in re.finditer(r"<meta\s+([^>]+)>", page_html, flags=re.I | re.S):
+        tag = m.group(1)
+        name = (attr(tag, "name") or attr(tag, "property") or "").lower()
+        if name == key.lower():
+            content = attr(tag, "content")
+            return html.unescape(content).strip() if content else None
+    return None
 
 
 def slug_text(value: str) -> str:
@@ -1114,9 +1129,19 @@ def fetch_text_via_cdp(url: str, timeout: int = 8) -> str | None:
 
         call("Page.enable")
         call("Runtime.enable")
+        call("Page.navigate", {"url": url})
         deadline = time.time() + timeout
         best_html = None
         while time.time() < deadline:
+            ready_response = call(
+                "Runtime.evaluate",
+                {
+                    "expression": "document.readyState",
+                    "returnByValue": True,
+                },
+            )
+            ready_result = ready_response.get("result", {}).get("result", {})
+            ready_state = ready_result.get("value") if isinstance(ready_result, dict) else None
             response = call(
                 "Runtime.evaluate",
                 {
@@ -1128,7 +1153,7 @@ def fetch_text_via_cdp(url: str, timeout: int = 8) -> str | None:
             value = result.get("value") if isinstance(result, dict) else None
             if isinstance(value, str) and value:
                 best_html = value
-                if not is_bot_wall(value) and not is_missing_page(value):
+                if ready_state in {"interactive", "complete"} and not is_bot_wall(value) and not is_missing_page(value):
                     return value
             time.sleep(0.5)
         return best_html
@@ -1163,6 +1188,25 @@ def source_probe(url: str) -> dict[str, Any]:
     _, final_url, status, method = try_fetch_live_page(url)
     ok = method in {"direct", "cdp"}
     return {"ok": ok, "method": method, "status": status, "url": final_url}
+
+
+def compact_text(value: str) -> str:
+    value = re.sub(r"\s+;\s*", "; ", value)
+    value = re.sub(r":\s*;\s*", ": ", value)
+    value = re.sub(r"(;\s*){2,}", "; ", value)
+    return value.strip(" ;")
+
+
+def dedupe_strings(values: list[str]) -> list[str]:
+    out: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        key = value.lower()
+        if not value or key in seen:
+            continue
+        seen.add(key)
+        out.append(value)
+    return out
 
 
 def parse_date_arg(value: str | None, label: str) -> dt.date | None:
@@ -2025,6 +2069,257 @@ def fetch_chc_facilities(kind: str) -> tuple[list[dict[str, Any]], str]:
     return cards, source_url
 
 
+def parse_pmn_pool_listing(page_html: str, source_url: str) -> list[dict[str, Any]]:
+    starts = [m.start() for m in re.finditer(r'<div\s+class=["\'][^"\']*list-item-container[^"\']*small-panel', page_html, flags=re.I)]
+    facilities: list[dict[str, Any]] = []
+    for idx, start in enumerate(starts):
+        end = starts[idx + 1] if idx + 1 < len(starts) else min(len(page_html), start + 7000)
+        block = page_html[start:end]
+        link_m = re.search(r"<a\s+([^>]+)>", block, flags=re.I | re.S)
+        title_m = re.search(r'<h2[^>]*class=["\'][^"\']*list-item-title[^"\']*["\'][^>]*>(.*?)</h2>', block, flags=re.I | re.S)
+        desc_m = re.search(r"<p[^>]*>(.*?)</p>", block, flags=re.I | re.S)
+        if not link_m or not title_m:
+            continue
+        href = attr(link_m.group(1), "href")
+        name = strip_tags(title_m.group(1))
+        if not href or not name:
+            continue
+        image_m = re.search(r"<img\s+([^>]+)>", block, flags=re.I | re.S)
+        facilities.append(
+            {
+                "name": name,
+                "id": slug_text(name),
+                "type": "pool",
+                "council": "pmn",
+                "council_name": "Palmerston North",
+                "source": "palmerston-north-city-council",
+                "source_url": absolutize(href, PNCC_BASE),
+                "listing_source_url": source_url,
+                "description": strip_tags(desc_m.group(1)) if desc_m else None,
+                "image": absolutize(attr(image_m.group(1), "src") or attr(image_m.group(1), "data-src"), PNCC_BASE) if image_m else None,
+                "hours": None,
+                "hours_summary": None,
+                "hours_note": None,
+            }
+        )
+    return facilities
+
+
+def fetch_pmn_text(url_or_path: str, base: str = PNCC_BASE, timeout: int = 30) -> tuple[str, str, int]:
+    url = resolve_url(url_or_path, base)
+    body, final_url, status, method = try_fetch_live_page(url, use_cdp=True)
+    if not body:
+        die(f"could not fetch Palmerston North source {url}: {method}")
+    canonical_url = meta_content(body, "og:url")
+    if canonical_url:
+        final_url = absolutize(canonical_url, final_url) or final_url
+    return body, final_url, status or 0
+
+
+def first_href(page_html: str, contains: str | None = None) -> str | None:
+    for m in re.finditer(r"<a\s+([^>]+)>", page_html, flags=re.I | re.S):
+        href = attr(m.group(1), "href")
+        if not href:
+            continue
+        if contains and contains.lower() not in href.lower():
+            continue
+        return html.unescape(href)
+    return None
+
+
+def is_pmn_clm_page(page_html: str, final_url: str) -> bool:
+    parsed = urllib.parse.urlparse(final_url)
+    if parsed.netloc.endswith("clmnz.co.nz"):
+        return True
+    return (
+        parsed.netloc.endswith("pncc.govt.nz")
+        and not parsed.path.lower().startswith("/parks-recreation/swimming-pools/")
+        and "clmnz.co.nz" in page_html.lower()
+    )
+
+
+def clm_page_base(page_html: str, final_url: str, slug: str | None = None) -> str:
+    parsed = urllib.parse.urlparse(final_url)
+    if parsed.netloc.endswith("clmnz.co.nz"):
+        return final_url
+    if parsed.netloc.endswith("pncc.govt.nz") and parsed.path and not parsed.path.lower().startswith("/parks-recreation/swimming-pools/"):
+        return "https://www.clmnz.co.nz" + parsed.path
+    if slug and re.search(rf"https://www\.clmnz\.co\.nz/{re.escape(slug)}/?", page_html, flags=re.I):
+        return f"https://www.clmnz.co.nz/{slug}/"
+    for m in re.finditer(r"https://www\.clmnz\.co\.nz/([a-z0-9-]+)/?", page_html, flags=re.I):
+        segment = m.group(1).lower()
+        if segment not in {"media", "assets"}:
+            return f"https://www.clmnz.co.nz/{segment}/"
+    return final_url
+
+
+def pncc_side_section(page_html: str, title: str) -> str:
+    pattern = rf'<h2[^>]*class=["\'][^"\']*side-box-title[^"\']*["\'][^>]*>\s*{re.escape(title)}\s*</h2>'
+    return text_between(page_html, pattern, [r'<h2[^>]*class=["\'][^"\']*side-box-title', r'<div[^>]*class=["\'][^"\']*share-page-container'])
+
+
+def parse_pmn_pncc_detail(page_html: str, final_url: str, card: dict[str, Any] | None = None) -> dict[str, Any]:
+    title_m = re.search(r"<h1[^>]*>(.*?)</h1>", page_html, flags=re.I | re.S)
+    name = strip_tags(title_m.group(1)) if title_m else (card or {}).get("name")
+    main_section = text_between(page_html, r"<!--normalTemplateStart-->", [r'<div[^>]*class=["\'][^"\']*share-page-container'])
+    main_before_side = text_between(page_html, r"<!--normalTemplateStart-->", [r'<div[^>]*class=["\'][^"\']*col-xs-12 col-m-4', r'<div[^>]*class=["\'][^"\']*share-page-container'])
+
+    description = meta_content(page_html, "description") or (card or {}).get("description")
+    intro_m = re.search(r'<p[^>]*class=["\'][^"\']*introduction[^"\']*["\'][^>]*>(.*?)</p>', main_section, flags=re.I | re.S)
+    if intro_m:
+        description = strip_tags(intro_m.group(1)) or description
+
+    features = [strip_tags(x) for x in re.findall(r"<li[^>]*>(.*?)</li>", main_before_side, flags=re.I | re.S)]
+    if not features:
+        features = [strip_tags(x) for x in re.findall(r"<h2[^>]*>(.*?)</h2>", main_before_side, flags=re.I | re.S)]
+    features = dedupe_strings([f for f in features if f and f.lower() not in {"facilities", "services"}])
+
+    location_section = pncc_side_section(page_html, "Location")
+    address = (card or {}).get("address")
+    address_m = re.search(r"<p[^>]*>(.*?)</p>", location_section, flags=re.I | re.S)
+    if address_m:
+        parsed_address = strip_tags(address_m.group(1), br=", ")
+        if parsed_address and "location map" not in parsed_address.lower():
+            address = parsed_address
+
+    hours_section = pncc_side_section(page_html, "Opening hours and prices")
+    hours_note = None
+    hours_note_m = re.search(r"<p[^>]*>(.*?)</p>", hours_section, flags=re.I | re.S)
+    if hours_note_m:
+        hours_note = strip_tags(hours_note_m.group(1))
+    if name and "paddling" in name.lower():
+        hours_note = "Memorial Park pool and splash pad are open in summer from 10am to 9pm; Victoria Esplanade paddling pool opens November to March."
+
+    phones = [html.unescape(x).strip() for x in re.findall(r'href=["\']tel:([^"\']+)', main_section, flags=re.I)]
+    emails = [html.unescape(x).strip() for x in re.findall(r'href=["\']mailto:([^"?\']+)', main_section, flags=re.I)]
+    opening_hours_url = first_href(hours_section, "contact") or first_href(hours_section)
+    prices_url = first_href(hours_section, "prices")
+
+    facility = {
+        "name": name,
+        "id": slug_text(name or ""),
+        "type": "pool",
+        "council": "pmn",
+        "council_name": "Palmerston North",
+        "source": "palmerston-north-city-council",
+        "source_url": final_url,
+        "listing_source_url": (card or {}).get("listing_source_url"),
+        "description": description,
+        "address": address,
+        "operator": "Community Leisure Management" if "clmnz.co.nz" in hours_section.lower() else None,
+        "status": None,
+        "hours": None,
+        "hours_summary": hours_note,
+        "hours_note": hours_note,
+        "phone": phones[0] if phones else None,
+        "email": emails[0] if emails else None,
+        "features": features[:20],
+        "opening_hours_url": absolutize(opening_hours_url, final_url) if opening_hours_url else None,
+        "prices_url": absolutize(prices_url, final_url) if prices_url else None,
+        "image": (card or {}).get("image") or meta_content(page_html, "og:image"),
+    }
+    return facility
+
+
+def parse_clm_contact(page_html: str, final_url: str) -> dict[str, Any]:
+    phones = [html.unescape(x).strip() for x in re.findall(r'href=["\']tel:([^"\']+)', page_html, flags=re.I)]
+    emails = [html.unescape(x).strip() for x in re.findall(r'href=["\']mailto:([^"?\']+)', page_html, flags=re.I)]
+    address = None
+    address_m = re.search(r'class=["\']contact-address__text["\'][^>]*>(.*?)</span>', page_html, flags=re.I | re.S)
+    if address_m:
+        address = strip_tags(address_m.group(1), br=", ")
+        address = re.sub(r"\s*,\s*", ", ", address)
+
+    starts = [m.start() for m in re.finditer(r'<div\s+class=["\']card__body["\']', page_html, flags=re.I)]
+    hours: list[dict[str, str]] = []
+    for idx, start in enumerate(starts):
+        end = starts[idx + 1] if idx + 1 < len(starts) else min(len(page_html), start + 3500)
+        block = page_html[start:end]
+        title_m = re.search(r'class=["\']card__title-text["\'][^>]*>(.*?)</span>', block, flags=re.I | re.S)
+        text_m = re.search(r"<p[^>]*>(.*?)</p>", block, flags=re.I | re.S)
+        if not title_m or not text_m:
+            continue
+        label = strip_tags(title_m.group(1))
+        text = compact_text(strip_tags(text_m.group(1), br="; "))
+        if label and text and any(word in label.lower() for word in ("hours", "hydroslides")):
+            hours.append({"label": label, "text": text})
+
+    pool_hours = next((h for h in hours if "pool" in h["label"].lower()), hours[0] if hours else None)
+    return {
+        "source_url": final_url,
+        "phone": phones[0] if phones else None,
+        "email": emails[0] if emails else None,
+        "address": address,
+        "hours": hours or None,
+        "hours_summary": pool_hours["text"] if pool_hours else None,
+    }
+
+
+def parse_pmn_clm_detail(page_html: str, final_url: str, card: dict[str, Any] | None = None) -> dict[str, Any]:
+    source_url = clm_page_base(page_html, final_url, str((card or {}).get("id") or ""))
+    name = meta_content(page_html, "og:title") or (card or {}).get("name")
+    description = meta_content(page_html, "description") or meta_content(page_html, "og:description") or (card or {}).get("description")
+    contact_url = absolutize(first_href(page_html, "contact/"), source_url)
+    features = [strip_tags(x) for x in re.findall(r'class=["\']navigation__link__text["\'][^>]*>\s*<span>(.*?)</span>', page_html, flags=re.I | re.S)]
+    features = dedupe_strings([f for f in features if f and f.lower() not in {"business hours", "contact us", "prices", "news", "work with us"}])
+    contact = parse_clm_contact(page_html, final_url)
+    facility = {
+        "name": name,
+        "id": slug_text(name or ""),
+        "type": "pool",
+        "council": "pmn",
+        "council_name": "Palmerston North",
+        "source": "palmerston-north-city-council-linked-clm",
+        "source_url": source_url,
+        "listing_source_url": (card or {}).get("listing_source_url"),
+        "description": description,
+        "address": contact.get("address"),
+        "operator": "Community Leisure Management",
+        "status": None,
+        "hours": contact.get("hours"),
+        "hours_summary": contact.get("hours_summary"),
+        "hours_note": None,
+        "phone": contact.get("phone"),
+        "email": contact.get("email"),
+        "features": features[:20],
+        "opening_hours_url": contact_url,
+        "prices_url": absolutize(first_href(page_html, "prices/"), source_url),
+        "image": (card or {}).get("image") or meta_content(page_html, "og:image"),
+    }
+    return facility
+
+
+def enrich_pmn_facility(card: dict[str, Any]) -> dict[str, Any]:
+    facility = dict(card)
+    try:
+        body, final_url, _ = fetch_pmn_text(card["source_url"], PNCC_BASE)
+        if is_pmn_clm_page(body, final_url):
+            facility.update(parse_pmn_clm_detail(body, final_url, card))
+        else:
+            facility.update(parse_pmn_pncc_detail(body, final_url, card))
+        opening_hours_url = facility.get("opening_hours_url")
+        if opening_hours_url and urllib.parse.urlparse(opening_hours_url).netloc.endswith("clmnz.co.nz"):
+            contact_body, contact_final_url, _ = fetch_pmn_text(opening_hours_url, PNCC_BASE)
+            contact = parse_clm_contact(contact_body, contact_final_url)
+            facility["hours"] = contact.get("hours") or facility.get("hours")
+            facility["hours_summary"] = contact.get("hours_summary") or facility.get("hours_summary")
+            facility["hours_source_url"] = contact_final_url
+            facility["phone"] = facility.get("phone") or contact.get("phone")
+            facility["email"] = facility.get("email") or contact.get("email")
+            facility["address"] = facility.get("address") or contact.get("address")
+    except SystemExit:
+        facility["detail_error"] = "Could not fetch facility detail page."
+    return facility
+
+
+def fetch_pmn_facilities(kind: str) -> tuple[list[dict[str, Any]], str]:
+    if kind != "pool":
+        return [], urllib.parse.urljoin(PNCC_BASE, PNCC_SWIMMING_PATH)
+    body, final_url, _ = fetch_pmn_text(PNCC_SWIMMING_PATH, PNCC_BASE)
+    facilities = parse_pmn_pool_listing(body, final_url)
+    return [enrich_pmn_facility(card) for card in facilities], final_url
+
+
 def parse_time_label(value: str) -> dt.datetime | None:
     for fmt in ("%I:%M %p", "%I %p"):
         try:
@@ -2448,6 +2743,15 @@ def pool_detail_for_council(council: str, name: str) -> tuple[dict[str, Any] | N
             "facility": card,
             "lane_availability_today": None,
         }, listing_url, []
+    if council == "pmn":
+        cards, listing_url = fetch_pmn_facilities("pool")
+        card = find_facility(cards, name)
+        if not card:
+            return None, listing_url, [c["name"] for c in cards[:10]]
+        return {
+            "facility": card,
+            "lane_availability_today": None,
+        }, listing_url, []
     if council in {"npr", "has"}:
         cards, listing_url = static_recreation_facilities(council, "pool")
         card = find_facility(cards, name)
@@ -2540,6 +2844,10 @@ def cmd_pools(args: argparse.Namespace) -> None:
         if args.region:
             die("--region is only supported for Auckland pools")
         pools, source_url, note = fetch_whg_facilities("pool")
+    elif args.council == "pmn":
+        pools, source_url = fetch_pmn_facilities("pool")
+        if args.region:
+            die("--region is only supported for Auckland pools")
         pools = pools[: args.limit]
     else:
         if args.region:
@@ -2560,7 +2868,7 @@ def cmd_pools(args: argparse.Namespace) -> None:
 
 def cmd_pool(args: argparse.Namespace) -> None:
     started = time.perf_counter()
-    councils = [args.council] if args.council else ["whg", "npr", "has", "npl", "rot", "akl", "wlg", "ham", "hutt", "porirua", "uhutt", "kapiti", "chc"]
+    councils = [args.council] if args.council else ["whg", "npr", "has", "npl", "rot", "akl", "wlg", "ham", "hutt", "porirua", "uhutt", "kapiti", "chc", "pmn"]
     suggestions_by_council: list[str] = []
     for council in councils:
         detail, listing_url, suggestions = pool_detail_for_council(council, args.name)
@@ -2675,6 +2983,15 @@ def cmd_facilities(args: argparse.Namespace) -> None:
         if args.region:
             die("--region is only supported for Auckland facilities")
         facilities, source_url, note = fetch_whg_facilities(args.type)
+    elif args.council == "pmn":
+        if args.region:
+            die("--region is only supported for Auckland facilities")
+        if args.type == "pool":
+            facilities, source_url = fetch_pmn_facilities("pool")
+            note = None
+        else:
+            facilities, source_url = [], urllib.parse.urljoin(PNCC_BASE, PNCC_SWIMMING_PATH)
+            note = "Palmerston North recreation is wired for council-listed swimming facilities only."
         facilities = facilities[: args.limit]
     else:
         if args.region:
