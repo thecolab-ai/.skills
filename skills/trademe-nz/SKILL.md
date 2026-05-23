@@ -43,7 +43,7 @@ python3 skills/trademe-nz/scripts/cli.py <command> [flags]
 
 ### Commands
 
-- `search [query] --type marketplace|property-sale|property-rent|motors|motors-new|jobs|flatmates|commercial-sale|commercial-lease|rural|retirement [--region id/name] [--price-min N] [--price-max N] [--bedrooms-min N] [--bedrooms-max N] [--limit N] [--page N] [--json]`
+- `search [query] --type marketplace|property-sale|property-rent|motors|jobs|flatmates|commercial-sale|commercial-lease|rural|retirement [--region id/name] [--price-min N] [--price-max N] [--bedrooms-min N] [--bedrooms-max N] [--limit N] [--page N] [--json]`
 - `listing <listing-id> [--json] [--raw]` — fetch public listing details
 - `regions [--json]` — list Trade Me region ids
 - `categories [--query text] [--depth N] [--limit N] [--json]` — list/search public category tree

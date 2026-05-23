@@ -30,7 +30,6 @@ SEARCH_ENDPOINTS = {
     "property-sale": "/search/property/residential",
     "property-rent": "/search/property/rental",
     "motors": "/search/motors/used",
-    "motors-new": "/search/motors/new",
     "jobs": "/search/jobs",
     "flatmates": "/search/flatmates",
     "commercial-sale": "/search/property/commercialsale",
@@ -39,25 +38,30 @@ SEARCH_ENDPOINTS = {
     "retirement": "/search/property/retirement",
 }
 
+# Region IDs sourced from the live /regions endpoint. Keep in sync with that
+# response rather than hand-numbering, because Trade Me's regional ids are not
+# alphabetical and have caught us out before.
 REGION_ALIASES = {
     "northland": 9,
     "auckland": 1,
-    "waikato": 2,
-    "bay of plenty": 3,
+    "waikato": 14,
+    "bay of plenty": 2,
     "gisborne": 4,
     "hawkes bay": 5,
     "hawke's bay": 5,
-    "taranaki": 6,
-    "manawatu": 7,
-    "manawatu / whanganui": 7,
-    "wellington": 8,
-    "nelson": 10,
-    "marlborough": 11,
-    "tasman": 12,
-    "west coast": 13,
-    "canterbury": 14,
-    "otago": 15,
-    "southland": 16,
+    "taranaki": 12,
+    "manawatu": 6,
+    "manawatu / whanganui": 6,
+    "whanganui": 6,
+    "wellington": 15,
+    "nelson": 8,
+    "nelson / tasman": 8,
+    "tasman": 8,
+    "marlborough": 7,
+    "west coast": 16,
+    "canterbury": 3,
+    "otago": 10,
+    "southland": 11,
 }
 
 
