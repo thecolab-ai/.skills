@@ -42,6 +42,12 @@ PORIRUA_ARENA_BASE = "https://terauparaha-arena.co.nz"
 UHUTT_H2O_BASE = "https://www.h2oxtream.com"
 KAPITI_AQUATICS_BASE = "https://www.kapiticoastaquatics.co.nz"
 CDP_HTTP_BASE = "http://127.0.0.1:5100"
+WHG_WDC_BASE = "https://www.wdc.govt.nz"
+WHG_CLM_BASE = "https://www.clmnz.co.nz"
+WHG_RECREATION_URL = WHG_WDC_BASE + "/Community/Parks-and-recreation"
+WHG_AQUATIC_URL = WHG_CLM_BASE + "/whangarei-aquatic-centre/"
+WHG_AQUATIC_POOLS_URL = WHG_AQUATIC_URL + "pools/"
+WHG_AQUATIC_CONTACT_URL = WHG_AQUATIC_URL + "contact/"
 
 UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146 Safari/537.36"
 
@@ -54,6 +60,7 @@ COUNCIL_LOCATIONS = {
     "npr": "napier",
     "has": "hastings",
     "ham": "hamilton",
+    "whg": "whangarei",
 }
 
 COUNCIL_NAMES = {
@@ -69,9 +76,10 @@ COUNCIL_NAMES = {
     "porirua": "Porirua City",
     "uhutt": "Upper Hutt City",
     "kapiti": "Kāpiti Coast",
+    "whg": "Whangarei",
 }
 
-RECREATION_COUNCILS = ("akl", "wlg", "chc", "rot", "npl", "npr", "has", "ham", "hutt", "porirua", "uhutt", "kapiti")
+RECREATION_COUNCILS = ("akl", "wlg", "chc", "rot", "npl", "npr", "has", "ham", "hutt", "porirua", "uhutt", "kapiti", "whg")
 
 AKL_AREA_IDS = {
     "central": "1134",
@@ -491,6 +499,68 @@ HAM_MAIN_POOL_PATHS = (
 )
 
 HAM_PARTNER_POOLS_PATH = "/facilities/partner-pools"
+
+WHG_POOL_NO_COMMUNITY_NOTE = (
+    "Current public Whangarei District Council pages checked for v1 expose parks, beaches, sports parks, "
+    "and community facilities but no council-managed Kamo or Ruakaka community pool listing. "
+    "Whangarei Aquatic Centre is the public pool/leisure-centre source currently wired."
+)
+
+WHG_FACILITIES = [
+    {
+        "name": "Whangarei Aquatic Centre",
+        "id": "whangarei-aquatic-centre",
+        "aliases": ["ASB Leisure Centre", "ASB Leisure", "Whangarei Aquatic Centre"],
+        "type": "pool",
+        "facility_types": ["pool", "gym", "leisure-centre"],
+        "council": "whg",
+        "council_name": "Whangarei",
+        "source": "clmnz-whangarei-aquatic-centre",
+        "source_url": WHG_AQUATIC_URL,
+        "listing_source_url": WHG_RECREATION_URL,
+        "operator": "Community Leisure Management",
+        "address": "Ewing Road, Whangarei",
+        "phone": "09 430 4072",
+        "email": "whr@clmnz.co.nz",
+        "description": (
+            "Public aquatic and leisure centre with pool, spa, sauna, gym, swim school, "
+            "kids programmes, and pool availability links."
+        ),
+        "hours": [
+            {"label": "Pool hours", "text": "Monday-Friday 6:00am-8:00pm; Saturday-Sunday 8:00am-6:00pm"},
+            {"label": "Gym hours", "text": "Monday-Friday 6:00am-8:00pm; weekends 8:00am-4:00pm"},
+            {
+                "label": "Public holidays",
+                "text": "10:00am-6:00pm; Good Friday closed; Anzac Day 1:00pm-6:00pm",
+            },
+        ],
+        "hours_summary": "Monday-Friday 6:00am-8:00pm; Saturday-Sunday 8:00am-6:00pm",
+        "hours_note": "Pools close 15 minutes before centre closing.",
+        "features": [
+            "Competition Pool",
+            "Wave Pool",
+            "Tots Pool",
+            "Hydrotherapy Pool",
+            "Learn To Swim Pool",
+            "Spa Pool",
+            "Sauna",
+            "Gym",
+            "Group fitness",
+            "Swim school",
+        ],
+        "availability_urls": [
+            {
+                "label": "25m Pool Lane Availability",
+                "url": "https://clm.perfectgym.com.au/ClientPortal2/ClubZoneOccupancyCalendar/15e262e78",
+            },
+            {
+                "label": "Wave Pool Availability",
+                "url": "https://clm.perfectgym.com.au/ClientPortal2/ClubZoneOccupancyCalendar/08ad415711",
+            },
+        ],
+        "source_urls": [WHG_RECREATION_URL, WHG_AQUATIC_URL, WHG_AQUATIC_POOLS_URL, WHG_AQUATIC_CONTACT_URL],
+    },
+]
 
 EVENT_TYPES = {
     "Event",
@@ -1481,6 +1551,17 @@ def static_recreation_facilities(council: str, kind: str | None = None) -> tuple
     return facilities, source_url
 
 
+def fetch_whg_facilities(kind: str) -> tuple[list[dict[str, Any]], str, str | None]:
+    if kind == "library":
+        return [], WHG_WDC_BASE, "Libraries are outside this skill's recreation-focused v1 data source."
+    facilities: list[dict[str, Any]] = []
+    for item in WHG_FACILITIES:
+        if kind in item.get("facility_types", []) or kind == item.get("type"):
+            facilities.append(dict(item))
+    note = WHG_POOL_NO_COMMUNITY_NOTE if kind == "pool" else None
+    return facilities, WHG_RECREATION_URL, note
+
+
 def parse_time_label(value: str) -> dt.datetime | None:
     for fmt in ("%I:%M %p", "%I %p"):
         try:
@@ -1931,11 +2012,22 @@ def pool_detail_for_council(council: str, name: str) -> tuple[dict[str, Any] | N
             "facility": regional_pool_detail(card),
             "lane_availability_today": None,
         }, listing_url, []
+    if council == "whg":
+        cards, listing_url, note = fetch_whg_facilities("pool")
+        card = find_facility(cards, name)
+        if not card:
+            return None, listing_url, [c["name"] for c in cards[:10]]
+        return {
+            "facility": card,
+            "lane_availability_today": None,
+            "note": note,
+        }, listing_url, []
     die("Christchurch pool detail is not wired in v1")
 
 
 def cmd_pools(args: argparse.Namespace) -> None:
     started = time.perf_counter()
+    note = None
     if args.council == "akl":
         pools, source_url = akl_location_listing("pool", args.region)
         pools = pools[: args.limit]
@@ -1964,11 +2056,17 @@ def cmd_pools(args: argparse.Namespace) -> None:
         if args.region:
             die("--region is only supported for Auckland pools")
         pools, source_url = fetch_ham_facilities("pool")
+        note = "Hamilton Pools currently lists Waterworld, Gallagher Aquatic Centre, and seasonal partner pools; Founders Memorial Theatre Pool is not listed as an active pool."
         pools = pools[: args.limit]
     elif args.council in REGIONAL_POOL_CATALOG:
         if args.region:
             die("--region is only supported for Auckland pools")
         pools, source_url, _ = regional_pool_cards(args.council)
+        pools = pools[: args.limit]
+    elif args.council == "whg":
+        if args.region:
+            die("--region is only supported for Auckland pools")
+        pools, source_url, note = fetch_whg_facilities("pool")
         pools = pools[: args.limit]
     else:
         die("Christchurch pools are not wired in v1 because the public council recreation source is JS/vendor-backed")
@@ -1977,7 +2075,7 @@ def cmd_pools(args: argparse.Namespace) -> None:
         "query": {"council": args.council, "region": args.region, "limit": args.limit},
         "source_url": source_url,
         "elapsed_ms": round((time.perf_counter() - started) * 1000),
-        "note": "Hamilton Pools currently lists Waterworld, Gallagher Aquatic Centre, and seasonal partner pools; Founders Memorial Theatre Pool is not listed as an active pool." if args.council == "ham" else None,
+        "note": note,
         "pools": pools,
     }
     emit_facility_list(data, "pools", args.json)
@@ -1985,7 +2083,7 @@ def cmd_pools(args: argparse.Namespace) -> None:
 
 def cmd_pool(args: argparse.Namespace) -> None:
     started = time.perf_counter()
-    councils = [args.council] if args.council else ["npr", "has", "npl", "rot", "akl", "wlg", "ham", "hutt", "porirua", "uhutt", "kapiti"]
+    councils = [args.council] if args.council else ["whg", "npr", "has", "npl", "rot", "akl", "wlg", "ham", "hutt", "porirua", "uhutt", "kapiti"]
     suggestions_by_council: list[str] = []
     for council in councils:
         detail, listing_url, suggestions = pool_detail_for_council(council, args.name)
@@ -1997,6 +2095,8 @@ def cmd_pool(args: argparse.Namespace) -> None:
                 "facility": detail["facility"],
                 "lane_availability_today": detail["lane_availability_today"],
             }
+            if detail.get("note"):
+                data["note"] = detail["note"]
             emit_pool_detail(data, args.json)
             return
         if suggestions:
@@ -2087,6 +2187,11 @@ def cmd_facilities(args: argparse.Namespace) -> None:
         else:
             facilities = []
             note = f"{COUNCIL_NAMES.get(args.council, args.council)} recreation support is currently wired for public aquatic facilities only."
+    elif args.council == "whg":
+        if args.region:
+            die("--region is only supported for Auckland facilities")
+        facilities, source_url, note = fetch_whg_facilities(args.type)
+        facilities = facilities[: args.limit]
     else:
         facilities, source_url = [], "https://recandsport.ccc.govt.nz/"
         note = "Christchurch recreation uses a vendor-backed source that is documented in references but not wired in v1."

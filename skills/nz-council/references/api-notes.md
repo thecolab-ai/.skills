@@ -21,6 +21,7 @@ Implemented as the primary event source.
 - List Wellington: `https://www.eventfinda.co.nz/whatson/events/wellington`
 - List Christchurch: `https://www.eventfinda.co.nz/whatson/events/christchurch`
 - List New Plymouth: `https://www.eventfinda.co.nz/whatson/events/new-plymouth`
+- List Whangarei: `https://www.eventfinda.co.nz/whatson/events/whangarei`
 - List all NZ: `https://www.eventfinda.co.nz/whatson/events/new-zealand`
 - Category form: `https://www.eventfinda.co.nz/{category}/events/{location}`
 - Pagination: `?page=N`
@@ -434,6 +435,55 @@ Data captured:
 - Waikanae: 52 Ngarara Road, Waikanae; 04 296 4789; seasonal outdoor 33.5m pool, toddler pool, hydroslide, BBQ/gazebo bookings
 - Ōtaki: Haruātai Park, 200 Mill Road, Ōtaki; 06 364 5542; 33.5m lane pool, toddler pool, spa/sauna, slippery slope, splashpad
 - Shared email: `swim@kapiticoast.govt.nz`
+
+### Whangarei recreation facilities
+
+Implemented as a basic static facility listing for the current public aquatic-centre source.
+
+- WDC recreation landing page checked: `https://www.wdc.govt.nz/Community/Parks-and-recreation`
+- Supplied WDC path checked first: `https://www.wdc.govt.nz/Services/Sport-and-recreation/Pools-and-leisure`
+- Supplied WDC path result: direct request returned the WDC `Page Not Found - Error 404` page.
+- Supplied operator host checked first: `https://www.asbleisurecentre.co.nz`
+- Supplied operator host result: DNS resolution failed during direct fetch.
+- Current operator home: `https://www.clmnz.co.nz/whangarei-aquatic-centre/`
+- Current operator pools page: `https://www.clmnz.co.nz/whangarei-aquatic-centre/pools/`
+- Current operator contact/hours page: `https://www.clmnz.co.nz/whangarei-aquatic-centre/contact/`
+
+Observed current public pool/leisure source:
+
+```json
+{
+  "name": "Whangarei Aquatic Centre",
+  "aliases": ["ASB Leisure Centre", "ASB Leisure"],
+  "id": "whangarei-aquatic-centre",
+  "type": "pool",
+  "council": "whg",
+  "source": "clmnz-whangarei-aquatic-centre",
+  "source_url": "https://www.clmnz.co.nz/whangarei-aquatic-centre/",
+  "address": "Ewing Road, Whangarei",
+  "phone": "09 430 4072",
+  "operator": "Community Leisure Management"
+}
+```
+
+Operator pages expose:
+
+- pool hours: Monday-Friday 6:00am-8:00pm; weekends 8:00am-6:00pm
+- gym hours: Monday-Friday 6:00am-8:00pm; weekends 8:00am-4:00pm
+- pools close 15 minutes before closing
+- public-holiday notes
+- pool set: Competition Pool, Wave Pool, Tots Pool, Hydrotherapy Pool, Learn To Swim Pool, Spa Pool
+- gym, group fitness, swim school, kids programmes
+- PerfectGym public availability links for the 25m pool and wave pool
+
+Community pool check:
+
+- WDC parks/recreation and community-facilities pages expose parks, beaches/coastal facilities, sports parks, playgrounds, community halls, libraries, and Ruakaka Service Centre.
+- No current WDC page found a council-managed Kamo or Ruakaka community pool listing.
+- Kamo search results found school/private/history references rather than a current council-managed public pool.
+- Ruakaka search results found a recreation centre/service-centre/community-hub context, not a current council-managed public pool.
+
+Freshness: static facility metadata captured from current direct-fetchable public pages during discovery. Availability links are emitted, but PerfectGym availability parsing is not wired for Whangarei v1.
 
 ### Christchurch recreation and sport
 

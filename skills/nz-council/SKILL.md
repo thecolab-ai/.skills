@@ -1,6 +1,6 @@
 ---
 name: nz-council
-description: Query NZ council-area event listings and public recreation facilities through a lightweight read-only CLI. Use for Auckland, Wellington, Christchurch, Rotorua, New Plymouth, Napier, Hastings, or Hamilton what's-on events; Eventfinda council-area events; Auckland Council pools/leisure centres; Wellington City pools/recreation centres; Rotorua Lakes pools and aquatic facilities; New Plymouth pools; Napier and Hastings aquatic facilities; Hamilton Pools facilities; Wellington region pools and aquatic centres for Hutt City, Porirua, Upper Hutt, and Kāpiti Coast; pool hours; and public lane availability snapshots where exposed. Not for rates, consents, rubbish, recycling, parking fines, bookings, logins, or payments.
+description: Query NZ council-area event listings and public recreation facilities through a lightweight read-only CLI. Use for Auckland, Wellington, Christchurch, Rotorua, New Plymouth, Napier, Hastings, Hamilton, or Whangarei what's-on events; Eventfinda council-area events; Auckland Council pools/leisure centres; Wellington City pools/recreation centres; Rotorua Lakes pools and aquatic facilities; New Plymouth pools; Napier and Hastings aquatic facilities; Hamilton Pools facilities; Whangarei Aquatic Centre; Wellington region pools and aquatic centres for Hutt City, Porirua, Upper Hutt, and Kāpiti Coast; pool hours; and public lane availability snapshots where exposed. Not for rates, consents, rubbish, recycling, parking fines, bookings, logins, or payments.
 ---
 
 # NZ Council
@@ -16,7 +16,7 @@ This v1 is deliberately narrow. It is not a general council-services skill.
 
 ## Use this when
 
-- The user asks what is on in Auckland, Wellington, Christchurch, Rotorua, New Plymouth, Napier, Hastings, Hamilton, or across NZ council areas.
+- The user asks what is on in Auckland, Wellington, Christchurch, Rotorua, New Plymouth, Napier, Hastings, Hamilton, Whangarei, or across NZ council areas.
 - The user asks for council-listed concerts, markets, exhibitions, kids' activities, festivals, or free events.
 - The user asks for public pools, leisure centres, gyms, recreation centres, hours, pool contact details, pool facilities, or pool lane availability.
 - You need a quick JSON feed for council-area events or recreation facility listings without browser automation.
@@ -41,7 +41,8 @@ This v1 is deliberately narrow. It is not a general council-services skill.
 9. Use `pools --council has --json` for Hastings aquatic recreation facilities, including Splash Planet and Aquatics Hastings pools.
 10. Use `pools --council ham --json` or `pool "Waterworld" --json` for Hamilton Pools facilities, including Waterworld, Gallagher Aquatic Centre, and current seasonal partner pools.
 11. Use Wellington region council codes for aquatic facilities beyond Wellington City: `hutt`, `porirua`, `uhutt`, and `kapiti`.
-12. Treat Christchurch recreation as discovered but not fully wired in v1; the public council page is protected/vendor-backed.
+12. Use `pools --council whg --json` or `pool "ASB Leisure" --json` for Whangarei Aquatic Centre. ASB Leisure is treated as a legacy/search alias for the current Ewing Road aquatic-centre source.
+13. Treat Christchurch recreation as discovered but not fully wired in v1; the public council page is protected/vendor-backed.
 
 ## CLI
 
@@ -56,12 +57,12 @@ Every data command supports `--json`.
 ## Commands
 
 ```bash
-python3 skills/nz-council/scripts/cli.py events [--council akl|wlg|chc|rot|npl|npr|has|ham] [--from DATE] [--to DATE] [--category SLUG] [--free] [--limit N] [--json]
+python3 skills/nz-council/scripts/cli.py events [--council akl|wlg|chc|rot|npl|npr|has|ham|whg] [--from DATE] [--to DATE] [--category SLUG] [--free] [--limit N] [--json]
 python3 skills/nz-council/scripts/cli.py event <id-or-url> [--json]
 
-python3 skills/nz-council/scripts/cli.py pools [--council akl|wlg|chc|rot|npl|npr|has|ham|hutt|porirua|uhutt|kapiti] [--region central|east|north|south|west] [--limit N] [--json]
-python3 skills/nz-council/scripts/cli.py pool <name> [--council akl|wlg|chc|rot|npl|npr|has|ham|hutt|porirua|uhutt|kapiti] [--json]
-python3 skills/nz-council/scripts/cli.py facilities [--council akl|wlg|chc|rot|npl|npr|has|ham|hutt|porirua|uhutt|kapiti] [--type pool|gym|leisure-centre|library] [--region central|east|north|south|west] [--limit N] [--json]
+python3 skills/nz-council/scripts/cli.py pools [--council akl|wlg|chc|rot|npl|npr|has|ham|hutt|porirua|uhutt|kapiti|whg] [--region central|east|north|south|west] [--limit N] [--json]
+python3 skills/nz-council/scripts/cli.py pool <name> [--council akl|wlg|chc|rot|npl|npr|has|ham|hutt|porirua|uhutt|kapiti|whg] [--json]
+python3 skills/nz-council/scripts/cli.py facilities [--council akl|wlg|chc|rot|npl|npr|has|ham|hutt|porirua|uhutt|kapiti|whg] [--type pool|gym|leisure-centre|library] [--region central|east|north|south|west] [--limit N] [--json]
 ```
 
 ## Examples
@@ -87,6 +88,8 @@ python3 skills/nz-council/scripts/cli.py pool "Waterworld" --json
 python3 skills/nz-council/scripts/cli.py pools --council hutt --json
 python3 skills/nz-council/scripts/cli.py pool "Naenae Pool" --council hutt --json
 python3 skills/nz-council/scripts/cli.py pools --council kapiti --json
+python3 skills/nz-council/scripts/cli.py pools --council whg --json
+python3 skills/nz-council/scripts/cli.py pool "ASB Leisure" --json
 ```
 
 ## Resources
@@ -109,6 +112,7 @@ python3 skills/nz-council/scripts/cli.py pools --council kapiti --json
 - Porirua Arena Aquatics uses the public Te Rauparaha Arena aquatic pages.
 - Upper Hutt H2O Xtream uses public H2O Xtream pages. Some direct requests are Akamai-denied in Python, so the CLI can use the same local CDP fallback.
 - Kāpiti Coast pools use public Kāpiti Coast Aquatics pages.
+- Whangarei recreation uses the current WDC parks/recreation landing page plus CLM's Whangarei Aquatic Centre pages. The old `wdc.govt.nz/Services/Sport-and-recreation/Pools-and-leisure` path returned a WDC 404 during discovery, and `asbleisurecentre.co.nz` did not resolve.
 - Christchurch recreation and sport pages were observed at `recandsport.ccc.govt.nz`, but the useful dynamic data is vendor-backed and is documented rather than wired in v1.
 - Napier aquatic recreation uses Napier City Council's current Napier Aquatic Centre page. The centre is also commonly known as Onekawa Pools.
 - Hastings aquatic recreation uses Hastings District Council's current swimming-pools page plus linked Aquatics Hastings and Splash Planet public pages. Frimley Pool is retained as a closed facility because HDC's current page records the September 2024 closure decision.
