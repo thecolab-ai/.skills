@@ -282,13 +282,123 @@ def first_sale_for(prop_id: str | None, sales_by_id: dict[str, list[dict[str, An
     return None
 
 
+def _address_search(query: str) -> list[dict[str, Any]]:
+    """Return raw address/search Results list for *query*, stripping empty items."""
+    payload = request_json(BASE_GATEWAY, "/address/search", {"Address": query})
+    return [x for x in (payload or {}).get("Results") or [] if isinstance(x, dict)]
+
+
+def _all_type1(results: list[dict[str, Any]]) -> bool:
+    """Return True when every result is a city-level (Type=1) fallback row."""
+    return bool(results) and all(r.get("Type") == 1 for r in results)
+
+
+def _resolve_property_from_map(lat: float, lon: float, street_number: Any, radius_m: int = 150) -> str | None:
+    """Try to find a property_id near *lat*/*lon* using the map/items viewport endpoint.
+
+    Looks for a map item or card whose ``display_street_number`` contains
+    ``str(street_number)`` within *radius_m* metres.  Returns the first matching
+    property_id, or None if nothing suitable is found.
+    """
+    if lat is None or lon is None:
+        return None
+    lat_delta = radius_m / 111320.0
+    lon_delta = radius_m / (111320.0 * max(0.1, math.cos(math.radians(lat))))
+    params: dict[str, Any] = {
+        "nw_lat": lat + lat_delta,
+        "nw_long": lon - lon_delta,
+        "se_lat": lat - lat_delta,
+        "se_long": lon + lon_delta,
+        "limit": 50,
+        "display_rentals": False,
+    }
+    payload = request_json(BASE_GATEWAY, "/map/items", params)
+    if not payload:
+        return None
+    snum = str(street_number).strip() if street_number is not None else ""
+
+    # Prefer cards (richer data) first – check property_details.address for street number.
+    for card in (payload.get("cards") or []):
+        if not isinstance(card, dict):
+            continue
+        prop_id = card.get("property_id") or card.get("id")
+        if not prop_id:
+            continue
+        pd = card.get("property_details") or {}
+        addr = pd.get("address") or pd.get("display_address") or ""
+        # Match when the address starts with the street number (handles "7/1", "1", etc.)
+        if snum and addr:
+            # "42/1 Queen Street…" → split on space, first token is "42/1"
+            first_token = addr.split()[0] if addr.split() else ""
+            # Accept exact number or unit/number where right side equals snum
+            parts = first_token.split("/")
+            if snum in parts or first_token == snum:
+                return str(prop_id)
+        # Fallback: return first valid card property_id when no number hint
+        if not snum:
+            return str(prop_id)
+
+    # Fall through to map_items (lighter, just lat/lon + short URL)
+    for item in (payload.get("map_items") or []):
+        if not isinstance(item, dict):
+            continue
+        prop_id = item.get("id") or item.get("item_id")
+        if not prop_id:
+            continue
+        display = str(item.get("display_street_number") or "").strip()
+        if snum and display:
+            parts = display.split("/")
+            if snum in parts or display == snum:
+                return str(prop_id)
+        if not snum:
+            return str(prop_id)
+    return None
+
+
 def address(args: argparse.Namespace) -> dict[str, Any]:
     started = time.perf_counter()
-    payload = request_json(BASE_GATEWAY, "/address/search", {"Address": args.query})
-    results = [x for x in (payload or {}).get("Results") or [] if isinstance(x, dict)][: max(1, args.limit)]
+
+    # ── Step 1: primary address/search ──────────────────────────────────────
+    results = _address_search(args.query)
+
+    # ── Step 2: city-level fallback recovery ────────────────────────────────
+    # When the API returns only Type=1 (city rows) the query likely included a
+    # suburb or city suffix that confused the search engine.  Retry by dropping
+    # the last word iteratively until we get address-level (Type=3 or Type=4)
+    # results or run out of words to drop.
+    retry_query = args.query
+    if _all_type1(results):
+        words = args.query.split()
+        while len(words) > 2 and _all_type1(results):
+            words = words[:-1]
+            retry_query = " ".join(words)
+            results = _address_search(retry_query)
+
+    # Limit to the requested number of matches.
+    results = results[: max(1, args.limit)]
+
+    # ── Step 3: property-ID resolve for null-PropertyID address rows ─────────
+    # Since mid-2025 the address/search endpoint omits PropertyID for many
+    # Type=4 (address-level) results when the query includes a city qualifier.
+    # For those rows we attempt a secondary resolve via the map/items viewport
+    # endpoint, matching by the street number embedded in the address result.
+    for item in results:
+        if item.get("PropertyID"):
+            continue  # already have an ID – nothing to do
+        if item.get("Type") != 4:
+            continue  # only attempt resolve for address-level rows
+        lat = as_float(item.get("Lat"))
+        lon = as_float(item.get("Long"))
+        street_number = item.get("StreetNumber") or item.get("UnitIdentifier") or None
+        resolved = _resolve_property_from_map(lat, lon, street_number)
+        if resolved:
+            item["PropertyID"] = resolved
+
+    # ── Step 4: bulk-fetch cards / sales for resolved IDs ───────────────────
     prop_ids = [str(x.get("PropertyID")) for x in results if x.get("PropertyID")]
     cards = get_cards(prop_ids)
     sales = get_sales(prop_ids)
+
     matches = []
     for item in results:
         prop_id = str(item.get("PropertyID")) if item.get("PropertyID") else None
@@ -322,7 +432,7 @@ def address(args: argparse.Namespace) -> dict[str, Any]:
         "count": len(matches),
         "elapsed_ms": round((time.perf_counter() - started) * 1000),
         "matches": matches,
-        "error": (payload or {}).get("ErrorMessage") or None,
+        "error": None,
     }
 
 
