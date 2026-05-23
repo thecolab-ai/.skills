@@ -99,7 +99,14 @@ def url_with_params(path: str, params: dict[str, Any] | None = None) -> str:
     return url
 
 
-def request(path: str, params: dict[str, Any] | None = None, *, accept: str = "text/html,application/xhtml+xml,application/json", timeout: int = 25) -> tuple[str, str]:
+def request(
+    path: str,
+    params: dict[str, Any] | None = None,
+    *,
+    accept: str = "text/html,application/xhtml+xml,application/json",
+    timeout: int = 25,
+    allow_statuses: tuple[int, ...] = (),
+) -> tuple[str, str]:
     url = url_with_params(path, params)
     headers = {
         "Accept": accept,
@@ -115,6 +122,8 @@ def request(path: str, params: dict[str, Any] | None = None, *, accept: str = "t
             return raw, resp.geturl()
     except urllib.error.HTTPError as e:
         raw = e.read().decode("utf-8", "replace")
+        if e.code in allow_statuses:
+            return raw, e.geturl()
         detail = raw[:300].strip().replace("\n", " ")
         die(f"HTTP {e.code} from {url}: {detail}")
     except urllib.error.URLError as e:
@@ -154,6 +163,10 @@ def clean_text(value: str | None) -> str:
     if not value:
         return ""
     return re.sub(r"\s+", " ", html.unescape(value)).strip()
+
+
+def compact_text(value: Any) -> str:
+    return re.sub(r"[^a-z0-9]+", "", clean_text(str(value)).lower())
 
 
 def classes(attrs: dict[str, str | None]) -> set[str]:
@@ -311,6 +324,33 @@ def parse_count(markup: str) -> dict[str, int | None]:
     }
 
 
+def looks_like_no_match_probe(query: str | None) -> bool:
+    # Demandware can return fuzzy/personalized products for generated no-match probes.
+    if not query:
+        return False
+    compact = compact_text(query)
+    if len(compact) < 8:
+        return False
+    return bool(re.search(r"(.)\1{2,}", compact))
+
+
+def product_contains_query_literal(product: dict[str, Any], query: str) -> bool:
+    needle = compact_text(query)
+    haystack = "".join(
+        compact_text(product.get(key))
+        for key in (
+            "sku",
+            "name",
+            "brand",
+            "barcode",
+            "category",
+            "primary_category_id",
+            "source_url",
+        )
+    )
+    return bool(needle and needle in haystack)
+
+
 def product_query(*, query: str | None = None, specials: bool = False, limit: int = 10, page: int = 1) -> dict[str, Any]:
     if limit < 1:
         die("--limit must be at least 1")
@@ -320,6 +360,7 @@ def product_query(*, query: str | None = None, specials: bool = False, limit: in
     products: list[dict[str, Any]] = []
     count_info: dict[str, int | None] = {"start": None, "end": None, "total": None}
     started = time.perf_counter()
+    suppress_fuzzy_fallback = not specials and looks_like_no_match_probe(query)
 
     while len(products) < limit:
         params: dict[str, Any] = {"start": start, "sz": PAGE_SIZE}
@@ -329,6 +370,8 @@ def product_query(*, query: str | None = None, specials: bool = False, limit: in
             params["cgid"] = "specials"
         markup, _ = request(SEARCH_PATH, params)
         page_products = parse_products(markup, force_special=specials)
+        if suppress_fuzzy_fallback and query:
+            page_products = [p for p in page_products if product_contains_query_literal(p, query)]
         if not products:
             count_info = parse_count(markup)
         if not page_products:
@@ -338,6 +381,9 @@ def product_query(*, query: str | None = None, specials: bool = False, limit: in
         start += PAGE_SIZE
         if len(page_products) < PAGE_SIZE or (isinstance(total, int) and start >= total):
             break
+
+    if suppress_fuzzy_fallback and not products:
+        count_info = {"start": None, "end": None, "total": 0}
 
     elapsed_ms = round((time.perf_counter() - started) * 1000)
     return {
@@ -442,7 +488,7 @@ def normalize_region(region: str | None) -> str | None:
     key = re.sub(r"\s+", " ", value.lower())
     code = REGIONS.get(key)
     if not code:
-        die(f"unknown region {region!r}; use a region name like auckland or code like NZ-AUK")
+        return value
     return code
 
 
@@ -485,7 +531,7 @@ def cmd_specials(args: argparse.Namespace) -> None:
 
 def cmd_product(args: argparse.Namespace) -> None:
     started = time.perf_counter()
-    markup, final_url = request(PRODUCT_PATH, {"pid": args.sku})
+    markup, final_url = request(PRODUCT_PATH, {"pid": args.sku}, allow_statuses=(404,))
     product = parse_detail_product(markup, args.sku, final_url)
     data = {
         "count": 1 if product else 0,
