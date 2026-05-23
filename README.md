@@ -110,6 +110,16 @@ cd .skills && npm install   # repo tooling only — not required for running ski
 
 npm run new-skill -- my-nz-skill --variant minimal
 npm run validate-skill -- skills/my-nz-skill
+
+# Run smoke tests (Python, no extra deps)
+python3 skills/paknsave-nz/scripts/smoke_test.py
+python3 skills/newworld-nz/scripts/smoke_test.py
+python3 skills/briscoes-nz/scripts/smoke_test.py
+python3 skills/trademe-nz/scripts/smoke_test.py
+python3 skills/nzbn-register/scripts/smoke_test.py
+python3 skills/eventfinda-nz/scripts/smoke_test.py
+python3 skills/woolworths-nz/scripts/smoke_test.py
+python3 skills/auckland-bin-schedule/scripts/smoke_test.py
 ```
 
 ### Available scaffold variants
