@@ -30,6 +30,8 @@ NPL_BASE = "https://www.npdc.govt.nz"
 NPL_COMMUNITY_POOLS_URL = NPL_BASE + "/leisure-and-culture/community-swimming-pools/"
 NPL_TEAC_URL = NPL_BASE + "/leisure-and-culture/todd-energy-aquatic-centre/"
 BELL_BLOCK_POOL_URL = "https://www.bellblockaquaticcentre.co.nz/"
+NPR_BASE = "https://www.napier.govt.nz"
+HAS_BASE = "https://www.hastingsdc.govt.nz"
 
 UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146 Safari/537.36"
 
@@ -39,6 +41,8 @@ COUNCIL_LOCATIONS = {
     "chc": "christchurch",
     "rot": "rotorua",
     "npl": "new-plymouth",
+    "npr": "napier",
+    "has": "hastings",
 }
 
 COUNCIL_NAMES = {
@@ -47,6 +51,8 @@ COUNCIL_NAMES = {
     "chc": "Christchurch",
     "rot": "Rotorua Lakes",
     "npl": "New Plymouth",
+    "npr": "Napier",
+    "has": "Hastings",
 }
 
 AKL_AREA_IDS = {
@@ -62,7 +68,7 @@ AKL_FACILITY_IDS = {
     "gym": "1119",
 }
 
-RECREATION_COUNCILS = ("akl", "wlg", "chc", "rot", "npl")
+RECREATION_COUNCILS = ("akl", "wlg", "chc", "rot", "npl", "npr", "has")
 
 ROT_RECREATION_SOURCE_URL = ROT_BASE + "/parks-lakes-recreation"
 ROT_PARK_RESERVES_SOURCE_URL = ROT_BASE + "/parks-lakes-recreation/park-reserves"
@@ -254,6 +260,214 @@ NPL_POOL_FACILITIES = [
         "features": ["33m six-lane outdoor pool", "Learners' pool", "Toddlers' pool", "Deep dive pool"],
     },
 ]
+
+NPR_AQUATIC_SOURCE_URL = NPR_BASE + "/napier/facilities/napier-aquatic-centre/"
+HAS_SWIMMING_POOLS_URL = HAS_BASE + "/hastings/facilities/swimming-pools/"
+
+STATIC_RECREATION_FACILITIES: dict[str, list[dict[str, Any]]] = {
+    "npr": [
+        {
+            "name": "Napier Aquatic Centre",
+            "aliases": ["Onekawa Aquatic Centre", "Onekawa Pools", "Te Whare Kaukau o Ahuriri"],
+            "type": "pool",
+            "council": "npr",
+            "council_name": "Napier",
+            "source": "napier-city-council",
+            "source_url": NPR_AQUATIC_SOURCE_URL,
+            "listing_source_url": NPR_AQUATIC_SOURCE_URL,
+            "website": "http://www.napieraquatic.co.nz",
+            "address": "Maadi Road, Onekawa, Napier",
+            "operator": "Napier City Council",
+            "status": "open year-round",
+            "description": (
+                "Napier's main year-round aquatic facility in Onekawa Park, with heated pools, "
+                "swim school, aqua fitness, hydro slides, spa pools, and accessible pool facilities."
+            ),
+            "hours_note": "Open times are published by Napier Aquatic Centre; verify before travel.",
+            "features": [
+                "heated pools",
+                "25m lap pools",
+                "learners pool",
+                "toddlers area",
+                "spa pools",
+                "hydro slides",
+                "swim school",
+                "aqua fitness",
+            ],
+        }
+    ],
+    "has": [
+        {
+            "name": "Splash Planet",
+            "aliases": ["Splash Planet Theme Park"],
+            "type": "water-park",
+            "council": "has",
+            "council_name": "Hastings",
+            "source": "hastings-district-council",
+            "source_url": HAS_BASE + "/hastings/facilities/splash-planet/",
+            "listing_source_url": HAS_SWIMMING_POOLS_URL,
+            "website": "https://www.splashplanet.co.nz/",
+            "address": "1001 Grove Road, Hastings",
+            "operator": "Hastings District Council",
+            "status": "seasonal water park; dry Play Park weekends outside the water season",
+            "description": (
+                "Hastings water theme park with water slides and family attractions; HDC lists it "
+                "as open each summer between mid-November and early February."
+            ),
+            "hours_summary": (
+                "Water park operates in summer; Splash Planet Play Park opens weekends outside the "
+                "water season with dry rides and playgrounds only."
+            ),
+            "features": [
+                "water slides",
+                "mini-golf",
+                "Fantasyland Express train",
+                "go-karts",
+                "beach volleyball",
+                "bumper boats",
+            ],
+        },
+        {
+            "name": "Flaxmere Pool",
+            "aliases": ["Swim Heretaunga", "Swim Heretaunga Pool", "Flaxmere Aquatics Pool"],
+            "type": "pool",
+            "council": "has",
+            "council_name": "Hastings",
+            "source": "aquatics-hastings",
+            "source_url": "https://www.aquaticshastings.co.nz/facilities/flaxmere-aquatics-pool",
+            "listing_source_url": HAS_SWIMMING_POOLS_URL,
+            "address": "Swansea Road, Flaxmere, Hastings",
+            "operator": "Hastings District Council",
+            "status": "open year-round",
+            "description": "Two-pool heated indoor complex in Flaxmere with a 25m training pool and 15m learn-to-swim pool.",
+            "hours": [
+                {"label": "Monday-Thursday", "text": "6am-7pm"},
+                {"label": "Friday", "text": "6am-7am and 9am-5pm"},
+                {"label": "Saturday", "text": "9am-3pm"},
+                {"label": "Sunday", "text": "Closed"},
+            ],
+            "hours_summary": "Mon-Thu 6am-7pm; Fri 6am-7am and 9am-5pm; Sat 9am-3pm; Sun closed.",
+            "phone": "+64 6 879 7676",
+            "email": "flaxmerepool@hdc.govt.nz",
+            "features": [
+                "25m training pool",
+                "learn-to-swim pool",
+                "recreational swimming",
+                "lap swimming",
+                "learn to swim",
+                "AquaFit",
+                "giant inflatables",
+            ],
+            "resource_availability_url": "https://portal.hastingsdc.govt.nz/ResourceAvailability/4",
+        },
+        {
+            "name": "Clive War Memorial Pool",
+            "aliases": ["Clive Memorial Pool", "Clive Pool"],
+            "type": "pool",
+            "council": "has",
+            "council_name": "Hastings",
+            "source": "aquatics-hastings",
+            "source_url": "https://www.aquaticshastings.co.nz/facilities/clive-war-memorial-pool",
+            "listing_source_url": HAS_SWIMMING_POOLS_URL,
+            "address": "15 Farndon Road, Clive",
+            "operator": "Hastings District Council",
+            "status": "open year-round",
+            "description": "Two-pool heated indoor complex at Farndon Park with a 25m training pool and learner pool.",
+            "hours": [
+                {"label": "Monday", "text": "6am-6:30pm"},
+                {"label": "Tuesday-Thursday", "text": "6am-6pm"},
+                {"label": "Friday", "text": "6am-5pm"},
+                {"label": "Saturday", "text": "8:30am-3pm"},
+                {"label": "Sunday", "text": "Closed"},
+            ],
+            "hours_summary": "Mon 6am-6:30pm; Tue-Thu 6am-6pm; Fri 6am-5pm; Sat 8:30am-3pm; Sun closed.",
+            "phone": "+64 6 870 0492",
+            "email": "swimmingclive@hdc.govt.nz",
+            "features": [
+                "25m training pool",
+                "learner pool",
+                "recreational swimming",
+                "lap swimming",
+                "learn to swim",
+                "AquaFit",
+                "school holiday inflatables",
+            ],
+        },
+        {
+            "name": "Havelock North Village Pool",
+            "aliases": ["Village Pool", "Village Pool - Havelock North", "Havelock North Pool"],
+            "type": "pool",
+            "council": "has",
+            "council_name": "Hastings",
+            "source": "aquatics-hastings",
+            "source_url": "https://www.aquaticshastings.co.nz/facilities/village-pool",
+            "listing_source_url": HAS_SWIMMING_POOLS_URL,
+            "address": "Havelock North Domain, Te Mata Road, Havelock North",
+            "operator": "Hastings District Council",
+            "status": "closed until summer 2026/7",
+            "description": "Seasonal outdoor pool complex in Havelock North Village Green.",
+            "hours_summary": "Closed until summer 2026/7.",
+            "phone": "+64 6 877 5544",
+            "email": "villagepool@hdc.govt.nz",
+            "features": [
+                "seasonal outdoor pools",
+                "33m pool",
+                "toddlers pool",
+                "learners pools",
+                "lap swimming",
+                "BBQ hire",
+            ],
+        },
+        {
+            "name": "Frimley Pool",
+            "aliases": ["Frimley Park Pool"],
+            "type": "pool",
+            "council": "has",
+            "council_name": "Hastings",
+            "source": "hastings-district-council",
+            "source_url": HAS_SWIMMING_POOLS_URL,
+            "listing_source_url": HAS_SWIMMING_POOLS_URL,
+            "address": "503 Frimley Road, Frimley, Hastings",
+            "operator": "Hastings District Council",
+            "status": "closed following a September 2024 Hastings District Council decision",
+            "description": "Former seasonal outdoor pool; HDC's current swimming-pools page notes the council decision to close Frimley Pool.",
+            "hours_summary": "Closed.",
+            "features": ["former outdoor pool", "closed"],
+        },
+        {
+            "name": "Hawke's Bay Regional Aquatic Centre",
+            "id": "hawkes-bay-regional-aquatic-centre",
+            "aliases": ["Hastings Aquatic Centre", "Regional Aquatic Centre", "HB Regional Aquatic Centre"],
+            "type": "aquatic-centre",
+            "council": "has",
+            "council_name": "Hastings",
+            "source": "hawkes-bay-regional-aquatic-centre",
+            "source_url": "https://www.hbaquatic.co.nz/",
+            "listing_source_url": HAS_SWIMMING_POOLS_URL,
+            "address": "42 Percival Road, Hastings 4120",
+            "operator": "Hawke's Bay Community Fitness Centre Trust",
+            "status": "open year-round",
+            "description": (
+                "Separate Hastings aquatic centre with a 50m Olympic pool, training pool, swim school, "
+                "and hydrotherapy pools; not listed by HDC as one of its three council-run Aquatics Hastings pools."
+            ),
+            "hours": [
+                {"label": "Monday-Friday", "text": "5:30am-8pm"},
+                {"label": "Saturday-Sunday", "text": "8am-5pm"},
+            ],
+            "hours_summary": "Mon-Fri 5:30am-8pm; Sat-Sun 8am-5pm.",
+            "phone": "+64 6 651 2324",
+            "email": "reception@hbaquatic.co.nz",
+            "features": [
+                "50m Olympic pool",
+                "training pool",
+                "learn-to-swim pool",
+                "hydrotherapy pools",
+                "swim school",
+            ],
+        },
+    ],
+}
 
 EVENT_TYPES = {
     "Event",
@@ -765,6 +979,21 @@ def fetch_npl_facilities(kind: str) -> tuple[list[dict[str, Any]], str]:
     return [dict(item) for item in NPL_POOL_FACILITIES], NPL_COMMUNITY_POOLS_URL
 
 
+def static_recreation_facilities(council: str, kind: str | None = None) -> tuple[list[dict[str, Any]], str]:
+    source_url = {"npr": NPR_AQUATIC_SOURCE_URL, "has": HAS_SWIMMING_POOLS_URL}.get(council, "")
+    facilities: list[dict[str, Any]] = []
+    for item in STATIC_RECREATION_FACILITIES.get(council, []):
+        item_type = item.get("type")
+        if kind == "pool" and item_type not in {"pool", "water-park", "aquatic-centre"}:
+            continue
+        if kind and kind != "pool" and item_type != kind:
+            continue
+        facility = dict(item)
+        facility["id"] = facility.get("id") or slug_text(str(facility.get("name") or ""))
+        facilities.append(facility)
+    return facilities, source_url
+
+
 def parse_time_label(value: str) -> dt.datetime | None:
     for fmt in ("%I:%M %p", "%I %p"):
         try:
@@ -844,16 +1073,77 @@ def parse_akl_availability(url: str) -> dict[str, Any]:
 
 def find_facility(cards: list[dict[str, Any]], query: str) -> dict[str, Any] | None:
     needle = slug_text(query)
-    exact = [c for c in cards if c.get("id") == needle or slug_text(str(c.get("name") or "")) == needle]
+    if not needle:
+        return None
+
+    def keys(card: dict[str, Any]) -> list[str]:
+        values = [card.get("id"), card.get("name")]
+        values.extend(card.get("aliases") or [])
+        return [slug_text(str(v)) for v in values if v]
+
+    exact = [c for c in cards if needle in keys(c)]
     if exact:
         return exact[0]
-    contains: list[dict[str, Any]] = []
-    for card in cards:
-        haystacks = [str(card.get("id") or ""), slug_text(str(card.get("name") or ""))]
-        haystacks.extend(slug_text(str(alias)) for alias in card.get("aliases") or [])
-        if any(needle in value or value in needle for value in haystacks if value):
-            contains.append(card)
+    contains = [
+        c
+        for c in cards
+        if any(needle in key or (len(key) > 3 and key in needle) for key in keys(c))
+    ]
     return contains[0] if contains else None
+
+
+def pool_detail_for_council(council: str, name: str) -> tuple[dict[str, Any] | None, str, list[str]]:
+    if council == "akl":
+        cards, listing_url = akl_location_listing("pool", None)
+        card = find_facility(cards, name)
+        if not card:
+            return None, listing_url, [c["name"] for c in cards[:10]]
+        body, final_url, _ = fetch_text(card["source_url"], AKL_LEISURE_BASE)
+        facility = parse_akl_detail(body, final_url, card)
+        availability = None
+        if facility.get("resource_availability_url"):
+            availability = parse_akl_availability(facility["resource_availability_url"])
+        return {
+            "facility": facility,
+            "lane_availability_today": availability,
+        }, listing_url, []
+    if council == "wlg":
+        cards, listing_url = fetch_wlg_facilities("pool")
+        card = find_facility(cards, name)
+        if not card:
+            return None, listing_url, [c["name"] for c in cards[:10]]
+        return {
+            "facility": card,
+            "lane_availability_today": None,
+        }, listing_url, []
+    if council == "rot":
+        cards, listing_url = fetch_rot_facilities("pool")
+        card = find_facility(cards, name)
+        if not card:
+            return None, listing_url, [c["name"] for c in cards[:10]]
+        return {
+            "facility": card,
+            "lane_availability_today": None,
+        }, listing_url, []
+    if council == "npl":
+        cards, listing_url = fetch_npl_facilities("pool")
+        card = find_facility(cards, name)
+        if not card:
+            return None, listing_url, [c["name"] for c in cards[:10]]
+        return {
+            "facility": card,
+            "lane_availability_today": None,
+        }, listing_url, []
+    if council in {"npr", "has"}:
+        cards, listing_url = static_recreation_facilities(council, "pool")
+        card = find_facility(cards, name)
+        if not card:
+            return None, listing_url, [c["name"] for c in cards[:10]]
+        return {
+            "facility": card,
+            "lane_availability_today": None,
+        }, listing_url, []
+    die("Christchurch pool detail is not wired in v1")
 
 
 def cmd_pools(args: argparse.Namespace) -> None:
@@ -873,9 +1163,14 @@ def cmd_pools(args: argparse.Namespace) -> None:
         pools, source_url = fetch_rot_facilities("pool")
         pools = pools[: args.limit]
     elif args.council == "npl":
-        pools, source_url = fetch_npl_facilities("pool")
         if args.region:
             die("--region is only supported for Auckland pools")
+        pools, source_url = fetch_npl_facilities("pool")
+        pools = pools[: args.limit]
+    elif args.council in {"npr", "has"}:
+        if args.region:
+            die("--region is only supported for Auckland pools")
+        pools, source_url = static_recreation_facilities(args.council, "pool")
         pools = pools[: args.limit]
     else:
         die("Christchurch pools are not wired in v1 because the public council recreation source is JS/vendor-backed")
@@ -889,84 +1184,29 @@ def cmd_pools(args: argparse.Namespace) -> None:
     emit_facility_list(data, "pools", args.json)
 
 
-def pool_detail_for_council(council: str, name: str, started: float) -> tuple[dict[str, Any] | None, str | None]:
-    if council == "akl":
-        cards, listing_url = akl_location_listing("pool", None)
-        card = find_facility(cards, name)
-        if not card:
-            suggestions = ", ".join(c["name"] for c in cards[:10])
-            return None, f"Auckland: {suggestions}"
-        body, final_url, _ = fetch_text(card["source_url"], AKL_LEISURE_BASE)
-        facility = parse_akl_detail(body, final_url, card)
-        availability = None
-        if facility.get("resource_availability_url"):
-            availability = parse_akl_availability(facility["resource_availability_url"])
-        return {
-            "query": {"council": council, "name": name},
-            "listing_source_url": listing_url,
-            "elapsed_ms": round((time.perf_counter() - started) * 1000),
-            "facility": facility,
-            "lane_availability_today": availability,
-        }, None
-    if council == "wlg":
-        cards, listing_url = fetch_wlg_facilities("pool")
-        card = find_facility(cards, name)
-        if not card:
-            suggestions = ", ".join(c["name"] for c in cards[:10])
-            return None, f"Wellington: {suggestions}"
-        return {
-            "query": {"council": council, "name": name},
-            "listing_source_url": listing_url,
-            "elapsed_ms": round((time.perf_counter() - started) * 1000),
-            "facility": card,
-            "lane_availability_today": None,
-        }, None
-    if council == "rot":
-        cards, listing_url = fetch_rot_facilities("pool")
-        card = find_facility(cards, name)
-        if not card:
-            suggestions = ", ".join(c["name"] for c in cards[:10])
-            return None, f"Rotorua Lakes: {suggestions}"
-        return {
-            "query": {"council": council, "name": name},
-            "listing_source_url": listing_url,
-            "elapsed_ms": round((time.perf_counter() - started) * 1000),
-            "facility": card,
-            "lane_availability_today": None,
-        }, None
-    if council == "npl":
-        cards, listing_url = fetch_npl_facilities("pool")
-        card = find_facility(cards, name)
-        if not card:
-            suggestions = ", ".join(c["name"] for c in cards[:10])
-            return None, f"New Plymouth: {suggestions}"
-        return {
-            "query": {"council": council, "name": name},
-            "listing_source_url": listing_url,
-            "elapsed_ms": round((time.perf_counter() - started) * 1000),
-            "facility": card,
-            "lane_availability_today": None,
-        }, None
-    die("Christchurch pool detail is not wired in v1")
-
-
 def cmd_pool(args: argparse.Namespace) -> None:
     started = time.perf_counter()
-    councils = [args.council] if args.council else ["npl", "rot", "akl", "wlg"]
-    misses: list[str] = []
+    councils = [args.council] if args.council else ["npr", "has", "npl", "rot", "akl", "wlg"]
+    suggestions_by_council: list[str] = []
     for council in councils:
-        data, miss = pool_detail_for_council(council, args.name, started)
-        if data:
+        detail, listing_url, suggestions = pool_detail_for_council(council, args.name)
+        if detail:
+            data = {
+                "query": {"council": council, "name": args.name},
+                "listing_source_url": listing_url,
+                "elapsed_ms": round((time.perf_counter() - started) * 1000),
+                "facility": detail["facility"],
+                "lane_availability_today": detail["lane_availability_today"],
+            }
             emit_pool_detail(data, args.json)
             return
-        if miss:
-            misses.append(miss)
-    if args.council:
-        council_name = COUNCIL_NAMES.get(args.council, args.council)
-        suggestion = misses[0] if misses else "no suggestions available"
-        die(f"no {council_name} pool matched {args.name!r}. Try one of: {suggestion}")
-    suggestion_text = " | ".join(misses) if misses else "use --council akl, wlg, rot, or npl"
-    die(f"no pool matched {args.name!r}. Try one of: {suggestion_text}")
+        if suggestions:
+            suggestions_by_council.append(f"{COUNCIL_NAMES.get(council, council)}: {', '.join(suggestions)}")
+    searched = ", ".join(COUNCIL_NAMES.get(c, c) for c in councils)
+    hint = "; ".join(suggestions_by_council[:3])
+    if hint:
+        die(f"no pool matched {args.name!r} in {searched}. Try one of: {hint}")
+    die(f"no pool matched {args.name!r} in {searched}")
 
 
 def cmd_facilities(args: argparse.Namespace) -> None:
@@ -1002,6 +1242,13 @@ def cmd_facilities(args: argparse.Namespace) -> None:
             note = None
             if args.type == "gym":
                 note = "Rotorua Aquatic Centre includes a gym; linked operator pages have current programme details."
+    elif args.council in {"npr", "has"}:
+        if args.region:
+            die("--region is only supported for Auckland facilities")
+        facilities, source_url = static_recreation_facilities(args.council, args.type)
+        note = None
+        if args.type != "pool":
+            note = f"{COUNCIL_NAMES[args.council]} recreation support currently covers aquatic facilities only."
         facilities = facilities[: args.limit]
     elif args.council == "npl":
         if args.region:
@@ -1113,7 +1360,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     events = sub.add_parser("events", help="list council-area public events")
-    events.add_argument("--council", choices=sorted(COUNCIL_LOCATIONS), help="council area: akl, wlg, chc, rot, or npl")
+    events.add_argument("--council", choices=sorted(COUNCIL_LOCATIONS), help="council area code")
     events.add_argument("--from", dest="date_from", help="start date filter, ISO yyyy-mm-dd")
     events.add_argument("--to", dest="date_to", help="end date filter, ISO yyyy-mm-dd")
     events.add_argument("--category", help="Eventfinda category slug, e.g. concerts-gig-guide")
@@ -1136,7 +1383,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     pool = sub.add_parser("pool", help="show one pool detail and lane availability where supported")
     pool.add_argument("name", help="pool name or slug, e.g. Tepid Baths")
-    pool.add_argument("--council", choices=RECREATION_COUNCILS, help="council recreation source; default searches supported pool sources")
+    pool.add_argument("--council", choices=RECREATION_COUNCILS, help="council recreation source; searches supported councils when omitted")
     pool.add_argument("--json", action="store_true", help="emit JSON")
     pool.set_defaults(func=cmd_pool)
 

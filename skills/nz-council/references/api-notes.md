@@ -234,6 +234,75 @@ Observed NPDC/Bell Block records:
 
 Freshness: source-backed static records in the CLI with source URLs for verification. Seasonal pool status and Todd Energy daily opening times can change, so users should verify the linked public pages before travel.
 
+### Napier City aquatic facilities
+
+Implemented as a static council-backed facility record.
+
+- Current council page: `https://www.napier.govt.nz/napier/facilities/napier-aquatic-centre/`
+- Requested legacy-style path checked first: `https://www.napier.govt.nz/services/swimming-pools`
+- Result for requested path on 2026-05-23: public Napier "Page not Found" response, no bot wall.
+
+Observed facility:
+
+- Napier Aquatic Centre, also matched by `Onekawa`, `Onekawa Aquatic Centre`, and `Onekawa Pools`
+
+Useful fields emitted:
+
+```json
+{
+  "name": "Napier Aquatic Centre",
+  "id": "napier-aquatic-centre",
+  "type": "pool",
+  "council": "npr",
+  "source": "napier-city-council",
+  "source_url": "https://www.napier.govt.nz/napier/facilities/napier-aquatic-centre/",
+  "address": "Maadi Road, Onekawa, Napier",
+  "operator": "Napier City Council",
+  "status": "open year-round"
+}
+```
+
+Freshness: facility identity and council source URL are static in the CLI; users should open the linked council/centre page for current open times before travel.
+
+### Hastings District aquatic facilities
+
+Implemented as static council-backed facility records, including linked Aquatics Hastings and Splash Planet pages.
+
+- Current council swimming-pools page: `https://www.hastingsdc.govt.nz/hastings/facilities/swimming-pools/`
+- Requested legacy-style path checked first: `https://www.hastingsdc.govt.nz/our-community/recreation-and-sport/swimming-pools`
+- Result for requested path on 2026-05-23: public Hastings "Page not found" response, no bot wall.
+- Splash Planet council page: `https://www.hastingsdc.govt.nz/hastings/facilities/splash-planet/`
+- Aquatics Hastings facilities page: `https://www.aquaticshastings.co.nz/facilities`
+
+Observed current council-run Aquatics Hastings pools:
+
+- Flaxmere Pool / Swim Heretaunga
+- Clive War Memorial Pool
+- Havelock North Village Pool / Village Pool
+
+Other Hastings aquatic recreation records:
+
+- Splash Planet, listed by HDC as a water theme park at 1001 Grove Road
+- Frimley Pool, retained as a closed facility because the current HDC page notes the September 2024 closure decision
+- Hawke's Bay Regional Aquatic Centre, included for `Hastings Aquatic Centre` lookup as the separate Hastings aquatic centre; its own public site says it is owned and operated by the Hawke's Bay Community Fitness Centre Trust, not Aquatics Hastings
+
+Useful fields emitted:
+
+```json
+{
+  "name": "Splash Planet",
+  "id": "splash-planet",
+  "type": "water-park",
+  "council": "has",
+  "source": "hastings-district-council",
+  "source_url": "https://www.hastingsdc.govt.nz/hastings/facilities/splash-planet/",
+  "address": "1001 Grove Road, Hastings",
+  "operator": "Hastings District Council"
+}
+```
+
+Freshness: facility identity, status notes, and source URLs are static in the CLI. Flaxmere, Clive, Village Pool, Splash Planet, and the regional aquatic centre source pages publish current hours and seasonal changes.
+
 ### Christchurch recreation and sport
 
 Discovered, documented, not wired in v1.
