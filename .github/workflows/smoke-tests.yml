@@ -7,28 +7,8 @@ on:
     - cron: '0 18 * * *'
 
 jobs:
-  discover:
-    runs-on: [self-hosted, linux, x64, skills-smoke]
-    outputs:
-      skills: ${{ steps.list.outputs.skills }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - id: list
-        name: List skill directories
-        run: |
-          skills=$(ls skills/ | python3 -c "import sys,json; print(json.dumps(sys.stdin.read().split()))")
-          echo "skills=$skills" >> "$GITHUB_OUTPUT"
-
   smoke:
-    needs: discover
     runs-on: [self-hosted, linux, x64, skills-smoke]
-    continue-on-error: true
-    strategy:
-      fail-fast: false
-      matrix:
-        skill: ${{ fromJson(needs.discover.outputs.skills) }}
-
     steps:
       - uses: actions/checkout@v4
 
@@ -36,118 +16,9 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Run smoke test — ${{ matrix.skill }}
-        id: test
+      - name: Run smoke tests (parallel)
         env:
           AT_API_KEY: ${{ secrets.AT_API_KEY }}
           METOCEAN_API_KEY: ${{ secrets.METOCEAN_API_KEY }}
           METLINK_API_KEY: ${{ secrets.METLINK_API_KEY }}
-        run: |
-          set +e
-          echo "::group::env diag"
-          echo "AT_API_KEY len=${#AT_API_KEY}"
-          echo "METOCEAN_API_KEY len=${#METOCEAN_API_KEY}"
-          echo "METLINK_API_KEY len=${#METLINK_API_KEY}"
-          echo "::endgroup::"
-          output=$(uv run --no-project python "skills/${{ matrix.skill }}/scripts/smoke_test.py" 2>&1)
-          exit_code=$?
-          echo "$output"
-
-          skip_count=$(echo "$output" | grep -c '\[SKIP\]' || echo 0)
-
-          if [ "$exit_code" -ne 0 ]; then
-            result=FAIL
-          elif [ "$skip_count" -gt 0 ]; then
-            result=SKIP
-          else
-            result=PASS
-          fi
-
-          mkdir -p /tmp/smoke-results
-          echo "$result" > "/tmp/smoke-results/${{ matrix.skill }}.txt"
-
-          {
-            if [ "$result" = FAIL ]; then
-              printf "## ❌ %s\n\n\`\`\`\n%s\n\`\`\`\n\n" "${{ matrix.skill }}" "$output"
-            elif [ "$result" = SKIP ]; then
-              printf "## ⏭️ %s (skipped — missing API key)\n\n" "${{ matrix.skill }}"
-            else
-              printf "## ✅ %s\n\n" "${{ matrix.skill }}"
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
-
-          exit "$exit_code"
-
-      - name: Upload result
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: smoke-result-${{ matrix.skill }}
-          path: /tmp/smoke-results/${{ matrix.skill }}.txt
-          if-no-files-found: warn
-
-  report:
-    needs: smoke
-    runs-on: [self-hosted, linux, x64, skills-smoke]
-    if: always()
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: smoke-result-*
-          path: /tmp/results
-          merge-multiple: true
-
-      - name: Summarise results
-        run: |
-          pass=0; skip=0; fail=0
-          failed_skills=(); skip_skills=()
-
-          shopt -s nullglob
-          for f in /tmp/results/*.txt; do
-            skill=$(basename "$f" .txt)
-            result=$(cat "$f")
-            case "$result" in
-              PASS) pass=$((pass+1)) ;;
-              SKIP) skip=$((skip+1)); skip_skills+=("$skill") ;;
-              FAIL) fail=$((fail+1)); failed_skills+=("$skill") ;;
-            esac
-          done
-
-          total=$((pass+skip+fail))
-
-          {
-            echo "## 🥝 Smoke Test Summary"
-            echo ""
-            echo "| Status | Count |"
-            echo "|--------|-------|"
-            echo "| ✅ Passed | $pass |"
-            echo "| ⏭️ Skipped (missing API key) | $skip |"
-            echo "| ❌ Failed | $fail |"
-            echo "| **Total** | **$total** |"
-
-            if [ ${#skip_skills[@]} -gt 0 ]; then
-              echo ""
-              echo "### Skipped (missing API key)"
-              for s in "${skip_skills[@]}"; do
-                echo "- \`$s\`"
-              done
-            fi
-
-            if [ ${#failed_skills[@]} -gt 0 ]; then
-              echo ""
-              echo "### Failed"
-              for s in "${failed_skills[@]}"; do
-                echo "- \`$s\`"
-              done
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
-
-          echo "Pass: $pass | Skip: $skip | Fail: $fail"
-          if [ "$total" -eq 0 ]; then
-            echo "WARNING: no result files found — artifacts may not have uploaded"
-            exit 1
-          fi
-          if [ ${#failed_skills[@]} -gt 0 ]; then
-            echo "FAILED: ${failed_skills[*]}"
-            exit 1
-          fi
+        run: bash scripts/run_all_smoke.sh
