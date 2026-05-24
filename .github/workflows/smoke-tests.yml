@@ -38,6 +38,10 @@ jobs:
 
       - name: Run smoke test — ${{ matrix.skill }}
         id: test
+        env:
+          AT_API_KEY: ${{ secrets.AT_API_KEY }}
+          METOCEAN_API_KEY: ${{ secrets.METOCEAN_API_KEY }}
+          METLINK_API_KEY: ${{ secrets.METLINK_API_KEY }}
         run: |
           set +e
           output=$(uv run --no-project python "skills/${{ matrix.skill }}/scripts/smoke_test.py" 2>&1)
