@@ -2,6 +2,8 @@ name: Smoke Tests
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
   schedule:
     # 06:00 NZST daily (UTC+12 → 18:00 UTC previous day)
     - cron: '0 18 * * *'
