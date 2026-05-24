@@ -76,3 +76,4 @@ python3 skills/bunnings/scripts/cli.py --country au search drill --limit 5
 - Product prices and stock are live snapshots and may vary by store, fulfilment method, country, and time
 - Endpoint shapes can change without notice because this is not an official public API
 - Keep usage narrow and respectful
+- See `references/api-notes.md` for detailed endpoint shapes and request patterns
