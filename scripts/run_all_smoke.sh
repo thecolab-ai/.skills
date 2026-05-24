@@ -72,6 +72,11 @@ fi
 
 if [[ ${#failed_skills[@]} -gt 0 ]]; then
     (IFS=", "; echo "PASS: ${pass}, SKIP: ${skip}, FAIL: ${fail} (${failed_skills[*]})")
+    for skill in "${failed_skills[@]}"; do
+        echo "===== FAIL: ${skill} ====="
+        cat "$RESULTS_DIR/${skill}.log"
+        echo "============================="
+    done
 else
     echo "PASS: ${pass}, SKIP: ${skip}, FAIL: ${fail}"
 fi

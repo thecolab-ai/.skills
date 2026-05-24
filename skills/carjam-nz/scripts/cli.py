@@ -84,7 +84,17 @@ def normalise_identifier(value: str) -> str:
     return cleaned
 
 
+_RETRY_STATUSES = {429, 502, 503, 504}
+_RETRY_DELAYS = (2, 5, 10)  # seconds between attempts 1→2, 2→3, 3→fail
+
+
 def fetch(url: str) -> str:
+    """Fetch *url* with up to 3 attempts and exponential backoff.
+
+    Retries on HTTP 429/502/503/504, connection/timeout errors, and Cloudflare
+    challenge responses ("Just a moment" body or ``cf-mitigated`` header).
+    Other 4xx errors (bad plate etc.) fail immediately.
+    """
     req = urllib.request.Request(
         url,
         headers={
@@ -92,14 +102,35 @@ def fetch(url: str) -> str:
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         },
     )
-    try:
-        with urllib.request.urlopen(req, timeout=30) as response:
-            return response.read().decode("utf-8", "replace")
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", "replace")[:300]
-        die(f"HTTP {exc.code} for {url}: {detail}")
-    except urllib.error.URLError as exc:
-        die(f"network error for {url}: {exc.reason}")
+    last_error: str = "unknown error"
+    for attempt, delay in enumerate((*_RETRY_DELAYS, None), start=1):
+        try:
+            with urllib.request.urlopen(req, timeout=30) as response:
+                body = response.read().decode("utf-8", "replace")
+                # Cloudflare challenge — treat as transient
+                cf_mitigated = response.headers.get("cf-mitigated", "")
+                if cf_mitigated or "Just a moment" in body:
+                    last_error = f"Cloudflare challenge on attempt {attempt}"
+                    should_retry = True
+                else:
+                    return body
+        except urllib.error.HTTPError as exc:
+            if exc.code not in _RETRY_STATUSES:
+                # Non-retryable HTTP error (e.g. 404 for bad plate) — fail fast
+                detail = exc.read().decode("utf-8", "replace")[:300]
+                die(f"HTTP {exc.code} for {url}: {detail}")
+            last_error = f"HTTP {exc.code} for {url}"
+            should_retry = True
+        except (urllib.error.URLError, TimeoutError, OSError) as exc:
+            last_error = f"network error for {url}: {exc}"
+            should_retry = True
+
+        if should_retry:
+            if delay is None:
+                # All retries exhausted
+                die(f"all {attempt} attempts failed — last error: {last_error}")
+            time.sleep(delay)
+
     raise AssertionError("unreachable")
 
 
