@@ -32,6 +32,15 @@ def test(name: str, fn):
 
 results: list[bool] = []
 
+# Current public Trade Me vehicle listing 5805102051 exposed this plate in
+# listing details on 2026-05-24. Use a real listed vehicle rather than a
+# vanity/example plate, because CarJam's public fields can disappear for
+# non-current or placeholder plates.
+SMOKE_PLATE = "PSP532"
+SMOKE_MAKE = "TOYOTA"
+SMOKE_MODEL = "HIACE"
+SMOKE_YEAR = "2019"
+
 
 def test_help() -> bool:
     result = run(["--help"])
@@ -44,7 +53,7 @@ results.append(test("--help exits 0", test_help))
 
 
 def test_lookup_json() -> bool:
-    result = run(["lookup", "KMM42", "--json"])
+    result = run(["lookup", SMOKE_PLATE, "--json"])
     if result.returncode != 0:
         print(f"  stderr: {result.stderr[:300]}")
         return False
@@ -52,10 +61,10 @@ def test_lookup_json() -> bool:
     summary = payload.get("summary") or {}
     checks = [
         payload.get("vehicle"),
-        summary.get("make"),
-        summary.get("model"),
-        summary.get("year_of_manufacture"),
-        summary.get("plate") == "KMM42",
+        summary.get("make") == SMOKE_MAKE,
+        summary.get("model") == SMOKE_MODEL,
+        summary.get("year_of_manufacture") == SMOKE_YEAR,
+        summary.get("plate") == SMOKE_PLATE,
         payload.get("source_url", "").startswith("https://www.carjam.co.nz/car/?plate="),
     ]
     if not all(checks):
@@ -64,22 +73,22 @@ def test_lookup_json() -> bool:
     return True
 
 
-results.append(test("lookup KMM42 returns public vehicle summary", test_lookup_json))
+results.append(test(f"lookup {SMOKE_PLATE} returns public vehicle summary", test_lookup_json))
 
 
 def test_lookup_human() -> bool:
-    result = run(["lookup", "KMM42"])
+    result = run(["lookup", SMOKE_PLATE])
     if result.returncode != 0:
         print(f"  stderr: {result.stderr[:300]}")
         return False
-    return "TOYOTA" in result.stdout and "Source: https://www.carjam.co.nz" in result.stdout
+    return SMOKE_MAKE in result.stdout and SMOKE_MODEL in result.stdout and "Source: https://www.carjam.co.nz" in result.stdout
 
 
-results.append(test("lookup KMM42 human output includes vehicle/source", test_lookup_human))
+results.append(test(f"lookup {SMOKE_PLATE} human output includes vehicle/source", test_lookup_human))
 
 
 def test_batch_json() -> bool:
-    result = run(["batch", "KMM42", "KMM42", "--sleep", "0", "--json"])
+    result = run(["batch", SMOKE_PLATE, SMOKE_PLATE, "--sleep", "0", "--json"])
     if result.returncode != 0:
         print(f"  stderr: {result.stderr[:300]}")
         return False
