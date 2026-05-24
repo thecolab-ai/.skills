@@ -806,7 +806,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub = ap.add_subparsers(dest="command", required=True)
 
     sp = sub.add_parser("stops", help="search Metlink bus stops")
-    sp.add_argument("--query", help="filter by stop name, code, id, or description")
+    sp.add_argument("query", nargs="?", default=None, help="filter by stop name, code, id, or description")
     sp.add_argument("--near", help="sort by distance from a stop name/code/id or 'lat,lon'")
     sp.add_argument("--limit", type=positive_int, default=20)
     sp.add_argument("--json", action="store_true")
