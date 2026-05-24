@@ -14,5 +14,11 @@ ok.append(check('search interest rates', search))
 def dataset():
  d=json.loads(run(['dataset','exchange-rates','--json'])); assert d['dataset']['resource_list']
 ok.append(check('dataset exchange-rates', dataset))
+def download_preview():
+ d=json.loads(run(['download','exchange-rates','--match','daily','--rows','3','--json'])); assert d['bytes'] > 10000; assert d['preview']['rows']
+ok.append(check('direct XLSX download preview', download_preview))
+def chart():
+ d=json.loads(run(['chart','retail-rates','--limit','3','--json'])); assert d['data']; assert 'Column0' in d['data'][-1]
+ok.append(check('direct chart cache JSON', chart))
 if all(ok): print('All tests passed.'); sys.exit(0)
 sys.exit(1)
