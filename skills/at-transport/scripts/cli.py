@@ -389,7 +389,10 @@ def cmd_alerts(args: argparse.Namespace) -> None:
     now_ts = time.time()
     active = [
         a for a in alerts
-        if any(p.get("start", 0) <= now_ts <= p.get("end", now_ts + 1) for p in a.get("active_period", []))
+        if any(
+            (p.get("start") or 0) <= now_ts <= (p.get("end") if p.get("end") is not None else now_ts + 1)
+            for p in a.get("active_period", [])
+        )
     ]
     limited = active[: args.limit] if args.limit else active
 
