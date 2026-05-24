@@ -44,6 +44,11 @@ jobs:
           METLINK_API_KEY: ${{ secrets.METLINK_API_KEY }}
         run: |
           set +e
+          echo "::group::env diag"
+          echo "AT_API_KEY len=${#AT_API_KEY}"
+          echo "METOCEAN_API_KEY len=${#METOCEAN_API_KEY}"
+          echo "METLINK_API_KEY len=${#METLINK_API_KEY}"
+          echo "::endgroup::"
           output=$(uv run --no-project python "skills/${{ matrix.skill }}/scripts/smoke_test.py" 2>&1)
           exit_code=$?
           echo "$output"
