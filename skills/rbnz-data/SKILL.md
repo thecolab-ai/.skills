@@ -1,13 +1,13 @@
 ---
 name: rbnz-data
-description: Discover Reserve Bank of New Zealand public statistics datasets and resources through the data.govt.nz CKAN catalogue, including exchange-rate, wholesale-interest-rate, OCR/key-graph, lending, banking, and monetary datasets. Use when the task involves finding RBNZ dataset metadata, resource URLs, downloadable series, or datastore previews. Read-only; no authentication required for catalogue access.
+description: Discover and fetch Reserve Bank of New Zealand public statistics datasets through data.govt.nz CKAN and browser-compatible rbnz.govt.nz public file/chart endpoints. Use when the task involves RBNZ exchange rates, wholesale interest rates, OCR/key graphs, retail mortgage/deposit rate charts, dataset metadata, resource URLs, downloadable XLSX series, or JSON chart-cache previews. Read-only; no authentication required.
 ---
 
 # RBNZ Data
 
 ## Goal
 
-Find RBNZ public statistics datasets/resources reliably through the data.govt.nz catalogue when direct rbnz.govt.nz downloads are protected by Cloudflare.
+Find RBNZ public statistics datasets/resources through the data.govt.nz catalogue, then fetch official rbnz.govt.nz public XLSX/chart endpoints using browser-compatible request headers.
 
 ## CLI
 
@@ -15,6 +15,8 @@ Find RBNZ public statistics datasets/resources reliably through the data.govt.nz
 python3 skills/rbnz-data/scripts/cli.py search "interest rates" --json
 python3 skills/rbnz-data/scripts/cli.py dataset exchange-rates --json
 python3 skills/rbnz-data/scripts/cli.py exchange-rates --limit 3 --json
+python3 skills/rbnz-data/scripts/cli.py download exchange-rates --match daily --preview
+python3 skills/rbnz-data/scripts/cli.py chart retail-rates --limit 5 --json
 ```
 
 Commands:
@@ -22,6 +24,8 @@ Commands:
 - `search QUERY [--limit N] [--json]` - RBNZ-only data.govt.nz catalogue search
 - `dataset ID_OR_NAME [--json]` - package metadata and resource URLs
 - `exchange-rates [--limit N] [--json]` - small CKAN datastore preview for the RBNZ exchange-rates resource where available
+- `download DATASET [--match TEXT] [--preview] [--output PATH] [--json]` - fetch a matching official RBNZ public XLSX resource and optionally preview worksheet rows
+- `chart {twi,retail-rates}` - fetch public RBNZ chart-cache JSON used on the Statistics page
 
 ## Resources
 

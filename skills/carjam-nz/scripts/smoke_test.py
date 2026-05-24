@@ -44,7 +44,7 @@ results.append(test("--help exits 0", test_help))
 
 
 def test_lookup_json() -> bool:
-    result = run(["lookup", "ABC123", "--json"])
+    result = run(["lookup", "KMM42", "--json"])
     if result.returncode != 0:
         print(f"  stderr: {result.stderr[:300]}")
         return False
@@ -55,7 +55,7 @@ def test_lookup_json() -> bool:
         summary.get("make"),
         summary.get("model"),
         summary.get("year_of_manufacture"),
-        summary.get("plate") == "ABC123",
+        summary.get("plate") == "KMM42",
         payload.get("source_url", "").startswith("https://www.carjam.co.nz/car/?plate="),
     ]
     if not all(checks):
@@ -64,7 +64,7 @@ def test_lookup_json() -> bool:
     return True
 
 
-results.append(test("lookup ABC123 returns public vehicle summary", test_lookup_json))
+results.append(test("lookup KMM42 returns public vehicle summary", test_lookup_json))
 
 
 def test_lookup_human() -> bool:
@@ -79,7 +79,7 @@ results.append(test("lookup KMM42 human output includes vehicle/source", test_lo
 
 
 def test_batch_json() -> bool:
-    result = run(["batch", "ABC123", "KMM42", "--sleep", "0", "--json"])
+    result = run(["batch", "KMM42", "KMM42", "--sleep", "0", "--json"])
     if result.returncode != 0:
         print(f"  stderr: {result.stderr[:300]}")
         return False
