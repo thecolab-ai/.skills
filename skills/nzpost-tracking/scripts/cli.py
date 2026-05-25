@@ -6,6 +6,7 @@ Self-contained stdlib wrapper. No authentication required.
 from __future__ import annotations
 
 import argparse
+import html
 import json
 import re
 import sys
@@ -13,6 +14,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from typing import Any
+
+_CONTROL_CHARS_RE = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -83,6 +86,20 @@ def _safe_str(v: Any, default: str = "") -> str:
 def strip_html(text: str) -> str:
     """Strip HTML tags from a string."""
     return re.sub(r"<[^>]+>", "", text)
+
+
+def clean_text(text: Any) -> str:
+    """Sanitise an untrusted string field before display.
+
+    Strips HTML tags, decodes HTML entities, removes terminal control
+    characters that could spoof output, and trims whitespace.
+    """
+    if text is None:
+        return ""
+    s = strip_html(str(text))
+    s = html.unescape(s)
+    s = _CONTROL_CHARS_RE.sub("", s)
+    return s.strip()
 
 
 def validate_tracking_number(tn: str) -> str:
@@ -186,10 +203,10 @@ def emit_human(tracking_reference: str, events: list[dict[str, Any]]) -> None:
 
     # Latest event = last in list
     latest = events[-1]
-    latest_status = _safe_str(latest.get("status"), "Unknown").strip()
+    latest_status = clean_text(latest.get("status")) or "Unknown"
     latest_dt = fmt_datetime(latest.get("date_time"))
-    latest_desc = strip_html(_safe_str(latest.get("description"), "")).strip()
-    latest_depot = _safe_str(latest.get("depot_name"), "").strip()
+    latest_desc = clean_text(latest.get("description"))
+    latest_depot = clean_text(latest.get("depot_name"))
 
     print(f"Status:   {latest_status}")
     print(f"Updated:  {latest_dt}")
@@ -203,9 +220,9 @@ def emit_human(tracking_reference: str, events: list[dict[str, Any]]) -> None:
 
     for ev in events:
         dt = fmt_datetime(ev.get("date_time"))
-        status = _safe_str(ev.get("status"), "").strip()
-        depot = _safe_str(ev.get("depot_name"), "").strip()
-        run = _safe_str(ev.get("run_name"), "").strip()
+        status = clean_text(ev.get("status"))
+        depot = clean_text(ev.get("depot_name"))
+        run = clean_text(ev.get("run_name"))
         loc_parts = [p for p in [depot, run] if p]
         loc_str = f"  [{', '.join(loc_parts)}]" if loc_parts else ""
         print(f"  {dt}  {status}{loc_str}")
@@ -216,17 +233,17 @@ def emit_json_output(tracking_reference: str, events: list[dict[str, Any]]) -> N
     latest = events[-1] if events else {}
     result = {
         "tracking_reference": tracking_reference,
-        "status": _safe_str(latest.get("status"), "").strip(),
+        "status": clean_text(latest.get("status")),
         "last_updated": _safe_str(latest.get("date_time"), ""),
-        "last_depot": _safe_str(latest.get("depot_name"), "").strip() or None,
+        "last_depot": clean_text(latest.get("depot_name")) or None,
         "event_count": len(events),
         "events": [
             {
                 "date_time": ev.get("date_time"),
-                "status": _safe_str(ev.get("status"), "").strip(),
-                "description": strip_html(_safe_str(ev.get("description"), "")).strip(),
-                "depot_name": ev.get("depot_name"),
-                "run_name": ev.get("run_name"),
+                "status": clean_text(ev.get("status")),
+                "description": clean_text(ev.get("description")),
+                "depot_name": clean_text(ev.get("depot_name")) or None,
+                "run_name": clean_text(ev.get("run_name")) or None,
                 "edifact_code": ev.get("edifact_code"),
                 "seqref": ev.get("seqref"),
             }
