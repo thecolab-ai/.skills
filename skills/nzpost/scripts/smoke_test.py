@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Smoke tests for nzpost-tracking skill -- basic API and CLI checks."""
+"""Smoke tests for nzpost skill -- basic API and CLI checks."""
 import json
 import subprocess
 import sys
@@ -47,10 +47,10 @@ results.append(test("--help exits 0", test_help))
 
 def test_track_subcommand_help():
     result = run(["track", "--help"])
-    return result.returncode == 0 and "number" in result.stdout
+    return result.returncode == 0 and "NUMBER" in result.stdout
 
 
-results.append(test("track --help mentions number argument", test_track_subcommand_help))
+results.append(test("track --help mentions NUMBER argument", test_track_subcommand_help))
 
 
 def test_track_human_output():
@@ -198,6 +198,134 @@ def test_events_chronological():
 
 
 results.append(test("events are returned in chronological order", test_events_chronological))
+
+
+# ---------------------------------------------------------------------------
+# New smoke tests: locations
+# ---------------------------------------------------------------------------
+
+def test_locations_near_json():
+    """locations --near 'Auckland CBD' --json parses as JSON with >=1 location."""
+    result = run(["locations", "--near", "Auckland CBD", "--json"])
+    if result.returncode != 0:
+        print(f"  stderr: {result.stderr[:300]}")
+        return False
+    try:
+        data = json.loads(result.stdout)
+    except json.JSONDecodeError as e:
+        print(f"  JSON parse error: {e}")
+        return False
+    locs = data.get("locations", [])
+    if len(locs) < 1:
+        print(f"  Expected >=1 location, got {len(locs)}")
+        return False
+    return True
+
+
+results.append(test("locations --near 'Auckland CBD' --json returns >=1 location", test_locations_near_json))
+
+
+def test_locations_latlon_json():
+    """locations --lat --lon --json returns >=1 location."""
+    result = run(["locations", "--lat", "-36.8485", "--lon", "174.7633", "--json"])
+    if result.returncode != 0:
+        print(f"  stderr: {result.stderr[:300]}")
+        return False
+    try:
+        data = json.loads(result.stdout)
+    except json.JSONDecodeError as e:
+        print(f"  JSON parse error: {e}")
+        return False
+    locs = data.get("locations", [])
+    if len(locs) < 1:
+        print(f"  Expected >=1 location, got {len(locs)}")
+        return False
+    return True
+
+
+results.append(test("locations --lat/-lon --json returns >=1 location", test_locations_latlon_json))
+
+
+def test_locations_human_no_banner():
+    """locations human output renders without banner contamination."""
+    result = run(["locations", "--near", "Auckland CBD", "--limit", "3"])
+    if result.returncode != 0:
+        print(f"  stderr: {result.stderr[:300]}")
+        return False
+    # Human output should NOT start with NZ Post Tracking banner
+    if result.stdout.startswith("NZ Post Tracking"):
+        print("  Human output starts with tracking banner (contamination)")
+        return False
+    # Should have some output (location names)
+    if not result.stdout.strip():
+        print("  Empty output")
+        return False
+    return True
+
+
+results.append(test("locations human output renders without banner contamination", test_locations_human_no_banner))
+
+
+# ---------------------------------------------------------------------------
+# New smoke tests: address
+# ---------------------------------------------------------------------------
+
+def test_address_json():
+    """address 'Papakura' --json parses as JSON with >=1 address."""
+    result = run(["address", "Papakura", "--json"])
+    if result.returncode != 0:
+        print(f"  stderr: {result.stderr[:300]}")
+        return False
+    try:
+        data = json.loads(result.stdout)
+    except json.JSONDecodeError as e:
+        print(f"  JSON parse error: {e}")
+        return False
+    addrs = data.get("addresses", [])
+    if len(addrs) < 1:
+        print(f"  Expected >=1 address, got {len(addrs)}")
+        return False
+    return True
+
+
+results.append(test("address 'Papakura' --json returns >=1 address", test_address_json))
+
+
+# ---------------------------------------------------------------------------
+# New smoke tests: multi-parcel track
+# ---------------------------------------------------------------------------
+
+def test_track_multi_json():
+    """track with two refs --json returns 2 results in parcels[]."""
+    result = run(["track", LIVE_TRACKING_NUMBER, UNKNOWN_TRACKING_NUMBER, "--json"])
+    if result.returncode != 0:
+        print(f"  stderr: {result.stderr[:300]}")
+        return False
+    try:
+        data = json.loads(result.stdout)
+    except json.JSONDecodeError as e:
+        print(f"  JSON parse error: {e}")
+        return False
+    parcels = data.get("parcels", [])
+    if len(parcels) != 2:
+        print(f"  Expected 2 parcels, got {len(parcels)}")
+        return False
+    return True
+
+
+results.append(test("track two refs --json returns 2 results", test_track_multi_json))
+
+
+def test_track_single_regression():
+    """Single track still works (regression)."""
+    result = run(["track", LIVE_TRACKING_NUMBER])
+    if result.returncode != 0:
+        print(f"  stderr: {result.stderr[:200]}")
+        return False
+    return "NZ Post Tracking" in result.stdout and LIVE_TRACKING_NUMBER in result.stdout
+
+
+results.append(test("track single parcel still works (regression)", test_track_single_regression))
 
 
 if all(results):
