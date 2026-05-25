@@ -11,7 +11,7 @@ number `00794210392715622565`, and capture all network requests/responses.
 GET https://tools.nzpost.co.nz/tracking/api/parceltrack/parcels?tracking_reference=<TRACKING_NUMBER>
 ```
 
-### Required headers
+### Headers used by the CLI
 
 ```
 User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:151.0) Gecko/20100101 Firefox/151.0
@@ -19,8 +19,10 @@ Referer: https://www.nzpost.co.nz/tools/tracking
 Content-Type: application/json
 ```
 
-No authentication token, cookie, or CSRF header is required. The `Referer` header is important for
-CORS validation (`access-control-allow-origin: https://www.nzpost.co.nz`).
+No authentication token, cookie, or CSRF header is required. Direct curl requests returned 200
+without the `Referer` header during review on 2026-05-25. The CLI still sends it for parity with the
+NZ Post website, and browser CORS responses advertise `access-control-allow-origin:
+https://www.nzpost.co.nz`.
 
 ### Response shape
 
@@ -52,6 +54,31 @@ CORS validation (`access-control-allow-origin: https://www.nzpost.co.nz`).
           "run_name": "Papakura",
           "source": "CME",
           "status": "Delivered"
+        }
+      ]
+    }
+  ]
+}
+```
+
+### No-data response shape
+
+Unknown or invalid references can still return HTTP 200 with `success: true`. Callers must check
+`status_code` and nested result errors, not only the top-level `success` flag.
+
+```json
+{
+  "message_id": "...",
+  "success": true,
+  "status_code": 2,
+  "results": [
+    {
+      "tracking_reference": "00000000000000000000",
+      "errors": [
+        {
+          "code": 400002,
+          "message": "Invalid parameter(s)",
+          "details": "No data found for this Tracking Reference"
         }
       ]
     }

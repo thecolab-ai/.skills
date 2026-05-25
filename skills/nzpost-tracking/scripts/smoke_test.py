@@ -9,6 +9,7 @@ SKILL_DIR = Path(__file__).parent.parent
 CLI = SKILL_DIR / "scripts" / "cli.py"
 
 LIVE_TRACKING_NUMBER = "00794210392715622565"
+UNKNOWN_TRACKING_NUMBER = "00000000000000000000"
 
 
 def run(args: list) -> subprocess.CompletedProcess:
@@ -141,6 +142,28 @@ def test_invalid_tracking_number():
 
 
 results.append(test("invalid tracking number exits non-zero with message", test_invalid_tracking_number))
+
+
+def test_too_long_tracking_number():
+    result = run(["track", "1234567890123456789012345"])
+    return result.returncode != 0 and "unrecognised tracking number format" in result.stderr
+
+
+results.append(test("too-long numeric tracking number is rejected", test_too_long_tracking_number))
+
+
+def test_unknown_tracking_number():
+    result = run(["track", UNKNOWN_TRACKING_NUMBER, "--json"])
+    if result.returncode == 0:
+        print("  Expected non-zero exit for unknown tracking number")
+        return False
+    if result.stdout.strip():
+        print(f"  Expected no stdout in --json error path, got: {result.stdout[:100]}")
+        return False
+    return "No data found" in result.stderr or "tracking lookup failed" in result.stderr
+
+
+results.append(test("unknown valid-format tracking number exits non-zero", test_unknown_tracking_number))
 
 
 def test_delivered_status():

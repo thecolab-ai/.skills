@@ -58,7 +58,7 @@ python3 skills/nzpost-tracking/scripts/cli.py track EA123456789NZ --json
 
 NZ Post accepts a wide range of tracking number formats:
 
-- 18-20 digit domestic numbers (e.g. `00794210392715622565`)
+- 18 or 20 digit domestic numbers (e.g. `00794210392715622565`)
 - 13-digit domestic short numbers
 - UPU international format: 2 letters + 9 digits + 2 letters (e.g. `EA123456789NZ`)
 - Alphanumeric codes (TP, RMA, RMC, SUN, CTC prefixes, etc.)
@@ -89,6 +89,6 @@ NZ Post accepts a wide range of tracking number formats:
 
 - No API key or authentication required
 - The endpoint is `tools.nzpost.co.nz/tracking/api/parceltrack/parcels` (unauthenticated)
-- Requires `Referer: https://www.nzpost.co.nz/tools/tracking` header for CORS validation
+- Sends `Referer: https://www.nzpost.co.nz/tools/tracking` for browser parity; direct API requests also returned 200 without it during review
 - Python stdlib only (`urllib`, `json`, `re`, `argparse`)
 - Delivered parcels retain their full tracking history indefinitely

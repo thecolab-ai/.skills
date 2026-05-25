@@ -90,10 +90,10 @@ def validate_tracking_number(tn: str) -> str:
     cleaned = tn.strip().upper()
     if not cleaned:
         die("tracking number cannot be empty")
-    if not TRACKING_RE.match(cleaned):
+    if not TRACKING_RE.fullmatch(cleaned):
         die(
             f"unrecognised tracking number format: {tn!r}\n"
-            "  NZ Post tracking numbers are typically 13 or 18-20 digits, or alphanumeric codes."
+            "  NZ Post tracking numbers are typically numeric references or alphanumeric codes."
         )
     return cleaned
 
@@ -123,6 +123,28 @@ def fetch_tracking(tracking_reference: str, timeout: int = 15) -> dict[str, Any]
         die(f"network error calling tracking API: {e.reason}")
     except json.JSONDecodeError as e:
         die(f"invalid JSON from tracking API: {e}")
+
+
+def extract_api_error(results: Any) -> str | None:
+    """Return a concise API error from a results payload, if present."""
+    if not isinstance(results, list):
+        return None
+    messages: list[str] = []
+    for result in results:
+        if not isinstance(result, dict):
+            continue
+        errors = result.get("errors")
+        if not isinstance(errors, list):
+            continue
+        for err in errors:
+            if not isinstance(err, dict):
+                continue
+            message = err.get("details") or err.get("message") or err.get("code")
+            if message is not None:
+                messages.append(_safe_str(message))
+    if messages:
+        return "; ".join(messages)
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -224,20 +246,51 @@ def cmd_track(args: argparse.Namespace) -> None:
 
     data = fetch_tracking(tn)
 
-    if not data.get("success"):
-        status_code = data.get("status_code")
+    if not isinstance(data, dict):
+        die("unexpected tracking API response: top-level JSON is not an object")
+
+    results = data.get("results")
+    status_code = data.get("status_code")
+    if data.get("success") is not True or status_code != 1:
+        api_error = extract_api_error(results)
+        suffix = f": {api_error}" if api_error else ""
         if not args.json:
             print_banner()
-        die(f"tracking lookup failed (status_code={status_code})")
+        die(f"tracking lookup failed (status_code={status_code}){suffix}")
 
-    results = data.get("results", [])
+    if not isinstance(results, list):
+        if not args.json:
+            print_banner()
+        die("unexpected tracking API response: results is not a list")
+
     if not results:
         if not args.json:
             print_banner()
         die(f"no tracking data found for: {tn}")
 
     parcel = results[0]
-    events = parcel.get("tracking_events", [])
+    if not isinstance(parcel, dict):
+        if not args.json:
+            print_banner()
+        die("unexpected tracking API response: first result is not an object")
+
+    events = parcel.get("tracking_events")
+    if not isinstance(events, list):
+        if not args.json:
+            print_banner()
+        die("unexpected tracking API response: tracking_events is not a list")
+
+    if not events:
+        if not args.json:
+            print_banner()
+        die(f"no tracking events found for: {tn}")
+
+    for ev in events:
+        if not isinstance(ev, dict):
+            if not args.json:
+                print_banner()
+            die("unexpected tracking API response: tracking_events contains a non-object")
+
     ref = _safe_str(parcel.get("tracking_reference", tn))
 
     if args.json:
