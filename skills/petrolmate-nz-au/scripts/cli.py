@@ -25,7 +25,7 @@ API_NEARBY = "/api/stations/nearby"
 API_GEOIP = "/api/geoip"
 API_GEOCODE = "/api/geocode/search"
 
-UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:130.0) Gecko/20100101 Firefox/130.0"
+UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:151.0) Gecko/20100101 Firefox/151.0"
 
 FUEL_TYPES: dict[str, str] = {
     "ULP": "Unleaded 91",
