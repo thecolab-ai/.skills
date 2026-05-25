@@ -35,6 +35,7 @@ FUEL_TYPES: dict[str, str] = {
     "PREMIUM": "Premium (95+98)",
     "DIESEL": "Diesel",
     "PDIESEL": "Premium Diesel",
+    "DIESEL_PREMIUM": "Premium Diesel",
     "LPG": "LPG",
     "E85": "E85",
     "B20": "Biodiesel B20",
@@ -377,12 +378,13 @@ def cmd_search(args: argparse.Namespace) -> None:
     radius = args.radius
 
     started = time.perf_counter()
+    fetch_limit = 100 if args.sort == "price" or args.brand else args.limit
     stations = api_stations(
         lat=lat,
         lon=lon,
         radius_km=radius,
         fuel_type=fuel,
-        limit=args.limit,
+        limit=fetch_limit,
         brand=args.brand,
     )
     elapsed_ms = round((time.perf_counter() - started) * 1000)
@@ -432,7 +434,7 @@ def cmd_fuel_types(_args: argparse.Namespace) -> None:
     """List fuel types."""
     print("Fuel types:")
     for code, label in FUEL_TYPES.items():
-        print(f"  {code:<10} {label}")
+        print(f"  {code:<15} {label}")
 
 
 # ---------------------------------------------------------------------------

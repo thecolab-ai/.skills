@@ -56,8 +56,10 @@ Fuel-type coverage varies by region and station -- not all types are available e
 | PREMIUM | Premium (95+98) |
 | DIESEL | Diesel |
 | PDIESEL | Premium Diesel |
+| DIESEL_PREMIUM | Premium Diesel (alias for PDIESEL) |
 | LPG | LPG/Autogas |
 | E85 | E85 (Ethanol 85%) |
+| B20 | Biodiesel B20 |
 
 API field `fuel_name` uses labels like "Unleaded Petrol", "Premium Unleaded 95", and "Diesel" — the CLI maps these to short codes.
 

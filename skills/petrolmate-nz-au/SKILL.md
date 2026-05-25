@@ -1,6 +1,6 @@
 ---
 name: petrolmate-nz-au
-description: Query live AU & NZ fuel prices from petrolmate.com.au's public API. Search stations near any AU or NZ location, filter by 9 fuel types, sort by price or distance. Covers AU state FuelCheck data and NZ Gaspy data. No API key or authentication required.
+description: Query live AU & NZ fuel prices from petrolmate.com.au's public API. Search stations near any AU or NZ location, filter by supported fuel type, sort by price or distance. Covers AU state FuelCheck data and NZ Gaspy data. No API key or authentication required.
 ---
 
 # PetrolMate (AU + NZ)
@@ -93,6 +93,7 @@ python3 skills/petrolmate-nz-au/scripts/cli.py fuel-types
 | PREMIUM | Premium (95+98) |
 | DIESEL | Diesel |
 | PDIESEL | Premium Diesel |
+| DIESEL_PREMIUM | Premium Diesel (alias for PDIESEL) |
 | LPG | LPG/Autogas |
 | E85 | E85 (Ethanol 85%) |
 | B20 | Biodiesel B20 |

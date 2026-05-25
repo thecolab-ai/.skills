@@ -47,7 +47,7 @@ def test_fuel_types():
     if result.returncode != 0:
         print(f"  stderr: {result.stderr[:200]}")
         return False
-    for code in ("ULP", "DIESEL", "PULP95", "PULP98"):
+    for code in ("ULP", "DIESEL", "PULP95", "PULP98", "B20", "DIESEL_PREMIUM"):
         if code not in result.stdout:
             print(f"  Missing fuel type: {code}")
             return False
