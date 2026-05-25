@@ -133,3 +133,67 @@ The CLI validates against a simplified subset covering the most common NZ domest
 
 No rate limiting was observed during testing. The endpoint is served via Cloudflare (`cf-ray` header
 present). No CSRF token or session cookie is needed.
+
+## Address suggest endpoint
+
+```
+GET https://tools.nzpost.co.nz/legacy/api/suggest?q=<QUERY>&max=<LIMIT>
+```
+
+The correct limit parameter is `max=N` (an integer). An earlier note incorrectly documented this as
+`MaxData=max:N` -- that parameter name was wrong and the colon-in-value theory was a misdiagnosis.
+The `Accept: application/json` header must be included or the endpoint returns a "Bad request" error.
+
+```
+Headers:
+  User-Agent: <Firefox UA>
+  Referer: https://www.nzpost.co.nz/tools/address-postcode-finder
+  Accept: application/json
+```
+
+Response shape: `{"success": true, "addresses": [{"DPID": ..., "FullAddress": "...", ...}], "status": "success"}`
+
+## PostShop locations endpoint
+
+```
+GET https://api.nzpost.co.nz/digital/postshop-locations/v2/locations?type=NEARBY&value=<JSON>&max=<N>
+GET https://api.nzpost.co.nz/digital/postshop-locations/v2/locations?type=KEYWORD&value=<TEXT>&max=<N>
+```
+
+### Real location type strings (verified 2026-05-25)
+
+| CLI flag value | API `type` field |
+|----------------|-----------------|
+| `postshop` | `PostShop` |
+| `postbox` | `Postbox` (also matches `Postbox Lobby` via substring) |
+| `parcel-collect` | `Third Party Partner` |
+| `all` | (no filter) |
+
+Note: `ParcelCollect` and `PostBox` do NOT appear in live API responses. Earlier documentation was
+wrong.
+
+### Hours field
+
+The `hours` field is a **list** of objects, one per day:
+
+```json
+[
+  {"day": 0, "open": "08:30", "close": "17:30", "closed": false},
+  {"day": 5, "open": "09:00", "close": "17:00", "closed": false},
+  {"day": 6, "open": null, "close": null, "closed": true}
+]
+```
+
+`day` uses ISO weekday numbering: 0=Monday, 6=Sunday (matches Python `datetime.weekday()`).
+When `closed` is true, `open`/`close` may be null.
+
+### Geocoding via KEYWORD
+
+Use `type=KEYWORD` with a place name to get coordinates from the first matching location:
+
+```
+GET .../locations?type=KEYWORD&value=Clevedon&max=1
+```
+
+Response locations include `lat` and `lng` fields (float). This is the preferred geocoding path;
+OSM Nominatim is the fallback.
