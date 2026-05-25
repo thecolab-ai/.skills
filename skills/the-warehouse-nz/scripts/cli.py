@@ -1,13 +1,9 @@
 #!/usr/bin/env python3
-# /// script
-# requires-python = ">=3.9"
-# dependencies = ["curl_cffi>=0.7"]
-# ///
 """The Warehouse NZ lightweight read-only CLI.
 
-Uses curl_cffi for TLS fingerprint impersonation to defeat Cloudflare
-JA3/JA4 bot-detection on thewarehouse.co.nz. No login, cart mutation,
-browser automation, or write actions.
+Self-contained stdlib wrapper around public thewarehouse.co.nz storefront
+endpoints. No login, cart mutation, browser automation, or third-party
+dependencies.
 """
 from __future__ import annotations
 
@@ -18,14 +14,11 @@ import os
 import re
 import sys
 import time
+import urllib.error
 import urllib.parse
+import urllib.request
 from html.parser import HTMLParser
 from typing import Any
-
-from curl_cffi import requests as cffi_requests
-
-_SESSION: cffi_requests.Session | None = None
-IMPERSONATE = os.environ.get("THE_WAREHOUSE_NZ_IMPERSONATE", "chrome136")
 
 BASE_WEB = "https://www.thewarehouse.co.nz"
 SEARCH_PATH = "/search/updategrid"
@@ -33,6 +26,10 @@ PRODUCT_PATH = "/on/demandware.store/Sites-twl-Site/default/Product-Show"
 STORES_PATH = "/on/demandware.store/Sites-twl-Site/default/Stores-FindStores"
 PAGE_SIZE = 32
 MAX_LIMIT = 96
+UA = os.environ.get(
+    "THE_WAREHOUSE_NZ_USER_AGENT",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
+)
 
 REGIONS = {
     "northland": "NZ-NTL",
@@ -102,13 +99,6 @@ def url_with_params(path: str, params: dict[str, Any] | None = None) -> str:
     return url
 
 
-def _session() -> cffi_requests.Session:
-    global _SESSION
-    if _SESSION is None:
-        _SESSION = cffi_requests.Session(impersonate=IMPERSONATE)
-    return _SESSION
-
-
 def request(
     path: str,
     params: dict[str, Any] | None = None,
@@ -123,19 +113,21 @@ def request(
         "Accept-Language": "en-NZ,en;q=0.9",
         "Origin": BASE_WEB,
         "Referer": BASE_WEB + "/",
+        "User-Agent": UA,
     }
+    req = urllib.request.Request(url, headers=headers, method="GET")
     try:
-        resp = _session().get(url, headers=headers, timeout=timeout)
-        if resp.status_code in allow_statuses or resp.status_code == 200:
-            return resp.text, str(resp.url)
-        if resp.status_code >= 400:
-            detail = resp.text[:300].strip().replace("\n", " ")
-            die(f"HTTP {resp.status_code} from {url}: {detail}")
-        return resp.text, str(resp.url)
-    except SystemExit:
-        raise
-    except Exception as e:
-        die(f"network error calling {url}: {e}")
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            raw = resp.read().decode("utf-8", "replace")
+            return raw, resp.geturl()
+    except urllib.error.HTTPError as e:
+        raw = e.read().decode("utf-8", "replace")
+        if e.code in allow_statuses:
+            return raw, e.geturl()
+        detail = raw[:300].strip().replace("\n", " ")
+        die(f"HTTP {e.code} from {url}: {detail}")
+    except urllib.error.URLError as e:
+        die(f"network error calling {url}: {e.reason}")
 
 
 def request_json(path: str, params: dict[str, Any] | None = None) -> Any:
