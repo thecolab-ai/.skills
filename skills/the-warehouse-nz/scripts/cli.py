@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 # /// script
 # requires-python = ">=3.9"
-# dependencies = ["curl_cffi>=0.7", "playwright>=1.40", "playwright-stealth>=2.0"]
+# dependencies = ["curl_cffi>=0.7"]
 # ///
 """The Warehouse NZ lightweight read-only CLI.
 
 Uses curl_cffi for TLS fingerprint impersonation to defeat Cloudflare
-JA3/JA4 bot-detection on thewarehouse.co.nz. Falls back to Playwright
-headless Chromium for Managed Challenge (JS puzzle) when the IP is flagged.
-No login, cart mutation, or write actions.
+JA3/JA4 bot-detection on thewarehouse.co.nz. No login, cart mutation,
+browser automation, or write actions.
 """
 from __future__ import annotations
 
@@ -26,7 +25,6 @@ from typing import Any
 from curl_cffi import requests as cffi_requests
 
 _SESSION: cffi_requests.Session | None = None
-_CF_SOLVED = False
 IMPERSONATE = os.environ.get("THE_WAREHOUSE_NZ_IMPERSONATE", "chrome136")
 
 BASE_WEB = "https://www.thewarehouse.co.nz"
@@ -111,65 +109,6 @@ def _session() -> cffi_requests.Session:
     return _SESSION
 
 
-def _is_cf_challenge(text: str) -> bool:
-    snippet = text[:2000]
-    return "<title>Just a moment" in snippet or "cf-mitigated" in snippet
-
-
-def _solve_cf_challenge() -> bool:
-    """Launch headless Chromium once to solve CF JS challenge; inject cookies into session.
-
-    Returns True if cf_clearance was obtained, False if the challenge couldn't be solved
-    (e.g. Turnstile CAPTCHA requiring human interaction).
-    """
-    global _CF_SOLVED
-    if _CF_SOLVED:
-        return True
-    try:
-        from playwright.sync_api import sync_playwright
-    except ImportError:
-        die("Cloudflare managed challenge requires playwright. Run: playwright install chromium")
-
-    with sync_playwright() as pw:
-        browser = pw.chromium.launch(
-            headless=True,
-            args=["--disable-blink-features=AutomationControlled"],
-        )
-        context = browser.new_context(
-            user_agent=(
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/136.0.0.0 Safari/537.36"
-            ),
-            viewport={"width": 1920, "height": 1080},
-        )
-        page = context.new_page()
-        try:
-            from playwright_stealth import Stealth
-            Stealth().apply_stealth_sync(page)
-        except Exception:
-            pass
-        try:
-            page.goto(BASE_WEB, wait_until="domcontentloaded", timeout=30000)
-        except Exception:
-            pass
-        deadline = time.monotonic() + 25
-        while time.monotonic() < deadline:
-            if "Just a moment" not in page.title():
-                break
-            time.sleep(0.5)
-        cookies = context.cookies()
-        browser.close()
-
-    cf_clearance_found = any(c["name"] == "cf_clearance" for c in cookies)
-    sess = _session()
-    for c in cookies:
-        sess.cookies.set(c["name"], c["value"], domain=c.get("domain", ""), path=c.get("path", "/"))
-    if cf_clearance_found:
-        _CF_SOLVED = True
-    return cf_clearance_found
-
-
 def request(
     path: str,
     params: dict[str, Any] | None = None,
@@ -187,10 +126,6 @@ def request(
     }
     try:
         resp = _session().get(url, headers=headers, timeout=timeout)
-        if resp.status_code == 403 and _is_cf_challenge(resp.text):
-            solved = _solve_cf_challenge()
-            if solved:
-                resp = _session().get(url, headers=headers, timeout=timeout)
         if resp.status_code in allow_statuses or resp.status_code == 200:
             return resp.text, str(resp.url)
         if resp.status_code >= 400:

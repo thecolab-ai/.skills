@@ -18,9 +18,6 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install Playwright browsers
-        run: uv run --with playwright playwright install chromium
-
       - name: Run smoke tests (parallel)
         env:
           AT_API_KEY: ${{ secrets.AT_API_KEY }}
