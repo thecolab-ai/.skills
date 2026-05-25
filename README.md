@@ -41,6 +41,18 @@ It includes:
 
 We are borrowing the shape of the best public skills repos, but not copying their skill content.
 
+## For businesses whose APIs we touch
+
+If you operate a service that one of these skills connects to and you'd prefer we didn't, email **adam@thecolab.ai** with the skill name and a brief reason. We action good-faith requests from the affected operator promptly, usually within 5 working days. Full process in [COMPLAINTS.md](COMPLAINTS.md).
+
+But before you do, hear us out on why we built this.
+
+These skills access endpoints that respond to unauthenticated public requests. We don't bypass authentication or circumvent technical access controls. Users of these skills are responsible for complying with the terms of service of the underlying provider. What we've done is make that data legible to AI agents, so a Kiwi using an LLM can actually get useful answers about NZ fuel prices, bus times, pharmacy stock, or property data without us all reinventing the same wrapper a thousand times.
+
+The thing is, agents are going to access this data either way. The only question is whether they do it well, with one clean shared connector, or badly, with ten thousand half-broken scrapers hammering your servers. We think one clean connector is better for everyone, you included.
+
+If you're a business looking at this and thinking "how do we actually want AI agents to interact with our data" rather than "how do we stop them", that's a conversation worth having. We do that work. Email **adam@thecolab.ai** or [open an issue](https://github.com/thecolab-ai/.skills/issues/new) and we'll help you design the right surface: a proper agent-ready API, sensible rate limits, an auth model that fits, the lot. The businesses that figure this out early will own their corner of the agent economy. The ones that don't will get scraped anyway, just less efficiently.
+
 ## Available skills
 
 | Skill | Description |
