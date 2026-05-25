@@ -376,6 +376,10 @@ def cmd_search(args: argparse.Namespace) -> None:
 
     fuel = args.fuel or "ULP"
     radius = args.radius
+    if radius > 50:
+        if not args.json:
+            print(f"⚠️  --radius {radius}km exceeds API maximum of 50km. Clamping to 50km.", file=sys.stderr)
+        radius = 50.0
 
     started = time.perf_counter()
     fetch_limit = 100 if args.sort == "price" or args.brand else args.limit
