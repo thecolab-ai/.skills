@@ -1,6 +1,6 @@
 ---
 name: nzbn-register
-description: Search and lookup public New Zealand Business Number (NZBN) Register business/entity records through the NZBN website's read-only public proxy. Use when the task involves NZ business identity lookup, exact NZBN details, company/entity status, trading names, public addresses, websites, or source-register identifiers. No account login or API subscription key required for supported read-only commands.
+description: Search and lookup public NZBN Register NZ business records: NZBN identity, company/entity status, trading names, addresses, and source-register identifiers. No login or API key required.
 ---
 
 # NZBN Register

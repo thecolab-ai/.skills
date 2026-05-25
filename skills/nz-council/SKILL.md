@@ -1,6 +1,6 @@
 ---
 name: nz-council
-description: Query NZ council-area event listings and public recreation facilities through a lightweight read-only CLI. Use for Auckland, Wellington, Christchurch, Rotorua, New Plymouth, Nelson, Tasman, Napier, Hastings, Hamilton, Whangarei, Palmerston North, Tauranga, Queenstown Lakes, or Dunedin what's-on events; Eventfinda council-area events; Auckland Council pools/leisure centres; Wellington City pools/recreation centres; Rotorua Lakes pools and aquatic facilities; New Plymouth pools; Nelson pools; Tasman pools/recreation centres; Napier and Hastings aquatic facilities; Hamilton Pools facilities; Whangarei Aquatic Centre; Palmerston North swimming facilities; Wellington region pools and aquatic centres for Hutt City, Porirua, Upper Hutt, and Kāpiti Coast; Tauranga pools/aquatic centres; Queenstown Lakes pools/recreation facilities; Dunedin pools; pool hours; and public lane availability snapshots where exposed. Not for rates, consents, rubbish, recycling, parking fines, bookings, logins, or payments.
+description: Query NZ council events and public recreation facilities (pools, leisure centres) for Auckland, Wellington, Christchurch, Rotorua, Hamilton, Dunedin, and 10 other NZ council areas. Not for rates, consents, payments, or bookings.
 ---
 
 # NZ Council

@@ -1,6 +1,6 @@
 ---
 name: mitre10-nz
-description: Query Mitre 10 NZ public product search, specials, store locator, and product detail endpoints through a lightweight no-login CLI. Use when the task involves Mitre 10 NZ product lookup, online hardware prices, catalogue specials, store locations, product codes, or machine-readable Mitre 10 product data. Read-only; no cart, checkout, account, or order actions.
+description: Query Mitre 10 NZ product search, specials, store locator, and product detail. Use for Mitre 10 NZ product lookup, hardware prices, catalogue specials, product codes, or store locations. No cart or account.
 ---
 
 # Mitre 10 NZ

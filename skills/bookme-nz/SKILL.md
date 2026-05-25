@@ -1,6 +1,6 @@
 ---
 name: bookme-nz
-description: Query Bookme NZ public read-only deal/search endpoints for discounted activities, experiences, tours, restaurants, and last-minute things to do. Use when the task involves Bookme.co.nz deals, cheap activities by region/category, hot deals, cheapest current offers, restaurant discounts, or machine-readable public Bookme deal data. No login, booking, checkout, or account credentials required.
+description: Query Bookme NZ discounted activities, experiences, tours, restaurants, and last-minute deals. Supports hot deals, cheapest offers, regional/category search, and deal detail. No login, booking, or payment.
 ---
 
 # Bookme NZ

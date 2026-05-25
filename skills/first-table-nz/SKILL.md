@@ -1,6 +1,6 @@
 ---
 name: first-table-nz
-description: Query First Table NZ public restaurant, city, deal-price, and availability data through a lightweight no-login CLI. Use when the task involves First Table restaurants, 50%-off early-table deals, city/suburb restaurant discovery, cuisine search, or public availability slots. Read-only; no booking, login, payment, or account actions.
+description: Query First Table NZ restaurants, 50%-off early-table deals, city/suburb discovery, cuisine search, and availability slots. Read-only; no booking, login, or payment.
 ---
 
 # First Table NZ

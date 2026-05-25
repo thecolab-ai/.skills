@@ -1,6 +1,6 @@
 ---
 name: fuelclock-nz
-description: Query New Zealand fuel price, supply, vessel, geopolitical risk market, and recent headline data from fuelclock.nz. Use when the task involves NZ petrol or diesel prices, fuel supply security, days of supply remaining, MSO status, incoming fuel tankers, shipping market risk signals, or recent NZ fuel news. No authentication required.
+description: Query NZ fuel prices, supply, inbound tankers, MSO status, geopolitical shipping risk markets, and NZ fuel headlines from fuelclock.nz. No authentication required.
 ---
 
 # FuelClock NZ

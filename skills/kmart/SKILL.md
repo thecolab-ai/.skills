@@ -1,6 +1,6 @@
 ---
 name: kmart
-description: Query Kmart NZ and AU public read-only product search, SKU lookup, specials-style product metadata, and store-location sitemap data through a lightweight no-login CLI. Use when the task involves Kmart NZ or AU product lookup, prices, product SKUs, clearance/promotional snapshots, store URL discovery, or machine-readable Kmart product data. Read-only; no login, cart, checkout, or account actions.
+description: Query Kmart NZ and AU product search, prices, SKU lookup, clearance/promotional snapshots, and store-location data. Read-only; no login, cart, checkout, or account actions.
 ---
 
 # Kmart

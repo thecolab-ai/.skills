@@ -1,6 +1,6 @@
 ---
 name: the-warehouse-nz
-description: Query The Warehouse NZ public read-only product search, specials, product detail, and store finder endpoints through a lightweight no-login CLI. Use when the task involves The Warehouse NZ product lookup, prices, specials, product SKUs, store locations, opening hours, or machine-readable Warehouse product/store data. Read-only; no cart, checkout, wishlist, account, or order actions.
+description: Query The Warehouse NZ product search, specials, product detail, and store finder. Use for The Warehouse NZ product lookup, prices, specials, SKUs, store locations, or opening hours. No cart or account.
 ---
 
 # The Warehouse NZ

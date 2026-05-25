@@ -1,6 +1,6 @@
 ---
 name: stats-nz
-description: Query public Stats NZ population, CPI, migration, GDP, time-series, and CSV catalogue data through a lightweight no-login CLI. Use when the task involves official New Zealand statistics from Stats NZ, Infoshare-derived CSV releases, population estimates or projections, CPI, GDP, or migration. Read-only; no API key or browser session.
+description: Query official Stats NZ data: CPI, GDP, population estimates/projections, migration, and CSV catalogue. No API key or browser session required.
 ---
 
 # Stats NZ

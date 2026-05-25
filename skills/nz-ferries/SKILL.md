@@ -1,6 +1,6 @@
 ---
 name: nz-ferries
-description: Query public NZ ferry operator sailing schedules, fare/availability snapshots, and service alerts through a lightweight read-only CLI. Use for Cook Strait Interislander/Bluebridge sailings, SeaLink Waiheke/Great Barrier vehicle ferries, Fullers360/AT Metro Auckland ferry schedules and alerts, and NZ ferry operator alerts. Does not duplicate Auckland Transport GTFS live vehicle tracking; use at-transport for AT Metro ferry real-time positions.
+description: Query NZ ferry schedules, fare snapshots, and service alerts: Cook Strait Interislander/Bluebridge, SeaLink Waiheke/Great Barrier, Fullers360/AT Metro Auckland ferries. Read-only; no booking or payment. Use at-transport for AT Metro real-time positions.
 ---
 
 # NZ Ferries

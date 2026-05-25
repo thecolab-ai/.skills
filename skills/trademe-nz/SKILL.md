@@ -1,6 +1,6 @@
 ---
 name: trademe-nz
-description: Query Trade Me NZ public read-only listing/search endpoints for marketplace, property, rentals, motors, jobs, flatmates, regions, categories, and listing details. Use when the task involves Trade Me market research, listing lookup, property/rental scans, used-car scans, job searches, or machine-readable public listing data. No login or app credentials required for supported read-only commands.
+description: Query Trade Me NZ public listings: marketplace, property sale/rental, motors, jobs, flatmates, rural, retirement, regions, categories, and listing details. No login or credentials required.
 ---
 
 # Trade Me NZ

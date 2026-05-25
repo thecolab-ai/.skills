@@ -1,6 +1,6 @@
 ---
 name: nz-tv-guide
-description: Query live New Zealand TV guide and EPG listings through a lightweight read-only CLI, focused on Sky NZ and Sky Sport with Freeview/TVNZ linear fallback where useful. Use when the task asks when a sport, show, channel, or movie is on TV in New Zealand, what channel it is on, or what is playing now or tonight. Read-only; no streaming, login, recording, account, purchase, or booking actions.
+description: Query NZ TV guide and EPG for Sky NZ, Sky Sport, ESPN, Trackside, and Freeview/TVNZ. Use for NZ sport showtimes, movie schedules, and what's on now or tonight. Read-only; no streaming or account actions.
 ---
 
 # NZ TV Guide

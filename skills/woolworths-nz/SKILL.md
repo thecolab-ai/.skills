@@ -1,6 +1,6 @@
 ---
 name: woolworths-nz
-description: Query Woolworths NZ public product search, specials, browse, and SKU detail endpoints through a lightweight no-login CLI. Use when the task involves Woolworths NZ product lookup, online grocery prices, specials, product SKUs, category browsing, or machine-readable Woolworths product data. Read-only; no trolley or checkout actions.
+description: Query Woolworths NZ product search, specials, category browse, and SKU detail. Use for Woolworths NZ grocery prices, specials, and product lookup. Read-only; no trolley or checkout actions.
 ---
 
 # Woolworths NZ
