@@ -7,15 +7,15 @@ from __future__ import annotations
 
 import argparse
 import html
-import http.client
 import json
 import re
-import ssl
 import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+from datetime import datetime
 from typing import Any
+from zoneinfo import ZoneInfo
 
 _CONTROL_CHARS_RE = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
 
@@ -34,6 +34,7 @@ REFERER = "https://www.nzpost.co.nz/tools/tracking"
 ADDRESS_REFERER = "https://www.nzpost.co.nz/tools/address-postcode-finder"
 
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
+NOMINATIM_UA = "nzpost-skill/1.0 (mail@adamholt.co.nz)"
 
 # Simplified regex covering common NZ Post domestic and international formats.
 # Full pattern is available from the tracking-masks endpoint; this covers typical use.
@@ -64,13 +65,17 @@ TRACKING_RE = re.compile(
     re.IGNORECASE,
 )
 
-# Location type filter mapping (CLI value -> API type string fragment)
+# Location type filter mapping (CLI value -> API type string fragment).
+# The filter uses case-insensitive substring matching so "Postbox" matches
+# both "Postbox" and "Postbox Lobby" from the real API.
 LOCATION_TYPES = {
     "postshop": "PostShop",
-    "parcel-collect": "ParcelCollect",
-    "postbox": "PostBox",
+    "parcel-collect": "Third Party Partner",
+    "postbox": "Postbox",
     "all": None,
 }
+
+MAX_TRACKING_REFS = 20
 
 
 # ---------------------------------------------------------------------------
@@ -192,10 +197,10 @@ def extract_api_error(results: Any) -> str | None:
 # Locations API
 # ---------------------------------------------------------------------------
 
-def _geocode_via_suggestions(query: str, timeout: int = 15) -> tuple[float, float] | None:
-    """Try NZ Post suggest API for a query. Returns (lat, lng) if found, else None."""
-    params = urllib.parse.urlencode({"query": query, "max": 50})
-    url = f"{LOCATIONS_API_BASE}/suggestions?{params}"
+def _geocode_via_keyword(query: str, timeout: int = 15) -> tuple[float, float] | None:
+    """Try NZ Post locations KEYWORD API for geocoding. Returns (lat, lng) if found, else None."""
+    params = urllib.parse.urlencode({"type": "KEYWORD", "value": query, "max": 1})
+    url = f"{LOCATIONS_API_BASE}/locations?{params}"
     headers = {"User-Agent": UA, "Referer": REFERER}
     try:
         req = urllib.request.Request(url, headers=headers, method="GET")
@@ -205,12 +210,12 @@ def _geocode_via_suggestions(query: str, timeout: int = 15) -> tuple[float, floa
     except Exception:
         return None
 
-    suggestions = data if isinstance(data, list) else data.get("suggestions", [])
-    for s in suggestions:
-        if not isinstance(s, dict):
+    locations = data.get("locations", []) if isinstance(data, dict) else []
+    for loc in locations:
+        if not isinstance(loc, dict):
             continue
-        lat = s.get("lat") or s.get("latitude")
-        lng = s.get("lng") or s.get("longitude")
+        lat = loc.get("lat")
+        lng = loc.get("lng")
         if lat is not None and lng is not None:
             try:
                 return float(lat), float(lng)
@@ -228,7 +233,7 @@ def _geocode_via_nominatim(query: str, timeout: int = 15) -> tuple[float, float]
     })
     url = f"{NOMINATIM_URL}?{params}"
     headers = {
-        "User-Agent": UA,
+        "User-Agent": NOMINATIM_UA,
         "Accept-Language": "en",
     }
     try:
@@ -249,8 +254,8 @@ def _geocode_via_nominatim(query: str, timeout: int = 15) -> tuple[float, float]
 
 
 def geocode_near(query: str, timeout: int = 15) -> tuple[float, float]:
-    """Geocode a place-name query. Tries NZ Post suggestions first, then Nominatim."""
-    coords = _geocode_via_suggestions(query, timeout)
+    """Geocode a place-name query. Tries NZ Post KEYWORD first, then Nominatim."""
+    coords = _geocode_via_keyword(query, timeout)
     if coords:
         return coords
     coords = _geocode_via_nominatim(query, timeout)
@@ -299,16 +304,23 @@ def filter_locations_by_type(locations: list[dict[str, Any]], loc_type: str | No
 
 def _today_hours(loc: dict[str, Any]) -> str:
     """Extract today's opening hours from a location dict."""
-    import datetime
-    day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-    today_name = day_names[datetime.date.today().weekday()]
-    hours = loc.get("hours", {})
-    if not isinstance(hours, dict):
+    now = datetime.now(ZoneInfo("Pacific/Auckland"))
+    weekday = now.weekday()  # 0=Monday, 6=Sunday, matches API day field
+    hours = loc.get("hours", [])
+    if not isinstance(hours, list) or not hours:
         return "hours unknown"
-    for key, val in hours.items():
-        if today_name.lower() in _safe_str(key).lower():
-            return clean_text(val) or "closed"
-    return "hours unknown"
+    for entry in hours:
+        if not isinstance(entry, dict):
+            continue
+        if entry.get("day") == weekday:
+            if entry.get("closed"):
+                return "closed today"
+            open_t = entry.get("open")
+            close_t = entry.get("close")
+            if open_t and close_t:
+                return f"{open_t} - {close_t}"
+            return "hours unknown"
+    return "closed today"
 
 
 def fmt_distance(dist_m: float) -> str:
@@ -323,31 +335,15 @@ def fmt_distance(dist_m: float) -> str:
 # ---------------------------------------------------------------------------
 
 def fetch_addresses(query: str, limit: int = 10, timeout: int = 15) -> list[dict[str, Any]]:
-    """Fetch NZ Post address suggestions. Returns list of address dicts.
-
-    The MaxData parameter uses a literal colon (max:N). urllib.request re-encodes
-    colons in query strings, so we use http.client directly to preserve the raw URL.
-    """
-    q_encoded = urllib.parse.quote(query, safe="")
-    path = f"/legacy/api/suggest?q={q_encoded}&MaxData=max:{limit}"
-    ctx = ssl.create_default_context()
-    try:
-        conn = http.client.HTTPSConnection("tools.nzpost.co.nz", timeout=timeout, context=ctx)
-        conn.request(
-            "GET",
-            path,
-            headers={
-                "User-Agent": UA,
-                "Referer": ADDRESS_REFERER,
-                "Accept": "application/json",
-                "Host": "tools.nzpost.co.nz",
-            },
-        )
-        resp = conn.getresponse()
-        raw = resp.read().decode("utf-8", "replace")
-        conn.close()
-    except OSError as e:
-        die(f"network error calling address API: {e}")
+    """Fetch NZ Post address suggestions. Returns list of address dicts."""
+    params = urllib.parse.urlencode({"q": query, "max": limit})
+    url = f"{ADDRESS_API}?{params}"
+    headers = {
+        "User-Agent": UA,
+        "Referer": ADDRESS_REFERER,
+        "Accept": "application/json",
+    }
+    raw = _http_get(url, headers, timeout)
     try:
         data = json.loads(raw)
     except json.JSONDecodeError as e:
@@ -446,13 +442,56 @@ def _parcel_record(tracking_reference: str, events: list[dict[str, Any]]) -> dic
     }
 
 
+def _error_parcel_record(tracking_reference: str, error: str) -> dict[str, Any]:
+    """Build an error parcel JSON record."""
+    return {
+        "tracking_reference": tracking_reference,
+        "status": "error",
+        "last_updated": "",
+        "last_depot": None,
+        "event_count": 0,
+        "error": error,
+        "events": [],
+    }
+
+
+def _not_found_parcel_record(tracking_reference: str) -> dict[str, Any]:
+    """Build a not-found parcel JSON record."""
+    return {
+        "tracking_reference": tracking_reference,
+        "status": "not found",
+        "last_updated": "",
+        "last_depot": None,
+        "event_count": 0,
+        "events": [],
+    }
+
+
 # ---------------------------------------------------------------------------
 # Commands
 # ---------------------------------------------------------------------------
 
 def cmd_track(args: argparse.Namespace) -> None:
     """Track one or more parcels by tracking number."""
-    refs = [validate_tracking_number(n) for n in args.numbers]
+    # M4: dedup preserving first-seen order
+    seen: set[str] = set()
+    unique_raw: list[str] = []
+    for n in args.numbers:
+        if n not in seen:
+            unique_raw.append(n)
+            seen.add(n)
+    if len(unique_raw) < len(args.numbers):
+        duped = len(args.numbers) - len(unique_raw)
+        print(f"nzpost: note: {duped} duplicate tracking number(s) removed", file=sys.stderr)
+
+    refs = [validate_tracking_number(n) for n in unique_raw]
+
+    # M7: cap at MAX_TRACKING_REFS after dedup
+    if len(refs) > MAX_TRACKING_REFS:
+        die(
+            f"too many tracking numbers (got {len(refs)}, max {MAX_TRACKING_REFS})."
+            " Run multiple commands instead."
+        )
 
     data = fetch_tracking_multi(refs)
 
@@ -467,54 +506,10 @@ def cmd_track(args: argparse.Namespace) -> None:
             print_banner()
         die("unexpected tracking API response: results is not a list")
 
-    # Single parcel -- preserve original output shape exactly
-    if len(refs) == 1:
-        if data.get("success") is not True or status_code != 1:
-            api_error = extract_api_error(results)
-            suffix = f": {api_error}" if api_error else ""
-            if not args.json:
-                print_banner()
-            die(f"tracking lookup failed (status_code={status_code}){suffix}")
-
-        if not results:
-            if not args.json:
-                print_banner()
-            die(f"no tracking data found for: {refs[0]}")
-
-        parcel = results[0]
-        if not isinstance(parcel, dict):
-            if not args.json:
-                print_banner()
-            die("unexpected tracking API response: first result is not an object")
-
-        events = parcel.get("tracking_events")
-        if not isinstance(events, list):
-            if not args.json:
-                print_banner()
-            die("unexpected tracking API response: tracking_events is not a list")
-
-        if not events:
-            if not args.json:
-                print_banner()
-            die(f"no tracking events found for: {refs[0]}")
-
-        for ev in events:
-            if not isinstance(ev, dict):
-                if not args.json:
-                    print_banner()
-                die("unexpected tracking API response: tracking_events contains a non-object")
-
-        ref = _safe_str(parcel.get("tracking_reference", refs[0]))
-
-        if args.json:
-            print(json.dumps(_parcel_record(ref, events), indent=2, ensure_ascii=False))
-        else:
-            emit_human(ref, events)
-        return
-
-    # Multi-parcel path
-    parcel_records: list[dict[str, Any]] = []
-    human_sections: list[tuple[str, list[dict[str, Any]], str | None]] = []
+    # M3: build ref -> (record, events, error) maps from API response
+    ref_records: dict[str, dict[str, Any]] = {}
+    ref_events: dict[str, list[dict[str, Any]]] = {}
+    ref_errors: dict[str, str] = {}
 
     for parcel in results:
         if not isinstance(parcel, dict):
@@ -527,23 +522,61 @@ def cmd_track(args: argparse.Namespace) -> None:
                 if isinstance(e, dict):
                     err_msg = _safe_str(e.get("details") or e.get("message") or e.get("code", "error"))
                     break
-            human_sections.append((ref, [], err_msg or "lookup failed"))
-            parcel_records.append({
-                "tracking_reference": ref,
-                "status": "error",
-                "last_updated": "",
-                "last_depot": None,
-                "event_count": 0,
-                "error": err_msg,
-                "events": [],
-            })
+            err_msg = err_msg or "lookup failed"
+            ref_errors[ref] = err_msg
+            ref_records[ref] = _error_parcel_record(ref, err_msg)
             continue
 
         events = parcel.get("tracking_events")
         if not isinstance(events, list):
             events = []
-        human_sections.append((ref, events, None))
-        parcel_records.append(_parcel_record(ref, events))
+        ref_events[ref] = events
+        ref_records[ref] = _parcel_record(ref, events)
+
+    # Single-ref path: check success/error before emitting
+    if len(refs) == 1:
+        ref = refs[0]
+        if data.get("success") is not True or status_code != 1:
+            api_error = extract_api_error(results)
+            suffix = f": {api_error}" if api_error else ""
+            if not args.json:
+                print_banner()
+            die(f"tracking lookup failed (status_code={status_code}){suffix}")
+
+        if ref in ref_errors:
+            if not args.json:
+                print_banner()
+            die(f"tracking lookup failed: {ref_errors[ref]}")
+
+        events = ref_events.get(ref, [])
+
+        if not events:
+            if not args.json:
+                print_banner()
+            die(f"no tracking events found for: {ref}")
+
+        # M5: single-ref JSON always emits {"parcels": [...]}
+        if args.json:
+            print(json.dumps({"parcels": [ref_records[ref]]}, indent=2, ensure_ascii=False))
+        else:
+            emit_human(ref, events)
+        return
+
+    # Multi-parcel path: emit in input order (M3), not API order
+    parcel_records: list[dict[str, Any]] = []
+    human_sections: list[tuple[str, list[dict[str, Any]], str | None]] = []
+
+    for ref in refs:
+        if ref in ref_errors:
+            parcel_records.append(ref_records[ref])
+            human_sections.append((ref, [], ref_errors[ref]))
+        elif ref in ref_events:
+            parcel_records.append(ref_records[ref])
+            human_sections.append((ref, ref_events[ref], None))
+        else:
+            # Ref was not in API response -- emit explicit not-found slot
+            parcel_records.append(_not_found_parcel_record(ref))
+            human_sections.append((ref, [], "not found"))
 
     if args.json:
         print(json.dumps({"parcels": parcel_records}, indent=2, ensure_ascii=False))
@@ -564,24 +597,28 @@ def cmd_locations(args: argparse.Namespace) -> None:
     """Find NZ Post locations near a place, coordinates, or by keyword."""
     limit = args.limit
 
-    if args.near:
-        lat, lng = geocode_near(args.near)
-        locations = fetch_locations_by_coords(lat, lng, max_results=limit)
-    elif args.lat is not None and args.lon is not None:
-        locations = fetch_locations_by_coords(args.lat, args.lon, max_results=limit)
-    elif args.keyword:
-        locations = fetch_locations_by_keyword(args.keyword, max_results=limit)
-    else:
-        die("specify one of --near, --lat/--lon, or --keyword")
-
-    # Filter by type
+    # When filtering by type, over-fetch so the filter has enough to work with.
+    # PostShops and other types can be sparse near high-density urban areas.
     type_filter = None
     if args.type and args.type != "all":
         type_filter = LOCATION_TYPES.get(args.type)
+    fetch_limit = limit if not type_filter else max(limit * 10, 100)
+
+    if args.near:
+        lat, lng = geocode_near(args.near)
+        locations = fetch_locations_by_coords(lat, lng, max_results=fetch_limit)
+    elif args.lat is not None and args.lon is not None:
+        locations = fetch_locations_by_coords(args.lat, args.lon, max_results=fetch_limit)
+    elif args.keyword:
+        locations = fetch_locations_by_keyword(args.keyword, max_results=fetch_limit)
+    else:
+        die("specify one of --near, --lat/--lon, or --keyword")
+
     locations = filter_locations_by_type(locations, type_filter)
 
-    # Sort by distance ascending
+    # Sort by distance ascending, then truncate to requested limit
     locations = sorted(locations, key=lambda x: _safe_float(x.get("distance_in_m"), 0.0))
+    locations = locations[:limit]
 
     if args.json:
         print(json.dumps({"locations": locations}, indent=2, ensure_ascii=False))
