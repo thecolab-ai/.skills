@@ -6,7 +6,7 @@ This file is for businesses, operators, and individuals who have a concern about
 
 Email **adam@thecolab.ai** with:
 
-- The skill name (e.g. `petrolmate-nz-au`)
+- The skill name (e.g. `my-skill-name`)
 - Your role at the affected service (we action requests from the operator, not from third parties)
 - A brief reason. You don't need to justify it in detail, but "we don't want this skill to exist" is enough
 
