@@ -36,16 +36,14 @@ Approximate location from IP (Cloudflare). Returns `city`, `country`, `latitude`
 
 ### `GET /api/geocode/search`
 
-Geocode an address. Parameter: `q` (query string). Returns `display_name`, `lat`, `lon`.
+Geocode an address. Parameter: `q` (query string). Returns `address`, `name`, `lat`, `lon`.
 
 ## Data sources
 
 - **AU:** State government FuelCheck data — NSW, QLD, VIC, SA, TAS
 - **NZ:** Community-sourced Gaspy data
 
-Not all fuel types available in all states:
-- NSW: ULP, E10, LPG, E85 only
-- VIC/QLD/NZ: all 9 fuel types (ULP, E10, PULP95, PULP98, PREMIUM, DIESEL, PDIESEL, LPG, E85)
+Fuel-type coverage varies by region and station -- not all types are available everywhere.
 
 ## Fuel type codes
 

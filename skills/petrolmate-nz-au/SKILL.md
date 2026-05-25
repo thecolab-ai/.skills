@@ -95,6 +95,7 @@ python3 skills/petrolmate-nz-au/scripts/cli.py fuel-types
 | PDIESEL | Premium Diesel |
 | LPG | LPG/Autogas |
 | E85 | E85 (Ethanol 85%) |
+| B20 | Biodiesel B20 |
 
 ## Resources
 
@@ -108,4 +109,4 @@ python3 skills/petrolmate-nz-au/scripts/cli.py fuel-types
 - Prices are displayed in cents (divide by 100 for dollars)
 - `--location` first checks the built-in lookup table, then falls back to PetrolMate geocoding
 - No third-party dependencies — Python stdlib only (`urllib` + `json`)
-- Not all fuel types available in all states: NSW reports ULP, E10, LPG, E85 only; VIC/QLD/NZ report all 9 types
+- Fuel-type coverage varies by region and station -- not all types are available everywhere

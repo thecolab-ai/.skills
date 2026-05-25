@@ -37,6 +37,7 @@ FUEL_TYPES: dict[str, str] = {
     "PDIESEL": "Premium Diesel",
     "LPG": "LPG",
     "E85": "E85",
+    "B20": "Biodiesel B20",
 }
 
 FUEL_CODE_LABELS: dict[str, str] = {
@@ -114,6 +115,10 @@ def request_json(path: str, params: dict[str, Any], timeout: int = 15) -> Any:
         die(f"network error calling {url}: {e.reason}")
     except json.JSONDecodeError as e:
         die(f"invalid JSON from {url}: {e}")
+
+
+def _safe_float(v: Any, default: float) -> float:
+    return float(v) if v is not None else default
 
 
 def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -218,8 +223,8 @@ def api_stations(
 
     # Add computed distance using haversine
     for s in stations:
-        slat = float(s.get("latitude", 0))
-        slon = float(s.get("longitude", 0))
+        slat = _safe_float(s.get("latitude"), 0.0)
+        slon = _safe_float(s.get("longitude"), 0.0)
         s["_distance_km"] = round(haversine_km(lat, lon, slat, slon), 2)
 
     # Filter by radius (API radius param is approximate)
@@ -313,7 +318,8 @@ def emit_stations(
         brand = s.get("brand", "")
         price = fmt_price(s.get("price"))
         fuel = fuel_label(s.get("fuel_name"), s.get("fuel_code"))
-        dist = fmt_dist(s.get("_distance_km"))
+        raw_m = s.get("distance_meters")
+        dist = fmt_dist(raw_m if raw_m is not None else s["_distance_km"] * 1000)
         age = fmt_age(s.get("hours_old"))
         addr = s.get("address", "")
 
@@ -326,7 +332,7 @@ def emit_stations(
 
     # Cheapest summary
     if stations:
-        cheapest = min(stations, key=lambda s: float(s.get("price", 99999)))
+        cheapest = min(stations, key=lambda s: _safe_float(s.get("price"), 99999))
         print()
         print(
             f"  🏆 Cheapest: {cheapest.get('name')} — "
@@ -346,20 +352,24 @@ def cmd_search(args: argparse.Namespace) -> None:
         loc_name = args.location.lower()
         if loc_name in LOCATIONS:
             lat, lon = LOCATIONS[loc_name]
-            print(f"📍 {args.location} ({lat}, {lon})")
+            if not args.json:
+                print(f"📍 {args.location} ({lat}, {lon})")
         else:
             # Try PetrolMate geocoding
             geo = api_geocode(args.location)
             lat = float(geo["lat"])
             lon = float(geo["lon"])
-            print(f"📍 {geo.get('display_name', args.location)}")
+            if not args.json:
+                print(f"📍 {geo.get('address') or geo.get('name') or args.location}")
     elif args.lat is not None and args.lon is not None:
         lat, lon = args.lat, args.lon
-        print(f"📍 ({lat}, {lon})")
+        if not args.json:
+            print(f"📍 ({lat}, {lon})")
     elif args.geoip:
         loc = api_geoip()
         lat, lon = loc["latitude"], loc["longitude"]
-        print(f"📍 {loc.get('city', 'Unknown')}, {loc.get('country')} (from IP)")
+        if not args.json:
+            print(f"📍 {loc.get('city', 'Unknown')}, {loc.get('country')} (from IP)")
     else:
         die("Either --location, --lat/--lon, or --geoip is required.")
 
@@ -379,11 +389,12 @@ def cmd_search(args: argparse.Namespace) -> None:
 
     # Sort
     if args.sort == "price":
-        stations.sort(key=lambda s: float(s.get("price", 99999)))
+        stations.sort(key=lambda s: _safe_float(s.get("price"), 99999))
     else:
         stations.sort(key=lambda s: s.get("_distance_km", 999))
 
-    print()  # blank line after coordinate info
+    if not args.json:
+        print()  # blank line after coordinate info
     emit_stations(
         stations=stations,
         fuel_type=fuel,
