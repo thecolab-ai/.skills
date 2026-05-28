@@ -33,9 +33,9 @@ Implemented endpoints:
 - `GET /me` - identity/access-grant metadata for the authorised user
 - `GET /accounts` - account names, masked/formatted account identifiers, status, type, attributes, balances, refresh timestamps
 - `GET /transactions` - recent transactions; supports date range query parameters and client-side `--limit` capping in the CLI
-- `endpoint PATH` - escape hatch for Akahu API paths using Personal App authentication, including account-specific transactions, pending transactions, parties, payments, webhooks, refresh, and other documented paths when the token has permission
+- `endpoint PATH` - advanced escape hatch for Akahu API paths using Personal App authentication, mainly account-specific and pending transaction paths not represented by a first-class subcommand
 
-The named commands cover common read-only analysis. Use `endpoint` when Akahu adds new endpoints or the task needs a path not represented by a first-class subcommand. Some documented Akahu endpoints are app-scoped or require permissions/scopes that a Personal App token may not have; those correctly return Akahu `401`/`403` errors.
+The named commands cover the normal Personal App analysis flow. Use `endpoint` for documented paths that your token actually has permission to call; some Akahu endpoints are app-scoped or require permissions/scopes that a Personal App token may not have, and those correctly return Akahu `401`/`403` errors.
 
 ## Data boundaries
 
