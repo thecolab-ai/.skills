@@ -84,5 +84,6 @@ python3 skills/osm-nz/scripts/cli.py categories
 - Walking time estimated at 5 km/h; driving at 30 km/h (urban average)
 - Travel mode is "walk" for places under 1.5 km, "drive" otherwise
 - The Overpass API has a fair-use policy — avoid rapid repeated queries
+- Coordinates are limited to New Zealand bounds and radius is capped at 10 km to protect the shared public API
 - OSM data coverage varies: urban areas are well-mapped, rural areas less so
 - Some results may lack names or have incomplete tags — these are filtered out

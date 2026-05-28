@@ -18,8 +18,8 @@ Example query to find restaurants within 2 km of a point:
 ```text
 [out:json][timeout:25];
 (
-  node["amenity"="restaurant"](around:2000,-36.8485,174.7633);
-  way["amenity"="restaurant"](around:2000,-36.8485,174.7633);
+  node["amenity"="restaurant"] (around:2000,-36.8485,174.7633);
+  way["amenity"="restaurant"] (around:2000,-36.8485,174.7633);
 );
 out center tags;
 ```
