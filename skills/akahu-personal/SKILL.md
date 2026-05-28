@@ -1,6 +1,6 @@
 ---
 name: akahu-personal
-description: Query personal transactional bank-account data — account lists, balances, settled/pending transactions, payment history, parties, refreshes, webhooks, and arbitrary authenticated API endpoints — from Akahu, a New Zealand open-banking provider. Use when the task involves personal bank data exports, NZ account balances, transaction analysis, cashflow/spending categorisation, or calling a specific authenticated banking-data endpoint. Requires user-provided AKAHU_APP_TOKEN and AKAHU_USER_TOKEN; never smoke-test against real personal data in CI.
+description: Query personal transactional bank-account data — account lists, balances, settled/pending transactions, account-specific transaction history, and private JSON/CSV exports — from Akahu, a New Zealand open-banking provider. Use when the task involves personal bank data exports, NZ account balances, transaction analysis, cashflow/spending categorisation, or inspecting authenticated Personal App banking data. Requires user-provided AKAHU_APP_TOKEN and AKAHU_USER_TOKEN; never smoke-test against real personal data in CI.
 ---
 
 # Akahu Personal App
@@ -13,7 +13,8 @@ Fetch a user's own Akahu Personal App data through a small deterministic CLI, wi
 
 - The user has created an Akahu Personal App and supplied tokens out-of-band
 - A task needs Akahu `/me`, account balances, account metadata, or recent transactions
-- A workflow needs a local JSON/CSV export of personal NZ banking data for analysis
+- A workflow needs settled or pending transaction samples for analysis
+- A workflow needs a local JSON/CSV export of personal NZ banking data
 
 ## Privacy and safety
 
@@ -32,7 +33,6 @@ python3 skills/akahu-personal/scripts/cli.py me --json
 python3 skills/akahu-personal/scripts/cli.py accounts --json
 python3 skills/akahu-personal/scripts/cli.py transactions --limit 20 --json
 python3 skills/akahu-personal/scripts/cli.py endpoint /accounts/<account_id>/transactions/pending --json
-python3 skills/akahu-personal/scripts/cli.py endpoint /payments --param start=2026-01-01 --param end=2026-02-01 --json
 python3 skills/akahu-personal/scripts/cli.py export --out-dir /private/akahu-export
 ```
 
@@ -41,7 +41,7 @@ Commands:
 - `me [--json]` - call `/v1/me`
 - `accounts [--json] [--raw-account-numbers]` - list accounts and balances
 - `transactions [--limit N] [--start ISO] [--end ISO] [--json] [--raw-account-numbers]` - recent settled transactions
-- `endpoint PATH [--method METHOD] [--param key=value] [--data-json JSON] [--data-file FILE]` - call any Akahu API path with Personal App auth; non-GET methods require `--i-understand-this-can-mutate`
+- `endpoint PATH [--method METHOD] [--param key=value] [--data-json JSON] [--data-file FILE]` - advanced escape hatch for documented Akahu paths if the Personal App token has permission; non-GET methods require `--i-understand-this-can-mutate`
 - `export --out-dir DIR [--limit N] [--raw-account-numbers]` - write private JSON exports with `0600` file permissions
 
 ## Resources
