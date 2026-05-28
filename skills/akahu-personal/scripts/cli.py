@@ -279,6 +279,7 @@ def main(argv=None):
     p.add_argument("--data-json", help="JSON request body for POST/PUT/PATCH")
     p.add_argument("--data-file", help="path to JSON request body for POST/PUT/PATCH")
     p.add_argument("--raw-account-numbers", action="store_true", help="do not redact account numbers")
+    p.add_argument("--json", action="store_true", help="accepted for consistency; endpoint output is always JSON")
     p.add_argument("--i-understand-this-can-mutate", action="store_true", help="required for POST/PUT/PATCH/DELETE")
     p.set_defaults(func=cmd_endpoint)
 
