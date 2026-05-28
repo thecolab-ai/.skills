@@ -10,8 +10,8 @@ This skill is an unofficial lightweight wrapper around public read-only SafeSwim
 
 ## Endpoints
 
-- `GET /api/locations` — list of all Auckland beaches with summary data (name, slug, position, water quality, patrol status)
-- `GET /api/locations/{slug}` — full detail for a single beach: description, forecasts (hourly water quality, temperature, wind, UV, tide), tags (facilities + hazards), alerts, patrol info, camera ID, images
+- `GET /api/locations` — list of SafeSwim-supported NZ swimming locations with summary data (name, slug, position, water quality, patrol status)
+- `GET /api/locations/{slug}` — full detail for a single location: description, forecasts (hourly water quality, temperature, wind, UV, tide), tags (facilities + hazards), alerts, patrol info, camera ID, images
 
 ## Data shape
 
@@ -21,10 +21,10 @@ This skill is an unofficial lightweight wrapper around public read-only SafeSwim
 {
   "locations": [
     {
-      "name": "Takapuna Beach",
+      "name": "Takapuna",
       "alternative_name": null,
-      "slug": "takapunabeach",
-      "position": [-36.7891, 174.7734],
+      "slug": "takapuna",
+      "position": [-36.7916, 174.7791],
       "patrolled": true,
       "state": {
         "quality": "GREEN",
@@ -39,10 +39,10 @@ This skill is an unofficial lightweight wrapper around public read-only SafeSwim
 ### Location detail (`/api/locations/{slug}`)
 
 Additional fields include:
-- `description`: paragraph about the beach
+- `description`: paragraph about the swimming location
 - `tags[]`: `LOCATION_FACILITY` (toilets, BBQ, playground, etc.) and `LOCATION_HAZARD` (rocks, rips, etc.)
 - `forecasts`: arrays of hourly values (typically 48-72 hours)
-  - `WATER_QUALITY`: GREEN/AMBER/RED each hour
+  - `WATER_QUALITY`: GREEN/AMBER/RED/RED+/BLACK status each hour
   - `ATMOSPHERIC_TEMPERATURE`: °C
   - `WATER_TEMPERATURE`: °C
   - `WIND_SPEED`: km/h string
@@ -50,9 +50,9 @@ Additional fields include:
   - `UV_INDEX`: number
   - `WEATHER_CONDITIONS`: descriptive
   - `TIDE`: height in metres (may be null)
-- `alerts[]`: sewage overflow or contamination warnings
+- `alerts[]`: wastewater overflow or contamination warnings
 - `camId`: live webcam ID (if available)
-- `images[]`: beach photo URLs
+- `images[]`: location photo identifiers/URLs
 
 ## Water quality codes
 
@@ -62,16 +62,16 @@ Additional fields include:
 | AMBER | Caution — check conditions |
 | RED | Unsafe — do not swim |
 | RED+ | Very unsafe — high risk |
-| BLACK | Sewage overflow — stay out of water |
+| BLACK | Wastewater overflow — stay out of water |
 
 ## Discovery notes
 
 - The full location list is fetched once and filtered in-process by the CLI; brief in-process caching avoids duplicate fetches within the same CLI invocation
 - Water quality changes rapidly after rainfall (>5mm in 24h can trigger AMBER/RED)
-- Not all beaches return all forecast fields — some arrays may be sparse or absent
-- SafeSwim covers Auckland region only: East Coast Bays, West Coast beaches, Hauraki Gulf islands, Manukau Harbour
-- The alternative_name field may contain Māori names for some beaches
-- Slugs are URL-safe, lowercase, no spaces (e.g. "takapunabeach", "murraysbay", "piha")
+- Not all locations return all forecast fields — some arrays may be sparse or absent
+- SafeSwim covers only locations returned by the live API; it is not an all-NZ waterway catalogue
+- The alternative_name field may contain Māori names for some locations
+- Slugs are URL-safe, lowercase, usually hyphenated or compact lowercase (e.g. "takapuna", "murrays-bay", "piha")
 
 ## Stability and safety
 
@@ -79,4 +79,4 @@ Additional fields include:
 - Forecast data is model-generated from MetService and NIWA sources
 - Endpoint shapes can change without notice as this is not a formally documented public API
 - Avoid high-frequency polling; the CLI caches for 2 seconds but manual rapid-fire calls should be avoided
-- Do not use for safety-critical decisions — always check physical signage at the beach
+- Do not use for safety-critical decisions — always check physical signage at the location

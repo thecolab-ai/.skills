@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""safeswim.org.nz lightweight beach water quality CLI.
+"""safeswim.org.nz lightweight swimming-location water quality CLI.
 
 Self-contained stdlib wrapper around the public SafeSwim REST API.
 No login, account state, browser automation, or third-party dependencies.
@@ -16,9 +16,12 @@ import urllib.request
 from typing import Any
 
 BASE = "https://safeswim.org.nz/api"
-UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"
+UA = "thecolab-ai-skills/safeswim-nz (+https://github.com/thecolab-ai/.skills)"
 _CACHE: dict[str, tuple[float, Any]] = {}
 _CACHE_TTL = 2.0  # seconds
+
+QUALITY_RANK = {"GREEN": 0, "AMBER": 1, "RED": 2, "RED+": 3, "BLACK": 4}
+QUALITY_STATUSES = tuple(QUALITY_RANK)
 
 
 def die(message: str, code: int = 1) -> None:
@@ -50,21 +53,93 @@ def fetch(path: str) -> Any:
 
 
 def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    R = 6371.0
-    φ1, φ2 = math.radians(lat1), math.radians(lat2)
-    Δφ, Δλ = math.radians(lat2 - lat1), math.radians(lon2 - lon1)
-    a = math.sin(Δφ / 2) ** 2 + math.cos(φ1) * math.cos(φ2) * math.sin(Δλ / 2) ** 2
-    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    radius_km = 6371.0
+    lat1_rad, lat2_rad = math.radians(lat1), math.radians(lat2)
+    delta_lat = math.radians(lat2 - lat1)
+    delta_lon = math.radians(lon2 - lon1)
+    a = (
+        math.sin(delta_lat / 2) ** 2
+        + math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(delta_lon / 2) ** 2
+    )
+    return radius_km * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 
-QUALITY_RANK = {"GREEN": 0, "AMBER": 1, "RED": 2, "RED+": 2, "BLACK": 3}
+def status_at_or_above_risk(actual: str, minimum: str) -> bool:
+    """True when actual status is at least as risky as minimum."""
+    actual_rank = QUALITY_RANK.get(actual.upper())
+    minimum_rank = QUALITY_RANK[minimum]
+    return actual_rank is not None and actual_rank >= minimum_rank
 
 
-def quality_matches(actual: str, minimum: str) -> bool:
-    """True when `actual` quality is at least as bad as `minimum` (for filtering)."""
-    a = QUALITY_RANK.get(actual.upper(), 99)
-    m = QUALITY_RANK.get(minimum.upper(), 99)
-    return a >= m  # RED+ (2) >= RED (2), GREEN (0) < RED (2) → excluded
+def positive_int(value: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("must be an integer") from exc
+    if parsed < 1:
+        raise argparse.ArgumentTypeError("must be at least 1")
+    return parsed
+
+
+def positive_float(value: str) -> float:
+    try:
+        parsed = float(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("must be a number") from exc
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("must be greater than 0")
+    return parsed
+
+
+def latitude(value: str) -> float:
+    try:
+        parsed = float(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("must be a number") from exc
+    if not -90 <= parsed <= 90:
+        raise argparse.ArgumentTypeError("must be between -90 and 90")
+    return parsed
+
+
+def longitude(value: str) -> float:
+    try:
+        parsed = float(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("must be a number") from exc
+    if not -180 <= parsed <= 180:
+        raise argparse.ArgumentTypeError("must be between -180 and 180")
+    return parsed
+
+
+def quality_status(value: str) -> str:
+    status = value.upper()
+    if status not in QUALITY_RANK:
+        raise argparse.ArgumentTypeError(
+            f"must be one of: {', '.join(QUALITY_STATUSES)}"
+        )
+    return status
+
+
+def forecast_series(forecasts: dict[str, Any], key: str) -> list[Any]:
+    series = forecasts.get(key)
+    return series if isinstance(series, list) else []
+
+
+def forecast_value(series: list[Any], index: int) -> Any:
+    return series[index] if index < len(series) else None
+
+
+def display_value(value: Any) -> Any:
+    return "?" if value is None or value == "" else value
+
+
+def get_locations(payload: Any) -> list[dict[str, Any]]:
+    if not isinstance(payload, dict):
+        die("unexpected /locations response shape")
+    locations = payload.get("locations") or []
+    if not isinstance(locations, list):
+        die("unexpected /locations.locations response shape")
+    return [loc for loc in locations if isinstance(loc, dict)]
 
 
 # ---------------------------------------------------------------------------
@@ -73,16 +148,13 @@ def quality_matches(actual: str, minimum: str) -> bool:
 
 def cmd_list(args: argparse.Namespace) -> None:
     payload = fetch("/locations")
-    locations = (payload or {}).get("locations") or []
+    locations = get_locations(payload)
     results = []
     query = (args.search or "").lower()
 
     for loc in locations:
-        if not isinstance(loc, dict):
-            continue
         state = loc.get("state") or {}
         quality = (state.get("quality") or "UNKNOWN").upper()
-        # Filter by search text against name, slug, or alternative name
         if query:
             name = (loc.get("name") or "").lower()
             alt = (loc.get("alternative_name") or "").lower()
@@ -100,28 +172,54 @@ def cmd_list(args: argparse.Namespace) -> None:
             "patrol": state.get("patrol"),
         })
 
-    results = results[: args.limit or len(results)]
+    results = results[:args.limit]
 
     if args.json:
-        print(json.dumps({"kind": "list", "count": len(results), "total": len(locations), "beaches": results}, indent=2, ensure_ascii=False))
+        print(json.dumps({
+            "kind": "list",
+            "count": len(results),
+            "total": len(locations),
+            "locations": results,
+        }, indent=2, ensure_ascii=False))
     else:
-        print(f"SafeSwim Auckland beaches: {len(results)} shown (of {len(locations)} total)")
-        for b in results:
-            pos = b.get("position") or []
+        print(f"SafeSwim NZ locations: {len(results)} shown (of {len(locations)} total)")
+        for item in results:
+            pos = item.get("position") or []
             latlon = f" ({pos[0]:.4f}, {pos[1]:.4f})" if len(pos) >= 2 else ""
-            patrol_icon = "🛟" if b.get("patrolled") else "  "
-            print(f"  {patrol_icon} {b['quality']:6s} {b['name']}{latlon}")
+            patrol = "patrolled" if item.get("patrolled") else "unpatrolled"
+            print(f"  {item['quality']:6s} {item['name']}{latlon} [{patrol}]")
 
 
 def cmd_detail(args: argparse.Namespace) -> None:
     slug = args.slug
     payload = fetch(f"/locations/{slug}")
-    if not payload:
-        die(f"no data returned for beach '{slug}'")
+    if not isinstance(payload, dict) or not payload:
+        die(f"no data returned for location '{slug}'")
 
     forecasts = payload.get("forecasts") or {}
+    if not isinstance(forecasts, dict):
+        forecasts = {}
     tags = payload.get("tags") or []
+    if not isinstance(tags, list):
+        tags = []
     alerts = payload.get("alerts") or []
+    if not isinstance(alerts, list):
+        alerts = []
+
+    forecast_sample = {
+        "water_quality": forecast_series(forecasts, "WATER_QUALITY")[:6],
+        "air_temp_c": forecast_series(forecasts, "ATMOSPHERIC_TEMPERATURE")[:6],
+        "water_temp_c": forecast_series(forecasts, "WATER_TEMPERATURE")[:6],
+        "wind_speed": forecast_series(forecasts, "WIND_SPEED")[:6],
+        "wind_direction": forecast_series(forecasts, "WIND_DIRECTION")[:6],
+        "uv_index": forecast_series(forecasts, "UV_INDEX")[:6],
+        "weather": forecast_series(forecasts, "WEATHER_CONDITIONS")[:6],
+        "tide_height_m": forecast_series(forecasts, "TIDE")[:6],
+    }
+    forecast_hours = max(
+        (len(series) for series in forecasts.values() if isinstance(series, list)),
+        default=0,
+    )
 
     detail = {
         "id": payload.get("id"),
@@ -131,30 +229,28 @@ def cmd_detail(args: argparse.Namespace) -> None:
         "patrolled": bool(payload.get("patrolled")),
         "latitude": payload.get("latitude"),
         "longitude": payload.get("longitude"),
-        "forecast_hours": len(forecasts.get("ATMOSPHERIC_TEMPERATURE") or []),
+        "forecast_hours": forecast_hours,
         "alerts": alerts,
-        "facilities": [t.get("name") for t in tags if isinstance(t, dict) and t.get("type") == "LOCATION_FACILITY"],
-        "hazards": [t.get("name") for t in tags if isinstance(t, dict) and t.get("type") == "LOCATION_HAZARD"],
-        # Sample first 6 forecast hours
+        "facilities": [
+            tag.get("name")
+            for tag in tags
+            if isinstance(tag, dict) and tag.get("type") == "LOCATION_FACILITY"
+        ],
+        "hazards": [
+            tag.get("name")
+            for tag in tags
+            if isinstance(tag, dict) and tag.get("type") == "LOCATION_HAZARD"
+        ],
         "forecast_sample": {
-            "hour_0_to_5": {
-                "water_quality": (forecasts.get("WATER_QUALITY") or [])[:6],
-                "air_temp_c": (forecasts.get("ATMOSPHERIC_TEMPERATURE") or [])[:6],
-                "water_temp_c": (forecasts.get("WATER_TEMPERATURE") or [])[:6],
-                "wind_speed": (forecasts.get("WIND_SPEED") or [])[:6],
-                "wind_direction": (forecasts.get("WIND_DIRECTION") or [])[:6],
-                "uv_index": (forecasts.get("UV_INDEX") or [])[:6],
-                "weather": (forecasts.get("WEATHER_CONDITIONS") or [])[:6],
-                "tide_height_m": (forecasts.get("TIDE") or [])[:6],
-            },
-            "total_forecast_hours": len(forecasts.get("ATMOSPHERIC_TEMPERATURE") or []),
+            "hour_0_to_5": forecast_sample,
+            "total_forecast_hours": forecast_hours,
         },
         "cam_id": payload.get("camId"),
         "images": payload.get("images") or [],
     }
 
     if args.json:
-        print(json.dumps({"kind": "detail", "beach": detail}, indent=2, ensure_ascii=False))
+        print(json.dumps({"kind": "detail", "location": detail}, indent=2, ensure_ascii=False))
     else:
         print(f"SafeSwim: {detail['name']}")
         print(f"  Patrolled: {'Yes' if detail['patrolled'] else 'No'}")
@@ -166,36 +262,36 @@ def cmd_detail(args: argparse.Namespace) -> None:
         if detail["hazards"]:
             print(f"  Hazards: {', '.join(detail['hazards'][:10])}")
         if detail["alerts"]:
-            print(f"  ⚠️  Alerts:")
-            for a in detail["alerts"]:
-                title = a.get("title") or a.get("message") or str(a)
+            print("  Alerts:")
+            for alert in detail["alerts"]:
+                title = alert.get("title") or alert.get("message") or str(alert)
                 print(f"    - {title[:120]}")
         if detail["cam_id"]:
-            print(f"  📷 Live cam: https://safeswim.org.nz/location/{slug}")
-        print(f"  Forecast sample (first 6 hours):")
+            print(f"  Live cam: https://safeswim.org.nz/locations/{slug}")
+        print("  Forecast sample (first 6 hours):")
         for i in range(min(6, detail["forecast_hours"])):
-            f = detail["forecast_sample"]["hour_0_to_5"]
-            print(f"    +{i}h: "
-                  f"air={f['air_temp_c'][i] or '?'}°C, "
-                  f"water={f['water_temp_c'][i] or '?'}°C, "
-                  f"wind={f['wind_speed'][i] or '?'}, "
-                  f"UV={f['uv_index'][i] or '?'}, "
-                  f"quality={f['water_quality'][i] or '?'}, "
-                  f"weather={f['weather'][i] or '?'}")
+            sample = detail["forecast_sample"]["hour_0_to_5"]
+            print(
+                f"    +{i}h: "
+                f"air={display_value(forecast_value(sample['air_temp_c'], i))}C, "
+                f"water={display_value(forecast_value(sample['water_temp_c'], i))}C, "
+                f"wind={display_value(forecast_value(sample['wind_speed'], i))}, "
+                f"UV={display_value(forecast_value(sample['uv_index'], i))}, "
+                f"quality={display_value(forecast_value(sample['water_quality'], i))}, "
+                f"weather={display_value(forecast_value(sample['weather'], i))}"
+            )
 
 
 def cmd_nearby(args: argparse.Namespace) -> None:
-    lat, lon = float(args.lat), float(args.lon)
-    radius = args.radius or 10
-    min_quality = (args.min_quality or "").upper()
+    lat, lon = args.lat, args.lon
+    radius = args.radius
+    min_risk = args.min_risk or ""
 
     payload = fetch("/locations")
-    locations = (payload or {}).get("locations") or []
+    locations = get_locations(payload)
 
     results = []
     for loc in locations:
-        if not isinstance(loc, dict):
-            continue
         pos = loc.get("position")
         if not pos or len(pos) < 2:
             continue
@@ -204,7 +300,7 @@ def cmd_nearby(args: argparse.Namespace) -> None:
             continue
         state = loc.get("state") or {}
         quality = (state.get("quality") or "UNKNOWN").upper()
-        if min_quality and not quality_matches(quality, min_quality):
+        if min_risk and not status_at_or_above_risk(quality, min_risk):
             continue
         results.append({
             "name": loc.get("name"),
@@ -215,50 +311,62 @@ def cmd_nearby(args: argparse.Namespace) -> None:
         })
 
     results.sort(key=lambda x: x["distance_km"])
-    results = results[: args.limit or 20]
+    results = results[:args.limit]
 
     if args.json:
         print(json.dumps({
             "kind": "nearby",
             "center": {"lat": lat, "lon": lon},
             "radius_km": radius,
-            "min_quality": min_quality or None,
+            "min_risk": min_risk or None,
             "count": len(results),
-            "beaches": results,
+            "locations": results,
         }, indent=2, ensure_ascii=False))
     else:
-        q_filter = f" (quality ≥ {min_quality})" if min_quality else ""
-        print(f"SafeSwim beaches within {radius}km of {lat:.4f}, {lon:.4f}{q_filter}: {len(results)} found")
-        for b in results:
-            patrol_icon = "🛟" if b["patrolled"] else "  "
-            print(f"  {patrol_icon} {b['quality']:6s} {b['distance_km']:5.1f}km  {b['name']}")
+        q_filter = f" (status at/above {min_risk})" if min_risk else ""
+        print(f"SafeSwim locations within {radius}km of {lat:.4f}, {lon:.4f}{q_filter}: {len(results)} found")
+        for item in results:
+            patrol = "patrolled" if item["patrolled"] else "unpatrolled"
+            print(f"  {item['quality']:6s} {item['distance_km']:5.1f}km  {item['name']} [{patrol}]")
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description="Query SafeSwim Auckland beach water quality")
-    sub = p.add_subparsers(dest="cmd", required=True)
+    parser = argparse.ArgumentParser(description="Query SafeSwim NZ swimming-location water quality")
+    sub = parser.add_subparsers(dest="cmd", required=True)
 
-    s = sub.add_parser("list", help="List beaches with quality status")
-    s.add_argument("--search", help="Filter by name/slug")
-    s.add_argument("--limit", type=int, default=50)
-    s.add_argument("--json", action="store_true")
-    s.set_defaults(func=cmd_list)
+    list_parser = sub.add_parser("list", help="List SafeSwim locations with quality status")
+    list_parser.add_argument("--search", help="Filter by name/slug")
+    list_parser.add_argument("--limit", type=positive_int, default=50)
+    list_parser.add_argument("--json", action="store_true")
+    list_parser.set_defaults(func=cmd_list)
 
-    s = sub.add_parser("detail", help="Full forecast detail for a beach")
-    s.add_argument("slug", help="Beach slug (e.g. takapunabeach)")
-    s.add_argument("--json", action="store_true")
-    s.set_defaults(func=cmd_detail)
+    detail_parser = sub.add_parser("detail", help="Full forecast detail for a SafeSwim location")
+    detail_parser.add_argument("slug", help="Location slug (e.g. takapuna)")
+    detail_parser.add_argument("--json", action="store_true")
+    detail_parser.set_defaults(func=cmd_detail)
 
-    s = sub.add_parser("nearby", help="Beaches near a coordinate")
-    s.add_argument("lat", help="Latitude")
-    s.add_argument("lon", help="Longitude")
-    s.add_argument("--radius", type=float, default=10, help="Search radius in km (default: 10)")
-    s.add_argument("--min-quality", help="Minimum water quality: GREEN, AMBER, RED")
-    s.add_argument("--limit", type=int, default=20)
-    s.add_argument("--json", action="store_true")
-    s.set_defaults(func=cmd_nearby)
+    nearby_parser = sub.add_parser("nearby", help="SafeSwim locations near a coordinate")
+    nearby_parser.add_argument("lat", type=latitude, help="Latitude")
+    nearby_parser.add_argument("lon", type=longitude, help="Longitude")
+    nearby_parser.add_argument("--radius", type=positive_float, default=10, help="Search radius in km (default: 10)")
+    nearby_parser.add_argument(
+        "--min-risk",
+        dest="min_risk",
+        type=quality_status,
+        metavar="STATUS",
+        help="Minimum warning severity/status to include: GREEN, AMBER, RED, RED+, BLACK",
+    )
+    nearby_parser.add_argument(
+        "--min-quality",
+        dest="min_risk",
+        type=quality_status,
+        help=argparse.SUPPRESS,
+    )
+    nearby_parser.add_argument("--limit", type=positive_int, default=20)
+    nearby_parser.add_argument("--json", action="store_true")
+    nearby_parser.set_defaults(func=cmd_nearby)
 
-    args = p.parse_args()
+    args = parser.parse_args()
     args.func(args)
 
 

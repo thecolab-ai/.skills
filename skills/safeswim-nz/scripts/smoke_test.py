@@ -8,10 +8,13 @@ SKILL_DIR = Path(__file__).parent.parent
 CLI = SKILL_DIR / "scripts" / "cli.py"
 
 
-def run(args: list) -> subprocess.CompletedProcess:
+def run(args: list[str]) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        [sys.executable, str(CLI)] + args,
-        capture_output=True, text=True, cwd=str(SKILL_DIR), timeout=30,
+        [sys.executable, "-B", str(CLI)] + args,
+        capture_output=True,
+        text=True,
+        cwd=str(SKILL_DIR),
+        timeout=30,
     )
 
 
@@ -26,49 +29,56 @@ def test(name: str, fn):
         return False
 
 
+def parse_json(args: list[str]) -> dict:
+    result = run(args)
+    if result.returncode != 0:
+        raise AssertionError(result.stderr.strip() or result.stdout.strip())
+    return json.loads(result.stdout)
+
+
 results = []
 
-# 1. help
 results.append(test("--help exits 0", lambda: run(["--help"]).returncode == 0))
 
-# 2. list (plain)
-results.append(test("list returns beaches", lambda: (
+results.append(test("list returns locations", lambda: (
     (r := run(["list", "--limit", "3"])).returncode == 0 and
-    "SafeSwim Auckland beaches:" in r.stdout and
-    len([l for l in r.stdout.split("\n") if "🛟" in l or "GREEN" in l or "AMBER" in l or "RED" in l]) >= 1
+    "SafeSwim NZ locations:" in r.stdout and
+    len([line for line in r.stdout.splitlines() if any(code in line for code in ("GREEN", "AMBER", "RED", "BLACK"))]) >= 1
 )))
 
-# 3. list --json
 results.append(test("list --json returns structured data", lambda: (
-    (r := run(["list", "--limit", "3", "--json"])).returncode == 0 and
-    isinstance(json.loads(r.stdout).get("beaches"), list) and
-    len(json.loads(r.stdout)["beaches"]) >= 1
+    (data := parse_json(["list", "--limit", "3", "--json"])).get("kind") == "list" and
+    isinstance(data.get("locations"), list) and
+    len(data["locations"]) >= 1
 )))
 
-# 4. list --search
 results.append(test("list --search takapuna returns results", lambda: (
-    (r := run(["list", "--search", "takapuna", "--json"])).returncode == 0 and
-    len(json.loads(r.stdout).get("beaches", [])) >= 1
+    len(parse_json(["list", "--search", "takapuna", "--json"]).get("locations", [])) >= 1
 )))
 
-# 5. detail
 results.append(test("detail takapuna returns forecast data", lambda: (
-    (r := run(["detail", "takapuna", "--json"])).returncode == 0 and
-    json.loads(r.stdout).get("beach", {}).get("name") is not None and
-    json.loads(r.stdout)["beach"].get("forecast_hours", 0) > 0
+    (data := parse_json(["detail", "takapuna", "--json"])).get("kind") == "detail" and
+    data.get("location", {}).get("name") is not None and
+    data["location"].get("forecast_hours", 0) > 0
 )))
 
-# 6. nearby
-results.append(test("nearby returns beaches sorted by distance", lambda: (
-    (r := run(["nearby", "-36.8485", "174.7633", "--radius", "10", "--limit", "5", "--json"])).returncode == 0 and
-    isinstance(json.loads(r.stdout).get("beaches"), list) and
-    len(json.loads(r.stdout)["beaches"]) >= 1
+results.append(test("nearby returns locations sorted by distance", lambda: (
+    (data := parse_json(["nearby", "-36.8485", "174.7633", "--radius", "10", "--limit", "5", "--json"])).get("kind") == "nearby" and
+    isinstance(data.get("locations"), list) and
+    len(data["locations"]) >= 1 and
+    [item["distance_km"] for item in data["locations"]] == sorted(item["distance_km"] for item in data["locations"])
 )))
 
-# 7. nearby with quality filter
-results.append(test("nearby --min-quality RED returns only RED/BLACK", lambda: (
-    (r := run(["nearby", "-36.8485", "174.7633", "--radius", "20", "--min-quality", "RED", "--json"])).returncode == 0 and
-    all(b.get("quality", "") in ("RED", "RED+", "BLACK") for b in json.loads(r.stdout).get("beaches", []))
+results.append(test("nearby --min-risk RED returns only RED or worse", lambda: (
+    all(
+        item.get("quality", "") in ("RED", "RED+", "BLACK")
+        for item in parse_json(["nearby", "-36.8485", "174.7633", "--radius", "20", "--min-risk", "RED", "--json"]).get("locations", [])
+    )
+)))
+
+results.append(test("invalid coordinates fail before fetching", lambda: (
+    (r := run(["nearby", "91", "174", "--json"])).returncode == 2 and
+    "between -90 and 90" in r.stderr
 )))
 
 if all(results):

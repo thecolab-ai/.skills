@@ -1,38 +1,40 @@
 ---
 name: safeswim-nz
-description: Query Auckland SafeSwim public beach water quality, swimming conditions, sewage overflow alerts, and hour-by-hour forecast data through a no-login REST API. Use when the task involves Auckland beach safety, water quality (GREEN/AMBER/RED), swimming conditions, sewage alerts, beach facilities, or per-beach forecasts. Read-only.
+description: Query SafeSwim NZ public swimming-location water quality, swimming conditions, wastewater overflow alerts, and hour-by-hour forecast data through a no-login REST API. Use when the task involves SafeSwim-supported NZ beach/lake swimming safety, water quality (GREEN/AMBER/RED/RED+/BLACK), lifeguard/patrol status, safety hazards, facilities, or per-location forecasts. Read-only.
 ---
 
 # SafeSwim NZ
 
 ## Goal
 
-Query live Auckland SafeSwim beach water-quality and swimming-condition data with a deterministic CLI and JSON output.
+Query live SafeSwim NZ swimming-location water-quality and swimming-condition data with a deterministic CLI and JSON output.
 
 ## Use this when
 
-- A user asks whether it's safe to swim at an Auckland beach today
-- A user wants water quality status (GREEN/AMBER/RED/BLACK) for Auckland beaches
-- A user asks about sewage overflow alerts or beach hazards
+- A user asks whether it's safe to swim at a SafeSwim-supported NZ beach, lake, or swimming spot today
+- A user wants water quality status (GREEN/AMBER/RED/RED+/BLACK) for SafeSwim locations
+- A user asks about wastewater overflow alerts or swimming hazards
 - A user wants hour-by-hour swimming forecasts (water temp, wind, UV, tide height)
-- A user needs a list of nearby beaches with swim-quality filtering
-- A workflow needs machine-readable beach safety data
+- A user needs nearby SafeSwim locations, optionally filtered by warning severity
+- A workflow needs machine-readable swimming-location safety data
 
 ## Do not use this for
 
-- River or lake water quality; use `lawa-nz` for freshwater sites
+- General freshwater monitoring outside SafeSwim coverage; use `lawa-nz` for broader river/lake sites
 - Tide predictions alone; use `nz-tides-surf` for LINZ tide tables
 - Surf conditions; use `nz-tides-surf` for SwellMap surf data
-- Beaches outside the Auckland SafeSwim coverage area
+- Swimming spots outside the SafeSwim API coverage area
 - Historical water-quality records beyond what the live API returns
+- Safety-critical decisions without also checking local signage and conditions
 
 ## Preferred workflow
 
-1. Run `scripts/cli.py list` to discover Auckland beaches (optionally filtered by search or distance)
-2. Use `detail <slug>` for a specific beach with hour-by-hour forecast data
-3. Use `nearby <lat> <lon>` to find beaches close to a location
-4. Use `--json` for agent chaining, alerts, or structured reports
-5. Mention that SafeSwim data is live and can change rapidly after rainfall events
+1. Run `scripts/cli.py list` to discover SafeSwim locations, optionally filtered by search text
+2. Use `detail <slug>` for a specific location with hour-by-hour forecast data
+3. Use `nearby <lat> <lon>` to find SafeSwim locations close to a coordinate
+4. Use `--min-risk RED` when the user wants warning-level or worse locations, not safe-swim recommendations
+5. Use `--json` for agent chaining, alerts, or structured reports
+6. Mention that SafeSwim data is live and can change rapidly after rainfall events
 
 ## CLI
 
@@ -44,16 +46,16 @@ python3 skills/safeswim-nz/scripts/cli.py <command> [flags]
 
 ### Commands
 
-- `list [--search TEXT] [--limit N] [--json]` — list all Auckland beaches with quality status, patrol info
-- `detail <slug> [--json]` — full detail for a beach: forecasts, tags, alerts, facilities
-- `nearby <lat> <lon> [--radius N] [--min-quality GREEN|AMBER|RED] [--limit N] [--json]` — beaches near a location ordered by distance
+- `list [--search TEXT] [--limit N] [--json]` — list SafeSwim locations with quality status and patrol info
+- `detail <slug> [--json]` — full detail for a location: forecasts, tags, alerts, facilities
+- `nearby <lat> <lon> [--radius N] [--min-risk GREEN|AMBER|RED|RED+|BLACK] [--limit N] [--json]` — SafeSwim locations near a coordinate ordered by distance; `--min-quality` is accepted as a compatibility alias
 
 Examples:
 
 ```bash
 python3 skills/safeswim-nz/scripts/cli.py list --search takapuna --limit 5
-python3 skills/safeswim-nz/scripts/cli.py detail takapunabeach --json
-python3 skills/safeswim-nz/scripts/cli.py nearby -36.8485 174.7633 --radius 10 --min-quality AMBER
+python3 skills/safeswim-nz/scripts/cli.py detail takapuna --json
+python3 skills/safeswim-nz/scripts/cli.py nearby -36.8485 174.7633 --radius 10 --min-risk RED
 ```
 
 ## Resources
@@ -67,7 +69,7 @@ python3 skills/safeswim-nz/scripts/cli.py nearby -36.8485 174.7633 --radius 10 -
 - No API key, username, password, cookie, or browser automation is required
 - The SafeSwim API is public and read-only at `safeswim.org.nz/api`
 - Water quality can change rapidly after rainfall — treat results as current snapshots
-- GREEN = safe to swim, AMBER = caution, RED = unsafe, BLACK = sewage overflow
-- Not all beaches provide the full forecast array; some data arrays may be sparse
-- SafeSwim covers Auckland region only (East Coast, West Coast, Hauraki Gulf islands)
+- GREEN = lower risk, AMBER = caution, RED/RED+ = unsafe, BLACK = wastewater overflow
+- Not all locations provide the full forecast array; some data arrays may be sparse
+- SafeSwim covers only locations returned by the live API; it is not an all-NZ waterway catalogue
 - The CLI fetches the full location list once and filters in-process; repeated hits within a second reuse the cached fetch
