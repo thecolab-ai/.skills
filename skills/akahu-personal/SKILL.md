@@ -1,6 +1,6 @@
 ---
 name: akahu-personal
-description: Query a user's own Akahu Personal App data — identity, accounts, balances, transactions, and arbitrary Akahu API endpoints — through Akahu's authenticated API. Use when the task involves Akahu personal apps, NZ bank-account data via Akahu, personal finance exports, account balances, transaction samples, or calling a specific Akahu endpoint. Requires user-provided AKAHU_APP_TOKEN and AKAHU_USER_TOKEN; never smoke-test against real personal data in CI.
+description: Query personal transactional bank-account data — account lists, balances, settled/pending transactions, payment history, parties, refreshes, webhooks, and arbitrary authenticated API endpoints — from Akahu, a New Zealand open-banking provider. Use when the task involves personal bank data exports, NZ account balances, transaction analysis, cashflow/spending categorisation, or calling a specific authenticated banking-data endpoint. Requires user-provided AKAHU_APP_TOKEN and AKAHU_USER_TOKEN; never smoke-test against real personal data in CI.
 ---
 
 # Akahu Personal App
