@@ -148,6 +148,14 @@ def maybe_redact(data, raw):
     return data if raw else redact_obj(data)
 
 
+def limit_items_response(data, limit):
+    if isinstance(data, dict) and isinstance(data.get("items"), list):
+        clone = dict(data)
+        clone["items"] = data["items"][:limit]
+        return clone
+    return data
+
+
 def cmd_me(args):
     data = get_client(args).get("/me")
     emit(data, args.json)
@@ -165,6 +173,7 @@ def cmd_transactions(args):
     if args.end:
         params.append(("end", args.end))
     data = get_client(args).get("/transactions", params=params)
+    data = limit_items_response(data, args.limit)
     emit(maybe_redact(data, args.raw_account_numbers), args.json)
 
 
@@ -211,7 +220,7 @@ def cmd_export(args):
     datasets = {
         "me.json": client.get("/me"),
         "accounts.json": maybe_redact(client.get("/accounts"), args.raw_account_numbers),
-        "transactions_recent.json": maybe_redact(client.get("/transactions", [("limit", str(args.limit))]), args.raw_account_numbers),
+        "transactions_recent.json": maybe_redact(limit_items_response(client.get("/transactions", [("limit", str(args.limit))]), args.limit), args.raw_account_numbers),
     }
     for filename, data in datasets.items():
         path = out_dir / filename
