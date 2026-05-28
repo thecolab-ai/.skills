@@ -34,7 +34,14 @@ results = []
 # 1. help
 results.append(test("--help exits 0", lambda: run(["--help"]).returncode == 0))
 
-# 2. rates — JSON
+# 2. rates — invalid ID format fails before any network request and preserves JSON errors
+results.append(test("rates with nonnumeric ID returns JSON error", lambda: (
+    (r := run(["rates", "abc/../123", "--json"])).returncode != 0 and
+    (data := json.loads(r.stderr)) and
+    "numeric" in data.get("error", "").lower()
+)))
+
+# 3. rates — JSON
 results.append(test(f"rates {TOWN_HALL_ID} --json returns CV and rates", lambda: (
     (r := run(["rates", TOWN_HALL_ID, "--json"])).returncode == 0 and
     (data := json.loads(r.stdout)) and
@@ -42,21 +49,21 @@ results.append(test(f"rates {TOWN_HALL_ID} --json returns CV and rates", lambda:
     data["property"].get("annual_rates") is not None
 )))
 
-# 3. rates — human-readable
+# 4. rates — human-readable
 results.append(test(f"rates {TOWN_HALL_ID} prints CV and rates", lambda: (
     (r := run(["rates", TOWN_HALL_ID])).returncode == 0 and
     "Capital Value" in r.stdout and
     "Annual Rates" in r.stdout
 )))
 
-# 4. rates — invalid ID errors cleanly
+# 5. rates — invalid ID errors cleanly
 results.append(test("rates with invalid ID errors cleanly", lambda: (
     (r := run(["rates", "00000000000"])).returncode != 0 or
     "no valuation data" in r.stdout.lower() or
     "API returned empty" in r.stdout
 )))
 
-# 5. rates JSON has all expected fields
+# 6. rates JSON has all expected fields
 results.append(test(f"rates {TOWN_HALL_ID} JSON has full property structure", lambda: (
     (r := run(["rates", TOWN_HALL_ID, "--json"])).returncode == 0 and
     (data := json.loads(r.stdout)) and

@@ -7,8 +7,8 @@ This skill is an unofficial lightweight wrapper around a public read-only Auckla
 - Council rates page: `https://www.aucklandcouncil.govt.nz/en/property-rates-valuations/find-property-rates-valuation.html`
 - Public API: `https://experience.aucklandcouncil.govt.nz/nextapi/property/{propertyId}/rate-assessment`
 - Property page: `https://www.aucklandcouncil.govt.nz/en/property-rates-valuations/find-property-rates-valuation/{propertyId}.html`
-- Auth model: none — public endpoint, no API key, no cookie, no login required
-- The endpoint requires a standard browser-like `User-Agent`, `Accept`, and `Referer` header
+- Auth model: public browser bearer token extracted from the council page; no user credentials, API key, cookie, or login required
+- The endpoint requires standard browser-like `User-Agent`, `Accept`, `Authorization`, `Origin`, and `Referer` headers
 
 ## Endpoint
 

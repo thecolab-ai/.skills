@@ -8,6 +8,7 @@ Extracts a public bearer token from the council search page, same as auckland-bi
 from __future__ import annotations
 
 import argparse
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 import json
 import re
 import sys
@@ -17,13 +18,18 @@ import urllib.request
 from typing import Any
 
 PROPERTY_API = "https://experience.aucklandcouncil.govt.nz/nextapi/property"
-SEARCH_PAGE = "https://www.aucklandcouncil.govt.nz/en/rubbish-recycling/rubbish-recycling-collections/rubbish-recycling-collection-days.html"
+SEARCH_PAGE = "https://www.aucklandcouncil.govt.nz/en/property-rates-valuations/find-property-rates-valuation.html"
 UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
 
 
+class CliError(Exception):
+    def __init__(self, message: str, code: int = 1) -> None:
+        super().__init__(message)
+        self.code = code
+
+
 def die(message: str, code: int = 1) -> None:
-    print(f"property-rates-nz: {message}", file=sys.stderr)
-    raise SystemExit(code)
+    raise CliError(message, code)
 
 
 def parse_int(value: Any) -> int | None:
@@ -31,8 +37,9 @@ def parse_int(value: Any) -> int | None:
     if value is None:
         return None
     try:
-        return int(float(str(value)))
-    except (ValueError, TypeError):
+        parsed = Decimal(str(value).strip().replace(",", ""))
+        return int(parsed.to_integral_value(rounding=ROUND_HALF_UP))
+    except (InvalidOperation, ValueError, TypeError):
         return None
 
 
@@ -72,19 +79,29 @@ def api_headers(token: str) -> dict[str, str]:
         "Accept": "application/json",
         "Authorization": f"Bearer {token}",
         "Origin": "https://www.aucklandcouncil.govt.nz",
-        "Referer": "https://www.aucklandcouncil.govt.nz/",
+        "Referer": SEARCH_PAGE,
     }
+
+
+def validate_property_id(property_id: str) -> str:
+    if not re.fullmatch(r"\d+", property_id):
+        die("property ID must be a numeric Auckland Council ACRateAccountKey")
+    return property_id
 
 
 def fetch_rates(property_id: str) -> Any:
     """Fetch the rate-assessment JSON for a given property ID using the public token."""
+    property_id = validate_property_id(property_id)
     token = current_public_token()
     url = f"{PROPERTY_API}/{property_id}/rate-assessment"
     try:
         raw = fetch_text(url, headers=api_headers(token))
-        return json.loads(raw)
+        data = json.loads(raw)
     except json.JSONDecodeError as e:
         die(f"invalid JSON from {url}: {e}")
+    if not isinstance(data, dict):
+        die(f"unexpected JSON shape from {url}: expected object")
+    return data
 
 
 # ---------------------------------------------------------------------------
@@ -155,18 +172,26 @@ def cmd_rates(args: argparse.Namespace) -> None:
         print(f"  Council page:             {result['rates_url']}")
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="Query Auckland Council property rates and valuations")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     s = sub.add_parser("rates", help="Fetch rates and CV data for a property")
     s.add_argument("property_id", help="Auckland Council property ID (ACRateAccountKey)")
-    s.add_argument("--json", action="store_true")
+    s.add_argument("--json", action="store_true", help="Emit JSON")
     s.set_defaults(func=cmd_rates)
 
-    args = p.parse_args()
-    args.func(args)
+    args = p.parse_args(argv)
+    try:
+        args.func(args)
+        return 0
+    except CliError as e:
+        if getattr(args, "json", False):
+            print(json.dumps({"error": str(e)}, indent=2), file=sys.stderr)
+        else:
+            print(f"property-rates-nz: {e}", file=sys.stderr)
+        return e.code
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
