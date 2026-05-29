@@ -27,19 +27,18 @@ Query live New Zealand fuel price and supply data from fuelclock.nz through a CL
 
 ## Preferred workflow
 
-1. Run `scripts/cli.ts` with the narrowest subcommand that answers the task
+1. Run `scripts/cli.py` with the narrowest subcommand that answers the task
 2. Use `summary` for a quick situational briefing across prices, supply, and vessels
 3. Use `watch` for a quick briefing across geopolitical risk markets and recent headlines
 4. Use default human output for direct answers
 5. Use `--json` when another tool or agent needs machine-readable output
-6. Fall back to importing `scripts/client.ts` only when you need the raw typed fetch functions
 
 ## CLI
 
 Run with:
 
 ```bash
-npx tsx skills/fuelclock-nz/scripts/cli.ts <command> [flags]
+python3 skills/fuelclock-nz/scripts/cli.py <command> [flags]
 ```
 
 ### `summary [--json]`
@@ -55,8 +54,8 @@ JSON shape:
 Examples:
 
 ```bash
-npx tsx skills/fuelclock-nz/scripts/cli.ts summary
-npx tsx skills/fuelclock-nz/scripts/cli.ts summary --json
+python3 skills/fuelclock-nz/scripts/cli.py summary
+python3 skills/fuelclock-nz/scripts/cli.py summary --json
 ```
 
 ### `watch [--json]`
@@ -71,8 +70,8 @@ JSON shape:
 Examples:
 
 ```bash
-npx tsx skills/fuelclock-nz/scripts/cli.ts watch
-npx tsx skills/fuelclock-nz/scripts/cli.ts watch --json
+python3 skills/fuelclock-nz/scripts/cli.py watch
+python3 skills/fuelclock-nz/scripts/cli.py watch --json
 ```
 
 ### `prices [--fuel 91|95|98|diesel] [--json]`
@@ -91,9 +90,9 @@ JSON shape:
 Examples:
 
 ```bash
-npx tsx skills/fuelclock-nz/scripts/cli.ts prices
-npx tsx skills/fuelclock-nz/scripts/cli.ts prices --fuel diesel
-npx tsx skills/fuelclock-nz/scripts/cli.ts prices --fuel 95 --json
+python3 skills/fuelclock-nz/scripts/cli.py prices
+python3 skills/fuelclock-nz/scripts/cli.py prices --fuel diesel
+python3 skills/fuelclock-nz/scripts/cli.py prices --fuel 95 --json
 ```
 
 ### `supply [--fuel petrol|diesel|jet] [--below-mso] [--json]`
@@ -116,9 +115,9 @@ JSON shape:
 Examples:
 
 ```bash
-npx tsx skills/fuelclock-nz/scripts/cli.ts supply
-npx tsx skills/fuelclock-nz/scripts/cli.ts supply --below-mso
-npx tsx skills/fuelclock-nz/scripts/cli.ts supply --fuel diesel --json
+python3 skills/fuelclock-nz/scripts/cli.py supply
+python3 skills/fuelclock-nz/scripts/cli.py supply --below-mso
+python3 skills/fuelclock-nz/scripts/cli.py supply --fuel diesel --json
 ```
 
 ### `vessels [--fuel petrol|diesel|jet] [--flagged-only] [--limit N] [--json]`
@@ -140,9 +139,9 @@ JSON shape:
 Examples:
 
 ```bash
-npx tsx skills/fuelclock-nz/scripts/cli.ts vessels
-npx tsx skills/fuelclock-nz/scripts/cli.ts vessels --flagged-only --limit 3
-npx tsx skills/fuelclock-nz/scripts/cli.ts vessels --fuel diesel --json
+python3 skills/fuelclock-nz/scripts/cli.py vessels
+python3 skills/fuelclock-nz/scripts/cli.py vessels --flagged-only --limit 3
+python3 skills/fuelclock-nz/scripts/cli.py vessels --fuel diesel --json
 ```
 
 ### `risk [--limit N] [--json]`
@@ -161,9 +160,9 @@ JSON shape:
 Examples:
 
 ```bash
-npx tsx skills/fuelclock-nz/scripts/cli.ts risk
-npx tsx skills/fuelclock-nz/scripts/cli.ts risk --limit 5
-npx tsx skills/fuelclock-nz/scripts/cli.ts risk --limit 3 --json
+python3 skills/fuelclock-nz/scripts/cli.py risk
+python3 skills/fuelclock-nz/scripts/cli.py risk --limit 5
+python3 skills/fuelclock-nz/scripts/cli.py risk --limit 3 --json
 ```
 
 ### `news [--limit N] [--json]`
@@ -181,21 +180,20 @@ JSON shape:
 Examples:
 
 ```bash
-npx tsx skills/fuelclock-nz/scripts/cli.ts news
-npx tsx skills/fuelclock-nz/scripts/cli.ts news --limit 3
-npx tsx skills/fuelclock-nz/scripts/cli.ts news --limit 5 --json
+python3 skills/fuelclock-nz/scripts/cli.py news
+python3 skills/fuelclock-nz/scripts/cli.py news --limit 3
+python3 skills/fuelclock-nz/scripts/cli.py news --limit 5 --json
 ```
 
 ## Resources
 
-- CLI entrypoint: `scripts/cli.ts`
-- Typed fetch client: `scripts/client.ts`
-- Live smoke test: `scripts/smoke-test.ts`
+- CLI entrypoint: `scripts/cli.py`
+- Live smoke test: `scripts/smoke_test.py`
 
 ## Notes
 
 - No API key required
-- Uses the built-in `fetch` available in modern Node runtimes
+- Pure Python 3 standard library (`urllib`); no third-party dependencies
 - Default output is human-readable and filtered for quick answers
 - `--json` output is intended for chaining into other tools or agent steps
 - FuelClock supply data and MBIE stock data are related but not identical, FuelClock applies its own live supply model on top of source data
