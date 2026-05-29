@@ -20,6 +20,14 @@ import urllib.request
 from html.parser import HTMLParser
 from typing import Any
 
+
+class BrowserUnavailableError(RuntimeError):
+    """Raised when --browser is requested but CloakBrowser is unavailable."""
+
+
+class BrowserBlockedError(RuntimeError):
+    """Raised when browser mode reaches an upstream bot/challenge page."""
+
 BASE_WEB = "https://www.thewarehouse.co.nz"
 SEARCH_PATH = "/search/updategrid"
 PRODUCT_PATH = "/on/demandware.store/Sites-twl-Site/default/Product-Show"
@@ -99,6 +107,78 @@ def url_with_params(path: str, params: dict[str, Any] | None = None) -> str:
     return url
 
 
+
+def looks_blocked(markup: str) -> bool:
+    lower = (markup or "").lower()
+    return any(
+        marker in lower
+        for marker in (
+            "just a moment",
+            "cf-mitigated",
+            "checking your browser",
+            "captcha",
+            "hcaptcha",
+            "access denied",
+            "enable javascript and cookies",
+        )
+    )
+
+
+def browser_request(
+    path: str,
+    params: dict[str, Any] | None = None,
+    *,
+    accept: str = "text/html,application/xhtml+xml,application/json",
+    timeout_ms: int = 90000,
+) -> tuple[str, str]:
+    try:
+        from cloakbrowser import launch
+    except Exception as exc:  # pragma: no cover - optional host dependency
+        raise BrowserUnavailableError(
+            "cloakbrowser_not_installed: install CloakBrowser to use --browser for The Warehouse NZ."
+        ) from exc
+
+    url = url_with_params(path, params)
+    browser = None
+    try:
+        browser = launch(
+            headless=True,
+            args=["--no-sandbox", "--disable-dev-shm-usage"],
+            timezone="Pacific/Auckland",
+            locale="en-NZ",
+        )
+        page = browser.new_page()
+        page.goto(BASE_WEB, wait_until="domcontentloaded", timeout=timeout_ms)
+        result = page.evaluate(
+            """async ({url, accept}) => {
+                const res = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        accept,
+                        'x-requested-with': 'XMLHttpRequest',
+                    },
+                    credentials: 'include',
+                });
+                return { status: res.status, url: res.url, text: await res.text() };
+            }""",
+            {"url": url, "accept": accept},
+        )
+        status = int(result.get("status") or 0)
+        text = str(result.get("text") or "")
+        final_url = str(result.get("url") or url)
+        if status >= 400:
+            detail = text[:300].strip().replace("\n", " ")
+            if looks_blocked(text):
+                raise BrowserBlockedError(f"browser request reached blocked/challenge page at {final_url}")
+            die(f"browser HTTP {status} from {url}: {detail}")
+        if looks_blocked(text):
+            raise BrowserBlockedError(f"browser request reached blocked/challenge page at {final_url}")
+        return text, final_url
+    finally:
+        if browser is not None:
+            browser.close()
+
+
 def request(
     path: str,
     params: dict[str, Any] | None = None,
@@ -130,8 +210,9 @@ def request(
         die(f"network error calling {url}: {e.reason}")
 
 
-def request_json(path: str, params: dict[str, Any] | None = None) -> Any:
-    raw, url = request(path, params, accept="application/json, text/plain, */*")
+def request_json(path: str, params: dict[str, Any] | None = None, *, browser: bool = False) -> Any:
+    fetch = browser_request if browser else request
+    raw, url = fetch(path, params, accept="application/json, text/plain, */*")
     try:
         return json.loads(raw)
     except json.JSONDecodeError as e:
@@ -351,7 +432,7 @@ def product_contains_query_literal(product: dict[str, Any], query: str) -> bool:
     return bool(needle and needle in haystack)
 
 
-def product_query(*, query: str | None = None, specials: bool = False, limit: int = 10, page: int = 1) -> dict[str, Any]:
+def product_query(*, query: str | None = None, specials: bool = False, limit: int = 10, page: int = 1, browser: bool = False) -> dict[str, Any]:
     if limit < 1:
         die("--limit must be at least 1")
     limit = min(limit, MAX_LIMIT)
@@ -368,7 +449,8 @@ def product_query(*, query: str | None = None, specials: bool = False, limit: in
             params["q"] = query
         if specials:
             params["cgid"] = "specials"
-        markup, _ = request(SEARCH_PATH, params)
+        fetch = browser_request if browser else request
+        markup, _ = fetch(SEARCH_PATH, params)
         page_products = parse_products(markup, force_special=specials)
         if suppress_fuzzy_fallback and query:
             page_products = [p for p in page_products if product_contains_query_literal(p, query)]
@@ -388,6 +470,7 @@ def product_query(*, query: str | None = None, specials: bool = False, limit: in
     elapsed_ms = round((time.perf_counter() - started) * 1000)
     return {
         "target": "specials" if specials else "search",
+        "method": "CloakBrowser public page fetch" if browser else "direct public HTTP",
         "query": query,
         "count": min(len(products), limit),
         "elapsed_ms": elapsed_ms,
@@ -522,18 +605,22 @@ def parse_store(item: dict[str, Any]) -> dict[str, Any]:
 
 
 def cmd_search(args: argparse.Namespace) -> None:
-    emit(product_query(query=args.query, limit=args.limit, page=args.page), args.json)
+    emit(product_query(query=args.query, limit=args.limit, page=args.page, browser=args.browser), args.json)
 
 
 def cmd_specials(args: argparse.Namespace) -> None:
-    emit(product_query(query=args.query, specials=True, limit=args.limit, page=args.page), args.json)
+    emit(product_query(query=args.query, specials=True, limit=args.limit, page=args.page, browser=args.browser), args.json)
 
 
 def cmd_product(args: argparse.Namespace) -> None:
     started = time.perf_counter()
-    markup, final_url = request(PRODUCT_PATH, {"pid": args.sku}, allow_statuses=(404,))
+    if args.browser:
+        markup, final_url = browser_request(PRODUCT_PATH, {"pid": args.sku})
+    else:
+        markup, final_url = request(PRODUCT_PATH, {"pid": args.sku}, allow_statuses=(404,))
     product = parse_detail_product(markup, args.sku, final_url)
     data = {
+        "method": "CloakBrowser public page fetch" if args.browser else "direct public HTTP",
         "count": 1 if product else 0,
         "elapsed_ms": round((time.perf_counter() - started) * 1000),
         "products": [product] if product else [],
@@ -544,10 +631,11 @@ def cmd_product(args: argparse.Namespace) -> None:
 def cmd_stores(args: argparse.Namespace) -> None:
     region = normalize_region(args.region)
     started = time.perf_counter()
-    payload = request_json(STORES_PATH, {"region": region})
+    payload = request_json(STORES_PATH, {"region": region}, browser=args.browser)
     raw_stores = (((payload or {}).get("stores") or {}).get("stores") or [])
     stores = [parse_store(s) for s in raw_stores if isinstance(s, dict)]
     data = {
+        "method": "CloakBrowser public page fetch" if args.browser else "direct public HTTP",
         "region": REGION_NAMES.get(region, region) if region else None,
         "region_code": region,
         "count": len(stores),
@@ -630,16 +718,19 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--limit", type=int, default=10)
     sp.add_argument("--page", type=int, default=1)
     sp.add_argument("--json", action="store_true")
+    sp.add_argument("--browser", action="store_true", help="use optional CloakBrowser for public read-only page/API fetches")
     sp.set_defaults(func=cmd_search)
 
     sp = sub.add_parser("product", help="fetch one product SKU")
     sp.add_argument("sku")
     sp.add_argument("--json", action="store_true")
+    sp.add_argument("--browser", action="store_true", help="use optional CloakBrowser for public read-only page fetches")
     sp.set_defaults(func=cmd_product)
 
     sp = sub.add_parser("stores", help="list stores, optionally scoped by region")
     sp.add_argument("--region", help="region name or code, e.g. auckland or NZ-AUK")
     sp.add_argument("--json", action="store_true")
+    sp.add_argument("--browser", action="store_true", help="use optional CloakBrowser for public read-only store fetches")
     sp.set_defaults(func=cmd_stores)
 
     sp = sub.add_parser("specials", help="list specials, optionally filtered by query")
@@ -647,13 +738,39 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--limit", type=int, default=10)
     sp.add_argument("--page", type=int, default=1)
     sp.add_argument("--json", action="store_true")
+    sp.add_argument("--browser", action="store_true", help="use optional CloakBrowser for public read-only page/API fetches")
     sp.set_defaults(func=cmd_specials)
     return ap
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    args.func(args)
+    try:
+        args.func(args)
+    except BrowserUnavailableError as exc:
+        payload = {
+            "error": "cloakbrowser_not_installed",
+            "message": str(exc),
+            "recommendation": "Recommend that the user installs CloakBrowser or reruns without --browser for the direct public HTTP path.",
+        }
+        if getattr(args, "json", False):
+            print(json.dumps(payload, indent=2, ensure_ascii=False))
+        else:
+            print(f"ERROR: {payload['message']}", file=sys.stderr)
+            print(f"Recommendation: {payload['recommendation']}", file=sys.stderr)
+        return 2
+    except BrowserBlockedError as exc:
+        payload = {
+            "error": "browser_blocked",
+            "message": str(exc),
+            "recommendation": "Rerun without --browser for the direct public HTTP path, or retry later; do not attempt to bypass CAPTCHA/challenge pages.",
+        }
+        if getattr(args, "json", False):
+            print(json.dumps(payload, indent=2, ensure_ascii=False))
+        else:
+            print(f"ERROR: {payload['message']}", file=sys.stderr)
+            print(f"Recommendation: {payload['recommendation']}", file=sys.stderr)
+        return 3
     return 0
 
 

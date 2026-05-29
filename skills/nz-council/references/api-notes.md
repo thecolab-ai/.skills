@@ -380,7 +380,7 @@ Implemented for the following council codes:
 - `uhutt`: Upper Hutt City Council / H2O Xtream
 - `kapiti`: Kāpiti Coast District Council / Kāpiti Coast Aquatics
 
-The CLI stores a small public-page catalogue for these aquatic facilities so that list/detail commands return name, address, hours, contact details, and pool details in a consistent schema. Each command still probes the relevant public source URL at runtime. The probe tries direct HTTP first and falls back to Chrome DevTools Protocol at `http://127.0.0.1:5100` when direct access is bot-walled or denied.
+The CLI stores a small public-page catalogue for these aquatic facilities so that list/detail commands return name, address, hours, contact details, and pool details in a consistent schema. Each command still probes the relevant public source URL at runtime. The probe tries direct HTTP first and falls back to Chrome DevTools Protocol at `http://127.0.0.1:5100` when direct access is bot-walled or denied. Explicit `--browser` uses CloakBrowser instead of the legacy CDP fallback for those public page fetches; if CloakBrowser is missing, JSON mode returns `{"error": "cloakbrowser_not_installed", ...}`.
 
 #### Hutt City pools
 
@@ -391,7 +391,7 @@ Implemented facilities:
 - Stokes Valley Pool + Fitness: `https://pools.huttcity.govt.nz/our-pools/stokes-valley-pool`
 - McKenzie Baths Summer Pool: `https://pools.huttcity.govt.nz/our-pools/mckenzie-baths-summer-pool`
 
-Direct HTTP result during discovery: Cloudflare challenge. CDP fallback at `127.0.0.1:5100` returned the public pages in the test environment.
+Direct HTTP result during discovery: Cloudflare challenge. CDP fallback at `127.0.0.1:5100` returned the public pages in the test environment. `--browser` now offers the same public-page fallback via CloakBrowser on hosts where that is installed and preferred for headless CI.
 
 #### Porirua Arena Aquatics
 
@@ -414,7 +414,7 @@ Implemented facility:
 
 - H2O Xtream Aquatic Centre: `https://www.h2oxtream.com/Facility/hours-and-prices`
 
-Direct Python HTTP result during discovery: Akamai `403 Access Denied`. CDP fallback returned the public page.
+Direct Python HTTP result during discovery: Akamai `403 Access Denied`. CDP fallback returned the public page. Explicit `--browser` uses CloakBrowser for this public page fallback and reports `browser_blocked` rather than continuing if the browser lands on a challenge/missing page.
 
 Data captured:
 
@@ -508,7 +508,7 @@ Observed facilities:
 - Splashhurst Community Pool
 - Free paddling pools in Palmy
 
-PNCC direct `urllib` requests can return Akamai `403 Access Denied` even when browser and curl requests succeed. The CLI tries direct fetch first, then falls back to the local Chrome DevTools Protocol endpoint at `127.0.0.1:5100` for PNCC `403/429` bot-wall responses. The fallback is stdlib-only and reads rendered `document.documentElement.outerHTML`.
+PNCC direct `urllib` requests can return Akamai `403 Access Denied` even when browser and curl requests succeed. The CLI tries direct fetch first, then falls back to the local Chrome DevTools Protocol endpoint at `127.0.0.1:5100` for PNCC `403/429` bot-wall responses. The fallback is stdlib-only and reads rendered `document.documentElement.outerHTML`. With explicit `--browser`, the fallback uses CloakBrowser instead and still only reads public page HTML.
 
 PNCC pages expose:
 

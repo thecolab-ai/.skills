@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
 
 SKILL_DIR = Path(__file__).parent.parent
 CLI = SKILL_DIR / "scripts" / "cli.py"
+USE_BROWSER = os.environ.get("HERMES_SMOKE_USE_BROWSER") == "1" or os.environ.get("CI") == "true"
 
 
 def run(args: list) -> subprocess.CompletedProcess:
@@ -14,7 +16,7 @@ def run(args: list) -> subprocess.CompletedProcess:
         capture_output=True,
         text=True,
         cwd=str(SKILL_DIR),
-        timeout=30,
+        timeout=120,
     )
 
 
@@ -87,6 +89,28 @@ def test_cook_strait():
 
 
 results.append(test("cook-strait returns sailings[]", test_cook_strait))
+
+
+def test_fullers_browser_probe():
+    if not USE_BROWSER:
+        return True
+    result = run(["sailings", "auckland-devonport", "--json", "--browser"])
+    if result.returncode != 0:
+        print(f"  stderr: {result.stderr[:200]}")
+        return False
+    data = json.loads(result.stdout)
+    probe = data.get("browser_probe")
+    if not isinstance(probe, dict) or probe.get("status") not in {"loaded", "blocked"}:
+        print(f"  stdout: {result.stdout[:300]}")
+        print("  Expected browser_probe with loaded/blocked status")
+        return False
+    if not isinstance(data.get("sailings"), list):
+        print("  Expected AT GTFS fallback sailings[] alongside browser probe")
+        return False
+    return True
+
+
+results.append(test("fullers browser probe returns status", test_fullers_browser_probe))
 
 if all(results):
     print("All tests passed.")
