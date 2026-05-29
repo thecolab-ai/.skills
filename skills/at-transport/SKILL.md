@@ -31,7 +31,6 @@ Query live Auckland public transport data from the AT API through a CLI that is 
 1. Run `scripts/cli.py` with the narrowest subcommand that answers the task
 2. Use default human output for direct answers
 3. Use `--json` when another tool or agent needs machine-readable output
-4. Fall back to importing `scripts/client.ts` only when you need the raw typed fetch functions
 
 ## CLI
 

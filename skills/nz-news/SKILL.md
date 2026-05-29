@@ -182,7 +182,6 @@ No API key required — runs on the Python 3 standard library only.
 ## Notes
 
 - No API key required
-- Uses the built-in `fetch` available in modern Node runtimes
 - No external XML parsing dependencies, uses regex-based RSS and Atom parsing
 - Default output is human-readable, `--json` output is for chaining into other tools or agent steps
 - Headlines are deduplicated by normalised title across sources
