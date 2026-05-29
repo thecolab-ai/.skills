@@ -8,6 +8,9 @@ on:
     # 06:00 NZST daily (UTC+12 → 18:00 UTC previous day)
     - cron: '0 18 * * *'
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 jobs:
   smoke:
     runs-on: [self-hosted, linux, x64, skills-smoke]
@@ -20,7 +23,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
 
       - name: Install CloakBrowser for browser-assisted smoke tests
         run: |
