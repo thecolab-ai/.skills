@@ -28,6 +28,24 @@ python3 skills/<name>/scripts/smoke_test.py
 - TypeScript/Node skill helpers are **not accepted** — all scripts must be Python
 - Avoid per-skill doc clutter
 
+## Optional browser-assisted mode
+
+Direct public HTTP/API calls are still the default. Only add a `--browser` mode when a public,
+read-only website exposes useful data more reliably inside a real browser context than from a bare
+HTTP client.
+
+Use [CloakBrowser](https://github.com/CloakHQ/CloakBrowser) for browser-assisted skills when it is
+installed. Keep the dependency optional: import it only when `--browser` is requested, keep normal
+validation and non-browser smoke tests working on clean hosts, and return a clear machine-readable
+`cloakbrowser_not_installed` error if the user requested browser mode on a machine without it.
+
+Browser-assisted mode is not CAPTCHA bypass tooling. If the site returns CAPTCHA, request-auth, bot
+challenge, login, checkout, payment, booking, cart mutation, or protected account flows, stop and
+return a blocked state or use a public fallback. Do not forge tokens, hold bookings, operate accounts,
+or complete transactions.
+
+Full convention: [`docs/browser-assisted-skills.md`](docs/browser-assisted-skills.md).
+
 ## Definition of done
 
 A contribution is only ready when it passes all of these:

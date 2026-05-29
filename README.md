@@ -28,6 +28,20 @@ python3 skills/at-transport/scripts/cli.py alerts
 
 No auth needed for `fuelclock-nz`, `metservice-nz`, or `nz-news`. `at-transport` requires a free API key from [dev-portal.at.govt.nz](https://dev-portal.at.govt.nz).
 
+## Optional browser-assisted mode
+
+Most skills use direct public HTTP/API calls. Some modern sites only expose useful public data reliably inside a real browser context, especially on headless servers. Those skills may offer an explicit `--browser` flag.
+
+Recommended runtime: [CloakBrowser](https://github.com/CloakHQ/CloakBrowser). Full convention: [docs/browser-assisted-skills.md](docs/browser-assisted-skills.md).
+
+Recommended convention:
+
+- `--browser` should use CloakBrowser when it is installed.
+- CloakBrowser must be optional: normal validation and non-browser smoke tests should still run on clean hosts.
+- If CloakBrowser is missing, the CLI should return a clear `cloakbrowser_not_installed` error so the agent can recommend installing it instead of silently pretending browser mode ran.
+- Browser-assisted skills must stay read-only and stop before login, checkout, payment, booking, cart mutation, or protected account actions.
+- CAPTCHA, request-auth, and bot challenges are blocked states, not puzzles to defeat; return an explicit blocked flag or clear error and use a public fallback when one exists.
+
 ## About this repository
 
 This repo is intentionally structured like a proper skills library.
@@ -58,6 +72,7 @@ If you're a business looking at this and thinking "how do we actually want AI ag
 | Skill | Description |
 |-------|-------------|
 | [akahu-personal](skills/akahu-personal/SKILL.md) | Query personal transactional bank-account data — account lists, balances, settled/pending transactions, account-specific transaction history, and private JSON/CSV exports — from Akahu, a New Zealand open-banking provider. Use when the task involves personal bank data exports, NZ account balances, transaction analysis, cashflow/spending categorisation, or inspecting authenticated Personal App banking data. Requires user-provided AKAHU_APP_TOKEN and AKAHU_USER_TOKEN; never smoke-test against real personal data in CI. |
+| [airnz-flights](skills/airnz-flights/SKILL.md) | Search public Air New Zealand fare snapshots and timetable fallback data through a lightweight no-login CLI. Use when the task involves Air NZ route/date fare snapshots, fare products, flight numbers, departure/arrival times, duration, stops, or machine-readable current flight data. Optional --browser mode uses CloakBrowser when installed and returns cloakbrowser_not_installed when unavailable. Read-only; no login, Airpoints, seat holds, booking, payment, manage-booking, or checkout actions. |
 | [at-transport](skills/at-transport/SKILL.md) | Query live Auckland Transport (AT) public transport data — stops, departures, service alerts, vehicle positions, routes, and network status. Use when the task involves Auckland buses, trains, ferries, or real-time transit information. |
 | [auckland-bin-schedule](skills/auckland-bin-schedule/SKILL.md) | Query Auckland Council rubbish, recycling, and food scraps collection days for Auckland properties using the public collection-day website flow. Use when the task involves Auckland bin day, rubbish/recycling schedules, food scraps collection, address lookup, or property-id based collection checks. No account login required. |
 | [bargainchemist-nz](skills/bargainchemist-nz/SKILL.md) | Query Bargain Chemist NZ public product search, suggestions, and Shopify product JSON through a lightweight no-login CLI. Use when the task involves Bargain Chemist NZ product lookup, current online prices, availability, product handles, or machine-readable public product data. Read-only; no cart, checkout, account, prescription, or order actions. |
@@ -76,6 +91,7 @@ If you're a business looking at this and thinking "how do we actually want AI ag
 | [geonet-nz](skills/geonet-nz/SKILL.md) | Query GeoNet New Zealand public earthquake, volcano alert, and GeoNet news endpoints through a lightweight no-login CLI. Use when the task involves recent NZ earthquakes, felt/MMI-filtered quakes, earthquake detail by publicID, volcanic alert levels, volcanic activity bulletins, or GeoNet public geohazard updates. Read-only; no authentication required. |
 | [homes-nz](skills/homes-nz/SKILL.md) | Query homes.co.nz NZ residential property estimates (HomesEstimate/HEV), sales history, suburb trends, and nearby comparable properties. No login required. |
 | [interest-co-nz](skills/interest-co-nz/SKILL.md) | Query interest.co.nz public mortgage-rate tables through a lightweight no-login HTML parser. Use when the task involves current New Zealand mortgage rates, bank home-loan rates, variable/floating rates, fixed terms from 6 months to 5 years, special LVR rows, or comparing advertised mortgage rates across NZ lenders. Read-only; no application, lead, login, or quote submission. |
+| [jetstar-flights](skills/jetstar-flights/SKILL.md) | Search public Jetstar New Zealand one-way fare-cache flight availability through a no-login Node CLI. Use when the task involves Jetstar route/date fare snapshots, low-fare availability, flight IDs, prices, or machine-readable current Jetstar availability. Read-only; no login, Club Jetstar account, booking, seat hold, payment, manage-booking, or checkout actions. |
 | [kmart](skills/kmart/SKILL.md) | Query Kmart NZ and AU product search, prices, SKU lookup, clearance/promotional snapshots, and store-location data. Read-only; no login, cart, checkout, or account actions. |
 | [lawa-nz](skills/lawa-nz/SKILL.md) | Query Land Air Water Aotearoa (LAWA) public river-quality sites, swimming sites, and river indicator summaries through no-login Umbraco JSON endpoints. Use when the task involves NZ river quality, macroinvertebrate/community index data, E. coli/nutrient indicator bands, swim-site listings, or LAWA environmental monitoring site discovery. Read-only. |
 | [linz-data-service](skills/linz-data-service/SKILL.md) | Search and inspect LINZ Data Service public Koordinates catalogue layers, tables, services, licences, tags, and download/view capabilities through no-login JSON endpoints. Use when the task involves Toitū Te Whenua LINZ datasets such as addresses, parcels, imagery, hydrography, roads, property, or geospatial layers. Read-only; no API key needed for catalogue metadata. |
