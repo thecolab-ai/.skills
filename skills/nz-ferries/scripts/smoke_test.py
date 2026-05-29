@@ -7,7 +7,7 @@ from pathlib import Path
 
 SKILL_DIR = Path(__file__).parent.parent
 CLI = SKILL_DIR / "scripts" / "cli.py"
-USE_BROWSER = os.environ.get("HERMES_SMOKE_USE_BROWSER") == "1" or os.environ.get("CI") == "true"
+USE_BROWSER = os.environ.get("HERMES_SMOKE_USE_BROWSER") == "1"
 
 
 def run(args: list) -> subprocess.CompletedProcess:

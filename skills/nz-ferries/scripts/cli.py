@@ -442,10 +442,6 @@ class BrowserUnavailableError(RuntimeError):
     """Raised when --browser is requested but CloakBrowser is unavailable."""
 
 
-class BrowserBlockedError(RuntimeError):
-    """Raised when a browser-assisted public page fetch hits an upstream challenge."""
-
-
 def die(message: str, code: int = 1) -> None:
     print(f"nz-ferries: {message}", file=sys.stderr)
     raise SystemExit(code)
@@ -1374,6 +1370,7 @@ def fetch_sailings(route_id: str, route: dict[str, Any], day: date, operator: st
 
 
 def next_sailings(route_id: str, route: dict[str, Any], operator: str | None, limit: int) -> dict[str, Any]:
+    global BROWSER_MODE
     if route.get("coverage"):
         payload = route_handoff_payload(route_id, route, "next")
         payload["limit"] = limit
@@ -1386,7 +1383,13 @@ def next_sailings(route_id: str, route: dict[str, Any], operator: str | None, li
     for offset in range(0, 8):
         day = (now + timedelta(days=offset)).date()
         checked_dates.append(day.isoformat())
-        result = fetch_sailings(route_id, route, day, operator)
+        original_browser_mode = BROWSER_MODE
+        if original_browser_mode and browser_probe is not None:
+            BROWSER_MODE = False
+        try:
+            result = fetch_sailings(route_id, route, day, operator)
+        finally:
+            BROWSER_MODE = original_browser_mode
         if browser_probe is None and isinstance(result.get("browser_probe"), dict):
             browser_probe = result["browser_probe"]
         for warning in result.get("warnings") or []:
@@ -1814,13 +1817,6 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
     BROWSER_MODE = bool(getattr(args, "browser", False))
     try:
-        if BROWSER_MODE:
-            try:
-                import cloakbrowser  # noqa: F401
-            except Exception as exc:
-                raise BrowserUnavailableError(
-                    "cloakbrowser_not_installed: install CloakBrowser to use --browser for Fullers public timetable pages."
-                ) from exc
         args.func(args)
     except BrowserUnavailableError as exc:
         payload = {

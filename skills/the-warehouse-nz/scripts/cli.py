@@ -130,6 +130,7 @@ def browser_request(
     *,
     accept: str = "text/html,application/xhtml+xml,application/json",
     timeout_ms: int = 90000,
+    allow_statuses: tuple[int, ...] = (),
 ) -> tuple[str, str]:
     try:
         from cloakbrowser import launch
@@ -166,7 +167,7 @@ def browser_request(
         status = int(result.get("status") or 0)
         text = str(result.get("text") or "")
         final_url = str(result.get("url") or url)
-        if status >= 400:
+        if status >= 400 and status not in allow_statuses:
             detail = text[:300].strip().replace("\n", " ")
             if looks_blocked(text):
                 raise BrowserBlockedError(f"browser request reached blocked/challenge page at {final_url}")
@@ -442,6 +443,7 @@ def product_query(*, query: str | None = None, specials: bool = False, limit: in
     count_info: dict[str, int | None] = {"start": None, "end": None, "total": None}
     started = time.perf_counter()
     suppress_fuzzy_fallback = not specials and looks_like_no_match_probe(query)
+    browser_blocked = False
 
     while len(products) < limit:
         params: dict[str, Any] = {"start": start, "sz": PAGE_SIZE}
@@ -449,8 +451,12 @@ def product_query(*, query: str | None = None, specials: bool = False, limit: in
             params["q"] = query
         if specials:
             params["cgid"] = "specials"
-        fetch = browser_request if browser else request
-        markup, _ = fetch(SEARCH_PATH, params)
+        fetch = browser_request if browser and not browser_blocked else request
+        try:
+            markup, _ = fetch(SEARCH_PATH, params)
+        except BrowserBlockedError:
+            browser_blocked = True
+            markup, _ = request(SEARCH_PATH, params)
         page_products = parse_products(markup, force_special=specials)
         if suppress_fuzzy_fallback and query:
             page_products = [p for p in page_products if product_contains_query_literal(p, query)]
@@ -468,15 +474,18 @@ def product_query(*, query: str | None = None, specials: bool = False, limit: in
         count_info = {"start": None, "end": None, "total": 0}
 
     elapsed_ms = round((time.perf_counter() - started) * 1000)
-    return {
+    data = {
         "target": "specials" if specials else "search",
-        "method": "CloakBrowser public page fetch" if browser else "direct public HTTP",
+        "method": "direct public HTTP after blocked browser fallback" if browser_blocked else ("CloakBrowser public page fetch" if browser else "direct public HTTP"),
+        "browser_blocked": browser_blocked or None,
+        "warnings": ["CloakBrowser public page fetch was blocked/challenged; direct public HTTP fallback was used."] if browser_blocked else [],
         "query": query,
         "count": min(len(products), limit),
         "elapsed_ms": elapsed_ms,
         "raw_total": count_info.get("total"),
         "products": products[:limit],
     }
+    return data
 
 
 def extract_json_ld_product(markup: str) -> dict[str, Any]:
@@ -614,13 +623,20 @@ def cmd_specials(args: argparse.Namespace) -> None:
 
 def cmd_product(args: argparse.Namespace) -> None:
     started = time.perf_counter()
+    browser_blocked = False
     if args.browser:
-        markup, final_url = browser_request(PRODUCT_PATH, {"pid": args.sku})
+        try:
+            markup, final_url = browser_request(PRODUCT_PATH, {"pid": args.sku}, allow_statuses=(404,))
+        except BrowserBlockedError:
+            browser_blocked = True
+            markup, final_url = request(PRODUCT_PATH, {"pid": args.sku}, allow_statuses=(404,))
     else:
         markup, final_url = request(PRODUCT_PATH, {"pid": args.sku}, allow_statuses=(404,))
     product = parse_detail_product(markup, args.sku, final_url)
     data = {
-        "method": "CloakBrowser public page fetch" if args.browser else "direct public HTTP",
+        "method": "direct public HTTP after blocked browser fallback" if browser_blocked else ("CloakBrowser public page fetch" if args.browser else "direct public HTTP"),
+        "browser_blocked": browser_blocked or None,
+        "warnings": ["CloakBrowser public page fetch was blocked/challenged; direct public HTTP fallback was used."] if browser_blocked else [],
         "count": 1 if product else 0,
         "elapsed_ms": round((time.perf_counter() - started) * 1000),
         "products": [product] if product else [],
@@ -631,11 +647,18 @@ def cmd_product(args: argparse.Namespace) -> None:
 def cmd_stores(args: argparse.Namespace) -> None:
     region = normalize_region(args.region)
     started = time.perf_counter()
-    payload = request_json(STORES_PATH, {"region": region}, browser=args.browser)
+    browser_blocked = False
+    try:
+        payload = request_json(STORES_PATH, {"region": region}, browser=args.browser)
+    except BrowserBlockedError:
+        browser_blocked = True
+        payload = request_json(STORES_PATH, {"region": region}, browser=False)
     raw_stores = (((payload or {}).get("stores") or {}).get("stores") or [])
     stores = [parse_store(s) for s in raw_stores if isinstance(s, dict)]
     data = {
-        "method": "CloakBrowser public page fetch" if args.browser else "direct public HTTP",
+        "method": "direct public HTTP after blocked browser fallback" if browser_blocked else ("CloakBrowser public page fetch" if args.browser else "direct public HTTP"),
+        "browser_blocked": browser_blocked or None,
+        "warnings": ["CloakBrowser public page fetch was blocked/challenged; direct public HTTP fallback was used."] if browser_blocked else [],
         "region": REGION_NAMES.get(region, region) if region else None,
         "region_code": region,
         "count": len(stores),

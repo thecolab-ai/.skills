@@ -1573,7 +1573,10 @@ def fetch_text_cloakbrowser(url: str, timeout_ms: int = 90000) -> str:
 
 def fetch_text_browser_or_cdp(url: str, *, cdp_timeout: int = 8) -> str | None:
     if BROWSER_MODE:
-        return fetch_text_cloakbrowser(url)
+        try:
+            return fetch_text_cloakbrowser(url)
+        except BrowserBlockedError:
+            return None
     return fetch_text_via_cdp(url, timeout=cdp_timeout)
 
 
@@ -1818,6 +1821,8 @@ def try_fetch_live_page(url: str, use_cdp: bool = True) -> tuple[str | None, str
         method = "browser" if BROWSER_MODE else "cdp"
         if cdp_body and not is_bot_wall(cdp_body) and not is_missing_page(cdp_body):
             return cdp_body, final_url, 200, method
+        if BROWSER_MODE:
+            return None, final_url, status, "browser_blocked"
     if error:
         return None, final_url, status, error
     if body and is_bot_wall(body):
@@ -1827,7 +1832,7 @@ def try_fetch_live_page(url: str, use_cdp: bool = True) -> tuple[str | None, str
 
 def source_probe(url: str) -> dict[str, Any]:
     _, final_url, status, method = try_fetch_live_page(url)
-    ok = method in {"direct", "cdp"}
+    ok = method in {"direct", "cdp", "browser"}
     return {"ok": ok, "method": method, "status": status, "url": final_url}
 
 
@@ -2315,6 +2320,8 @@ def fetch_dud_text(url_or_path: str, timeout: int = 30) -> tuple[str, str, int, 
     method = "browser" if BROWSER_MODE else "cdp"
     if cdp_body and not is_bot_wall(cdp_body) and not is_missing_page(cdp_body):
         return cdp_body, final_url, 200, method
+    if BROWSER_MODE:
+        return "", final_url, status or 0, "browser_blocked"
 
     reason = error or ("bot-wall" if body and is_bot_wall(body) else "missing-page")
     fallback = "CloakBrowser --browser" if BROWSER_MODE else f"CDP fallback at {CDP_HTTP_BASE}"
