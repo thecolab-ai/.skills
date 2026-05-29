@@ -8,7 +8,11 @@ mkdir -p "$RESULTS_DIR"
 
 _smoke_one() {
     local skill="$1"
-    uv run --no-project python "$REPO_ROOT/skills/$skill/scripts/smoke_test.py" \
+    local uv_args=(run --no-project)
+    if [[ "${HERMES_SMOKE_WITH_CLOAKBROWSER:-}" == "1" ]]; then
+        uv_args+=(--with cloakbrowser)
+    fi
+    uv "${uv_args[@]}" python "$REPO_ROOT/skills/$skill/scripts/smoke_test.py" \
         > "$RESULTS_DIR/${skill}.log" 2>&1
     printf '%d\n' $? > "$RESULTS_DIR/${skill}.exit"
 }

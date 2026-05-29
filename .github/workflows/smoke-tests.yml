@@ -18,9 +18,23 @@ jobs:
         with:
           python-version: '3.12'
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install CloakBrowser for browser-assisted smoke tests
+        run: |
+          uv run --no-project --with cloakbrowser python -m cloakbrowser install
+          uv run --no-project --with cloakbrowser python - <<'PY'
+          from cloakbrowser import launch
+          print("CloakBrowser import OK", launch)
+          PY
+
       - name: Run smoke tests (parallel)
         env:
           AT_API_KEY: ${{ secrets.AT_API_KEY }}
           METOCEAN_API_KEY: ${{ secrets.METOCEAN_API_KEY }}
           METLINK_API_KEY: ${{ secrets.METLINK_API_KEY }}
+          HERMES_SMOKE_WITH_CLOAKBROWSER: "1"
+          HERMES_SMOKE_USE_BROWSER: "1"
         run: bash scripts/run_all_smoke.sh

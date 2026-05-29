@@ -20,6 +20,7 @@ skills/<name>/          # each skill — kebab-case dir, one clear job
   scripts/cli.py        #   the tool (main entry point)
   scripts/smoke_test.py #   end-to-end test, exits non-zero on failure
   references/*.md       #   heavy detail (API schemas, tables) loaded on demand
+docs/                   # repo-wide conventions, including optional browser-assisted mode
 scripts/                # repo tooling (see below)
 templates/              # skill-minimal, skill-tool-wrapper, skill-cli-workflow
 template/SKILL.md       # base template new_skill.py copies from
@@ -64,6 +65,11 @@ These come from `CONTRIBUTING.md` and are enforced by validation/CI:
   (machine-readable for Claude) and otherwise prints clean human-readable text.
 - **Timeout every network call** (10s default) and fail with a clear human message — not a stack
   trace — when an upstream API is down or rate-limited.
+- **Optional browser-assisted mode:** direct HTTP/API stays preferred. If a public read-only site
+  needs a real browser context, expose an explicit `--browser` flag using
+  [CloakBrowser](https://github.com/CloakHQ/CloakBrowser) when installed. Keep it optional, return
+  machine-readable `cloakbrowser_not_installed` when unavailable, and treat CAPTCHA/request-auth as
+  blocked states rather than bypass targets. See `docs/browser-assisted-skills.md`.
 - **NZ English** in user-facing strings ("organisation", "colour"); American spelling in code.
 - `smoke_test.py` exercises happy path + at least one edge case, is safe to re-run, and tolerates
   upstream flakiness (skip vs hard-fail on network errors).
