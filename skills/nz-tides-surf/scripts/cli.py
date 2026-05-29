@@ -724,7 +724,7 @@ def cmd_marine(args: argparse.Namespace) -> None:
             "Use `surf` or `best-break` for no-login SwellMap surf forecasts, or the existing `metservice-nz` "
             "skill's `marine` command for MetOcean wave variables when METOCEAN_API_KEY is available."
         ),
-        "metservice_nz_skill": "skills/metservice-nz/scripts/cli.ts marine <location>",
+        "metservice_nz_skill": "skills/metservice-nz/scripts/cli.py marine <location>",
         "metocean_docs": METOCEAN_DOCS,
     }
     emit(data, args.json, print_marine)

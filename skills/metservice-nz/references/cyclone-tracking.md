@@ -14,19 +14,19 @@
 
 ```bash
 # Pressure + extreme wind + storm surge data
-npx tsx skills/metservice-nz/scripts/cli.ts cyclone auckland
+python3 skills/metservice-nz/scripts/cli.py cyclone auckland
 
 # Continuous polling — alerts on changes
-npx tsx skills/metservice-nz/scripts/cli.ts watch wellington
+python3 skills/metservice-nz/scripts/cli.py watch wellington
 
 # Active MetService alerts
-npx tsx skills/metservice-nz/scripts/cli.ts warnings
+python3 skills/metservice-nz/scripts/cli.py warnings
 
 # Wave height / surge data
-npx tsx skills/metservice-nz/scripts/cli.ts marine auckland
+python3 skills/metservice-nz/scripts/cli.py marine auckland
 
 # Pressure trend (12h history + 12h forecast)
-npx tsx skills/metservice-nz/scripts/cli.ts pressure christchurch
+python3 skills/metservice-nz/scripts/cli.py pressure christchurch
 ```
 
 ## MetOcean variables for cyclone tracking

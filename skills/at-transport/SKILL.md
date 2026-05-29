@@ -28,7 +28,7 @@ Query live Auckland public transport data from the AT API through a CLI that is 
 
 ## Preferred workflow
 
-1. Run `scripts/cli.ts` with the narrowest subcommand that answers the task
+1. Run `scripts/cli.py` with the narrowest subcommand that answers the task
 2. Use default human output for direct answers
 3. Use `--json` when another tool or agent needs machine-readable output
 4. Fall back to importing `scripts/client.ts` only when you need the raw typed fetch functions
@@ -38,7 +38,7 @@ Query live Auckland public transport data from the AT API through a CLI that is 
 Run with:
 
 ```bash
-npx tsx skills/at-transport/scripts/cli.ts <command> [flags]
+python3 skills/at-transport/scripts/cli.py <command> [flags]
 ```
 
 ### `alerts [--limit N] [--json]`
@@ -54,9 +54,9 @@ JSON shape:
 Examples:
 
 ```bash
-npx tsx skills/at-transport/scripts/cli.ts alerts
-npx tsx skills/at-transport/scripts/cli.ts alerts --limit 5
-npx tsx skills/at-transport/scripts/cli.ts alerts --json
+python3 skills/at-transport/scripts/cli.py alerts
+python3 skills/at-transport/scripts/cli.py alerts --limit 5
+python3 skills/at-transport/scripts/cli.py alerts --json
 ```
 
 ### `departures <stop_id> [--limit N] [--json]`
@@ -78,9 +78,9 @@ Key stop codes:
 Examples:
 
 ```bash
-npx tsx skills/at-transport/scripts/cli.ts departures 11814
-npx tsx skills/at-transport/scripts/cli.ts departures 7155 --limit 5
-npx tsx skills/at-transport/scripts/cli.ts departures 11814 --json
+python3 skills/at-transport/scripts/cli.py departures 11814
+python3 skills/at-transport/scripts/cli.py departures 7155 --limit 5
+python3 skills/at-transport/scripts/cli.py departures 11814 --json
 ```
 
 ### `stops <query> [--limit N] [--json]`
@@ -96,9 +96,9 @@ JSON shape:
 Examples:
 
 ```bash
-npx tsx skills/at-transport/scripts/cli.ts stops Britomart
-npx tsx skills/at-transport/scripts/cli.ts stops Newmarket
-npx tsx skills/at-transport/scripts/cli.ts stops 7155 --json
+python3 skills/at-transport/scripts/cli.py stops Britomart
+python3 skills/at-transport/scripts/cli.py stops Newmarket
+python3 skills/at-transport/scripts/cli.py stops 7155 --json
 ```
 
 ### `nearby <lat,lon> [--radius N] [--limit N] [--json]`
@@ -115,9 +115,9 @@ JSON shape:
 Examples:
 
 ```bash
-npx tsx skills/at-transport/scripts/cli.ts nearby --location=-36.844,174.768
-npx tsx skills/at-transport/scripts/cli.ts nearby --location=-36.844,174.768 --radius 1000
-npx tsx skills/at-transport/scripts/cli.ts nearby --location=-36.844,174.768 --json
+python3 skills/at-transport/scripts/cli.py nearby --location=-36.844,174.768
+python3 skills/at-transport/scripts/cli.py nearby --location=-36.844,174.768 --radius 1000
+python3 skills/at-transport/scripts/cli.py nearby --location=-36.844,174.768 --json
 ```
 
 ### `route <route_id> [--json]`
@@ -130,8 +130,8 @@ JSON shape:
 Examples:
 
 ```bash
-npx tsx skills/at-transport/scripts/cli.ts route STH-201
-npx tsx skills/at-transport/scripts/cli.ts route 70-221 --json
+python3 skills/at-transport/scripts/cli.py route STH-201
+python3 skills/at-transport/scripts/cli.py route 70-221 --json
 ```
 
 ### `vehicles [--route <route_id>] [--limit N] [--json]`
@@ -148,9 +148,9 @@ JSON shape:
 Examples:
 
 ```bash
-npx tsx skills/at-transport/scripts/cli.ts vehicles
-npx tsx skills/at-transport/scripts/cli.ts vehicles --route STH-201
-npx tsx skills/at-transport/scripts/cli.ts vehicles --limit 10 --json
+python3 skills/at-transport/scripts/cli.py vehicles
+python3 skills/at-transport/scripts/cli.py vehicles --route STH-201
+python3 skills/at-transport/scripts/cli.py vehicles --limit 10 --json
 ```
 
 ### `status [--json]`
@@ -170,15 +170,14 @@ JSON shape:
 Examples:
 
 ```bash
-npx tsx skills/at-transport/scripts/cli.ts status
-npx tsx skills/at-transport/scripts/cli.ts status --json
+python3 skills/at-transport/scripts/cli.py status
+python3 skills/at-transport/scripts/cli.py status --json
 ```
 
 ## Resources
 
-- CLI entrypoint: `scripts/cli.ts`
-- Typed fetch client: `scripts/client.ts`
-- Live smoke test: `scripts/smoke-test.ts`
+- CLI entrypoint: `scripts/cli.py`
+- Live smoke test: `scripts/smoke_test.py`
 
 ## Notes
 

@@ -61,7 +61,7 @@ python3 skills/trademe-nz/scripts/cli.py listing 5945835894 --json
 ## Resources
 
 - CLI entrypoint: `scripts/cli.py`
-- Live smoke test: `scripts/smoke-test.ts`
+- Live smoke test: `scripts/smoke_test.py`
 - API and stability notes: `references/api-notes.md`
 
 ## Notes

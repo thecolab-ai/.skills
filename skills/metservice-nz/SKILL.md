@@ -25,7 +25,7 @@ Query point forecasts from the MetOcean API for New Zealand locations — weathe
 
 ## Preferred workflow
 
-1. Run `scripts/cli.ts` with the narrowest subcommand that answers the task
+1. Run `scripts/cli.py` with the narrowest subcommand that answers the task
 2. Use default human output for direct answers
 3. Use `--json` when another tool or agent needs machine-readable output
 4. Use `--location lat,lon` for custom coordinates not in the named list
@@ -46,7 +46,7 @@ Requires a MetOcean API key (free tier available).
 Run with:
 
 ```bash
-npx tsx skills/metservice-nz/scripts/cli.ts <command> [flags]
+python3 skills/metservice-nz/scripts/cli.py <command> [flags]
 ```
 
 ### `now [location] [--json] [--location lat,lon]`
@@ -56,9 +56,9 @@ Current conditions snapshot: temperature, wind, rain, humidity, pressure, cloud 
 Examples:
 
 ```bash
-npx tsx skills/metservice-nz/scripts/cli.ts now auckland
-npx tsx skills/metservice-nz/scripts/cli.ts now wellington --json
-npx tsx skills/metservice-nz/scripts/cli.ts now --location -37.0,175.5
+python3 skills/metservice-nz/scripts/cli.py now auckland
+python3 skills/metservice-nz/scripts/cli.py now wellington --json
+python3 skills/metservice-nz/scripts/cli.py now --location -37.0,175.5
 ```
 
 ### `forecast [location] [--json] [--location lat,lon]`
@@ -68,8 +68,8 @@ npx tsx skills/metservice-nz/scripts/cli.ts now --location -37.0,175.5
 Examples:
 
 ```bash
-npx tsx skills/metservice-nz/scripts/cli.ts forecast auckland
-npx tsx skills/metservice-nz/scripts/cli.ts forecast christchurch --json
+python3 skills/metservice-nz/scripts/cli.py forecast auckland
+python3 skills/metservice-nz/scripts/cli.py forecast christchurch --json
 ```
 
 ### `daily [location] [--json] [--location lat,lon]`
@@ -79,8 +79,8 @@ npx tsx skills/metservice-nz/scripts/cli.ts forecast christchurch --json
 Examples:
 
 ```bash
-npx tsx skills/metservice-nz/scripts/cli.ts daily queenstown
-npx tsx skills/metservice-nz/scripts/cli.ts daily wellington --json
+python3 skills/metservice-nz/scripts/cli.py daily queenstown
+python3 skills/metservice-nz/scripts/cli.py daily wellington --json
 ```
 
 ### `marine [location] [--json] [--location lat,lon]`
@@ -90,8 +90,8 @@ Marine forecast: wave height, swell height, swell period, swell direction, sea t
 Examples:
 
 ```bash
-npx tsx skills/metservice-nz/scripts/cli.ts marine auckland
-npx tsx skills/metservice-nz/scripts/cli.ts marine clevedon --json
+python3 skills/metservice-nz/scripts/cli.py marine auckland
+python3 skills/metservice-nz/scripts/cli.py marine clevedon --json
 ```
 
 ### `wind [location] [--json] [--location lat,lon]`
@@ -101,8 +101,8 @@ Detailed wind forecast: speed, gusts, direction — hourly for 24 hours.
 Examples:
 
 ```bash
-npx tsx skills/metservice-nz/scripts/cli.ts wind wellington
-npx tsx skills/metservice-nz/scripts/cli.ts wind auckland
+python3 skills/metservice-nz/scripts/cli.py wind wellington
+python3 skills/metservice-nz/scripts/cli.py wind auckland
 ```
 
 ### `rain [location] [--json] [--location lat,lon]`
@@ -112,8 +112,8 @@ Precipitation forecast: hourly rain rate for 24 hours.
 Examples:
 
 ```bash
-npx tsx skills/metservice-nz/scripts/cli.ts rain christchurch
-npx tsx skills/metservice-nz/scripts/cli.ts rain queenstown --json
+python3 skills/metservice-nz/scripts/cli.py rain christchurch
+python3 skills/metservice-nz/scripts/cli.py rain queenstown --json
 ```
 
 ### `warnings [--json]`
@@ -123,8 +123,8 @@ Scrape MetService severe weather warnings page for active alerts, watches, and a
 Examples:
 
 ```bash
-npx tsx skills/metservice-nz/scripts/cli.ts warnings
-npx tsx skills/metservice-nz/scripts/cli.ts warnings --json
+python3 skills/metservice-nz/scripts/cli.py warnings
+python3 skills/metservice-nz/scripts/cli.py warnings --json
 ```
 
 ### `cyclone [location] [--json] [--location lat,lon] [--hours n]`
@@ -134,9 +134,9 @@ Cyclone-specific data: pressure trend, extreme wind, storm surge indicators. Fet
 Examples:
 
 ```bash
-npx tsx skills/metservice-nz/scripts/cli.ts cyclone auckland
-npx tsx skills/metservice-nz/scripts/cli.ts cyclone wellington --hours 72
-npx tsx skills/metservice-nz/scripts/cli.ts cyclone clevedon --json
+python3 skills/metservice-nz/scripts/cli.py cyclone auckland
+python3 skills/metservice-nz/scripts/cli.py cyclone wellington --hours 72
+python3 skills/metservice-nz/scripts/cli.py cyclone clevedon --json
 ```
 
 ### `pressure [location] [--json] [--location lat,lon]`
@@ -146,8 +146,8 @@ Barometric pressure trend — the #1 cyclone indicator. Shows 12h history + 12h 
 Examples:
 
 ```bash
-npx tsx skills/metservice-nz/scripts/cli.ts pressure auckland
-npx tsx skills/metservice-nz/scripts/cli.ts pressure wellington --json
+python3 skills/metservice-nz/scripts/cli.py pressure auckland
+python3 skills/metservice-nz/scripts/cli.py pressure wellington --json
 ```
 
 ### `watch [location] [--location lat,lon] [--interval minutes] [--json]`
@@ -157,9 +157,9 @@ Continuous cyclone monitoring. Polls every 5 minutes (configurable) and alerts o
 Examples:
 
 ```bash
-npx tsx skills/metservice-nz/scripts/cli.ts watch auckland
-npx tsx skills/metservice-nz/scripts/cli.ts watch wellington --interval 2
-npx tsx skills/metservice-nz/scripts/cli.ts watch clevedon --json
+python3 skills/metservice-nz/scripts/cli.py watch auckland
+python3 skills/metservice-nz/scripts/cli.py watch wellington --interval 2
+python3 skills/metservice-nz/scripts/cli.py watch clevedon --json
 ```
 
 ### `locations [--json]`
@@ -169,8 +169,8 @@ List all named locations with coordinates.
 Examples:
 
 ```bash
-npx tsx skills/metservice-nz/scripts/cli.ts locations
-npx tsx skills/metservice-nz/scripts/cli.ts locations --json
+python3 skills/metservice-nz/scripts/cli.py locations
+python3 skills/metservice-nz/scripts/cli.py locations --json
 ```
 
 ## Named Locations
@@ -211,9 +211,8 @@ npx tsx skills/metservice-nz/scripts/cli.ts locations --json
 
 ## Resources
 
-- CLI entrypoint: `scripts/cli.ts`
-- Typed API client: `scripts/client.ts`
-- Live smoke test: `scripts/smoke-test.ts`
+- CLI entrypoint: `scripts/cli.py`
+- Live smoke test: `scripts/smoke_test.py`
 
 ## Notes
 

@@ -57,7 +57,7 @@ python3 skills/nzbn-register/scripts/cli.py lookup 9429000023795 --raw --json
 ## Resources
 
 - CLI entrypoint: `scripts/cli.py`
-- Live smoke test: `scripts/smoke-test.ts`
+- Live smoke test: `scripts/smoke_test.py`
 - API and stability notes: `references/api-notes.md`
 
 ## Notes

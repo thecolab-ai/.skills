@@ -60,7 +60,7 @@ The CLI resolves the first event's place/offers and aggregates unique sessions i
 ## Stability and safety
 
 - This is public website parsing, not a formal stable third-party API contract.
-- Markup can change. Run `scripts/smoke-test.ts` or a live `upcoming` + `event` poke before production use.
+- Markup can change. Run `scripts/smoke_test.py` or a live `upcoming` + `event` poke before production use.
 - Avoid high-volume scraping, full-site replication, or rapid polling.
 - Do not automate ticket purchases, checkout, account actions, or private organiser/customer workflows.
 - Treat results as live public snapshots; venues, dates, prices, and availability can change.
