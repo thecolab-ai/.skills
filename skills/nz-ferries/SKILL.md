@@ -1,13 +1,13 @@
 ---
 name: nz-ferries
-description: Query NZ ferry schedules, fare snapshots, and service alerts: Cook Strait Interislander/Bluebridge, SeaLink Waiheke/Great Barrier, Fullers360/AT Metro Auckland ferries. Read-only; no booking or payment. Use at-transport for AT Metro real-time positions.
+description: Query NZ ferry schedules, fare snapshots, and service alerts: Cook Strait Interislander/Bluebridge, SeaLink Waiheke/Great Barrier, Fullers360/AT Metro Auckland ferries. Optional --browser mode probes Fullers public timetable pages with CloakBrowser while keeping AT GTFS fallback. Read-only; no booking or payment. Use at-transport for AT Metro real-time positions.
 ---
 
 # NZ Ferries
 
 ## Goal
 
-Query live public ferry schedule and alert surfaces across major NZ ferry operators through a small deterministic CLI with human-readable and JSON output, without browser automation, login, booking, or payment.
+Query live public ferry schedule and alert surfaces across major NZ ferry operators through a small deterministic CLI with human-readable and JSON output. Direct public HTTP/GTFS is the default; optional `--browser` probes Fullers public timetable pages with CloakBrowser while keeping AT GTFS fallback. No login, booking, payment, or CAPTCHA bypass.
 
 This skill is deliberately separate from `at-transport`:
 
@@ -39,8 +39,9 @@ This skill is deliberately separate from `at-transport`:
 3. Use `sailings <route> --operator <operator>` when a specific ferry company is known
 4. Use `next <route>` for the next upcoming sailings from the current NZ time
 5. Use `alerts` before presenting travel advice for a date-sensitive trip
-6. Use `--json` for agent chaining, comparisons, or structured reports
-7. Mention the source operator and that results are public read-only snapshots
+6. Use `--browser` with Fullers routes only when you want a public Fullers timetable-page probe; if it is blocked, trust the AT GTFS fallback and report the blocked status
+7. Use `--json` for agent chaining, comparisons, or structured reports
+8. Mention the source operator and that results are public read-only snapshots
 
 ## CLI
 
@@ -54,8 +55,8 @@ python3 skills/nz-ferries/scripts/cli.py <command> [flags]
 
 - `operators [--json]` - list supported ferry operators and coverage
 - `routes [--operator OPERATOR] [--json]` - list route IDs and aliases
-- `sailings <route> [--date YYYY-MM-DD] [--operator OPERATOR] [--json]` - sailings on a date
-- `next <route> [--operator OPERATOR] [--limit N] [--json]` - next few upcoming sailings from now
+- `sailings <route> [--date YYYY-MM-DD] [--operator OPERATOR] [--json] [--browser]` - sailings on a date; `--browser` probes Fullers public timetable page and keeps AT GTFS fallback
+- `next <route> [--operator OPERATOR] [--limit N] [--json] [--browser]` - next few upcoming sailings from now; `--browser` probes Fullers public timetable page when applicable
 - `alerts [--operator OPERATOR] [--json]` - current public service alerts/reminders
 - `cook-strait [--date YYYY-MM-DD] [--direction wellington-picton|picton-wellington|both] [--operator OPERATOR] [--json]` - combined Cook Strait view
 
@@ -68,7 +69,7 @@ python3 skills/nz-ferries/scripts/cli.py cook-strait --date 2026-05-24 --json
 python3 skills/nz-ferries/scripts/cli.py sailings wellington-picton --operator interislander --date 2026-05-24
 python3 skills/nz-ferries/scripts/cli.py sailings wellington-picton --operator bluebridge --date 2026-05-24 --json
 python3 skills/nz-ferries/scripts/cli.py sailings auckland-waiheke --operator sealink --date 2026-05-24
-python3 skills/nz-ferries/scripts/cli.py sailings auckland-devonport --operator fullers --date 2026-05-24
+python3 skills/nz-ferries/scripts/cli.py sailings auckland-devonport --operator fullers --date 2026-05-24 --json --browser
 python3 skills/nz-ferries/scripts/cli.py sailings auckland-waiheke --operator fullers --date 2026-05-24 --json
 python3 skills/nz-ferries/scripts/cli.py next auckland-devonport --operator fullers
 python3 skills/nz-ferries/scripts/cli.py next auckland-waiheke --operator sealink --limit 5
@@ -82,7 +83,7 @@ python3 skills/nz-ferries/scripts/cli.py alerts --json
 - SeaLink uses a public schedule endpoint that returns sailing times, ferry names, availability/status, remaining passenger spaces, and fare snapshots for a query basket. The CLI uses one car+driver and one adult only to expose public fare/availability fields; it does not create or mutate bookings.
 - Interislander uses the public ferry timetable page and public disruption endpoint. The timetable page publishes departure times and says crossings take about 3.5 hours, so arrival times are estimated from that duration.
 - Bluebridge uses the public timetable and service-alert pages. The CLI filters known day restrictions such as "not available on weekends" from the published timetable notes.
-- Fullers360 app and website timetable endpoints were reverse-engineered, but direct stdlib requests hit Radware/hCaptcha validation. The shipped Fullers implementation uses AT's public static GTFS zip for scheduled sailings and AT GTFS-RT service alerts for cancellations and disruptions.
+- Fullers360 app and website timetable endpoints were reverse-engineered, but direct stdlib requests hit Radware/hCaptcha validation. The shipped Fullers implementation uses AT's public static GTFS zip for scheduled sailings and AT GTFS-RT service alerts for cancellations and disruptions. Optional `--browser` on `sailings`/`next` probes the public Fullers timetable page with CloakBrowser and records `browser_probe.status` as `loaded` or `blocked`; it never solves CAPTCHA/PerfDrive/hCaptcha and AT GTFS remains the structured source.
 - Fullers fare snapshots are not implemented because the Fullers website/app fare/timetable fragments are browser-gated from direct CLI fetches.
 - No operator account cookie, browser session, booking mutation, or payment action is required. The AT alert feed uses a public AT API subscription key with an `AT_API_KEY` environment override.
 - Endpoint shapes can change without notice because these are public website surfaces rather than official stable APIs.

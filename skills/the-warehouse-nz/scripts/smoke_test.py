@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
 
 SKILL_DIR = Path(__file__).parent.parent
 CLI = SKILL_DIR / "scripts" / "cli.py"
+USE_BROWSER = os.environ.get("HERMES_SMOKE_USE_BROWSER") == "1"
+
+
+def with_browser(args: list) -> list:
+    return args + (["--browser"] if USE_BROWSER else [])
 
 
 def run(args: list) -> subprocess.CompletedProcess:
@@ -42,7 +48,7 @@ results.append(test("--help exits 0", test_help))
 
 
 def test_search():
-    result = run(["search", "toys", "--limit", "3", "--json"])
+    result = run(with_browser(["search", "toys", "--limit", "3", "--json"]))
     if result.returncode != 0:
         print(f"  stderr: {result.stderr[:200]}")
         return False
@@ -58,7 +64,7 @@ results.append(test("search toys returns products[]", test_search))
 
 
 def test_stores():
-    result = run(["stores", "--json"])
+    result = run(with_browser(["stores", "--json"]))
     if result.returncode != 0:
         print(f"  stderr: {result.stderr[:200]}")
         return False
@@ -74,7 +80,7 @@ results.append(test("stores returns stores[]", test_stores))
 
 
 def test_specials():
-    result = run(["specials", "--limit", "3", "--json"])
+    result = run(with_browser(["specials", "--limit", "3", "--json"]))
     if result.returncode != 0:
         print(f"  stderr: {result.stderr[:200]}")
         return False

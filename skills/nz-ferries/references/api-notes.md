@@ -259,7 +259,7 @@ GET https://www.fullers.co.nz/timetables-and-fares/?from=<from>&to=<to>&date=<MM
 X-Requested-With: XMLHttpRequest
 ```
 
-The website `timetable-widget.js` requests this URL and parses the `.js.timetable-fares` fragment. CloakBrowser could load some fragments in a full browser context, but direct CLI requests to Fullers app/site endpoints returned Radware/hCaptcha/PerfDrive validation. Because the skill must remain stdlib-only and not depend on browser automation, those endpoints are documented as discovery context rather than shipped as a data source.
+The website `timetable-widget.js` requests this URL and parses the `.js.timetable-fares` fragment. Direct CLI requests to Fullers app/site endpoints returned Radware/hCaptcha/PerfDrive validation. The CLI now exposes optional `--browser` on `sailings`/`next` for Fullers routes: it launches CloakBrowser, loads the public timetable URL, records a `browser_probe` (`loaded` or `blocked`), and still uses AT GTFS as the structured schedule source. CAPTCHA/PerfDrive/hCaptcha results are treated as blocked states, not bypass targets.
 
 Use `at-transport` for Auckland Metro ferry vehicle positions and full stop-departure workflows. Use this skill for the normalized Fullers/AT Metro scheduled sailings and service alerts listed above.
 
