@@ -1,0 +1,385 @@
+#!/usr/bin/env python3
+"""CLI for public grocer.nz supermarket price data.
+
+Uses Grocer's public static DuckDB/parquet assets plus its public frontend
+Meilisearch search key. Dependencies are bootstrapped via uv when absent.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import pathlib
+import shutil
+import sys
+import urllib.error
+import urllib.request
+from typing import Any
+
+NEEDS = ("duckdb",)
+try:
+    import duckdb  # type: ignore
+except Exception:
+    if os.environ.get("GROCER_NZ_BOOTSTRAPPED") != "1" and shutil.which("uv"):
+        env = os.environ.copy()
+        env["GROCER_NZ_BOOTSTRAPPED"] = "1"
+        os.execvpe(
+            "uv",
+            ["uv", "run", "--quiet", "--with", "duckdb", "python", __file__, *sys.argv[1:]],
+            env,
+        )
+    raise
+
+BASE = "https://assets-prod.grocer.nz/public"
+MEILI = "https://meilisearch.grocer.nz"
+MEILI_KEY = "7f58239330307ec585c86863f985ab83cbb9ce951a9601c66e158548fb632fd1"
+CACHE = pathlib.Path(os.environ.get("GROCER_NZ_CACHE", "~/.cache/grocer-nz")).expanduser()
+HEADERS = {"User-Agent": "Mozilla/5.0 (Hermes grocer.nz skill)", "Referer": "https://grocer.nz/"}
+MAX_LIMIT = 100
+
+
+def http_get(url: str, *, headers: dict[str, str] | None = None) -> bytes:
+    req = urllib.request.Request(url, headers={**HEADERS, **(headers or {})})
+    with urllib.request.urlopen(req, timeout=120) as r:
+        return r.read()
+
+
+def http_json(url: str, payload: dict[str, Any], *, headers: dict[str, str] | None = None) -> dict[str, Any]:
+    data = json.dumps(payload).encode()
+    req = urllib.request.Request(
+        url,
+        data=data,
+        headers={"Content-Type": "application/json", **HEADERS, **(headers or {})},
+    )
+    with urllib.request.urlopen(req, timeout=60) as r:
+        return json.loads(r.read().decode())
+
+
+def download(url: str, path: pathlib.Path, *, force: bool = False) -> pathlib.Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if force or not path.exists() or path.stat().st_size == 0:
+        path.write_bytes(http_get(url))
+    return path
+
+
+def base_db(force: bool = False) -> pathlib.Path:
+    CACHE.mkdir(parents=True, exist_ok=True)
+    # Despite the .br suffix, CDN responses are often transparently decoded.
+    return download(f"{BASE}/base_v3.duckdb.br", CACHE / "base_v3.duckdb", force=force)
+
+
+def price_file(store_id: int, force: bool = False) -> pathlib.Path | None:
+    path = CACHE / "prices_per_store_v3" / f"public_prices_{store_id}.parquet"
+    try:
+        return download(f"{BASE}/prices_per_store_v3/public_prices_{store_id}.parquet", path, force=force)
+    except urllib.error.HTTPError as e:
+        if e.code in (403, 404):
+            return None
+        raise
+
+
+def history_file(product_id: int, force: bool = False) -> pathlib.Path | None:
+    path = CACHE / "price_history_v3" / f"price_history_{product_id}.parquet"
+    try:
+        return download(f"{BASE}/price_history_v3/price_history_{product_id}.parquet", path, force=force)
+    except urllib.error.HTTPError as e:
+        if e.code in (403, 404):
+            return None
+        raise
+
+
+def con(force: bool = False):
+    db = base_db(force=force)
+    c = duckdb.connect(":memory:")
+    sql = "attach " + sql_quote_path(db) + " as base (READ_ONLY)"
+    c.execute(sql)
+    return c
+
+
+def rows_to_dicts(cur) -> list[dict[str, Any]]:
+    cols = [d[0] for d in cur.description]
+    out = []
+    for row in cur.fetchall():
+        item = {}
+        for k, v in zip(cols, row):
+            if hasattr(v, "isoformat"):
+                v = v.isoformat()
+            item[k] = v
+        out.append(item)
+    return out
+
+
+def cents(v: Any) -> str:
+    return "-" if v is None else f"${int(v)/100:.2f}"
+
+
+def effective_expr(alias: str = "pr") -> str:
+    return f"least(coalesce({alias}.sale_price_cent, 999999999), coalesce({alias}.club_price_cent, 999999999), coalesce({alias}.online_price_cent, 999999999), coalesce({alias}.original_price_cent, 999999999))"
+
+
+def bounded_limit(value: int) -> int:
+    return max(1, min(int(value), MAX_LIMIT))
+
+
+def bounded_offset(value: int) -> int:
+    return max(0, int(value))
+
+
+def meili_filter_string(value: str) -> str:
+    return value.replace("\\", "\\\\").replace('"', '\\"')
+
+
+def print_result(data: Any, as_json: bool) -> None:
+    if as_json:
+        print(json.dumps(data, indent=2, ensure_ascii=False, default=str))
+    elif isinstance(data, list):
+        for item in data:
+            print(" | ".join(f"{k}={v}" for k, v in item.items()))
+    else:
+        print(data)
+
+
+def cmd_stores(args):
+    c = con(force=args.refresh)
+    where = ["s.is_enabled = true"] if not args.include_disabled else []
+    params: list[Any] = []
+    if args.query:
+        where.append("lower(s.name) like ?")
+        params.append(f"%{args.query.lower()}%")
+    if args.vendor:
+        where.append("lower(v.name) like ?")
+        params.append(f"%{args.vendor.lower()}%")
+    sql = """
+      select s.id, v.name as vendor, s.name, s.is_enabled
+      from base.public_stores s
+      left join base.public_vendors v on v.id = s.vendor_id
+    """
+    if where:
+        sql += " where " + " and ".join(where)
+    sql += " order by v.name, s.name limit ?"
+    params.append(args.limit)
+    rows = rows_to_dicts(c.execute(sql, params))
+    print_result(rows, args.json)
+
+
+def resolve_store_ids(c, store_ids: list[int], store_query: str | None) -> list[int]:
+    ids = list(dict.fromkeys(store_ids))
+    if store_query:
+        rows = c.execute(
+            "select id from base.public_stores where is_enabled=true and lower(name) like ? order by name",
+            [f"%{store_query.lower()}%"],
+        ).fetchall()
+        ids.extend(int(r[0]) for r in rows)
+    return list(dict.fromkeys(ids))
+
+
+def meili_search(term: str, limit: int, offset: int, store_ids: list[int] | None = None, category: str = "") -> dict[str, Any]:
+    filters = []
+    limit = bounded_limit(limit)
+    offset = bounded_offset(offset)
+    if store_ids:
+        filters.append(f"stores IN [ {', '.join(map(str, store_ids))} ]")
+    if category:
+        level = len(category.split(" > "))
+        filters.append(f'categories.level_{level} = "{meili_filter_string(category)}"')
+    payload = {
+        "q": term,
+        "limit": limit,
+        "offset": offset,
+        "filter": filters,
+        "attributesToRetrieve": ["id", "name", "brand", "size", "unit", "categories", "stores"],
+    }
+    return http_json(f"{MEILI}/indexes/products/search", payload, headers={"Authorization": f"Bearer {MEILI_KEY}"})
+
+
+def sql_quote_path(path: pathlib.Path) -> str:
+    return "'" + str(path).replace("'", "''") + "'"
+
+
+def attach_price_views(c, store_ids: list[int], refresh: bool = False) -> list[int]:
+    ok = []
+    for sid in store_ids:
+        p = price_file(sid, force=refresh)
+        if not p:
+            continue
+        sql = "create or replace view prices_{} as select * from read_parquet({})".format(
+            sid, sql_quote_path(p)
+        )
+        c.execute(sql)
+        ok.append(sid)
+    return ok
+
+
+def cmd_search(args):
+    c = con(force=args.refresh)
+    store_ids = resolve_store_ids(c, args.store_id or [], args.store_query)
+    result = meili_search(args.term, args.limit, args.offset, store_ids or None, args.category or "")
+    hits = result.get("hits", [])
+    ids = [int(h["id"]) for h in hits]
+    if store_ids and ids:
+        ok = attach_price_views(c, store_ids, refresh=args.refresh)
+        if ok:
+            union = " union all ".join([f"select * from prices_{sid}" for sid in ok])
+            placeholders = ",".join(["?"] * len(ids))
+            sql = """
+              with price_union as ({union})
+              select p.id as product_id, s.id as store_id, s.name as store_name,
+                     pr.updated_at, pr.original_price_cent, pr.sale_price_cent, pr.club_price_cent,
+                     pr.online_price_cent, pr.multibuy_price_cent, pr.multibuy_quantity,
+                     {effective_price} as effective_price_cent
+              from price_union pr
+              join base.public_products p on p.id = pr.product_id
+              join base.public_stores s on s.id = pr.store_id
+              where p.id in ({placeholders})
+              order by p.id, effective_price_cent, s.name
+            """.format(union=union, effective_price=effective_expr(), placeholders=placeholders)
+            price_rows = rows_to_dicts(c.execute(sql, ids))
+            by_pid: dict[int, list[dict[str, Any]]] = {}
+            for r in price_rows:
+                by_pid.setdefault(int(r["product_id"]), []).append(r)
+            for h in hits:
+                h["prices"] = by_pid.get(int(h["id"]), [])
+    if args.json:
+        print_result({"estimatedTotalHits": result.get("estimatedTotalHits"), "hits": hits}, True)
+    else:
+        print(f"estimatedTotalHits={result.get('estimatedTotalHits')}")
+        for h in hits:
+            label = " ".join(str(x) for x in [h.get("brand"), h.get("name"), h.get("size")] if x)
+            print(f"{h['id']} | {label}")
+            for p in h.get("prices", [])[:10]:
+                print(f"  {p['store_name']}: eff {cents(p['effective_price_cent'])} orig {cents(p['original_price_cent'])} sale {cents(p['sale_price_cent'])} club {cents(p['club_price_cent'])} updated {p['updated_at']}")
+
+
+def cmd_prices(args):
+    c = con(force=args.refresh)
+    store_ids = resolve_store_ids(c, args.store_id or [], args.store_query)
+    if args.all_stores or not store_ids:
+        store_ids = [int(r[0]) for r in c.execute("select id from base.public_stores where is_enabled=true order by id").fetchall()]
+    ok = attach_price_views(c, store_ids, refresh=args.refresh)
+    if not ok:
+        print_result([], args.json)
+        return
+    union = " union all ".join([f"select * from prices_{sid}" for sid in ok])
+    sql = """
+      with price_union as ({union})
+      select p.id as product_id, p.brand, p.name, p.size, s.id as store_id, s.name as store_name,
+             pr.updated_at, pr.original_price_cent, pr.sale_price_cent, pr.club_price_cent,
+             pr.online_price_cent, pr.multibuy_price_cent, pr.multibuy_quantity,
+             {effective_price} as effective_price_cent
+      from price_union pr
+      join base.public_products p on p.id=pr.product_id
+      join base.public_stores s on s.id=pr.store_id
+      where p.id=?
+      order by effective_price_cent, s.name
+      limit ?
+    """.format(union=union, effective_price=effective_expr())
+    rows = rows_to_dicts(c.execute(sql, [args.product_id, args.limit]))
+    if args.json:
+        print_result(rows, True)
+    else:
+        for r in rows:
+            print(f"{r['store_name']}: eff {cents(r['effective_price_cent'])} orig {cents(r['original_price_cent'])} sale {cents(r['sale_price_cent'])} club {cents(r['club_price_cent'])} updated {r['updated_at']}")
+
+
+def cmd_history(args):
+    c = con(force=args.refresh)
+    p = history_file(args.product_id, force=args.refresh)
+    if not p:
+        print_result([], args.json)
+        return
+    sql = "create or replace view hist as select * from read_parquet({})".format(
+        sql_quote_path(p)
+    )
+    c.execute(sql)
+    where = []
+    params: list[Any] = []
+    ids = resolve_store_ids(c, args.store_id or [], args.store_query)
+    if ids:
+        where.append("h.store_id in (" + ",".join(["?"] * len(ids)) + ")")
+        params.extend(ids)
+    where_sql = "where " + " and ".join(where) if where else ""
+    sql = """
+      select h.updated_at, h.store_id, s.vendor_id, s.name as store_name, h.price_cent
+      from hist h
+      left join base.public_stores s on s.id=h.store_id
+      {where_sql}
+      order by h.updated_at desc, s.name
+      limit ?
+    """.format(where_sql=where_sql)
+    rows = rows_to_dicts(c.execute(sql, [*params, args.limit]))
+    if args.json:
+        print_result(rows, True)
+    else:
+        for r in rows:
+            print(f"{r['updated_at']} | {r['store_name'] or r['store_id']} | {cents(r['price_cent'])}")
+
+
+def cmd_product(args):
+    c = con(force=args.refresh)
+    rows = rows_to_dicts(c.execute("""
+      select p.*, c1.name as category_1, c2.name as category_2, c3.name as category_3
+      from base.public_products p
+      left join base.public_collection_members cm1 on cm1.product_id=p.id
+      left join base.public_collections c1 on c1.id=cm1.collection_id and c1.is_comparable=true
+      left join base.public_collections c2 on false
+      left join base.public_collections c3 on false
+      where p.id=?
+      limit 1
+    """, [args.product_id]))
+    # Category joins in the app are hierarchy-derived; raw product row is the reliable bit here.
+    if not rows:
+        rows = rows_to_dicts(c.execute("select * from base.public_products where id=?", [args.product_id]))
+    print_result(rows[0] if rows else {}, args.json)
+
+
+def main(argv=None):
+    p = argparse.ArgumentParser(description="Query public grocer.nz supermarket price/search/history data")
+    p.add_argument("--refresh", action="store_true", help="refresh cached public files")
+    sub = p.add_subparsers(dest="cmd", required=True)
+
+    sp = sub.add_parser("stores", help="list stores")
+    sp.add_argument("--query", "-q")
+    sp.add_argument("--vendor")
+    sp.add_argument("--include-disabled", action="store_true")
+    sp.add_argument("--limit", type=int, default=50)
+    sp.add_argument("--json", action="store_true")
+    sp.set_defaults(func=cmd_stores)
+
+    sp = sub.add_parser("search", help="search products; optionally include current prices for selected stores")
+    sp.add_argument("term")
+    sp.add_argument("--store-id", type=int, action="append", default=[])
+    sp.add_argument("--store-query")
+    sp.add_argument("--category", default="")
+    sp.add_argument("--limit", type=int, default=10)
+    sp.add_argument("--offset", type=int, default=0)
+    sp.add_argument("--json", action="store_true")
+    sp.set_defaults(func=cmd_search)
+
+    sp = sub.add_parser("prices", help="current prices for a product id across selected stores")
+    sp.add_argument("product_id", type=int)
+    sp.add_argument("--store-id", type=int, action="append", default=[])
+    sp.add_argument("--store-query")
+    sp.add_argument("--all-stores", action="store_true", help="download/query all enabled store price parquet files; can be slow")
+    sp.add_argument("--limit", type=int, default=50)
+    sp.add_argument("--json", action="store_true")
+    sp.set_defaults(func=cmd_prices)
+
+    sp = sub.add_parser("history", help="historical price rows for a product id")
+    sp.add_argument("product_id", type=int)
+    sp.add_argument("--store-id", type=int, action="append", default=[])
+    sp.add_argument("--store-query")
+    sp.add_argument("--limit", type=int, default=100)
+    sp.add_argument("--json", action="store_true")
+    sp.set_defaults(func=cmd_history)
+
+    sp = sub.add_parser("product", help="raw product metadata by id")
+    sp.add_argument("product_id", type=int)
+    sp.add_argument("--json", action="store_true")
+    sp.set_defaults(func=cmd_product)
+
+    args = p.parse_args(argv)
+    args.func(args)
+
+
+if __name__ == "__main__":
+    main()
