@@ -10,22 +10,28 @@ import argparse
 import json
 import os
 import pathlib
+import re
 import shutil
 import sys
 import urllib.error
 import urllib.request
 from typing import Any
 
-NEEDS = ("duckdb",)
+NEEDS = ("duckdb", "pytz")
 try:
     import duckdb  # type: ignore
+    # duckdb requires pytz at runtime for timezone-aware timestamp casts (the
+    # price/history parquet `updated_at` columns). Import it here so a host that
+    # has duckdb but not pytz still triggers the uv bootstrap below instead of
+    # crashing mid-query.
+    import pytz  # type: ignore  # noqa: F401
 except Exception:
     if os.environ.get("GROCER_NZ_BOOTSTRAPPED") != "1" and shutil.which("uv"):
         env = os.environ.copy()
         env["GROCER_NZ_BOOTSTRAPPED"] = "1"
         os.execvpe(
             "uv",
-            ["uv", "run", "--quiet", "--with", "duckdb", "python", __file__, *sys.argv[1:]],
+            ["uv", "run", "--quiet", "--with", "duckdb", "--with", "pytz", "python", __file__, *sys.argv[1:]],
             env,
         )
     raise
@@ -239,6 +245,13 @@ def cmd_search(args):
                 by_pid.setdefault(int(r["product_id"]), []).append(r)
             for h in hits:
                 h["prices"] = by_pid.get(int(h["id"]), [])
+    # The Meilisearch document carries a full `stores` array (every store id that
+    # stocks the product — often hundreds). Replace it with a count to keep the
+    # payload lean and well under the MCP output cap.
+    for h in hits:
+        if "stores" in h:
+            h["store_count"] = len(h["stores"]) if isinstance(h["stores"], list) else None
+            del h["stores"]
     if args.json:
         print_result({"estimatedTotalHits": result.get("estimatedTotalHits"), "hits": hits}, True)
     else:
@@ -314,6 +327,132 @@ def cmd_history(args):
             print(f"{r['updated_at']} | {r['store_name'] or r['store_id']} | {cents(r['price_cent'])}")
 
 
+# ── Guarded read-only SQL (`query`) ───────────────────────────────────────────
+# Lets callers run ad-hoc analysis over the grocer dataset. Safety model:
+#   * statement must be a single SELECT / WITH (no ';', no DDL/DML)
+#   * filesystem + network reads are blocked (enable_external_access=false) and
+#     the config is locked (lock_configuration=true) AFTER our own parquet loads
+#   * base catalogue is attached READ_ONLY; results are row-capped
+# Net effect: an arbitrary query can only read the public grocery data we expose
+# — it cannot write, read other files, reach the network, or change settings.
+QUERY_ROW_CAP = 5000
+
+# File/network reader functions. enable_external_access=false already blocks
+# these at runtime; rejecting them up front gives a clearer error.
+_BLOCKED_FUNCS = (
+    "read_csv", "read_csv_auto", "read_parquet", "parquet_scan", "read_json",
+    "read_json_auto", "read_ndjson", "read_text", "read_blob", "glob", "sniff_csv",
+)
+
+
+def _strip_string_literals(sql: str) -> str:
+    # Replace '...' literal contents so product names like 'copy paper' don't
+    # trip the keyword scan.
+    return re.sub(r"'(?:[^']|'')*'", "''", sql)
+
+
+def validate_select(sql: str) -> str:
+    s = sql.strip().rstrip(";").strip()
+    if not s:
+        raise SystemExit("query: empty SQL")
+    if ";" in s:
+        raise SystemExit("query: only a single statement is allowed (no ';')")
+    scan = _strip_string_literals(s).lower()
+    if not (scan.startswith("select") or scan.startswith("with")):
+        raise SystemExit("query: only SELECT / WITH statements are allowed")
+    for tok in _BLOCKED_FUNCS:
+        if re.search(r"\b" + re.escape(tok) + r"\b", scan):
+            raise SystemExit(f"query: disallowed function '{tok}' (filesystem/network access is blocked)")
+    return s
+
+
+def fetch_limited(cur, limit: int) -> tuple[list[dict[str, Any]], bool]:
+    cols = [d[0] for d in cur.description]
+    out: list[dict[str, Any]] = []
+    rows = cur.fetchmany(limit + 1)
+    truncated = len(rows) > limit
+    for row in rows[:limit]:
+        item = {}
+        for k, v in zip(cols, row):
+            if hasattr(v, "isoformat"):
+                v = v.isoformat()
+            item[k] = v
+        out.append(item)
+    return out, truncated
+
+
+def cmd_query(args):
+    statement = validate_select(args.sql)
+    c = con(force=args.refresh)
+    # Convenience relations over the base catalogue.
+    c.execute("create view products as select * from base.public_products")
+    c.execute("create view stores as select * from base.public_stores")
+    try:
+        c.execute("create view vendors as select * from base.public_vendors")
+    except Exception:
+        pass
+
+    # Materialise current prices for selected stores into a `prices` table.
+    loaded_stores: list[int] = []
+    store_ids = resolve_store_ids(c, args.store_id or [], args.store_query)
+    if args.all_stores and not store_ids:
+        store_ids = [int(r[0]) for r in c.execute(
+            "select id from base.public_stores where is_enabled=true order by id").fetchall()]
+    price_parts = []
+    for sid in store_ids:
+        pth = price_file(sid, force=args.refresh)
+        if not pth:
+            continue
+        price_parts.append("select * from read_parquet(" + sql_quote_path(pth) + ")")
+        loaded_stores.append(sid)
+    if price_parts:
+        c.execute("create temp table prices as " + " union all ".join(price_parts))
+
+    # Materialise price history for selected products into a `history` table.
+    loaded_products: list[int] = []
+    hist_parts = []
+    for pid in (args.product or []):
+        f = history_file(int(pid), force=args.refresh)
+        if not f:
+            continue
+        hist_parts.append("select *, " + str(int(pid)) + " as product_id from read_parquet(" + sql_quote_path(f) + ")")
+        loaded_products.append(int(pid))
+    if hist_parts:
+        c.execute("create temp table history as " + " union all ".join(hist_parts))
+
+    # Lock down: no filesystem/network, no further config changes.
+    c.execute("set enable_external_access=false")
+    c.execute("set lock_configuration=true")
+
+    limit = max(1, min(int(args.limit), QUERY_ROW_CAP))
+    try:
+        cur = c.execute(statement)
+        rows, truncated = fetch_limited(cur, limit)
+    except Exception as e:
+        raise SystemExit("query error: " + str(e).splitlines()[0])
+
+    relations = ["products", "stores", "vendors"]
+    if price_parts:
+        relations.append("prices")
+    if hist_parts:
+        relations.append("history")
+    payload = {
+        "row_count": len(rows),
+        "truncated": truncated,
+        "loaded_stores": loaded_stores,
+        "loaded_products": loaded_products,
+        "available_relations": relations,
+        "rows": rows,
+    }
+    if args.json:
+        print_result(payload, True)
+    else:
+        for r in rows:
+            print(" | ".join(f"{k}={v}" for k, v in r.items()))
+        if truncated:
+            print(f"... truncated at {limit} rows")
+
+
 def cmd_product(args):
     c = con(force=args.refresh)
     rows = rows_to_dicts(c.execute("""
@@ -376,6 +515,28 @@ def main(argv=None):
     sp.add_argument("product_id", type=int)
     sp.add_argument("--json", action="store_true")
     sp.set_defaults(func=cmd_product)
+
+    sp = sub.add_parser(
+        "query",
+        help="run a guarded read-only SELECT over the grocer dataset",
+        description=(
+            "Run a single read-only SELECT/WITH statement. Relations: products, "
+            "stores, vendors (always), plus prices (load with --store-id/--store-query "
+            "or --all-stores) and history (load with --product). Filesystem and network "
+            "access are disabled; only the public grocery data is readable."
+        ),
+    )
+    sp.add_argument("sql", help="a single SELECT/WITH statement")
+    sp.add_argument("--store-id", type=int, action="append", default=[],
+                    help="load current prices for this store id into `prices` (repeatable)")
+    sp.add_argument("--store-query", help="load current prices for stores matching this name into `prices`")
+    sp.add_argument("--all-stores", action="store_true",
+                    help="load current prices for ALL enabled stores (slow; many parquet downloads)")
+    sp.add_argument("--product", type=int, action="append", default=[],
+                    help="load price history for this product id into `history` (repeatable)")
+    sp.add_argument("--limit", type=int, default=200, help=f"max rows returned (cap {QUERY_ROW_CAP})")
+    sp.add_argument("--json", action="store_true")
+    sp.set_defaults(func=cmd_query)
 
     args = p.parse_args(argv)
     args.func(args)

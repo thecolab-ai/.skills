@@ -103,6 +103,33 @@ History files are per product and include store-level rows when available.
 python3 $GROCER product 5461 --json
 ```
 
+### Ad-hoc SQL query (guarded, read-only)
+
+Run a single `SELECT`/`WITH` statement over the dataset for analysis the fixed
+commands don't cover (cheapest-across-stores, vendor trends, joins, aggregates).
+
+Always-available relations: `products`, `stores`, `vendors`. Load extra data with
+flags: `--store-id`/`--store-query`/`--all-stores` populate a `prices` table;
+`--product` populates a `history` table (with a `product_id` column added).
+
+```bash
+# cheapest blue-top milk (product 5452) across Papakura stores
+python3 $GROCER query "select s.name, p.original_price_cent from prices p join stores s on s.id=p.store_id where p.product_id=5452 order by 2" --store-query Papakura --json
+
+# count products by vendor that stock a given product's price rows
+python3 $GROCER query "with p as (select id,name,brand from products where lower(brand)='anchor') select * from p" --limit 20
+
+# price history rows for a product
+python3 $GROCER query "select store_id, price_cent, updated_at from history order by updated_at desc" --product 5461 --limit 30 --json
+```
+
+**Safety:** the statement must be a single read-only `SELECT`/`WITH` (no `;`, no
+DDL/DML). Filesystem and network access are disabled (`enable_external_access=
+false`, `lock_configuration=true`) after the requested parquet are loaded, and
+the base catalogue is attached `READ_ONLY`. An arbitrary query can therefore only
+read the public grocery data exposed here — it cannot write, read other files,
+reach the network, or change settings. Results are capped (`--limit`, max 5000).
+
 ## Data Notes
 
 See `references/api-notes.md` for the sniffed endpoints and file layout.
