@@ -1,6 +1,6 @@
 ---
 name: nz-council
-description: Query NZ council events and public recreation facilities (pools, leisure centres) for Auckland, Wellington, Christchurch, Rotorua, Hamilton, Dunedin, and 10 other NZ council areas. Not for rates, consents, payments, or bookings.
+description: Query NZ council events and public recreation facilities (pools, leisure centres) for Auckland, Wellington, Christchurch, Rotorua, Hamilton, Dunedin, and 10 other NZ council areas. Optional --browser mode uses CloakBrowser for public pages that direct HTTP cannot fetch. Not for rates, consents, payments, or bookings.
 ---
 
 # NZ Council
@@ -19,7 +19,7 @@ This v1 is deliberately narrow. It is not a general council-services skill.
 - The user asks what is on in Auckland, Wellington, Christchurch, Rotorua, New Plymouth, Nelson, Tasman, Napier, Hastings, Hamilton, Whangarei, Palmerston North, Tauranga, Queenstown Lakes, Dunedin, or across NZ council areas.
 - The user asks for council-listed concerts, markets, exhibitions, kids' activities, festivals, or free events.
 - The user asks for public pools, leisure centres, gyms, recreation centres, hours, pool contact details, pool facilities, or pool lane availability.
-- You need a quick JSON feed for council-area events or recreation facility listings without browser automation.
+- You need a quick JSON feed for council-area events or recreation facility listings; use optional `--browser` only when direct public HTTP is blocked by a public-page edge challenge
 
 ## Do not use this for
 
@@ -56,7 +56,7 @@ Run from this skill directory or point directly at the script:
 python3 skills/nz-council/scripts/cli.py --help
 ```
 
-Every data command supports `--json`.
+Every data command supports `--json` and optional `--browser`. Browser mode imports CloakBrowser only when requested and is intended for public council/facility pages where direct HTTP is Cloudflare/Akamai/Incapsula/Radware challenged; it does not book, log in, submit forms, or bypass CAPTCHA/challenge pages.
 
 ## Commands
 
@@ -89,7 +89,7 @@ python3 skills/nz-council/scripts/cli.py pool "Onekawa" --json
 python3 skills/nz-council/scripts/cli.py pool "Splash Planet" --json
 python3 skills/nz-council/scripts/cli.py pools --council ham --json
 python3 skills/nz-council/scripts/cli.py pool "Waterworld" --json
-python3 skills/nz-council/scripts/cli.py pools --council hutt --json
+python3 skills/nz-council/scripts/cli.py pools --council hutt --limit 3 --json --browser
 python3 skills/nz-council/scripts/cli.py pool "Naenae Pool" --council hutt --json
 python3 skills/nz-council/scripts/cli.py pools --council kapiti --json
 python3 skills/nz-council/scripts/cli.py pools --council whg --json
@@ -126,13 +126,13 @@ python3 skills/nz-council/scripts/cli.py facilities --council tdc --type leisure
 - Nelson pools use the public Nelson City Council swimming pools page, which links to CLM detail pages for Riverside Pool and Nayland Park Pool.
 - Tasman facilities use public Tasman District Council swimming and sport/recreation pages for Richmond Aquatic Centre and Motueka Recreation Centre.
 - Hamilton pools use `hamiltonpools.co.nz`, a Hamilton City Council site, for Waterworld, Gallagher Aquatic Centre, and seasonal partner pool listings. The current Hamilton Pools source does not list Founders Memorial Theatre Pool as an active pool.
-- Hutt City pools use the Hutt City Pools and Fitness public site. Direct HTTP is Cloudflare-challenged in some environments, so the CLI probes direct HTTP first and can fall back to the local Chrome DevTools endpoint at `127.0.0.1:5100`.
+- Hutt City pools use the Hutt City Pools and Fitness public site. Direct HTTP is Cloudflare-challenged in some environments; the CLI probes direct HTTP first, can fall back to the legacy local Chrome DevTools endpoint, and supports explicit `--browser` to use CloakBrowser for that public page fetch when installed.
 - Porirua Arena Aquatics uses the public Te Rauparaha Arena aquatic pages.
 - Upper Hutt H2O Xtream uses public H2O Xtream pages. Some direct requests are Akamai-denied in Python, so the CLI can use the same local CDP fallback.
 - Kāpiti Coast pools use public Kāpiti Coast Aquatics pages.
 - Whangarei recreation uses the current WDC parks/recreation landing page plus CLM's Whangarei Aquatic Centre pages. The old `wdc.govt.nz/Services/Sport-and-recreation/Pools-and-leisure` path returned a WDC 404 during discovery, and `asbleisurecentre.co.nz` did not resolve.
 - Palmerston North swimming facilities use the PNCC `Parks-recreation/Swimming-pools` listing page, linked PNCC detail pages, and public CLM contact pages for opening hours where PNCC links them.
-- Tauranga pools use Tauranga City Council's swimming-pools page plus `taurangapools.co.nz` / Bay Venues location and detail pages; Mount Hot Pools uses `mounthotpools.co.nz` for current closure and pool detail text. The CLI tries direct fetch first and falls back to a local CDP endpoint at `127.0.0.1:5100` only when a fetched page looks bot-walled.
+- Tauranga pools use Tauranga City Council's swimming-pools page plus `taurangapools.co.nz` / Bay Venues location and detail pages; Mount Hot Pools uses `mounthotpools.co.nz` for current closure and pool detail text. The CLI tries direct fetch first and falls back to a local CDP endpoint at `127.0.0.1:5100` only when a fetched page looks bot-walled; explicit `--browser` uses CloakBrowser for those fallback public page fetches.
 - Queenstown Lakes pools and recreation facilities use public `qldc.govt.nz/recreation` pages. Direct requests may return Radware captcha pages, so QLDC facility records are source-linked snapshots from public pages rather than live parses.
 - Napier aquatic recreation uses Napier City Council's current Napier Aquatic Centre page. The centre is also commonly known as Onekawa Pools.
 - Hastings aquatic recreation uses Hastings District Council's current swimming-pools page plus linked Aquatics Hastings and Splash Planet public pages. Frimley Pool is retained as a closed facility because HDC's current page records the September 2024 closure decision.

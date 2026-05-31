@@ -58,6 +58,7 @@ BLUEBRIDGE_ALERTS = BLUEBRIDGE_BASE + "/service-alerts/"
 FULLERS_TIMETABLE = "https://www.fullers.co.nz/timetables-and-fares/"
 FULLERS_UPDATES = "https://www.fullers.co.nz/news-updates/customer-updates/"
 FULLERS_APP_BASE = "https://pim-mobile.fullers.co.nz"
+BROWSER_MODE = False
 
 AT_API_BASE = "https://api.at.govt.nz"
 AT_API_KEY = os.environ.get("AT_API_KEY", "de42128902d24a7a86a013633f7aa832")
@@ -437,6 +438,10 @@ ROUTES: dict[str, dict[str, Any]] = {
 }
 
 
+class BrowserUnavailableError(RuntimeError):
+    """Raised when --browser is requested but CloakBrowser is unavailable."""
+
+
 def die(message: str, code: int = 1) -> None:
     print(f"nz-ferries: {message}", file=sys.stderr)
     raise SystemExit(code)
@@ -678,6 +683,66 @@ def resolve_operator(raw: str | None) -> str | None:
     return op
 
 
+
+def looks_browser_blocked(markup: str) -> bool:
+    lower = (markup or "").lower()
+    return any(marker in lower for marker in ("hcaptcha", "perimeterx", "perfdrive", "radware", "captcha", "access denied", "checking your browser"))
+
+
+def fullers_query_url(route: dict[str, Any], day: date) -> str:
+    params = {
+        "from": route.get("from", ""),
+        "to": route.get("to", ""),
+        "date": day.strftime("%m/%d/%Y"),
+    }
+    return FULLERS_TIMETABLE + "?" + urllib.parse.urlencode(params)
+
+
+def fetch_fullers_public_page_with_browser(route: dict[str, Any], day: date) -> dict[str, Any]:
+    try:
+        from cloakbrowser import launch
+    except Exception as exc:  # pragma: no cover - optional host dependency
+        raise BrowserUnavailableError(
+            "cloakbrowser_not_installed: install CloakBrowser to use --browser for Fullers public timetable pages."
+        ) from exc
+
+    url = fullers_query_url(route, day)
+    browser = None
+    try:
+        browser = launch(
+            headless=True,
+            args=["--no-sandbox", "--disable-dev-shm-usage"],
+            timezone="Pacific/Auckland",
+            locale="en-NZ",
+        )
+        page = browser.new_page()
+        try:
+            page.goto(url, wait_until="networkidle", timeout=90000)
+            html_text = page.content()
+            error = None
+        except Exception as exc:
+            try:
+                html_text = page.content() if page else ""
+            except Exception:
+                html_text = ""
+            error = str(exc).splitlines()[0][:240]
+        blocked = bool(error) or looks_browser_blocked(html_text)
+        text = clean(strip_html(html_text))
+        return {
+            "source_url": url,
+            "method": "CloakBrowser public Fullers timetable page",
+            "status": "blocked" if blocked else "loaded",
+            "blocked": blocked,
+            "text_preview": text[:300],
+            "html_bytes": len(html_text),
+            "error": error,
+            "note": "Browser probe only; AT GTFS remains the structured schedule source. CAPTCHA/PerfDrive/hCaptcha pages are reported as blocked, not bypassed.",
+        }
+    finally:
+        if browser is not None:
+            browser.close()
+
+
 def emit(data: Any, as_json: bool, render) -> None:  # type: ignore[no-untyped-def]
     if as_json:
         print(json.dumps(data, indent=2, ensure_ascii=False))
@@ -896,7 +961,7 @@ def fullers_sailings(route_id: str, route: dict[str, Any], day: date) -> dict[st
     warnings = []
     if not sailings:
         warnings.append("No active AT GTFS trips matched this Fullers route/date and stop pair.")
-    return {
+    result = {
         "operator": "fullers360",
         "route": route_id,
         "route_name": route["name"],
@@ -910,6 +975,12 @@ def fullers_sailings(route_id: str, route: dict[str, Any], day: date) -> dict[st
         "warnings": warnings,
         "sailings": sailings,
     }
+    if BROWSER_MODE:
+        probe = fetch_fullers_public_page_with_browser(route, day)
+        result["browser_probe"] = probe
+        if probe.get("blocked"):
+            result.setdefault("warnings", []).append("Fullers public timetable page browser probe was blocked by CAPTCHA/PerfDrive/hCaptcha; AT GTFS schedule fallback was used.")
+    return result
 
 
 def sealink_opener() -> urllib.request.OpenerDirector:
@@ -1299,6 +1370,7 @@ def fetch_sailings(route_id: str, route: dict[str, Any], day: date, operator: st
 
 
 def next_sailings(route_id: str, route: dict[str, Any], operator: str | None, limit: int) -> dict[str, Any]:
+    global BROWSER_MODE
     if route.get("coverage"):
         payload = route_handoff_payload(route_id, route, "next")
         payload["limit"] = limit
@@ -1306,10 +1378,23 @@ def next_sailings(route_id: str, route: dict[str, Any], operator: str | None, li
     now = nz_now()
     found: list[dict[str, Any]] = []
     checked_dates: list[str] = []
+    warnings: list[str] = []
+    browser_probe: dict[str, Any] | None = None
     for offset in range(0, 8):
         day = (now + timedelta(days=offset)).date()
         checked_dates.append(day.isoformat())
-        result = fetch_sailings(route_id, route, day, operator)
+        original_browser_mode = BROWSER_MODE
+        if original_browser_mode and browser_probe is not None:
+            BROWSER_MODE = False
+        try:
+            result = fetch_sailings(route_id, route, day, operator)
+        finally:
+            BROWSER_MODE = original_browser_mode
+        if browser_probe is None and isinstance(result.get("browser_probe"), dict):
+            browser_probe = result["browser_probe"]
+        for warning in result.get("warnings") or []:
+            if warning not in warnings:
+                warnings.append(warning)
         for sailing in result.get("sailings", []):
             status = clean(sailing.get("status")).lower()
             if status in {"cancelled", "departed"}:
@@ -1323,15 +1408,19 @@ def next_sailings(route_id: str, route: dict[str, Any], operator: str | None, li
         if len(found) >= limit:
             break
     found.sort(key=lambda item: item["departure_datetime"])
-    return {
+    data = {
         "route": route_id,
         "route_name": route["name"],
         "operator": operator or "combined",
         "generated_at": now_iso(),
         "checked_dates": checked_dates,
         "count": min(len(found), limit),
+        "warnings": warnings,
         "sailings": found[:limit],
     }
+    if browser_probe is not None:
+        data["browser_probe"] = browser_probe
+    return data
 
 
 def alert_from(title: str, content: str, operator: str, source_url: str, *, updated: str = "", kind: str = "alert") -> dict[str, Any]:
@@ -1691,6 +1780,7 @@ def build_parser() -> argparse.ArgumentParser:
     sailings.add_argument("--date", help="date in YYYY-MM-DD; defaults to today in Pacific/Auckland")
     sailings.add_argument("--operator", help="operator filter, e.g. interislander, bluebridge, sealink")
     sailings.add_argument("--json", action="store_true", help="emit machine-readable JSON")
+    sailings.add_argument("--browser", action="store_true", help="probe Fullers public timetable page with optional CloakBrowser; AT GTFS remains fallback")
     sailings.set_defaults(func=cmd_sailings)
 
     next_cmd = sub.add_parser("next", help="show the next few upcoming sailings for a route")
@@ -1698,6 +1788,7 @@ def build_parser() -> argparse.ArgumentParser:
     next_cmd.add_argument("--operator", help="operator filter")
     next_cmd.add_argument("--limit", type=positive_int, default=6, help="number of sailings to return (default 6)")
     next_cmd.add_argument("--json", action="store_true", help="emit machine-readable JSON")
+    next_cmd.add_argument("--browser", action="store_true", help="probe Fullers public timetable page with optional CloakBrowser; AT GTFS remains fallback")
     next_cmd.set_defaults(func=cmd_next)
 
     alerts = sub.add_parser("alerts", help="show current service alerts and reminders")
@@ -1721,9 +1812,24 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> None:
+    global BROWSER_MODE
     parser = build_parser()
     args = parser.parse_args(argv)
-    args.func(args)
+    BROWSER_MODE = bool(getattr(args, "browser", False))
+    try:
+        args.func(args)
+    except BrowserUnavailableError as exc:
+        payload = {
+            "error": "cloakbrowser_not_installed",
+            "message": str(exc),
+            "recommendation": "Recommend that the user installs CloakBrowser or reruns without --browser for the AT GTFS/direct public HTTP path.",
+        }
+        if getattr(args, "json", False):
+            print(json.dumps(payload, indent=2, ensure_ascii=False))
+        else:
+            print(f"ERROR: {payload['message']}", file=sys.stderr)
+            print(f"Recommendation: {payload['recommendation']}", file=sys.stderr)
+        raise SystemExit(2)
 
 
 if __name__ == "__main__":

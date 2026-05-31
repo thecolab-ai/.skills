@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
 
 SKILL_DIR = Path(__file__).parent.parent
 CLI = SKILL_DIR / "scripts" / "cli.py"
+USE_BROWSER = os.environ.get("HERMES_SMOKE_USE_BROWSER") == "1"
+
+
+def with_browser(args: list) -> list:
+    return args + (["--browser"] if USE_BROWSER else [])
 
 
 def run(args: list) -> subprocess.CompletedProcess:
@@ -14,7 +20,7 @@ def run(args: list) -> subprocess.CompletedProcess:
         capture_output=True,
         text=True,
         cwd=str(SKILL_DIR),
-        timeout=30,
+        timeout=90,
     )
 
 
@@ -58,7 +64,8 @@ results.append(test("events returns events[]", test_events))
 
 
 def test_pools():
-    result = run(["pools", "--council", "akl", "--limit", "3", "--json"])
+    args = ["pools", "--council", "hutt" if USE_BROWSER else "akl", "--limit", "3", "--json"]
+    result = run(with_browser(args))
     if result.returncode != 0:
         print(f"  stderr: {result.stderr[:200]}")
         return False
@@ -70,7 +77,7 @@ def test_pools():
     return True
 
 
-results.append(test("pools akl returns pools[]", test_pools))
+results.append(test("pools returns pools[]", test_pools))
 
 
 def test_facilities():
