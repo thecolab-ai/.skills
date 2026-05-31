@@ -46,6 +46,23 @@ def main() -> None:
     assert "$" in history
     assert "Papakura" in history
 
+    # Guarded read-only query: a priced join returns rows.
+    q = json.loads(run(
+        "query",
+        "select s.name, p.original_price_cent from prices p "
+        "join stores s on s.id=p.store_id where p.product_id=5461 order by 2",
+        "--store-query", "Papakura", "--json",
+    ))
+    assert q["row_count"] >= 1
+    assert "prices" in q["available_relations"]
+
+    # Query guard: a non-SELECT statement must be rejected (non-zero exit).
+    rejected = subprocess.run(
+        [sys.executable, str(CLI), "query", "drop table products", "--json"],
+        text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60, check=False,
+    )
+    assert rejected.returncode != 0, "expected non-SELECT query to be rejected"
+
     print("grocer-nz smoke ok")
 
 
