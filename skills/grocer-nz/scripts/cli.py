@@ -16,16 +16,21 @@ import urllib.error
 import urllib.request
 from typing import Any
 
-NEEDS = ("duckdb",)
+NEEDS = ("duckdb", "pytz")
 try:
     import duckdb  # type: ignore
+    # duckdb requires pytz at runtime for timezone-aware timestamp casts (the
+    # price/history parquet `updated_at` columns). Import it here so a host that
+    # has duckdb but not pytz still triggers the uv bootstrap below instead of
+    # crashing mid-query.
+    import pytz  # type: ignore  # noqa: F401
 except Exception:
     if os.environ.get("GROCER_NZ_BOOTSTRAPPED") != "1" and shutil.which("uv"):
         env = os.environ.copy()
         env["GROCER_NZ_BOOTSTRAPPED"] = "1"
         os.execvpe(
             "uv",
-            ["uv", "run", "--quiet", "--with", "duckdb", "python", __file__, *sys.argv[1:]],
+            ["uv", "run", "--quiet", "--with", "duckdb", "--with", "pytz", "python", __file__, *sys.argv[1:]],
             env,
         )
     raise
@@ -239,6 +244,13 @@ def cmd_search(args):
                 by_pid.setdefault(int(r["product_id"]), []).append(r)
             for h in hits:
                 h["prices"] = by_pid.get(int(h["id"]), [])
+    # The Meilisearch document carries a full `stores` array (every store id that
+    # stocks the product — often hundreds). Replace it with a count to keep the
+    # payload lean and well under the MCP output cap.
+    for h in hits:
+        if "stores" in h:
+            h["store_count"] = len(h["stores"]) if isinstance(h["stores"], list) else None
+            del h["stores"]
     if args.json:
         print_result({"estimatedTotalHits": result.get("estimatedTotalHits"), "hits": hits}, True)
     else:
