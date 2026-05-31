@@ -13,9 +13,12 @@ bot challenge). The CLI auto-discovers the latest release from the Stats NZ
 CSV-files index, downloads the ZIP in memory, and parses the national and
 disaggregated data files with the Python standard library only.
 
-The nine measures use codes `MEASA`–`MEASJ`. `MEASA` (income below 50% of the
-median, before housing costs) is the **primary legislated headline measure**.
-`MEASI` is material hardship (DEP-17); `MEASJ` is severe material hardship.
+The nine measures use codes `MEASA`–`MEASJ` (Stats NZ skips `MEASD`). The three
+**primary** legislated measures are `MEASA` (income below 50% of the median
+before housing costs, moving line), `MEASB` (below 50% after housing costs,
+anchored line) and `MEASC` (**material hardship**, DEP-17, lacking 6+ of 17
+items). `MEASI` is **severe** material hardship (lacking 9+ items) — a subset of
+`MEASC` — and `MEASJ` is the combined low-income-and-hardship measure.
 
 ## When to Use
 
@@ -52,7 +55,7 @@ python3 scripts/cli.py latest --json
 python3 scripts/cli.py national --measure MEASA --from 2023 --to 2025
 
 # Material hardship among children by disability status
-python3 scripts/cli.py breakdown --measure MEASI --by disability --json
+python3 scripts/cli.py breakdown --measure MEASC --by disability --json
 
 # Child poverty by ethnicity for the primary measure
 python3 scripts/cli.py breakdown --measure MEASA --by ethnicity

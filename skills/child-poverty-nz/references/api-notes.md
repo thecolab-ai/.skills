@@ -38,15 +38,19 @@ estimate; `SE` is the absolute sampling error.
 
 | Code | Plain English |
 |------|---------------|
-| MEASA | BHC < 50% of median equivalised disposable household income (primary legislated headline measure) |
-| MEASB | AHC < 50%, base/fixed financial-year line |
-| MEASC | BHC < 60% |
-| MEASE | AHC < 50%, moving line |
-| MEASF | AHC < 60% |
-| MEASG | AHC < 40% |
-| MEASH | AHC < 60% and material hardship (combined) |
-| MEASI | Material hardship (DEP-17, lacking 6+ of 17 items) |
-| MEASJ | Severe material hardship (lacking 9+ of 17 items) |
+| MEASA | BHC < 50% of median income, moving line (**primary** legislated measure) |
+| MEASB | AHC < 50%, base/anchored financial-year line (**primary**) |
+| MEASC | Material hardship (DEP-17, lacking 6+ of 17 items) (**primary**) |
+| MEASE | BHC < 60%, moving line |
+| MEASF | AHC < 60%, moving line |
+| MEASG | AHC < 50%, moving line |
+| MEASH | AHC < 40%, moving line |
+| MEASI | Severe material hardship (DEP-17, lacking 9+ of 17 items) |
+| MEASJ | Low income **and** hardship: AHC < 60% and in material hardship (combined) |
+
+Verbatim from the release's `cp-csv-codes.xlsx` legend (Stats NZ skips MEASD).
+The three primary CPRA measures are MEASA, MEASB and MEASC. Severe material
+hardship (MEASI) is a subset of material hardship (MEASC), so MEASI ≤ MEASC.
 
 BHC = before housing costs; AHC = after deducting housing costs.
 

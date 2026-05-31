@@ -27,18 +27,21 @@ CSV_PAGE = STATS_BASE + "/large-datasets/csv-files-for-download/"
 UA = "child-poverty-nz-skill/1.0 (+https://github.com/thecolab-ai/.skills)"
 
 # Plain-English names for the nine CPRA low-income / material-hardship measures.
-# Codes and descriptions are taken verbatim from the release's cp-csv-codes
-# legend. MEASA (BHC<50%) is the primary legislated headline measure.
+# Codes and descriptions are taken VERBATIM from the release's cp-csv-codes
+# legend (cp-csv-codes.xlsx). Stats NZ skips MEASD. The three primary legislated
+# measures are MEASA (BHC<50% moving), MEASB (AHC<50% anchored/base year) and
+# MEASC (material hardship). Severe hardship (MEASI) is a subset of material
+# hardship (MEASC), so MEASI <= MEASC always.
 MEASURES: dict[str, dict[str, str]] = {
-    "MEASA": {"short": "BHC<50% (primary)", "name": "Less than 50% of median equivalised disposable household income before housing costs (BHC)"},
-    "MEASB": {"short": "AHC<50% fixed line", "name": "Less than 50% of median income after housing costs (AHC), base/fixed financial year line"},
-    "MEASC": {"short": "BHC<60%", "name": "Less than 60% of median equivalised disposable household income before housing costs (BHC)"},
-    "MEASE": {"short": "AHC<50% moving line", "name": "Less than 50% of median income after housing costs (AHC), moving line"},
-    "MEASF": {"short": "AHC<60%", "name": "Less than 60% of median income after housing costs (AHC)"},
-    "MEASG": {"short": "AHC<40%", "name": "Less than 40% of median income after housing costs (AHC)"},
-    "MEASH": {"short": "AHC<60% + hardship", "name": "Less than 60% of median income after housing costs (AHC) and in material hardship (combined)"},
-    "MEASI": {"short": "material hardship", "name": "Material hardship (DEP-17, lacking 6+ of 17 items)"},
-    "MEASJ": {"short": "severe material hardship", "name": "Severe material hardship (lacking 9+ of 17 items)"},
+    "MEASA": {"short": "BHC<50% (primary, moving)", "name": "Low income: less than 50% of median equivalised disposable household income before housing costs (BHC), moving line"},
+    "MEASB": {"short": "AHC<50% (primary, anchored)", "name": "Low income: less than 50% of median equivalised disposable household income after housing costs (AHC), base/anchored financial year line"},
+    "MEASC": {"short": "material hardship (primary)", "name": "Material hardship (DEP-17, lacking 6+ of 17 items)"},
+    "MEASE": {"short": "BHC<60%", "name": "Low income: less than 60% of median equivalised disposable household income before housing costs (BHC), moving line"},
+    "MEASF": {"short": "AHC<60%", "name": "Low income: less than 60% of median equivalised disposable household income after housing costs (AHC), moving line"},
+    "MEASG": {"short": "AHC<50% (moving)", "name": "Low income: less than 50% of median equivalised disposable household income after housing costs (AHC), moving line"},
+    "MEASH": {"short": "AHC<40%", "name": "Low income: less than 40% of median equivalised disposable household income after housing costs (AHC), moving line"},
+    "MEASI": {"short": "severe material hardship", "name": "Severe material hardship (DEP-17, lacking 9+ of 17 items)"},
+    "MEASJ": {"short": "low income + hardship (combined)", "name": "Low income and hardship: less than 60% of median income after housing costs (AHC) and in material hardship"},
 }
 
 # National datafile EstCodes (cp-national-datafile-csv.csv).
