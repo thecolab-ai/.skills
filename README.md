@@ -22,6 +22,9 @@ python3 skills/fuelclock-nz/scripts/cli.py summary
 # Latest NZ news
 python3 skills/nz-news/scripts/cli.py headlines
 
+# NZ supermarket stores and pricing history
+python3 skills/grocer-nz/scripts/cli.py stores --query Papakura
+
 # Auckland Transport real-time (needs AT API key)
 python3 skills/at-transport/scripts/cli.py alerts
 ```
@@ -89,6 +92,7 @@ If you're a business looking at this and thinking "how do we actually want AI ag
 | [fuelclock-nz](skills/fuelclock-nz/SKILL.md) | Query NZ fuel prices, supply, inbound tankers, MSO status, geopolitical shipping risk markets, and NZ fuel headlines from fuelclock.nz. No authentication required. |
 | [gaspy-nz](skills/gaspy-nz/SKILL.md) | Query Gaspy NZ public crowd-sourced fuel price statistics through a lightweight no-login CLI. Use when the task involves Gaspy crowd-sourced NZ fuel price snapshots, national observed averages, top cheapest 91 stations, station/brand counts, or recent confirmation totals. Read-only; no login or price reporting. |
 | [geonet-nz](skills/geonet-nz/SKILL.md) | Query GeoNet New Zealand public earthquake, volcano alert, and GeoNet news endpoints through a lightweight no-login CLI. Use when the task involves recent NZ earthquakes, felt/MMI-filtered quakes, earthquake detail by publicID, volcanic alert levels, volcanic activity bulletins, or GeoNet public geohazard updates. Read-only; no authentication required. |
+| [grocer-nz](skills/grocer-nz/SKILL.md) | Query grocer.nz public NZ supermarket price data — store lookup, product search, current per-store prices, and historical product price rows from public DuckDB/parquet assets. Use for NZ grocery/supermarket pricing across Woolworths, New World, PAK'nSAVE, Fresh Choice, and related stores. Read-only; no login or private user data. |
 | [homes-nz](skills/homes-nz/SKILL.md) | Query homes.co.nz NZ residential property estimates (HomesEstimate/HEV), sales history, suburb trends, and nearby comparable properties. No login required. |
 | [interest-co-nz](skills/interest-co-nz/SKILL.md) | Query interest.co.nz public mortgage-rate tables through a lightweight no-login HTML parser. Use when the task involves current New Zealand mortgage rates, bank home-loan rates, variable/floating rates, fixed terms from 6 months to 5 years, special LVR rows, or comparing advertised mortgage rates across NZ lenders. Read-only; no application, lead, login, or quote submission. |
 | [jetstar-flights](skills/jetstar-flights/SKILL.md) | Search public Jetstar New Zealand one-way fare-cache flight availability through a no-login Node CLI. Use when the task involves Jetstar route/date fare snapshots, low-fare availability, flight IDs, prices, or machine-readable current Jetstar availability. Read-only; no login, Club Jetstar account, booking, seat hold, payment, manage-booking, or checkout actions. |
@@ -173,6 +177,7 @@ python3 skills/trademe-nz/scripts/smoke_test.py
 python3 skills/nzbn-register/scripts/smoke_test.py
 python3 skills/eventfinda-nz/scripts/smoke_test.py
 python3 skills/woolworths-nz/scripts/smoke_test.py
+python3 skills/grocer-nz/scripts/smoke_test.py
 python3 skills/auckland-bin-schedule/scripts/smoke_test.py
 ```
 
