@@ -60,6 +60,25 @@ def test_cpi():
 results.append(test("cpi returns latest.value", test_cpi))
 
 
+def test_fpi():
+    result = run(["fpi", "--json"])
+    if result.returncode != 0:
+        print(f"  stderr: {result.stderr[:200]}")
+        return False
+    data = json.loads(result.stdout)
+    if not isinstance(data.get("latest"), dict):
+        print(f"  stdout: {result.stdout[:200]}")
+        print("  Expected latest{} in fpi response")
+        return False
+    if data["latest"].get("value") is None:
+        print("  Expected latest.value to be set")
+        return False
+    return True
+
+
+results.append(test("fpi returns latest.value", test_fpi))
+
+
 def test_population():
     result = run(["population", "--json"])
     if result.returncode != 0:
