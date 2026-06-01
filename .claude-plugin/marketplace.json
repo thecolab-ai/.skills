@@ -11,7 +11,7 @@
     {
       "name": "nz-skills",
       "source": "./",
-      "description": "48 read-only NZ data connectors — LINZ, Stats NZ, RBNZ, GeoNet, MetService, Auckland Transport, Metlink, fuel prices, electricity market, supermarkets and retail pricing, Companies/NZBN registers, DOC huts, tides/surf, news, and more."
+      "description": "Read-only NZ data connectors — LINZ, Stats NZ, RBNZ, GeoNet, MetService, Auckland Transport, Metlink, fuel prices, electricity market, supermarkets and retail pricing, Companies/NZBN registers, DOC huts, tides/surf, news, and more."
     }
   ]
 }
