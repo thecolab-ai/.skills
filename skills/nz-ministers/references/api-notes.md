@@ -29,7 +29,7 @@ So `minister` and `articles` use this hybrid:
    loads the homepage, lets the Incapsula challenge resolve, and reads back the
    `User-Agent` + clearance cookies.
 2. **Cache:** the UA + cookies are written to `<tempdir>/nz-ministers-incap.json`
-   with a 10-minute TTL.
+   (file mode `0600`) with a 5-minute TTL.
 3. **Reuse (no browser):** subsequent `minister`/`articles` calls — even without
    `--browser` — fetch the protected pages with **plain stdlib HTTP** using the
    cached cookies. The browser is only re-launched when the cache is missing/stale.

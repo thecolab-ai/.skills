@@ -98,8 +98,11 @@ def load_clearance() -> dict[str, str] | None:
 
 
 def save_clearance(ua: str, cookie: str) -> None:
+    # Session cookies are sensitive; keep the cache file private (temp dirs are
+    # world-readable on multi-user hosts).
     tmp = CACHE_FILE + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as fh:
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
         json.dump({"ua": ua, "cookie": cookie, "ts": time.time()}, fh)
     os.replace(tmp, CACHE_FILE)
 
@@ -265,11 +268,12 @@ def parse_minister_articles(html: str) -> list[dict[str, Any]]:
     return out
 
 
-# The appointments view lists each role as one row:
+# The appointments view lists each role as one row. The row regex below is
+# specific enough (portfolio + position + archived fields, in order) to run over
+# the whole page, so we don't depend on isolating the (variably-nested) view div.
 #   <span class="views-field views-field-field-portfolio"><a href="/portfolio/..">Health</a></span>
 #   - <span class="views-field views-field-field-position">Minister</span>
 #   <span class="views-field views-field-field-archived"><span class="field-content">..</span></span>
-_APPT_VIEW_RE = re.compile(r'view-appointments\b.*?<div class="view-content">(.*?)</div>\s*</div>', re.S)
 _APPT_ROW_RE = re.compile(
     r'views-field-field-portfolio"><a\s+href="([^"]+)"[^>]*>(.*?)</a>.*?'
     r'views-field-field-position">(.*?)</span>.*?'
@@ -280,11 +284,9 @@ _APPT_ROW_RE = re.compile(
 
 def parse_minister_roles(html: str) -> list[dict[str, Any]]:
     """Roles & responsibilities: each portfolio the minister holds + their position."""
-    view = _APPT_VIEW_RE.search(html)
-    block = view.group(1) if view else html
     roles: list[dict[str, Any]] = []
     seen: set[tuple[str, str]] = set()
-    for url, portfolio, position, archived in _APPT_ROW_RE.findall(block):
+    for url, portfolio, position, archived in _APPT_ROW_RE.findall(html):
         name = _strip_tags(portfolio)
         pos = _strip_tags(position)
         key = (name, pos)
@@ -318,7 +320,9 @@ def parse_minister_id(html: str) -> str | None:
 
 def parse_latest_diary(html: str) -> dict[str, Any] | None:
     """The most recent ministerial diary (the minister's published calendar)."""
-    view = re.search(r"view-ministerial-diaries\b.*?(?=</aside>)", html, re.S)
+    view = re.search(
+        r"view-ministerial-diaries\b.*?(?=</aside>|</section>|<aside\b|$)", html, re.S
+    )
     if not view:
         return None
     block = view.group(0)
@@ -421,7 +425,10 @@ def _resolve_minister(value: str, *, allow_browser: bool) -> tuple[str, str]:
                 saw_404 = True
                 continue
             raise  # genuine network/upstream error
-        if re.search(r"<h1[^>]*>", html) and "/minister/" in html:
+        # Confirm this is the requested minister's own profile (the canonical
+        # /minister/<slug> URL appears on the page), not just any page linking
+        # to ministers.
+        if re.search(r"<h1[^>]*>", html) and f"/minister/{slug}" in html:
             return slug, html
         saw_404 = True
     if clearance_err is not None:
