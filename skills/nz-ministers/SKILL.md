@@ -12,8 +12,10 @@ website). Read-only; no login, account, or API key.
 ## Use this when
 
 - A user asks **who is the Minister of <X>**, or what portfolios a minister holds
-- A user wants a **minister's profile** (name, portfolios, recent announcements)
+- A user wants a **minister's profile** (roles, biography, latest diary, recent articles)
+- A user wants a minister's **roles & responsibilities** (portfolios + position)
 - A user wants **all articles by a minister** (releases, speeches, features)
+- A user wants a minister's **diary / calendar** (latest published ministerial diary)
 - A user wants the **latest government announcements** site-wide
 
 ## Do not use this for
@@ -32,9 +34,15 @@ cli=skills/nz-ministers/scripts/cli.py
 python3 $cli latest --limit 10
 python3 $cli latest --type speech --json
 
-# A minister's profile, portfolios, and recent articles
+# A minister's full profile: roles, biography, latest diary, recent articles
 python3 $cli minister hon-simeon-brown --browser --json
 python3 $cli minister "Simeon Brown" --browser
+
+# Roles & responsibilities (portfolios + position)
+python3 $cli roles hon-simeon-brown --browser --json
+
+# Latest published ministerial diary (calendar) + archive link
+python3 $cli diary hon-simeon-brown --browser --json
 
 # All releases/speeches by a minister
 python3 $cli articles hon-simeon-brown --limit 20 --browser --json
@@ -44,23 +52,30 @@ python3 $cli articles hon-simeon-brown --limit 20 --browser --json
 
 - `latest` — `--limit N`, `--type {release,speech,feature}`, `--json`
 - `minister <slug|name>` — `--browser`, `--json`
+- `roles <slug|name>` — `--browser`, `--json`
+- `diary <slug|name>` — `--browser`, `--json`
 - `articles <slug|name>` — `--limit N`, `--type {release,speech,feature}`, `--browser`, `--json`
 
-A minister is identified by slug (`hon-simeon-brown`) or plain name (`"Simeon Brown"`).
+A minister is identified by slug (`hon-simeon-brown`, `rt-hon-christopher-luxon`) or
+plain name (`"Simeon Brown"`); the CLI tries the `hon-` / `rt-hon-` honorific forms.
 
 ## Bot protection & `--browser`
 
 Only the latest-releases RSS feed is openly accessible. Minister pages are behind
-**Incapsula** bot protection, so `minister` and `articles` need a browser to clear
-the challenge **once**:
+**Incapsula** bot protection, so `minister`, `roles`, `diary`, and `articles` need a
+browser to clear the challenge **once**:
 
 - Pass `--browser` to launch [CloakBrowser](https://github.com/CloakHQ/CloakBrowser),
-  clear the wall, and cache the clearance cookies (10-minute TTL in a temp file).
-- After that, `minister`/`articles` work over **plain HTTP from the cache** — no
-  browser — until the cookies expire.
+  clear the wall, and cache the clearance cookies (~5-minute TTL in a temp file).
+- After that, those commands work over **plain HTTP from the cache** — no browser —
+  until the cookies expire.
 - Without clearance, those commands return a machine-readable blocked state
   (`clearance_required`, or `cloakbrowser_not_installed` if CloakBrowser is missing);
   `latest` always works regardless.
+
+The **full ministerial-diary archive** is rendered by a JavaScript search on beehive;
+`diary` returns the latest diary (title, date, PDF) directly plus the `archive_url`
+for the complete history.
 
 ## Resources
 

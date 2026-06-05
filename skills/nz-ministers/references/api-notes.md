@@ -49,16 +49,41 @@ are treated as blocked states, never bypass targets.
 
 ## HTML parsing
 
-Minister pages list each article as `<article class="teaser ...">` containing:
+All parsing is regex-based over deterministic Drupal view/field class names. If
+beehive restructures these blocks the parsers may need updating.
+
+**Articles** (`articles`, and `recent_articles` in `minister`) — each is an
+`<article class="teaser ...">` block containing:
 
 - `<em class="meta meta__content-type">Release</em>` — content type
 - `<div class="meta meta__date"><time datetime="…">5 June 2026</time></div>` — date
 - `<div class="field field--name-node-title">…<a href="/release/…">Title</a>` — title + URL
 
-Portfolios are `<a href="/portfolio/<government>/<area>">Area</a>` links (deduped by area).
+**Roles & responsibilities** (`roles`, and `roles` in `minister`) — the
+`view-appointments` block, one row per portfolio:
 
-Parsing is regex-based over deterministic Drupal class names; if beehive restructures
-these blocks the parsers may need updating.
+```html
+<span class="views-field views-field-field-portfolio"><a href="/portfolio/<gov>/<area>">Health</a></span>
+ - <span class="views-field views-field-field-position">Minister</span>
+<span class="views-field views-field-field-archived"><span class="field-content"></span></span>
+```
+
+Rows with a non-empty `field-archived` are treated as past roles and excluded.
+
+**Biography** — a `<a href="/minister/biography/<name>">` link → `biography_url`.
+
+**Diary / calendar** (`diary`, and `latest_diary` in `minister`) — the
+`view-ministerial-diaries` block holds the latest published diary: `views-field-title`
+(e.g. *Hon Simeon Brown - March 2026*), a `<time datetime>` issue date, and a `.pdf`
+attachment URL. The full diary archive is a JavaScript-rendered Solr search
+(`/search?f[0]=content_type_facet:ministerial_diary&f[1]=ministers:<id>…`); its result
+list is **not** in the static HTML, so the CLI returns the latest diary plus
+`archive_url` rather than scraping the JS list. The numeric minister id in that URL is
+read from the minister page (`ministers:<id>`).
+
+**Slugs** — ministers carry honorifics: most are `hon-<first>-<last>`; the Prime
+Minister and some senior ministers are `rt-hon-<first>-<last>`. From a plain name the
+CLI tries the bare slug and both honorific prefixes.
 
 ## CI / smoke tests
 

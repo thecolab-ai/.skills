@@ -39,7 +39,7 @@ DEFAULT_UA = os.environ.get(
     "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
 )
 CACHE_FILE = os.path.join(tempfile.gettempdir(), "nz-ministers-incap.json")
-CACHE_TTL_SECONDS = 600  # reuse browser-obtained Incapsula clearance for 10 minutes
+CACHE_TTL_SECONDS = 300  # reuse browser-obtained Incapsula clearance (sessions are short-lived)
 ARTICLE_TYPES = ("release", "speech", "feature")
 
 
@@ -265,22 +265,93 @@ def parse_minister_articles(html: str) -> list[dict[str, Any]]:
     return out
 
 
+# The appointments view lists each role as one row:
+#   <span class="views-field views-field-field-portfolio"><a href="/portfolio/..">Health</a></span>
+#   - <span class="views-field views-field-field-position">Minister</span>
+#   <span class="views-field views-field-field-archived"><span class="field-content">..</span></span>
+_APPT_VIEW_RE = re.compile(r'view-appointments\b.*?<div class="view-content">(.*?)</div>\s*</div>', re.S)
+_APPT_ROW_RE = re.compile(
+    r'views-field-field-portfolio"><a\s+href="([^"]+)"[^>]*>(.*?)</a>.*?'
+    r'views-field-field-position">(.*?)</span>.*?'
+    r'views-field-field-archived"><span class="field-content">(.*?)</span>',
+    re.S,
+)
+
+
+def parse_minister_roles(html: str) -> list[dict[str, Any]]:
+    """Roles & responsibilities: each portfolio the minister holds + their position."""
+    view = _APPT_VIEW_RE.search(html)
+    block = view.group(1) if view else html
+    roles: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    for url, portfolio, position, archived in _APPT_ROW_RE.findall(block):
+        name = _strip_tags(portfolio)
+        pos = _strip_tags(position)
+        key = (name, pos)
+        if not name or key in seen:
+            continue
+        seen.add(key)
+        position = pos or "Minister"
+        roles.append(
+            {
+                "portfolio": name,
+                "position": position,
+                # Mirror beehive's own "Health - Minister" phrasing rather than
+                # forcing "of"/"for", which varies by portfolio.
+                "title": f"{name} — {position}",
+                "url": BASE + url if url.startswith("/") else url,
+                "archived": bool(_strip_tags(archived)),
+            }
+        )
+    return [r for r in roles if not r["archived"]]
+
+
+def parse_biography_url(html: str) -> str | None:
+    m = re.search(r'href="(/minister/biography/[^"#?]+)"', html)
+    return BASE + m.group(1) if m else None
+
+
+def parse_minister_id(html: str) -> str | None:
+    m = re.search(r"ministers(?:%3A|:)(\d+)", html)
+    return m.group(1) if m else None
+
+
+def parse_latest_diary(html: str) -> dict[str, Any] | None:
+    """The most recent ministerial diary (the minister's published calendar)."""
+    view = re.search(r"view-ministerial-diaries\b.*?(?=</aside>)", html, re.S)
+    if not view:
+        return None
+    block = view.group(0)
+    title = re.search(r'views-field-title">\s*<strong[^>]*>(.*?)</strong>', block, re.S)
+    when = re.search(r'<time[^>]*datetime="([^"]+)"[^>]*>(.*?)</time>', block, re.S)
+    pdf = re.search(r'href="([^"]+\.pdf[^"]*)"', block)
+    if not (title or pdf):
+        return None
+    return {
+        "title": _strip_tags(title.group(1)) if title else "",
+        "published": when.group(1) if when else "",
+        "published_label": _strip_tags(when.group(2)) if when else "",
+        "pdf_url": pdf.group(1) if pdf else None,
+    }
+
+
+def diary_archive_url(html: str) -> str | None:
+    m = re.search(r'href="(/search\?[^"]*ministerial_diary[^"]*)"', html)
+    return BASE + m.group(1).replace("&amp;", "&") if m else None
+
+
 def parse_minister_profile(html: str, slug: str) -> dict[str, Any]:
     h1 = re.search(r"<h1[^>]*>(.*?)</h1>", html, re.S)
     name = _strip_tags(h1.group(1)) if h1 else slug
-    portfolios: list[dict[str, str]] = []
-    seen: set[str] = set()
-    for path, text in re.findall(r'<a\s+href="(/portfolio/[^"]+)"[^>]*>(.*?)</a>', html, re.S):
-        parts = path.rstrip("/").split("/")
-        if len(parts) < 4:  # /portfolio/<government>/<area>
-            continue
-        area = parts[-1]
-        if area in seen:
-            continue
-        seen.add(area)
-        label = _strip_tags(text) or area.replace("-", " ").title()
-        portfolios.append({"name": label, "url": BASE + path, "slug": area})
-    return {"name": name, "slug": slug, "portfolios": portfolios}
+    return {
+        "name": name,
+        "slug": slug,
+        "url": f"{BASE}/minister/{slug}",
+        "roles": parse_minister_roles(html),
+        "biography_url": parse_biography_url(html),
+        "latest_diary": parse_latest_diary(html),
+        "diary_archive_url": diary_archive_url(html),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -300,8 +371,11 @@ def minister_slug_candidates(value: str) -> list[str]:
     if "/" not in raw and " " not in raw and base == raw.lower():
         candidates.append(raw.lower())
     candidates.append(base)
-    if not base.startswith("hon-"):
-        candidates.append("hon-" + base)
+    # Ministers carry honorifics in their slug: "hon-", and "rt-hon-" for the
+    # Prime Minister / senior ministers. Try the bare name with each prefix.
+    bare = re.sub(r"^(rt-)?hon-", "", base)
+    for prefix in ("hon-", "rt-hon-"):
+        candidates.append(prefix + bare)
     # de-dup preserving order
     out: list[str] = []
     for c in candidates:
@@ -333,27 +407,36 @@ def cmd_latest(args: argparse.Namespace) -> int:
 
 def _resolve_minister(value: str, *, allow_browser: bool) -> tuple[str, str]:
     """Return (slug, html) for the first candidate slug that resolves to a page."""
-    last_err: Exception | None = None
+    saw_404 = False
+    clearance_err: ClearanceUnavailable | None = None
     for slug in minister_slug_candidates(value):
         url = f"{BASE}/minister/{slug}"
         try:
             html = fetch_protected(url, allow_browser=allow_browser)
+        except ClearanceUnavailable as e:
+            clearance_err = e  # bot-wall, not a name problem — report it, don't keep trying
+            break
         except ApiError as e:
-            last_err = e
-            continue
+            if "HTTP 404" in str(e):
+                saw_404 = True
+                continue
+            raise  # genuine network/upstream error
         if re.search(r"<h1[^>]*>", html) and "/minister/" in html:
             return slug, html
-        last_err = ApiError(f"no minister page found for {slug!r}")
-    if isinstance(last_err, Exception):
-        raise last_err
-    raise ApiError(f"no minister page found for {value!r}")
+        saw_404 = True
+    if clearance_err is not None:
+        raise clearance_err
+    if saw_404:
+        raise ApiError(
+            f"no minister found for {value!r} — try the exact beehive slug, e.g. 'hon-simeon-brown'"
+        )
+    raise ApiError(f"could not resolve minister {value!r}")
 
 
 def cmd_minister(args: argparse.Namespace) -> int:
     slug, html = _resolve_minister(args.minister, allow_browser=args.browser)
     profile = parse_minister_profile(html, slug)
     articles = parse_minister_articles(html)
-    profile["url"] = f"{BASE}/minister/{slug}"
     profile["recent_articles"] = articles[:5]
     profile["article_count_on_page"] = len(articles)
     if args.json:
@@ -361,12 +444,69 @@ def cmd_minister(args: argparse.Namespace) -> int:
     else:
         print(profile["name"])
         print(f"  {profile['url']}")
-        if profile["portfolios"]:
-            print("  Portfolios: " + ", ".join(p["name"] for p in profile["portfolios"]))
+        if profile["roles"]:
+            print("  Roles & responsibilities:")
+            for r in profile["roles"]:
+                print(f"    {r['title']}")
+        if profile.get("biography_url"):
+            print(f"  Biography: {profile['biography_url']}")
+        diary = profile.get("latest_diary")
+        if diary:
+            label = diary.get("published_label") or diary.get("published") or ""
+            print(f"  Latest diary: {diary.get('title') or 'Ministerial diary'} ({label})")
+            if diary.get("pdf_url"):
+                print(f"    {diary['pdf_url']}")
         if profile["recent_articles"]:
             print("  Recent articles:")
             for a in profile["recent_articles"]:
                 print(f"    [{a['type']}] {a.get('published_label') or a['published']} — {a['title']}")
+    return 0
+
+
+def cmd_roles(args: argparse.Namespace) -> int:
+    slug, html = _resolve_minister(args.minister, allow_browser=args.browser)
+    roles = parse_minister_roles(html)
+    name_m = re.search(r"<h1[^>]*>(.*?)</h1>", html, re.S)
+    payload = {
+        "minister": slug,
+        "name": _strip_tags(name_m.group(1)) if name_m else slug,
+        "url": f"{BASE}/minister/{slug}",
+        "count": len(roles),
+        "roles": roles,
+    }
+    if args.json:
+        print(json.dumps(payload, indent=2, ensure_ascii=False))
+    else:
+        print(f"{payload['name']} — roles & responsibilities ({len(roles)})")
+        for r in roles:
+            print(f"  {r['title']}")
+            print(f"    {r['url']}")
+    return 0
+
+
+def cmd_diary(args: argparse.Namespace) -> int:
+    slug, html = _resolve_minister(args.minister, allow_browser=args.browser)
+    diary = parse_latest_diary(html)
+    payload = {
+        "minister": slug,
+        "url": f"{BASE}/minister/{slug}",
+        "latest_diary": diary,
+        "archive_url": diary_archive_url(html),
+        "note": "Beehive publishes the latest ministerial diary on the minister page. "
+        "The full diary archive is behind a JavaScript search at archive_url.",
+    }
+    if args.json:
+        print(json.dumps(payload, indent=2, ensure_ascii=False))
+    else:
+        if diary:
+            label = diary.get("published_label") or diary.get("published") or ""
+            print(f"Latest ministerial diary for {slug}: {diary.get('title') or ''} ({label})")
+            if diary.get("pdf_url"):
+                print(f"  PDF: {diary['pdf_url']}")
+        else:
+            print(f"No published ministerial diary found for {slug}.")
+        if payload["archive_url"]:
+            print(f"  Full diary archive: {payload['archive_url']}")
     return 0
 
 
@@ -409,11 +549,23 @@ def build_parser() -> argparse.ArgumentParser:
     p_latest.add_argument("--json", action="store_true", help="emit JSON")
     p_latest.set_defaults(func=cmd_latest)
 
-    p_min = sub.add_parser("minister", help="a minister's profile, portfolios, and recent articles")
+    p_min = sub.add_parser("minister", help="a minister's profile: roles, biography, diary, recent articles")
     p_min.add_argument("minister", help="minister slug or name, e.g. 'hon-simeon-brown' or 'Simeon Brown'")
     p_min.add_argument("--browser", action="store_true", help="use CloakBrowser to clear beehive bot protection")
     p_min.add_argument("--json", action="store_true", help="emit JSON")
     p_min.set_defaults(func=cmd_minister)
+
+    p_roles = sub.add_parser("roles", help="a minister's roles & responsibilities (portfolios + position)")
+    p_roles.add_argument("minister", help="minister slug or name, e.g. 'hon-simeon-brown'")
+    p_roles.add_argument("--browser", action="store_true", help="use CloakBrowser to clear beehive bot protection")
+    p_roles.add_argument("--json", action="store_true", help="emit JSON")
+    p_roles.set_defaults(func=cmd_roles)
+
+    p_diary = sub.add_parser("diary", help="a minister's latest published diary (calendar) + archive link")
+    p_diary.add_argument("minister", help="minister slug or name, e.g. 'hon-simeon-brown'")
+    p_diary.add_argument("--browser", action="store_true", help="use CloakBrowser to clear beehive bot protection")
+    p_diary.add_argument("--json", action="store_true", help="emit JSON")
+    p_diary.set_defaults(func=cmd_diary)
 
     p_art = sub.add_parser("articles", help="releases/speeches attributed to a minister")
     p_art.add_argument("minister", help="minister slug or name, e.g. 'hon-simeon-brown'")

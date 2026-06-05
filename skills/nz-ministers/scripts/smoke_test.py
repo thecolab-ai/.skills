@@ -99,9 +99,9 @@ def test_minister():
             print(f"  stderr: {r.stderr[:200]}")
             return False
         data = json.loads(r.stdout)
-        if not data.get("name") or not isinstance(data.get("portfolios"), list):
+        if not data.get("name") or not isinstance(data.get("roles"), list):
             print(f"  stdout: {r.stdout[:200]}")
-            print("  Expected minister name + portfolios[]")
+            print("  Expected minister name + roles[]")
             return False
         return True
     # No browser: must return the clean clearance_required blocked state (exit 2).
@@ -147,6 +147,60 @@ def test_articles():
 
 
 results.append(test(f"articles {MINISTER}", test_articles))
+
+
+def test_roles():
+    if not WANT_BROWSER:
+        print("  [SKIP] roles needs browser clearance; not available on this host")
+        return True
+    r = run(["roles", MINISTER, "--browser", "--json"])
+    if r.returncode != 0:
+        if is_transient(r.stderr):
+            print(f"  [SKIP] browser/upstream blocked: {r.stderr.strip()[:140]}")
+            return True
+        print(f"  stderr: {r.stderr[:200]}")
+        return False
+    data = json.loads(r.stdout)
+    roles = data.get("roles")
+    if not isinstance(roles, list) or not roles:
+        print(f"  stdout: {r.stdout[:200]}")
+        print("  Expected non-empty roles[]")
+        return False
+    if not all(k in roles[0] for k in ("portfolio", "position", "url")):
+        print(f"  Missing keys in role: {roles[0]}")
+        return False
+    return True
+
+
+results.append(test(f"roles {MINISTER}", test_roles))
+
+
+def test_diary():
+    if not WANT_BROWSER:
+        print("  [SKIP] diary needs browser clearance; not available on this host")
+        return True
+    r = run(["diary", MINISTER, "--browser", "--json"])
+    if r.returncode != 0:
+        if is_transient(r.stderr):
+            print(f"  [SKIP] browser/upstream blocked: {r.stderr.strip()[:140]}")
+            return True
+        print(f"  stderr: {r.stderr[:200]}")
+        return False
+    data = json.loads(r.stdout)
+    # latest_diary may be null if the minister has none published, but the key
+    # and the archive_url must be present and well-formed.
+    if "latest_diary" not in data or "archive_url" not in data:
+        print(f"  stdout: {r.stdout[:200]}")
+        print("  Expected latest_diary + archive_url keys")
+        return False
+    diary = data["latest_diary"]
+    if diary is not None and not all(k in diary for k in ("title", "published", "pdf_url")):
+        print(f"  Missing keys in diary: {diary}")
+        return False
+    return True
+
+
+results.append(test(f"diary {MINISTER}", test_diary))
 
 if all(results):
     print("All tests passed.")
