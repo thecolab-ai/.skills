@@ -56,8 +56,9 @@ python3 $cli articles hon-simeon-brown --limit 20 --browser --json
 - `diary <slug|name>` — `--browser`, `--json`
 - `articles <slug|name>` — `--limit N`, `--type {release,speech,feature}`, `--browser`, `--json`
 
-A minister is identified by slug (`hon-simeon-brown`, `rt-hon-christopher-luxon`) or
-plain name (`"Simeon Brown"`); the CLI tries the `hon-` / `rt-hon-` honorific forms.
+A minister is identified by slug (`hon-simeon-brown`, `rt-hon-christopher-luxon`,
+`hon-dr-shane-reti`) or plain name (`"Simeon Brown"`, `"Shane Reti"`); the CLI tries the
+`hon-` / `rt-hon-` / `hon-dr-` honorific forms.
 
 ## Bot protection & `--browser`
 

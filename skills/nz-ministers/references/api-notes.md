@@ -82,8 +82,10 @@ list is **not** in the static HTML, so the CLI returns the latest diary plus
 read from the minister page (`ministers:<id>`).
 
 **Slugs** — ministers carry honorifics: most are `hon-<first>-<last>`; the Prime
-Minister and some senior ministers are `rt-hon-<first>-<last>`. From a plain name the
-CLI tries the bare slug and both honorific prefixes.
+Minister and some senior ministers are `rt-hon-<first>-<last>`; ministers styled "Dr"
+include a `dr-` element (e.g. `hon-dr-shane-reti`). From a plain name the CLI strips any
+supplied honorific and tries the bare slug plus the `hon-`, `rt-hon-`, `hon-dr-`,
+`rt-hon-dr-`, and `dr-` forms.
 
 ## CI / smoke tests
 

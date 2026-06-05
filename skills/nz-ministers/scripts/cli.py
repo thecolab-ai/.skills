@@ -107,8 +107,28 @@ def save_clearance(ua: str, cookie: str) -> None:
     os.replace(tmp, CACHE_FILE)
 
 
-def bootstrap_clearance() -> dict[str, str]:
-    """Launch CloakBrowser, clear the Incapsula challenge, cache UA + cookies."""
+def _http_get(url: str, clearance: dict[str, str]) -> str:
+    return _open(
+        url,
+        {
+            "User-Agent": clearance["ua"],
+            "Cookie": clearance["cookie"],
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-NZ,en;q=0.9",
+            "Referer": BASE + "/",
+        },
+    )
+
+
+def _browser_fetch(url: str) -> tuple[str, str, str]:
+    """Open `url` in CloakBrowser, clear the Incapsula challenge, and return
+    (html, user_agent, cookie_header).
+
+    Reading the page from the browser itself — rather than replaying cookies over
+    plain HTTP — is what reliably gets past the challenge (Incapsula re-challenges
+    a bare HTTP client even with valid cookies when the IP is under scrutiny). The
+    returned cookies are still cached so quiet periods can use the fast HTTP path.
+    """
     try:
         import cloakbrowser  # noqa: F401
     except Exception as exc:  # pragma: no cover - optional host dependency
@@ -130,9 +150,10 @@ def bootstrap_clearance() -> dict[str, str]:
                 locale="en-NZ",
             )
             page = browser.new_page()
-            page.goto(BASE + "/", wait_until="domcontentloaded", timeout=90000)
+            page.goto(url, wait_until="domcontentloaded", timeout=90000)
+            html = ""
             cleared = False
-            for _ in range(6):
+            for _ in range(7):
                 page.wait_for_timeout(2500)
                 html = page.content()
                 if not is_incapsula(html) and len(html) > 5000:
@@ -150,52 +171,36 @@ def bootstrap_clearance() -> dict[str, str]:
         if browser is not None:
             with contextlib.suppress(Exception):
                 browser.close()
-
-    if not cookie:
-        raise ClearanceUnavailable("browser_blocked: no clearance cookies obtained")
-    save_clearance(ua, cookie)
-    return {"ua": ua, "cookie": cookie}
+    return html, ua, cookie
 
 
 def fetch_protected(url: str, *, allow_browser: bool) -> str:
-    """Fetch a bot-protected beehive page using cached or fresh Incapsula clearance.
+    """Fetch a bot-protected beehive page.
 
-    Tries cached clearance first (pure HTTP, no browser). If that is missing or
-    stale, and --browser is allowed, bootstraps fresh clearance via CloakBrowser.
+    Fast path: replay cached Incapsula clearance cookies over plain HTTP. If there
+    is no cache, it is stale, or beehive re-challenges the HTTP client, fall back
+    (when --browser is allowed) to reading the page directly in CloakBrowser, and
+    refresh the cookie cache for subsequent fast calls.
     """
     clearance = load_clearance()
-    if clearance is None:
-        if not allow_browser:
-            raise ClearanceUnavailable(
-                "clearance_required: beehive minister pages are behind Incapsula bot "
-                "protection. Run this command once with --browser (CloakBrowser) to mint "
-                "clearance cookies; they are cached and reused for ~10 minutes."
-            )
-        clearance = bootstrap_clearance()
-
-    def _get(c: dict[str, str]) -> str:
-        return _open(
-            url,
-            {
-                "User-Agent": c["ua"],
-                "Cookie": c["cookie"],
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                "Accept-Language": "en-NZ,en;q=0.9",
-                "Referer": BASE + "/",
-            },
-        )
-
-    html = _get(clearance)
-    if is_incapsula(html):
-        # Cached cookies went stale mid-flight; re-bootstrap once if allowed.
+    if clearance is not None:
+        html = _http_get(url, clearance)
+        if not is_incapsula(html):
+            return html
         if not allow_browser:
             raise ClearanceUnavailable(
                 "clearance_expired: cached beehive clearance is stale. Re-run with --browser."
             )
-        clearance = bootstrap_clearance()
-        html = _get(clearance)
-        if is_incapsula(html):
-            raise ClearanceUnavailable("browser_blocked: beehive served a challenge after clearance")
+    elif not allow_browser:
+        raise ClearanceUnavailable(
+            "clearance_required: beehive minister pages are behind Incapsula bot "
+            "protection. Run this command once with --browser (CloakBrowser) to clear "
+            "it; clearance cookies are cached and reused for a few minutes."
+        )
+
+    html, ua, cookie = _browser_fetch(url)
+    if cookie:
+        save_clearance(ua, cookie)
     return html
 
 
@@ -367,6 +372,14 @@ def slugify(text: str) -> str:
     return s
 
 
+# Minister slugs carry honorific prefixes: "hon-", "rt-hon-" (Prime Minister /
+# senior ministers), and a "dr-" element for ministers styled "Dr" (e.g.
+# hon-dr-shane-reti). Strip any of these from the supplied name, then try each
+# combination, cheapest/most-common first.
+_HONORIFIC_PREFIX_RE = re.compile(r"^(rt-)?(hon-)?(dr-)?")
+_SLUG_PREFIXES = ("hon-", "rt-hon-", "hon-dr-", "rt-hon-dr-", "dr-", "")
+
+
 def minister_slug_candidates(value: str) -> list[str]:
     raw = value.strip()
     base = slugify(raw)
@@ -375,10 +388,8 @@ def minister_slug_candidates(value: str) -> list[str]:
     if "/" not in raw and " " not in raw and base == raw.lower():
         candidates.append(raw.lower())
     candidates.append(base)
-    # Ministers carry honorifics in their slug: "hon-", and "rt-hon-" for the
-    # Prime Minister / senior ministers. Try the bare name with each prefix.
-    bare = re.sub(r"^(rt-)?hon-", "", base)
-    for prefix in ("hon-", "rt-hon-"):
+    bare = _HONORIFIC_PREFIX_RE.sub("", base)
+    for prefix in _SLUG_PREFIXES:
         candidates.append(prefix + bare)
     # de-dup preserving order
     out: list[str] = []
@@ -425,10 +436,12 @@ def _resolve_minister(value: str, *, allow_browser: bool) -> tuple[str, str]:
                 saw_404 = True
                 continue
             raise  # genuine network/upstream error
-        # Confirm this is the requested minister's own profile (the canonical
-        # /minister/<slug> URL appears on the page), not just any page linking
-        # to ministers.
-        if re.search(r"<h1[^>]*>", html) and f"/minister/{slug}" in html:
+        # Confirm this is a real minister profile, not a 404 / search-results page
+        # (beehive serves a "Search" page for unknown minister slugs). Profile
+        # pages carry these minister-specific Drupal markers.
+        if ("minister__title" in html or "taxonomy-term--type-ministers" in html) and (
+            f"/minister/{slug}" in html
+        ):
             return slug, html
         saw_404 = True
     if clearance_err is not None:
