@@ -1,6 +1,6 @@
 ---
 name: nz-road-closures
-description: Query NZTA / Waka Kotahi Journey Planner state-highway road closures, roadworks, incidents, highway routes, regions, and traffic cameras through a lightweight no-login CLI. Use when the task involves New Zealand state highway journey conditions or machine-readable NZTA road-event data. Read-only; no alerts, accounts, or reporting actions.
+description: Query NZTA / Waka Kotahi state-highway road closures, roadworks, incidents, traffic cameras, routes, and regions. Use for NZ state highway conditions. Read-only; no alerts, accounts, or reporting.
 ---
 
 # NZ Road Closures

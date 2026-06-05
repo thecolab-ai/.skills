@@ -1,6 +1,6 @@
 ---
 name: nz-pricewatch
-description: Query PriceSpy NZ public read-only product search, merchant offers, and price-history data for NZ electronics and appliances through a lightweight CLI. Use when the task involves NZ price comparison, cheapest current electronics/appliance prices, store price spread, PriceSpy product ids, or recent price movement. No login, cart, checkout, or account credentials required.
+description: Query PriceSpy NZ for NZ electronics and appliance price comparison: cheapest prices, merchant offers, price history, and trending products. No login, cart, or account required.
 ---
 
 # NZ Pricewatch

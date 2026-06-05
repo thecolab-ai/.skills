@@ -60,7 +60,7 @@ python3 skills/auckland-bin-schedule/scripts/cli.py --property-id 12343300679 --
 ## Resources
 
 - CLI entrypoint: `scripts/cli.py`
-- Live smoke test: `scripts/smoke-test.ts`
+- Live smoke test: `scripts/smoke_test.py`
 - API and stability notes: `references/api-notes.md`
 
 ## Notes

@@ -1,13 +1,13 @@
 ---
 name: the-warehouse-nz
-description: Query The Warehouse NZ public read-only product search, specials, product detail, and store finder endpoints through a lightweight no-login CLI. Use when the task involves The Warehouse NZ product lookup, prices, specials, product SKUs, store locations, opening hours, or machine-readable Warehouse product/store data. Read-only; no cart, checkout, wishlist, account, or order actions.
+description: Query The Warehouse NZ product search, specials, product detail, and store finder. Use for The Warehouse NZ product lookup, prices, specials, SKUs, store locations, or opening hours. Optional --browser mode uses CloakBrowser for public read-only page/API fetches when installed. No cart or account.
 ---
 
 # The Warehouse NZ
 
 ## Goal
 
-Query live The Warehouse NZ product and store data through a small deterministic CLI with human-readable and JSON output, without browser automation or account login.
+Query live The Warehouse NZ product and store data through a small deterministic CLI with human-readable and JSON output, using direct public HTTP by default and optional CloakBrowser `--browser` mode for public read-only fetches when edge protection makes browser context useful.
 
 ## Use this when
 
@@ -30,8 +30,9 @@ Query live The Warehouse NZ product and store data through a small deterministic
 2. Use `search` for keyword product lookup and `specials` for promotional products
 3. Use `product` when an exact `R...` SKU is known
 4. Use `stores --region` for region-scoped store lookups
-5. Use `--json` for agent chaining, comparisons, alerts, or structured reports
-6. Mention that prices and hours are live The Warehouse website snapshots and the source is unofficial
+5. Use `--browser` when CI/headless edge protection blocks direct HTTP; if CloakBrowser is missing, the CLI returns `cloakbrowser_not_installed`
+6. Use `--json` for agent chaining, comparisons, alerts, or structured reports
+7. Mention that prices and hours are live The Warehouse website snapshots and the source is unofficial
 
 ## CLI
 
@@ -43,10 +44,10 @@ python3 skills/the-warehouse-nz/scripts/cli.py <command> [flags]
 
 ### Commands
 
-- `search <query> [--limit N] [--page N] [--json]` - product search with prices
-- `product <sku> [--json]` - fetch public product details for one SKU
-- `stores [--region name/code] [--json]` - list stores, optionally scoped to a NZ region
-- `specials [query] [--limit N] [--page N] [--json]` - promotional products, optionally filtered by query
+- `search <query> [--limit N] [--page N] [--json] [--browser]` - product search with prices
+- `product <sku> [--json] [--browser]` - fetch public product details for one SKU
+- `stores [--region name/code] [--json] [--browser]` - list stores, optionally scoped to a NZ region
+- `specials [query] [--limit N] [--page N] [--json] [--browser]` - promotional products, optionally filtered by query
 
 Examples:
 
@@ -56,6 +57,7 @@ python3 skills/the-warehouse-nz/scripts/cli.py search "school bag" --limit 5 --j
 python3 skills/the-warehouse-nz/scripts/cli.py product R3077131 --json
 python3 skills/the-warehouse-nz/scripts/cli.py stores --region auckland --json
 python3 skills/the-warehouse-nz/scripts/cli.py specials lego --limit 5 --json
+python3 skills/the-warehouse-nz/scripts/cli.py search toys --limit 3 --json --browser
 ```
 
 ## Resources
@@ -65,7 +67,10 @@ python3 skills/the-warehouse-nz/scripts/cli.py specials lego --limit 5 --json
 
 ## Notes
 
-- No API key, username, password, account cookie, private token, or browser automation is required for the implemented read-only operations
+- Direct public HTTP is the default path; optional `--browser` imports CloakBrowser only when requested and uses a headless public page context for search, specials, product, and store fetches
+- If `--browser --json` is requested and CloakBrowser is missing, the CLI returns `{"error": "cloakbrowser_not_installed", ...}` so agents can recommend installation
+- CAPTCHA, queue, or challenge pages are treated as blocked states, not bypass targets
+- No API key, username, password, account cookie, private token, cart, or checkout action is required for the implemented read-only operations
 - The CLI uses public Salesforce Commerce Cloud storefront endpoints and parses server-rendered product markup where JSON product search is not exposed
 - Product and store response shapes can change without notice; verify with a small live query before relying on larger workflows
 - Keep usage narrow and respectful

@@ -1,6 +1,6 @@
 ---
 name: briscoes-nz
-description: Query Briscoes NZ public product search, sale-flagged products, SKU detail, and store-finder endpoints through a lightweight no-login CLI. Use when the task involves Briscoes NZ homewares product lookup, current online prices, sale/deal snapshots, product SKUs, store locations, or machine-readable Briscoes public data. Read-only; no cart, account, checkout, or order actions.
+description: Query Briscoes NZ homewares product search, sale/deal snapshots, SKU detail, and store-finder. Use for Briscoes product lookup, prices, sale products, or store locations. No cart or account.
 ---
 
 # Briscoes NZ
@@ -62,7 +62,7 @@ python3 skills/briscoes-nz/scripts/cli.py specials bedding --limit 10 --json
 ## Resources
 
 - CLI entrypoint: `scripts/cli.py`
-- Live smoke test: `scripts/smoke-test.ts`
+- Live smoke test: `scripts/smoke_test.py`
 - API and stability notes: `references/api-notes.md`
 
 ## Notes

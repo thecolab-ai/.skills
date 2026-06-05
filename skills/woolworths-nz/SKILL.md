@@ -1,6 +1,6 @@
 ---
 name: woolworths-nz
-description: Query Woolworths NZ public product search, specials, browse, and SKU detail endpoints through a lightweight no-login CLI. Use when the task involves Woolworths NZ product lookup, online grocery prices, specials, product SKUs, category browsing, or machine-readable Woolworths product data. Read-only; no trolley or checkout actions.
+description: Query Woolworths NZ product search, specials, category browse, and SKU detail. Use for Woolworths NZ grocery prices, specials, and product lookup. Read-only; no trolley or checkout actions.
 ---
 
 # Woolworths NZ
@@ -60,7 +60,7 @@ python3 skills/woolworths-nz/scripts/cli.py product 705692 --json
 ## Resources
 
 - CLI entrypoint: `scripts/cli.py`
-- Live smoke test: `scripts/smoke-test.ts`
+- Live smoke test: `scripts/smoke_test.py`
 - API and stability notes: `references/api-notes.md`
 
 ## Notes

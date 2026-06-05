@@ -1,6 +1,6 @@
 ---
 name: nzbn-register
-description: Search and lookup public New Zealand Business Number (NZBN) Register business/entity records through the NZBN website's read-only public proxy. Use when the task involves NZ business identity lookup, exact NZBN details, company/entity status, trading names, public addresses, websites, or source-register identifiers. No account login or API subscription key required for supported read-only commands.
+description: Search and lookup public NZBN Register NZ business records: NZBN identity, company/entity status, trading names, addresses, and source-register identifiers. No login or API key required.
 ---
 
 # NZBN Register
@@ -57,7 +57,7 @@ python3 skills/nzbn-register/scripts/cli.py lookup 9429000023795 --raw --json
 ## Resources
 
 - CLI entrypoint: `scripts/cli.py`
-- Live smoke test: `scripts/smoke-test.ts`
+- Live smoke test: `scripts/smoke_test.py`
 - API and stability notes: `references/api-notes.md`
 
 ## Notes

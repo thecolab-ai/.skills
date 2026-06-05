@@ -1,6 +1,6 @@
 ---
 name: nz-healthpoint
-description: Query Healthpoint NZ public health-service directory pages through a lightweight read-only CLI. Use when the task involves finding New Zealand pharmacies, GPs, urgent care, hospitals, dentists, specialists, locations, contact details, opening hours, or services listed on healthpoint.co.nz. Read-only; not for bookings, triage, referrals, or medical advice.
+description: Query Healthpoint NZ health-service directory: NZ pharmacies, GPs, urgent care, hospitals, dentists, and specialists. Returns locations, contact details, opening hours, and services. No booking or login.
 ---
 
 # Healthpoint NZ

@@ -1,6 +1,6 @@
 ---
 name: trademe-nz
-description: Query Trade Me NZ public read-only listing/search endpoints for marketplace, property, rentals, motors, jobs, flatmates, regions, categories, and listing details. Use when the task involves Trade Me market research, listing lookup, property/rental scans, used-car scans, job searches, or machine-readable public listing data. No login or app credentials required for supported read-only commands.
+description: Query Trade Me NZ public listings: marketplace, property sale/rental, motors, jobs, flatmates, rural, retirement, regions, categories, and listing details. No login or credentials required.
 ---
 
 # Trade Me NZ
@@ -61,7 +61,7 @@ python3 skills/trademe-nz/scripts/cli.py listing 5945835894 --json
 ## Resources
 
 - CLI entrypoint: `scripts/cli.py`
-- Live smoke test: `scripts/smoke-test.ts`
+- Live smoke test: `scripts/smoke_test.py`
 - API and stability notes: `references/api-notes.md`
 
 ## Notes

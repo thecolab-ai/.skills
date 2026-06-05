@@ -27,7 +27,7 @@ Aggregate live RSS feeds from major New Zealand news websites into a single CLI 
 
 ## Preferred workflow
 
-1. Run `scripts/cli.ts` with the narrowest subcommand that answers the task
+1. Run `scripts/cli.py` with the narrowest subcommand that answers the task
 2. Start with `search` for any topic lookup, either positionally or with flags
 3. Use `--source`, `--since-hours`, `--since-date`, `--contains-all`, `--exact`, and `--exclude` when the request needs tighter matching
 4. Use default human output for direct answers
@@ -38,7 +38,7 @@ Aggregate live RSS feeds from major New Zealand news websites into a single CLI 
 Run with:
 
 ```bash
-npx tsx skills/nz-news/scripts/cli.ts <command> [flags]
+python3 skills/nz-news/scripts/cli.py <command> [flags]
 ```
 
 ### Search first
@@ -48,18 +48,18 @@ The easiest path for topic lookups is now `search`.
 Examples:
 
 ```bash
-npx tsx skills/nz-news/scripts/cli.ts search cyclone
-npx tsx skills/nz-news/scripts/cli.ts search --keyword cyclone --since-hours 24
-npx tsx skills/nz-news/scripts/cli.ts search --keyword "housing market" --contains-all --source rnz,newsroom
-npx tsx skills/nz-news/scripts/cli.ts search --keyword coalition --exact --since-date 2026-04-01
-npx tsx skills/nz-news/scripts/cli.ts topic cyclone --exclude sport --limit 5
+python3 skills/nz-news/scripts/cli.py search cyclone
+python3 skills/nz-news/scripts/cli.py search --keyword cyclone --since-hours 24
+python3 skills/nz-news/scripts/cli.py search --keyword "housing market" --contains-all --source rnz,newsroom
+python3 skills/nz-news/scripts/cli.py search --keyword coalition --exact --since-date 2026-04-01
+python3 skills/nz-news/scripts/cli.py topic cyclone --exclude sport --limit 5
 ```
 
 `topic` is kept as an alias for `search`, so both of these work:
 
 ```bash
-npx tsx skills/nz-news/scripts/cli.ts topic cyclone
-npx tsx skills/nz-news/scripts/cli.ts search --keyword cyclone
+python3 skills/nz-news/scripts/cli.py topic cyclone
+python3 skills/nz-news/scripts/cli.py search --keyword cyclone
 ```
 
 ### `headlines [--limit N] [--json]`
@@ -69,9 +69,9 @@ Top headlines across all primary sources (NZ Herald, Stuff, RNZ, Newsroom, The S
 Examples:
 
 ```bash
-npx tsx skills/nz-news/scripts/cli.ts headlines
-npx tsx skills/nz-news/scripts/cli.ts headlines --limit 20
-npx tsx skills/nz-news/scripts/cli.ts headlines --json
+python3 skills/nz-news/scripts/cli.py headlines
+python3 skills/nz-news/scripts/cli.py headlines --limit 20
+python3 skills/nz-news/scripts/cli.py headlines --json
 ```
 
 ### `source <name> [--limit N] [--json]`
@@ -81,9 +81,9 @@ News from a specific source. Accepts source ID (for example `rnz`, `stuff`, `her
 Examples:
 
 ```bash
-npx tsx skills/nz-news/scripts/cli.ts source rnz
-npx tsx skills/nz-news/scripts/cli.ts source stuff --limit 5
-npx tsx skills/nz-news/scripts/cli.ts source herald --json
+python3 skills/nz-news/scripts/cli.py source rnz
+python3 skills/nz-news/scripts/cli.py source stuff --limit 5
+python3 skills/nz-news/scripts/cli.py source herald --json
 ```
 
 ### `search [keyword...] [flags]`
@@ -122,11 +122,11 @@ JSON shape:
 Examples:
 
 ```bash
-npx tsx skills/nz-news/scripts/cli.ts search cyclone
-npx tsx skills/nz-news/scripts/cli.ts search --keyword cyclone --since-hours 24
-npx tsx skills/nz-news/scripts/cli.ts search --keyword "housing market" --contains-all --source rnz,newsroom
-npx tsx skills/nz-news/scripts/cli.ts search --keyword coalition --exact --since-date 2026-04-01
-npx tsx skills/nz-news/scripts/cli.ts topic cyclone --exclude sport --limit 5 --json
+python3 skills/nz-news/scripts/cli.py search cyclone
+python3 skills/nz-news/scripts/cli.py search --keyword cyclone --since-hours 24
+python3 skills/nz-news/scripts/cli.py search --keyword "housing market" --contains-all --source rnz,newsroom
+python3 skills/nz-news/scripts/cli.py search --keyword coalition --exact --since-date 2026-04-01
+python3 skills/nz-news/scripts/cli.py topic cyclone --exclude sport --limit 5 --json
 ```
 
 ### `sources [--json]`
@@ -136,8 +136,8 @@ List all available news sources with a live status check showing which feeds are
 Examples:
 
 ```bash
-npx tsx skills/nz-news/scripts/cli.ts sources
-npx tsx skills/nz-news/scripts/cli.ts sources --json
+python3 skills/nz-news/scripts/cli.py sources
+python3 skills/nz-news/scripts/cli.py sources --json
 ```
 
 ### `summary [--json]`
@@ -147,8 +147,8 @@ Brief summary showing total story count across sources and the top 5 headlines.
 Examples:
 
 ```bash
-npx tsx skills/nz-news/scripts/cli.ts summary
-npx tsx skills/nz-news/scripts/cli.ts summary --json
+python3 skills/nz-news/scripts/cli.py summary
+python3 skills/nz-news/scripts/cli.py summary --json
 ```
 
 ## Sources
@@ -172,18 +172,16 @@ Primary sources are queried by default. Category feeds (RNZ sub-feeds) are avail
 
 ## Setup
 
-No API key required — just Node.js and `npx tsx`.
+No API key required — runs on the Python 3 standard library only.
 
 ## Resources
 
-- CLI entrypoint: `scripts/cli.ts`
-- Feed definitions and parser: `scripts/feeds.ts`
-- Live smoke test: `scripts/smoke-test.ts`
+- CLI entrypoint: `scripts/cli.py`
+- Live smoke test: `scripts/smoke_test.py`
 
 ## Notes
 
 - No API key required
-- Uses the built-in `fetch` available in modern Node runtimes
 - No external XML parsing dependencies, uses regex-based RSS and Atom parsing
 - Default output is human-readable, `--json` output is for chaining into other tools or agent steps
 - Headlines are deduplicated by normalised title across sources

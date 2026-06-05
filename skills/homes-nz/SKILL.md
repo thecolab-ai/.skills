@@ -1,6 +1,6 @@
 ---
 name: homes-nz
-description: Query homes.co.nz public read-only NZ residential property estimate, sales history, suburb estimate trend, and nearby comparable-property endpoints through a lightweight no-login CLI. Use when the task involves HomesEstimate/HEV lookup, council/property attributes, historical sale records, or nearby comparable homes. No login or account credentials required for supported read-only commands.
+description: Query homes.co.nz NZ residential property estimates (HomesEstimate/HEV), sales history, suburb trends, and nearby comparable properties. No login required.
 ---
 
 # Homes NZ

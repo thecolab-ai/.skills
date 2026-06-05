@@ -1,6 +1,6 @@
 ---
 name: nz-cinemas
-description: Query live New Zealand cinema locations, now-playing movies, and session times across Event Cinemas, HOYTS, Reading Cinemas, Rialto, and HOYTS Berkeley Mission Bay through a lightweight read-only CLI. Use when the task involves NZ movie showtimes, cinema lookup, or machine-readable cinema session data. Read-only; no booking, login, seat, ticket, cart, or payment actions.
+description: Query NZ cinema locations, now-playing movies, and session times across Event Cinemas, HOYTS, Reading Cinemas, Rialto, and Berkeley Mission Bay. Read-only; no booking, ticket, or payment.
 ---
 
 # NZ Cinemas

@@ -27,6 +27,10 @@ PLACE_BASE = "https://tools.summaries.stats.govt.nz/places/RC"
 UA = "stats-nz-skill/1.0 (+https://github.com/thecolab-ai/.skills)"
 
 CPI_SERIES = "CPIQ.SE9A"
+# Food Price Index, all-groups headline series ("Food Price Index for New
+# Zealand"). Monthly. Note: the Stats NZ bulk-CSV page may host an older FPI
+# release than Infoshare; this command auto-freshens when a newer CSV is posted.
+FPI_SERIES = "CPIM.SE901"
 
 GDP_SERIES = {
     "production_chain_volume_sa": {
@@ -241,7 +245,7 @@ def fmt_pct(value: float | None) -> str:
 
 def period_tuple(raw: str) -> tuple[int, int]:
     text = str(raw).strip()
-    match = re.fullmatch(r"(\d{4})\.(\d{2})", text) or re.fullmatch(r"(\d{4})-(\d{2})(?:-\d{2})?", text)
+    match = re.fullmatch(r"(\d{4})\.(\d{1,2})", text) or re.fullmatch(r"(\d{4})-(\d{2})(?:-\d{2})?", text)
     if match:
         return int(match.group(1)), int(match.group(2))
     match = re.fullmatch(r"(\d{4})", text)
@@ -317,6 +321,13 @@ def cpi_doc() -> dict[str, str]:
     )
 
 
+def fpi_doc() -> dict[str, str]:
+    return find_catalog_doc(
+        ["food price index", "index numbers"],
+        ["seasonally adjusted", "weighted average"],
+    )
+
+
 def gdp_doc() -> dict[str, str]:
     return find_catalog_doc(["gross domestic product"], ["visualisation"])
 
@@ -373,6 +384,62 @@ def cmd_cpi(args: argparse.Namespace) -> None:
         latest_item = p["latest"]
         print(f"Stats NZ CPI ({p['series_id']}) latest: {latest_item['period']} = {fmt_number(latest_item['value'])} {latest_item.get('units') or ''}".rstrip())
         print(f"Quarterly change: {fmt_pct(latest_item['quarterly_change_percent'])}; annual change: {fmt_pct(latest_item['annual_change_percent'])}")
+        print(f"Status: {latest_item.get('status') or 'n/a'}")
+        print(f"Source: {p['dataset']}")
+        print(p["url"])
+
+    output(payload, args.json, render)
+
+
+def cmd_fpi(args: argparse.Namespace) -> None:
+    doc = fpi_doc()
+    rows, final_url = fetch_csv_rows(doc["url"], lambda row: row.get("Series_reference") == FPI_SERIES)
+    rows.sort(key=lambda row: period_tuple(row["Period"]))
+    if not rows:
+        die(f"series {FPI_SERIES} was not found in {doc['title']}")
+
+    filtered = filter_period_rows(rows, args.from_date, args.to_date)
+    if not filtered:
+        die("no FPI observations matched the supplied date range")
+
+    latest = rows[-1]
+    latest_key = period_tuple(latest["Period"])
+    latest_value = as_float(latest.get("Data_value"))
+    previous = rows[-2] if len(rows) > 1 else None
+    # Annual change: same month one year earlier (FPI is monthly).
+    annual = next((row for row in rows if period_tuple(row["Period"]) == (latest_key[0] - 1, latest_key[1])), None)
+
+    previous_value = as_float(previous.get("Data_value")) if previous else None
+    annual_value = as_float(annual.get("Data_value")) if annual else None
+    monthly_change = None
+    annual_change = None
+    if latest_value is not None and previous_value:
+        monthly_change = round(((latest_value / previous_value) - 1.0) * 100.0, 1)
+    if latest_value is not None and annual_value:
+        annual_change = round(((latest_value / annual_value) - 1.0) * 100.0, 1)
+
+    observation_rows = filtered if args.from_date or args.to_date else rows[-13:]
+    payload = {
+        "source": "Stats NZ",
+        "dataset": doc["title"],
+        "url": final_url,
+        "series_id": FPI_SERIES,
+        "series_title": series_title(latest) or "Food Price Index for New Zealand",
+        "latest": {
+            "period": latest.get("Period"),
+            "value": latest_value,
+            "units": latest.get("UNITS"),
+            "status": latest.get("STATUS"),
+            "monthly_change_percent": monthly_change,
+            "annual_change_percent": annual_change,
+        },
+        "observations": [serialize_series_row(row) for row in observation_rows],
+    }
+
+    def render(p: dict[str, Any]) -> None:
+        latest_item = p["latest"]
+        print(f"Stats NZ Food Price Index ({p['series_id']}) latest: {latest_item['period']} = {fmt_number(latest_item['value'])} {latest_item.get('units') or ''}".rstrip())
+        print(f"Monthly change: {fmt_pct(latest_item['monthly_change_percent'])}; annual change: {fmt_pct(latest_item['annual_change_percent'])}")
         print(f"Status: {latest_item.get('status') or 'n/a'}")
         print(f"Source: {p['dataset']}")
         print(p["url"])
@@ -732,6 +799,12 @@ def build_parser() -> argparse.ArgumentParser:
     cpi.add_argument("--to", dest="to_date", help="End period as YYYY-MM, YYYY-MM-DD, or YYYY.MM")
     cpi.add_argument("--json", action="store_true", help="Emit machine-readable JSON")
     cpi.set_defaults(func=cmd_cpi)
+
+    fpi = sub.add_parser("fpi", help="Food price index monthly all-groups index")
+    fpi.add_argument("--from", dest="from_date", help="Start period as YYYY-MM, YYYY-MM-DD, or YYYY.MM")
+    fpi.add_argument("--to", dest="to_date", help="End period as YYYY-MM, YYYY-MM-DD, or YYYY.MM")
+    fpi.add_argument("--json", action="store_true", help="Emit machine-readable JSON")
+    fpi.set_defaults(func=cmd_fpi)
 
     population = sub.add_parser("population", help="National, projected, or regional population")
     population.add_argument("--region", help="Regional council name or place-summary slug")

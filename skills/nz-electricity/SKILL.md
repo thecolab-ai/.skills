@@ -1,6 +1,6 @@
 ---
 name: nz-electricity
-description: Query public New Zealand electricity-market and lines-company outage data through a lightweight no-login CLI. Use when the task involves current NZ wholesale regional spot prices, grid demand, current grid carbon intensity, historical nodal wholesale prices, monthly generation output by fuel type, or public outage records from supported NZ lines companies. Read-only; uses public EM6 JSON feeds, Electricity Authority EMI CSV/report datasets, and distributor outage feeds.
+description: Query NZ electricity market data: EM6 wholesale spot prices, grid demand, carbon intensity, historical nodal prices, monthly generation by fuel type, and NZ lines-company outage records. No login or API key.
 ---
 
 # NZ Electricity

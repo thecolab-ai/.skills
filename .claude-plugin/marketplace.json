@@ -1,0 +1,17 @@
+{
+  "name": "thecolab-skills",
+  "owner": {
+    "name": "thecolab.ai",
+    "url": "https://github.com/thecolab-ai/.skills"
+  },
+  "metadata": {
+    "description": "Community-contributed AI skills for useful New Zealand-specific data and workflows."
+  },
+  "plugins": [
+    {
+      "name": "nz-skills",
+      "source": "./",
+      "description": "Read-only NZ data connectors — LINZ, Stats NZ, RBNZ, GeoNet, MetService, Auckland Transport, Metlink, fuel prices, electricity market, supermarkets and retail pricing, Companies/NZBN registers, DOC huts, tides/surf, news, and more."
+    }
+  ]
+}

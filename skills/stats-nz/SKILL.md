@@ -1,6 +1,6 @@
 ---
 name: stats-nz
-description: Query public Stats NZ population, CPI, migration, GDP, time-series, and CSV catalogue data through a lightweight no-login CLI. Use when the task involves official New Zealand statistics from Stats NZ, Infoshare-derived CSV releases, population estimates or projections, CPI, GDP, or migration. Read-only; no API key or browser session.
+description: Query official Stats NZ data: CPI, GDP, population estimates/projections, migration, and CSV catalogue. No API key or browser session required.
 ---
 
 # Stats NZ
@@ -39,6 +39,7 @@ This skill ships support for:
 
 1. Run `scripts/cli.py` with the narrowest subcommand that answers the task
 2. Use `cpi` for the headline quarterly all-groups CPI index
+2a. Use `fpi` for the headline monthly all-groups Food Price Index
 3. Use `population` for national estimates, `population --projection YEAR` for national projections, or `population --region REGION` for regional council population
 4. Use `migration` for latest long-term migrant arrivals, departures, and net migration
 5. Use `gdp` for quarterly headline GDP production and expenditure series
@@ -58,6 +59,7 @@ python3 skills/stats-nz/scripts/cli.py <command> [flags]
 ## Commands
 
 - `cpi [--from DATE] [--to DATE] [--json]` - Consumers price index quarterly all-groups index for New Zealand
+- `fpi [--from DATE] [--to DATE] [--json]` - Food price index monthly all-groups index for New Zealand
 - `population [--region REGION] [--projection YEAR] [--scenario SCENARIO] [--json]` - national population, regional council population, or national projection
 - `migration [--json]` - latest estimated long-term migrant arrivals, departures, and net migration
 - `gdp [--from DATE] [--to DATE] [--json]` - quarterly headline GDP production and expenditure measures
@@ -69,6 +71,7 @@ Examples:
 ```bash
 python3 skills/stats-nz/scripts/cli.py cpi
 python3 skills/stats-nz/scripts/cli.py cpi --from 2025-03 --json
+python3 skills/stats-nz/scripts/cli.py fpi --json
 python3 skills/stats-nz/scripts/cli.py population --json
 python3 skills/stats-nz/scripts/cli.py population --region auckland --json
 python3 skills/stats-nz/scripts/cli.py population --projection 2050 --json
@@ -87,7 +90,8 @@ python3 skills/stats-nz/scripts/cli.py search "gross domestic product" --limit 5
 
 - Stats NZ is the upstream source for all implemented commands
 - No API key, username, password, cookie, or browser session is required for implemented commands
-- `cpi`, `gdp`, `migration`, `series`, and `search` use the public Stats NZ large-datasets CSV catalogue at `https://www.stats.govt.nz/large-datasets/csv-files-for-download/`
+- `cpi`, `fpi`, `gdp`, `migration`, `series`, and `search` use the public Stats NZ large-datasets CSV catalogue at `https://www.stats.govt.nz/large-datasets/csv-files-for-download/`
+- `fpi` resolves the latest Food Price Index "index numbers" CSV on that page; the bulk-CSV page can host an older FPI release than Infoshare, so it auto-freshens when a newer CSV is posted
 - `population` uses public Stats NZ indicator, projection release, and place-summary pages
 - The modern Stats NZ OData/API surface was not wired because live discovery indicated subscription-key requirements; this skill stays no-login and read-only
 - CSV release URLs change as new releases are published; the CLI discovers the current release from the Stats NZ catalogue where possible

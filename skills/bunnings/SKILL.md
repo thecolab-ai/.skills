@@ -1,6 +1,6 @@
 ---
 name: bunnings
-description: Query Bunnings NZ public product search, pricing, product detail, category browse, store locator, and redemption/specials pages through a lightweight no-login CLI, with optional Bunnings AU support via --country au. Use when the task involves Bunnings New Zealand product lookup, live prices, SKUs, store details, category browsing, promotional/redemption offers, or machine-readable Bunnings product data. Read-only; no cart, checkout, account, or login actions.
+description: Query Bunnings NZ product search, prices, SKUs, store details, category browse, and redemption specials via no-login CLI. Optional --country au for Bunnings Australia. Read-only; no cart, checkout, or account actions.
 ---
 
 # Bunnings

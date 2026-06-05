@@ -1,0 +1,22 @@
+name: Validate Skills
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+jobs:
+  validate-skills:
+    runs-on: [self-hosted, linux, x64, skills-smoke]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: '3.12'
+
+      - name: Validate all skills
+        run: python3 scripts/validate_skill.py --strict

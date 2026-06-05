@@ -83,7 +83,7 @@ If a category/location combination produces no cards, try the broader `upcoming 
 ## Resources
 
 - CLI entrypoint: `scripts/cli.py`
-- Live smoke test: `scripts/smoke-test.ts`
+- Live smoke test: `scripts/smoke_test.py`
 - API and website notes: `references/api-notes.md`
 
 ## Notes

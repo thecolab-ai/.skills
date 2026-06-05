@@ -47,6 +47,7 @@ KAPITI_AQUATICS_BASE = "https://www.kapiticoastaquatics.co.nz"
 PNCC_BASE = "https://www.pncc.govt.nz"
 PNCC_SWIMMING_PATH = "/Parks-recreation/Swimming-pools"
 CDP_HTTP_BASE = "http://127.0.0.1:5100"
+BROWSER_MODE = False
 WHG_WDC_BASE = "https://www.wdc.govt.nz"
 WHG_CLM_BASE = "https://www.clmnz.co.nz"
 WHG_RECREATION_URL = WHG_WDC_BASE + "/Community/Parks-and-recreation"
@@ -1285,6 +1286,14 @@ REGIONAL_POOL_CATALOG: dict[str, list[dict[str, Any]]] = {
 }
 
 
+class BrowserUnavailableError(RuntimeError):
+    """Raised when --browser is requested but CloakBrowser is unavailable."""
+
+
+class BrowserBlockedError(RuntimeError):
+    """Raised when --browser reaches a public-page challenge or unusable page."""
+
+
 def die(message: str, code: int = 1) -> None:
     print(f"nz-council: {message}", file=sys.stderr)
     raise SystemExit(code)
@@ -1532,6 +1541,45 @@ def fetch_text_cdp(url: str, endpoint: str = TGA_CDP_ENDPOINT, timeout: int = 25
                 pass
 
 
+
+def fetch_text_cloakbrowser(url: str, timeout_ms: int = 90000) -> str:
+    try:
+        from cloakbrowser import launch
+    except Exception as exc:  # pragma: no cover - optional host dependency
+        raise BrowserUnavailableError(
+            "cloakbrowser_not_installed: install CloakBrowser to use --browser for nz-council public pages."
+        ) from exc
+
+    browser = None
+    try:
+        browser = launch(
+            headless=True,
+            args=["--no-sandbox", "--disable-dev-shm-usage"],
+            timezone="Pacific/Auckland",
+            locale="en-NZ",
+        )
+        page = browser.new_page()
+        page.goto(url, wait_until="networkidle", timeout=timeout_ms)
+        html_text = page.content()
+        if is_bot_wall(html_text):
+            raise BrowserBlockedError("browser_blocked: browser reached bot-wall/challenge page")
+        if is_missing_page(html_text):
+            raise BrowserBlockedError("browser_blocked: browser returned missing-page HTML")
+        return html_text
+    finally:
+        if browser is not None:
+            browser.close()
+
+
+def fetch_text_browser_or_cdp(url: str, *, cdp_timeout: int = 8) -> str | None:
+    if BROWSER_MODE:
+        try:
+            return fetch_text_cloakbrowser(url)
+        except BrowserBlockedError:
+            return None
+    return fetch_text_via_cdp(url, timeout=cdp_timeout)
+
+
 def fetch_text_with_cdp(url_or_path: str, base: str = "", headers: dict[str, str] | None = None, timeout: int = 30) -> tuple[str, str, int]:
     body, final_url, status, error = fetch_text_result(url_or_path, base, headers=headers, timeout=timeout, allow_http_error=True)
     body = body or ""
@@ -1541,9 +1589,14 @@ def fetch_text_with_cdp(url_or_path: str, base: str = "", headers: dict[str, str
         die(f"HTTP {status} from {final_url}: {message}")
     if error or status >= 400 or looks_bot_walled(body):
         try:
-            body = fetch_text_cdp(final_url)
+            body = fetch_text_cloakbrowser(final_url) if BROWSER_MODE else fetch_text_cdp(final_url)
+        except BrowserUnavailableError:
+            raise
+        except BrowserBlockedError:
+            raise
         except Exception as exc:
-            die(f"direct fetch looked bot-walled and CDP fallback at {TGA_CDP_ENDPOINT} failed: {exc}")
+            fallback = "CloakBrowser --browser" if BROWSER_MODE else f"CDP fallback at {TGA_CDP_ENDPOINT}"
+            die(f"direct fetch looked bot-walled and {fallback} failed: {exc}")
     return body, final_url, status
 
 
@@ -1764,9 +1817,12 @@ def try_fetch_live_page(url: str, use_cdp: bool = True) -> tuple[str | None, str
     if body and (status is None or status < 400) and not is_bot_wall(body) and not is_missing_page(body):
         return body, final_url, status, "direct"
     if use_cdp and ((body and is_bot_wall(body)) or error or (status is not None and status >= 400)):
-        cdp_body = fetch_text_via_cdp(final_url)
+        cdp_body = fetch_text_browser_or_cdp(final_url)
+        method = "browser" if BROWSER_MODE else "cdp"
         if cdp_body and not is_bot_wall(cdp_body) and not is_missing_page(cdp_body):
-            return cdp_body, final_url, 200, "cdp"
+            return cdp_body, final_url, 200, method
+        if BROWSER_MODE:
+            return None, final_url, status, "browser_blocked"
     if error:
         return None, final_url, status, error
     if body and is_bot_wall(body):
@@ -1776,7 +1832,7 @@ def try_fetch_live_page(url: str, use_cdp: bool = True) -> tuple[str | None, str
 
 def source_probe(url: str) -> dict[str, Any]:
     _, final_url, status, method = try_fetch_live_page(url)
-    ok = method in {"direct", "cdp"}
+    ok = method in {"direct", "cdp", "browser"}
     return {"ok": ok, "method": method, "status": status, "url": final_url}
 
 
@@ -2260,12 +2316,16 @@ def fetch_dud_text(url_or_path: str, timeout: int = 30) -> tuple[str, str, int, 
     if body and (status is None or status < 400) and not is_bot_wall(body) and not is_missing_page(body):
         return body, final_url, status or 200, "direct"
 
-    cdp_body = fetch_text_via_cdp(final_url, timeout=18)
+    cdp_body = fetch_text_browser_or_cdp(final_url, cdp_timeout=18)
+    method = "browser" if BROWSER_MODE else "cdp"
     if cdp_body and not is_bot_wall(cdp_body) and not is_missing_page(cdp_body):
-        return cdp_body, final_url, 200, "cdp"
+        return cdp_body, final_url, 200, method
+    if BROWSER_MODE:
+        return "", final_url, status or 0, "browser_blocked"
 
     reason = error or ("bot-wall" if body and is_bot_wall(body) else "missing-page")
-    die(f"Dunedin page fetch failed for {final_url} ({reason}); CDP fallback at {CDP_HTTP_BASE} did not return usable HTML")
+    fallback = "CloakBrowser --browser" if BROWSER_MODE else f"CDP fallback at {CDP_HTTP_BASE}"
+    die(f"Dunedin page fetch failed for {final_url} ({reason}); {fallback} did not return usable HTML")
 
 
 def dud_html_text_lines(page_html: str) -> list[str]:
@@ -4463,11 +4523,13 @@ def build_parser() -> argparse.ArgumentParser:
     events.add_argument("--free", action="store_true", help="only include events with a visible free badge/text match")
     events.add_argument("--limit", type=int, default=10, help="maximum events to emit")
     events.add_argument("--json", action="store_true", help="emit JSON")
+    events.add_argument("--browser", action="store_true", help="use optional CloakBrowser for public pages that direct HTTP cannot fetch")
     events.set_defaults(func=cmd_events)
 
     event = sub.add_parser("event", help="show one event detail from an Eventfinda URL/path id")
     event.add_argument("id_or_url", help="event id/path from events output, or a full Eventfinda event URL")
     event.add_argument("--json", action="store_true", help="emit JSON")
+    event.add_argument("--browser", action="store_true", help="use optional CloakBrowser for public pages that direct HTTP cannot fetch")
     event.set_defaults(func=cmd_event)
 
     pools = sub.add_parser("pools", help="list public pools with available hours where supported")
@@ -4475,12 +4537,14 @@ def build_parser() -> argparse.ArgumentParser:
     pools.add_argument("--region", choices=sorted(AKL_AREA_IDS), help="Auckland region filter")
     pools.add_argument("--limit", type=int, default=50, help="maximum pools to emit")
     pools.add_argument("--json", action="store_true", help="emit JSON")
+    pools.add_argument("--browser", action="store_true", help="use optional CloakBrowser for public pages that direct HTTP cannot fetch")
     pools.set_defaults(func=cmd_pools)
 
     pool = sub.add_parser("pool", help="show one pool detail and lane availability where supported")
     pool.add_argument("name", help="pool name or slug, e.g. Tepid Baths")
     pool.add_argument("--council", choices=RECREATION_COUNCILS, help="council recreation source; searches supported councils when omitted")
     pool.add_argument("--json", action="store_true", help="emit JSON")
+    pool.add_argument("--browser", action="store_true", help="use optional CloakBrowser for public pages that direct HTTP cannot fetch")
     pool.set_defaults(func=cmd_pool)
 
     facilities = sub.add_parser("facilities", help="list recreation facilities")
@@ -4489,17 +4553,52 @@ def build_parser() -> argparse.ArgumentParser:
     facilities.add_argument("--region", choices=sorted(AKL_AREA_IDS), help="Auckland region filter")
     facilities.add_argument("--limit", type=int, default=50, help="maximum facilities to emit")
     facilities.add_argument("--json", action="store_true", help="emit JSON")
+    facilities.add_argument("--browser", action="store_true", help="use optional CloakBrowser for public pages that direct HTTP cannot fetch")
     facilities.set_defaults(func=cmd_facilities)
 
     return parser
 
 
 def main() -> None:
+    global BROWSER_MODE
     parser = build_parser()
     args = parser.parse_args()
+    BROWSER_MODE = bool(getattr(args, "browser", False))
     if hasattr(args, "limit"):
         args.limit = min(max(1, args.limit), 100)
-    args.func(args)
+    try:
+        if BROWSER_MODE:
+            try:
+                import cloakbrowser  # noqa: F401
+            except Exception as exc:
+                raise BrowserUnavailableError(
+                    "cloakbrowser_not_installed: install CloakBrowser to use --browser for nz-council public pages."
+                ) from exc
+        args.func(args)
+    except BrowserUnavailableError as exc:
+        payload = {
+            "error": "cloakbrowser_not_installed",
+            "message": str(exc),
+            "recommendation": "Recommend that the user installs CloakBrowser or reruns without --browser for direct public HTTP / legacy CDP fallback.",
+        }
+        if getattr(args, "json", False):
+            print(json.dumps(payload, indent=2, ensure_ascii=False))
+        else:
+            print(f"ERROR: {payload['message']}", file=sys.stderr)
+            print(f"Recommendation: {payload['recommendation']}", file=sys.stderr)
+        raise SystemExit(2)
+    except BrowserBlockedError as exc:
+        payload = {
+            "error": "browser_blocked",
+            "message": str(exc),
+            "recommendation": "Rerun without --browser for direct public HTTP / legacy CDP fallback, or retry later; do not attempt to bypass CAPTCHA/challenge pages.",
+        }
+        if getattr(args, "json", False):
+            print(json.dumps(payload, indent=2, ensure_ascii=False))
+        else:
+            print(f"ERROR: {payload['message']}", file=sys.stderr)
+            print(f"Recommendation: {payload['recommendation']}", file=sys.stderr)
+        raise SystemExit(3)
 
 
 if __name__ == "__main__":
