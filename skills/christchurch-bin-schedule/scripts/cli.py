@@ -4,17 +4,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import ssl
 import sys
+import urllib.error
+import urllib.parse
+import urllib.request
 from datetime import date, datetime
 from typing import Any
-
-import urllib.parse
-
-try:
-    import requests
-    HAS_REQUESTS = True
-except ImportError:
-    HAS_REQUESTS = False
 
 ADDRESS_SUGGEST_URL = "https://opendata.ccc.govt.nz/CCCSearch/rest/address/suggest"
 COLLECTION_URL = "https://ccc.govt.nz/services/rubbish-and-recycling/collections/getProperty"
@@ -28,28 +24,8 @@ BIN_LABELS = {
 }
 
 
-def _fetch_requests(url: str, headers: dict[str, str] | None = None, timeout: int = 30) -> Any:
-    """Fetch JSON using requests (preferred)."""
-    resp = requests.get(
-        url,
-        headers={"User-Agent": UA, **(headers or {})},
-        timeout=timeout,
-    )
-    if resp.status_code == 403:
-        raise RuntimeError(
-            "CCC collection endpoint returned 403 (blocked by bot protection). "
-            "This endpoint works from residential NZ IPs but may block datacenter/VPN IPs. "
-            "Try from a home connection."
-        )
-    resp.raise_for_status()
-    return resp.json()
-
-
-def _fetch_urllib(url: str, headers: dict[str, str] | None = None, timeout: int = 30) -> Any:
-    """Fetch JSON using stdlib urllib (fallback)."""
-    import urllib.request
-    import ssl
-
+def fetch_json(url: str, headers: dict[str, str] | None = None, timeout: int = 15) -> Any:
+    """Fetch JSON from a URL using the Python standard library."""
     ctx = ssl.create_default_context()
     req = urllib.request.Request(
         url,
@@ -65,14 +41,9 @@ def _fetch_urllib(url: str, headers: dict[str, str] | None = None, timeout: int 
                 "This endpoint works from residential NZ IPs but may block datacenter/VPN IPs. "
                 "Try from a home connection."
             ) from e
-        raise
-
-
-def fetch_json(url: str, headers: dict[str, str] | None = None, timeout: int = 30) -> Any:
-    """Fetch JSON from a URL, using requests if available."""
-    if HAS_REQUESTS:
-        return _fetch_requests(url, headers, timeout)
-    return _fetch_urllib(url, headers, timeout)
+        raise RuntimeError(f"CCC endpoint returned HTTP {e.code}") from e
+    except urllib.error.URLError as e:
+        raise RuntimeError(f"network error contacting CCC: {e.reason}") from e
 
 
 def find_rating_unit_id(address: str) -> dict[str, Any] | None:
@@ -185,7 +156,11 @@ def main(argv: list[str] | None = None) -> int:
             address = " ".join(args.address).strip()
             match = find_rating_unit_id(address)
             if not match:
-                print(f"christchurch-bin-schedule: No address match for '{address}'", file=sys.stderr)
+                msg = f"No address match for '{address}'"
+                if args.json:
+                    print(json.dumps({"error": msg}, indent=2), file=sys.stderr)
+                else:
+                    print(f"christchurch-bin-schedule: {msg}", file=sys.stderr)
                 return 1
             result = get_collection(match["rating_unit_id"])
             result["address"] = match["address"]
