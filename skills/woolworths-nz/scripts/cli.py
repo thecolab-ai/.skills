@@ -168,7 +168,7 @@ def products_query(target: str, *, search: str | None = None, category_id: str |
         params["categoryId"] = category_id
     started = time.perf_counter()
     payload = request_json("/products", params=params)
-    products = product_items(payload)
+    products = product_items(payload)[:limit]
     elapsed_ms = round((time.perf_counter() - started) * 1000)
     return {
         "target": target,
@@ -176,7 +176,7 @@ def products_query(target: str, *, search: str | None = None, category_id: str |
         "category_id": category_id,
         "count": len(products),
         "elapsed_ms": elapsed_ms,
-        "products": products[:limit],
+        "products": products,
         "raw_total": nested(payload or {}, "products", "totalRecordCount"),
     }
 
