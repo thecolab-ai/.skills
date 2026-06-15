@@ -333,7 +333,11 @@ def gdp_doc() -> dict[str, str]:
 
 
 def migration_doc() -> dict[str, str]:
-    return find_catalog_doc(["international migration", "estimated migration by age and sex"])
+    # Stats NZ release titles/filenames have used both "estimated migration by
+    # age and sex" and "estimated migration by age sex" wording. Match the
+    # stable component terms instead of one exact phrase so the command survives
+    # routine monthly catalogue title changes.
+    return find_catalog_doc(["international migration", "estimated migration", "age", "sex"])
 
 
 def cmd_cpi(args: argparse.Namespace) -> None:
