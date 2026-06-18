@@ -7,6 +7,7 @@ Provides stops, departures, alerts, vehicles, routes, and network status.
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import datetime as dt
 import json
 import math
@@ -347,9 +348,17 @@ def get_departures(stop_input: str) -> dict:
 
 
 def get_network_status() -> dict:
-    alerts = get_service_alerts()
-    trip_updates = get_trip_updates()
-    vehicles = get_vehicle_positions()
+    # These are three independent realtime endpoints. Fetch them concurrently so
+    # `status` stays inside the 30s smoke-test budget even when one AT endpoint is
+    # sluggish. Sequential calls can legitimately take 35–45s with the existing
+    # 15s per-request timeout.
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+        alerts_future = executor.submit(get_service_alerts)
+        trips_future = executor.submit(get_trip_updates)
+        vehicles_future = executor.submit(get_vehicle_positions)
+        alerts = alerts_future.result()
+        trip_updates = trips_future.result()
+        vehicles = vehicles_future.result()
 
     by_severity: dict[str, int] = {}
     for a in alerts:
