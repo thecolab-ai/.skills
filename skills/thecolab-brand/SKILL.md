@@ -35,43 +35,54 @@ The Colab is a New Zealand AI consultancy and community helping businesses move 
 
 ## Visual Direction
 
-Use a modern consultancy/community aesthetic: premium but approachable, useful not sterile.
+Use the live `thecolab.ai` website as the brand source of truth. The look is editorial, premium, warm, and sparse — not neon SaaS sludge.
 
-### Palette
+### Site-Derived Palette
 
 Use these as defaults unless a client brand overrides them:
 
-- **Ink / deep charcoal:** `#1C1917` — title slides, strong text, premium dark sections.
-- **Colab blue-grey:** `#2E4057` — section blocks, trust, depth.
-- **Electric cyan:** `#0EA5E9` — highlights, connectors, progress, active AI/agent cues.
-- **Cyan dark:** `#0284C7` — secondary accent.
-- **Kea orange:** `#C2410C` — sparing emphasis, warnings, key moments.
-- **Warm cream:** `#FBF9F6` — light slide backgrounds.
-- **Stone text:** `#44403C` — body copy.
-- **Muted stone:** `#78716C` — captions, footers.
-- **White:** `#FFFFFF`.
+- **Ink / near black:** `#171412` — headings, primary CTAs, footer/dark sections.
+- **Warm off-white:** `#F8F7F4` — main canvas/background.
+- **White card:** `#FFFFFF` — cards and content panels.
+- **Deep navy:** `#31465F` — large stat cards and trust/depth blocks.
+- **Colab blue:** `#1688C7` — headline emphasis, links, metric accents.
+- **Bright blue:** `#19A7E0` — gradient/high-energy accents.
+- **Kea orange:** `#C94A0A` — sparing metric emphasis/warnings.
+- **Charcoal body:** `#4F4943` — paragraph copy.
+- **Muted stone:** `#6E6861` — captions/supporting text.
+- **Soft border:** `#DDD8D0` — card outlines.
 
-Recommended balance: 60–70% ink/cream base, 20–30% blue-grey, 5–10% cyan/orange accents.
+Recommended balance: 65–75% warm off-white/white, 15–20% ink/navy, 5–10% blue, tiny orange accents.
+
+### Type & Components
+
+- Headings feel like editorial serif: Georgia / Times-style, heavy, tight tracking.
+- Body copy is clean sans-serif: Inter/system sans, generous line height.
+- Primary CTAs are black rounded rectangles with white text.
+- Cards are rounded white panels with soft borders/shadows.
+- Metrics use big bold sans numerals with blue/orange accents.
+- Dark community/event sections use near-black backgrounds with white text and blue accents.
 
 ## Deck Rules
 
-When paired with `pptx`:
+When creating HTML→PDF decks, proposals, or presentation-style outputs:
 
 1. Start with the story: audience, decision, one-line takeaway, slide spine.
-2. Use a dark title slide, light content slides, and a dark closing/section slide where useful.
-3. Every slide should have a visual structure: cards, timeline, callout, process flow, comparison, or quote block.
+2. Use the thecolab.ai visual system: warm canvas, black serif headlines, blue emphasis, rounded cards, restrained orange.
+3. Every slide should have a visual structure: cards, timeline, callout, process flow, comparison, quote block, or metric panel.
 4. Keep text tight: one idea per slide, 3–5 bullets max, no paragraph sludge.
 5. Include proof/receipts when making claims: metric, example, source, or operational implication.
 6. Treat first-pass decks as editable working drafts unless the user asks for polished final art.
 
 ## Layout Motifs
 
-- Dark title slide with a bold left-aligned title and cyan/orange accent block.
-- Cream content slides with rounded white cards and sparse accent dots/lines.
-- Big-number callouts for quantified impact.
+- Website-style hero: centered editorial serif headline with blue emphasis word.
+- Cream content slides with rounded white cards and sparse blue accents.
+- Navy-to-blue metric panels for headline statistics.
 - Before/after columns for transformation stories.
 - Three-card operating model: **Discover → Build → Operate**.
 - Timeline/process flows for pilots and implementation plans.
+- Dark near-black community/CTA sections with white text and blue CTA accent.
 
 ## Slide Copy Patterns
 

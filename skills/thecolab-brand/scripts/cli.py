@@ -6,15 +6,16 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 PALETTE = {
-    "ink": "#1C1917",
-    "blue_grey": "#2E4057",
-    "electric_cyan": "#0EA5E9",
-    "cyan_dark": "#0284C7",
-    "kea_orange": "#C2410C",
-    "warm_cream": "#FBF9F6",
-    "stone_text": "#44403C",
-    "muted_stone": "#78716C",
-    "white": "#FFFFFF",
+    "ink": "#171412",
+    "warm_off_white": "#F8F7F4",
+    "white_card": "#FFFFFF",
+    "deep_navy": "#31465F",
+    "colab_blue": "#1688C7",
+    "bright_blue": "#19A7E0",
+    "kea_orange": "#C94A0A",
+    "charcoal_body": "#4F4943",
+    "muted_stone": "#6E6861",
+    "soft_border": "#DDD8D0",
 }
 
 MESSAGING = [
