@@ -118,7 +118,25 @@ def main() -> int:
         print("FAIL: totals command did not return expected shape", file=sys.stderr)
         print(totals.stdout, file=sys.stderr)
         return 1
+    if totals_data['totals'].get('requests_handled', 0) <= 0:
+        print("FAIL: totals command returned no handled requests", file=sys.stderr)
+        return 1
     print(f"OK: totals returned requests_handled={totals_data['totals'].get('requests_handled')}")
+
+    complaints = run(["complaints", "--period", latest_period or "latest", "--sort", "complaints", "--limit", "5", "--json"], timeout=120)
+    if complaints.returncode != 0:
+        print(complaints.stderr or complaints.stdout, file=sys.stderr)
+        return 1
+    complaints_data = parse_json_output(complaints)
+    records = complaints_data.get("records", [])
+    if any((r.get("org_id") in (0, None)) or r.get("agency_type") == "Agency Type Totals" for r in records):
+        print("FAIL: complaints includes aggregate rows", file=sys.stderr)
+        return 1
+    counts = [r.get("complaints", 0) for r in records]
+    if counts != sorted(counts, reverse=True):
+        print("FAIL: complaints sort is not descending", file=sys.stderr)
+        return 1
+    print("OK: complaints excludes aggregate rows and sorts descending")
 
     return 0
 

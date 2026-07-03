@@ -69,8 +69,12 @@ def load_csv_rows(timeout: int) -> tuple[list[dict[str, str]], str]:
                 accept="text/csv,application/csv,text/plain,*/*;q=0.8",
             ) as response:
                 source = response.geturl()
-                text = io.TextIOWrapper(response, encoding="utf-8-sig", newline="", errors="replace")
-                reader = csv.DictReader(text)
+                raw = response.read()
+                try:
+                    decoded = raw.decode("utf-8-sig")
+                except UnicodeDecodeError:
+                    decoded = raw.decode("cp1252", "replace")
+                reader = csv.DictReader(io.StringIO(decoded))
                 rows = [row for row in reader if row]
                 if rows:
                     return rows, source
@@ -221,10 +225,18 @@ def row_enriched(row: dict[str, str]) -> dict[str, object]:
     }
 
 
-def sort_by_key(rows: list[dict[str, object]], key: str, worst: bool) -> list[dict[str, object]]:
+def is_agency_row(row: dict[str, str]) -> bool:
+    return bool(_as_int(_first(row, "OrgID"))) and _first(row, "Agency_Type").lower() != "agency type totals"
+
+
+def agency_rows(rows: list[dict[str, str]]) -> list[dict[str, str]]:
+    return [row for row in rows if is_agency_row(row)]
+
+
+def sort_by_key(rows: list[dict[str, object]], key: str, descending: bool = False) -> list[dict[str, object]]:
     def to_number(value: Any) -> float:
         if value is None:
-            return float("-inf") if worst else float("inf")
+            return float("-inf") if descending else float("inf")
         if isinstance(value, (int, float)):
             return float(value)
         try:
@@ -236,12 +248,12 @@ def sort_by_key(rows: list[dict[str, object]], key: str, worst: bool) -> list[di
         return sorted(rows, key=lambda item: str(item.get("agency", "")).lower())
     if key in {"requests", "requests_handled"}:
         return sorted(rows, key=lambda item: to_number(item.get("requests_handled", 0)), reverse=True)
-    return sorted(rows, key=lambda item: to_number(item.get(key, 0)), reverse=not worst)
+    return sorted(rows, key=lambda item: to_number(item.get(key, 0)), reverse=descending)
 
 
 def list_agencies(rows: list[dict[str, str]]) -> list[dict[str, object]]:
     grouped: dict[str, dict[str, Any]] = {}
-    for row in rows:
+    for row in agency_rows(rows):
         org_id_raw = _first(row, "OrgID")
         org_id = _as_int(org_id_raw)
         if not org_id:
@@ -273,7 +285,8 @@ def list_agencies(rows: list[dict[str, str]]) -> list[dict[str, object]]:
 def periods_summary(rows: list[dict[str, str]]) -> list[dict[str, object]]:
     grouped = _rows_by_period(rows)
     items: list[dict[str, object]] = []
-    for period_end, period_rows in grouped.items():
+    for period_end, raw_period_rows in grouped.items():
+        period_rows = agency_rows(raw_period_rows)
         requests = sum((_as_int(_first(row, "OIA_RequestsHandled")) or 0) for row in period_rows)
         on_time = sum((_as_int(_first(row, "OIAs_CompletedWithinTimeframe")) or 0) for row in period_rows)
         published = sum((_as_int(_first(row, "OIAs_Published")) or 0) for row in period_rows)
@@ -282,7 +295,7 @@ def periods_summary(rows: list[dict[str, str]]) -> list[dict[str, object]]:
                 "period_end": period_end,
                 "period_label": period_label(period_end),
                 "rows": len(period_rows),
-                "agency_count": len({str(_first(r, "OrgID")) for r in period_rows if _first(r, "OrgID")}),
+                "agency_count": len({str(_first(r, "OrgID")) for r in period_rows}),
                 "requests_handled": requests,
                 "responses_published": published,
                 "requests_completed_within_timeframe": on_time,
@@ -539,15 +552,15 @@ def command_period(args: argparse.Namespace) -> dict[str, object]:
     if not period_rows:
         raise ValueError(f"no rows for period {period}")
 
-    records = [row_enriched(row) for row in period_rows]
+    records = [row_enriched(row) for row in agency_rows(period_rows)]
     if args.sort == "worst":
-        records = sort_by_key(records, "timeliness_pct", worst=True)
+        records = sort_by_key(records, "timeliness_pct", descending=False)
     elif args.sort == "best":
-        records = sort_by_key(records, "timeliness_pct", worst=False)
+        records = sort_by_key(records, "timeliness_pct", descending=True)
     elif args.sort == "requests":
-        records = sort_by_key(records, "requests", worst=False)
+        records = sort_by_key(records, "requests", descending=True)
     else:
-        records = sort_by_key(records, "name", worst=False)
+        records = sort_by_key(records, "name")
 
     limit = args.limit
     if limit and limit > 0:
@@ -591,7 +604,7 @@ def command_totals(args: argparse.Namespace) -> dict[str, object]:
     weighted_avg_sum = 0.0
     weighted_median_sum = 0.0
 
-    for row in period_rows:
+    for row in agency_rows(period_rows):
         agency_ids.add(str(_first(row, "OrgID")))
         enriched = row_enriched(row)
         handled = enriched.get("requests_handled") or 0
@@ -632,7 +645,7 @@ def command_totals(args: argparse.Namespace) -> dict[str, object]:
         "source": source_url,
         "period_end": period,
         "period_label": period_label(period),
-        "total_row_count": len(period_rows),
+        "total_row_count": len(agency_rows(period_rows)),
         "totals": totals,
     }
 
@@ -645,13 +658,13 @@ def _metric_records(
     sort: str,
 ) -> tuple[list[dict[str, object]], str]:
     period_rows, period_end = _rows_for_period(rows, period)
-    records = [row_enriched(row) for row in period_rows]
+    records = [row_enriched(row) for row in agency_rows(period_rows)]
     if sort == "name":
-        records = sort_by_key(records, "name", worst=True)
-    elif sort == "best":
-        records = sort_by_key(records, metric_key, worst=False)
+        records = sort_by_key(records, "name")
+    elif metric_key == "timeliness_pct":
+        records = sort_by_key(records, metric_key, descending=(sort == "best"))
     else:
-        records = sort_by_key(records, metric_key, worst=True)
+        records = sort_by_key(records, metric_key, descending=(sort != "best"))
 
     if limit and limit > 0:
         records = records[:limit]
@@ -725,17 +738,15 @@ def command_complaints(args: argparse.Namespace) -> dict[str, object]:
     if not period_rows:
         raise ValueError(f"no rows for period {period}")
 
-    records = [row_enriched(row) for row in period_rows]
+    records = [row_enriched(row) for row in agency_rows(period_rows)]
     if args.sort == "name":
-        records = sort_by_key(records, "name", worst=True)
+        records = sort_by_key(records, "name")
     elif args.sort == "final_opinions":
-        records = sort_by_key(records, "final_opinions", worst=True)
+        records = sort_by_key(records, "final_opinions", descending=True)
     elif args.sort == "best":
-        records = sort_by_key(records, "complaints", worst=False)
-    elif args.sort == "worst":
-        records = sort_by_key(records, "complaints", worst=True)
+        records = sort_by_key(records, "complaints", descending=False)
     else:
-        records = sort_by_key(records, "complaints", worst=True)
+        records = sort_by_key(records, "complaints", descending=True)
 
     if args.limit and args.limit > 0:
         records = records[:args.limit]
