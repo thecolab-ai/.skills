@@ -70,14 +70,19 @@ results.append(check("--help exits 0", lambda: run(["--help"]).returncode == 0 a
 def test_complaints():
     data = parse_json(["complaints", "--act", "OIA", "--limit", "2", "--json"])
     assert data.get("command") == "complaints"
-    if "matches" in data:
-        assert isinstance(data.get("matches"), list)
-    else:
-        assert isinstance(data.get("resources"), list)
+    assert data.get("status") == "ok"
+    if data.get("matches"):
+        assert all(match.get("act") == "OIA" for match in data["matches"] if match.get("act"))
+
+    lgoima = parse_json(["complaints", "--act", "LGOIMA", "--limit", "2", "--json"])
+    assert lgoima.get("status") == "ok"
+    if lgoima.get("matches"):
+        assert all(match.get("act") == "LGOIMA" for match in lgoima["matches"] if match.get("act"))
+        assert any(match.get("kind") in {"received", "completed"} for match in lgoima["matches"])
     return True
 
 
-results.append(check("complaints --act OIA returns structured JSON", test_complaints))
+results.append(check("complaints classify OIA/LGOIMA resources", test_complaints))
 
 
 def test_case_notes_search():

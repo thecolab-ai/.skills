@@ -379,18 +379,33 @@ def parse_case_notes_like_period(text: str | None) -> str | None:
 
 
 def classify_dataset_file(file_info: dict[str, Any], title_hint: str | None = None) -> tuple[str | None, str | None, str | None]:
-    text = normalise_slug((file_info.get("title") or "") + " " + (title_hint or "") + " " + (file_info.get("source_url") or "")).lower()
+    # Attachment titles carry the specific act/kind (for example "OIA complaints
+    # completed"), while the parent resource often says "OIA and LGOIMA
+    # complaints received". Classify from the attachment title/URL first and use
+    # the parent only as a period fallback to avoid turning every OIA attachment
+    # into LGOIMA/received.
+    own_text = normalise_slug(((file_info.get("title") or "") + " " + (file_info.get("source_url") or "")).lower())
+    hint_text = normalise_slug((title_hint or "").lower())
+
     act = None
-    if re.search(r"\blgoima\b", text):
-        act = "LGOIMA"
-    elif re.search(r"\boia\b", text):
+    if re.search(r"\boia\b", own_text):
         act = "OIA"
+    elif re.search(r"\blgoima\b", own_text):
+        act = "LGOIMA"
+    elif re.search(r"\boia\b", hint_text) and not re.search(r"\blgoima\b", hint_text):
+        act = "OIA"
+    elif re.search(r"\blgoima\b", hint_text) and not re.search(r"\boia\b", hint_text):
+        act = "LGOIMA"
 
     kind = None
-    if "received" in text:
-        kind = "received"
-    elif "completed" in text:
+    if "completed" in own_text:
         kind = "completed"
+    elif "received" in own_text:
+        kind = "received"
+    elif "completed" in hint_text and "received" not in hint_text:
+        kind = "completed"
+    elif "received" in hint_text and "completed" not in hint_text:
+        kind = "received"
 
     period = parse_case_notes_like_period(file_info.get("title") or "") or parse_case_notes_like_period(file_info.get("source_url") or "")
     if not period and title_hint:
@@ -611,8 +626,8 @@ def parse_xlsx_file(content: bytes, sheet_filter: str | None, max_rows: int) -> 
                 if not any(row):
                     continue
                 norm = {
-                    header[i]: row[i] if i < len(row) else ""
-                    for i in range(len(header))
+                    header[i]: row[i]
+                    for i in range(min(len(header), len(row)))
                     if row[i] and header[i]
                 }
                 sheet_rows.append(norm)
