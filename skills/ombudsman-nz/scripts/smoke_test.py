@@ -85,6 +85,18 @@ def test_complaints():
 results.append(check("complaints classify OIA/LGOIMA resources", test_complaints))
 
 
+
+def test_complaints_period_filter():
+    data = parse_json(["complaints", "--period", "2024-H1", "--act", "OIA", "--limit", "1", "--json"])
+    assert data.get("status") == "ok"
+    for match in data.get("matches", []):
+        assert match.get("period") == "2024-H1"
+    return True
+
+
+results.append(check("complaints period-filter excludes unknown-period files", test_complaints_period_filter))
+
+
 def test_case_notes_search():
     data = parse_json(["case-notes", "search", "--query", "complaints", "--limit", "3", "--json"])
     assert data.get("command") == "case-notes search"

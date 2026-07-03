@@ -352,7 +352,7 @@ def parse_case_notes_like_period(text: str | None) -> str | None:
 
     month_patterns = "|".join(sorted(MONTHS.keys(), key=len, reverse=True))
     m = re.search(
-        rf"(?:1\s*)?(?P<start>{month_patterns})[^a-z]{{1,15}}(?:and|to|\-)?\s*(?:31\s*)?(?P<end>{month_patterns})\s*(?P<year>20\d{{2}})",
+        rf"(?:1\s*)?(?P<start>{month_patterns})[^a-z]{{1,15}}(?:and|to|\-)?\s*(?:(?:30|31)\s*)?(?P<end>{month_patterns})\s*(?P<year>20\d{{2}})",
         norm,
     )
     if m:
@@ -708,7 +708,7 @@ def discover_complaint_resources(
                 continue
             if kind_filter and a_kind and kind_filter != "all" and a_kind != kind_filter:
                 continue
-            if period and a_period and a_period != period:
+            if period and a_period != period:
                 continue
             attachment_candidates.append(a)
 
@@ -756,7 +756,7 @@ def parse_complaint_payload(
                 continue
             if args.act and file.get("act") and file.get("act") != args.act:
                 continue
-            if args.period and file.get("period") and file.get("period") != args.period:
+            if args.period and file.get("period") != args.period:
                 continue
 
             tables, _ = parse_structured_rows(file["source_url"], args.sheet, max_rows=args.limit)
