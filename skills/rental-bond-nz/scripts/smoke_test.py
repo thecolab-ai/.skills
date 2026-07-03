@@ -89,6 +89,19 @@ def test_bonds() -> bool:
     return data.get("kind") == "tenancy_bond_series" and isinstance(data.get("records"), list)
 
 
+def test_quarter_bonds() -> bool:
+    result = run(["bonds", "--scope", "quarter", "--limit", "3", "--json"], timeout=120)
+    if upstream_unavailable(result):
+        print("  [SKIP] upstream unavailable")
+        return True
+    if result.returncode != 0:
+        print(result.stdout)
+        print(result.stderr)
+        return False
+    data = json.loads(result.stdout)
+    return data.get("scope") == "quarter" and data.get("returned", 0) > 0 and all(row.get("time_frame") for row in data.get("records", []))
+
+
 def test_market_rent() -> bool:
     result = run(["market-rent", "--city", "Auckland", "--suburb", "Avondale", "--period", "2025-10", "--bedrooms", "3", "--json"], timeout=120)
     if upstream_unavailable(result):
@@ -108,6 +121,7 @@ def main() -> int:
         ("datasets returns tenancy/CKAN data", test_datasets),
         ("areas returns suggestion records", test_areas),
         ("bonds returns monthly rows", test_bonds),
+        ("bonds returns quarterly rows", test_quarter_bonds),
         ("market-rent returns records or explicit skip", test_market_rent),
     ]
     results = [test(name, fn) for name, fn in tests]

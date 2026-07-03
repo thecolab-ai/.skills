@@ -497,6 +497,39 @@ def cmd_areas(args: argparse.Namespace) -> dict[str, Any]:
     }
 
 
+def parse_dataset_time_frame(value: Any) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    ym = parse_year_month(text[:7])
+    if ym:
+        return ym
+    match = re.fullmatch(r"(\d{1,2})/(\d{1,2})/((?:19|20)\d{2})", text)
+    if match:
+        _day, month, year = match.groups()
+        return f"{year}-{int(month):02d}"
+    return text[:7]
+
+
+def bond_row_location(row: dict[str, Any], scope: str) -> str:
+    location = (row.get("Location") or "").strip()
+    if location:
+        return location
+    if scope == "quarter":
+        loc_id = (row.get("Location Id") or "").strip()
+        if loc_id == "-99":
+            return "All"
+        if loc_id.upper() == "NULL":
+            return "Unknown"
+        return loc_id
+    return ""
+
+
+def is_default_bond_row(row: dict[str, Any], scope: str) -> bool:
+    if scope == "quarter":
+        return (row.get("Location Id") or "").strip() == "-99" and norm(row.get("Dwelling Type")) == "all"
+    return norm(row.get("Location")) == "all"
+
 def cmd_bonds(args: argparse.Namespace) -> dict[str, Any]:
     from_ = parse_year_month(args.from_)
     to_ = parse_year_month(args.to)
@@ -512,19 +545,20 @@ def cmd_bonds(args: argparse.Namespace) -> dict[str, Any]:
 
     filtered: list[dict[str, Any]] = []
     for row in rows:
-        time_frame = (row.get("Time Frame") or "")[:7]
+        time_frame = parse_dataset_time_frame(row.get("Time Frame") or row.get("TimeFrame"))
         if from_ and time_frame < from_:
             continue
         if to_ and time_frame > to_:
             continue
 
-        location = row.get("Location", "")
+        location = bond_row_location(row, args.scope)
         if args.area:
-            if norm(wanted_area) not in norm(location):
+            haystack = " ".join([location, str(row.get("Location Id") or ""), str(row.get("Dwelling Type") or "")])
+            if norm(wanted_area) not in norm(haystack):
                 continue
         else:
             # default to all-row trend for manageable output
-            if norm(location) != "all":
+            if not is_default_bond_row(row, args.scope):
                 continue
 
         filtered.append(
@@ -532,7 +566,10 @@ def cmd_bonds(args: argparse.Namespace) -> dict[str, Any]:
                 "time_frame": time_frame,
                 "location_id": (row.get("Location Id") or "").strip(),
                 "location": location,
-                "lodged_bonds": as_int(row.get("Lodged Bonds")),
+                "dwelling_type": (row.get("Dwelling Type") or "").strip() or None,
+                "number_of_beds": as_int(row.get("Number Of Beds")),
+                "lodged_bonds": as_int(row.get("Lodged Bonds") or row.get("Total Bonds")),
+                "total_bonds": as_int(row.get("Total Bonds") or row.get("Lodged Bonds")),
                 "active_bonds": as_int(row.get("Active Bonds")),
                 "closed_bonds": as_int(row.get("Closed Bonds")),
                 "median_rent": as_money(row.get("Median Rent")),
