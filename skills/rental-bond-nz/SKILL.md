@@ -33,7 +33,7 @@ python3 skills/rental-bond-nz/scripts/cli.py <command> [flags]
 ```
 
 - `datasets [--query Q] [--limit N] [--json]` - discover Tenancy bond and related datasets via `tenancy.govt.nz` links and `data.govt.nz` package search
-- `bonds [--from YYYY-MM] [--to YYYY-MM] [--area NAME] [--scope tla|region] [--limit N] [--json]` - monthly bonded-tenancy rows filtered by period and area
+- `bonds [--from YYYY-MM] [--to YYYY-MM] [--area NAME] [--scope tla|region|quarter] [--limit N] [--json]` - monthly bonded-tenancy rows filtered by period and area
 - `areas [--query Q] [--city CITY] [--limit N] [--json]` - discover market-rent city/suburb values from the Tenancy autosuggest endpoint
 - `market-rent --area NAME [--city CITY] [--suburb SUBURB] [--property-type PROPERTY] [--bedrooms N|N+] [--period YYYY-MM] [--json]` - fetch market-rent rows for a location/property combination
 
@@ -41,7 +41,7 @@ python3 skills/rental-bond-nz/scripts/cli.py <command> [flags]
 
 ```bash
 python3 skills/rental-bond-nz/scripts/cli.py datasets --json
-python3 skills/rental-bond-nz/scripts/cli.py bonds --from 2025-01 --to 2026-06 --area "Auckland City" --scope tla --json
+python3 skills/rental-bond-nz/scripts/cli.py bonds --from 2025-01 --to 2026-06 --area "Auckland" --scope tla --json
 python3 skills/rental-bond-nz/scripts/cli.py areas --query Auckland --json
 python3 skills/rental-bond-nz/scripts/cli.py market-rent --city Auckland --suburb Avondale --period 2025-10 --property-type apartment --json
 python3 skills/rental-bond-nz/scripts/cli.py market-rent --area "Auckland - Avondale" --bedrooms "2" --json

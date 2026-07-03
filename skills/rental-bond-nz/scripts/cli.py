@@ -282,13 +282,14 @@ def parse_area(value: str) -> tuple[str, str]:
     return city.strip(), suburb.strip()
 
 
-def resolve_market_area(area: str, city: str | None, timeout: int) -> tuple[str, str]:
-    if city:
-        city = city.strip()
-        if not area.strip():
-            raise ValueError("when using --city, provide --suburb")
-        suburb = area.strip()
-        return city, suburb
+def resolve_market_area(area: str | None, city: str | None, suburb_arg: str | None, timeout: int) -> tuple[str, str]:
+    if city or suburb_arg:
+        if not city or not suburb_arg:
+            raise ValueError("use both --city and --suburb, or provide --area 'City - Suburb'")
+        return city.strip(), suburb_arg.strip()
+
+    if not area:
+        raise ValueError("provide --area 'City - Suburb' or both --city and --suburb")
 
     if " - " in area:
         return parse_area(area)
@@ -330,7 +331,7 @@ def parse_market_frame(period_text: str | None) -> tuple[str | None, str | None]
     if not match:
         return None, None
     start_month = MONTH_INDEX.get(match.group(2).lower()[:3], 0)
-    end_month = MONTH_INDEX.get(match.group(4).lower()[:3], 0)
+    end_month = MONTH_INDEX.get(match.group(5).lower()[:3], 0)
     start = f"{match.group(3)}-{start_month:02d}" if start_month else None
     end = f"{match.group(6)}-{end_month:02d}" if end_month else None
     return start, end
@@ -392,7 +393,7 @@ def parse_market_rent_table(table_html: str) -> tuple[list[dict[str, Any]], dict
 def parse_bedrooms(value: str | None) -> tuple[int, bool] | None:
     if not value:
         return None
-    match = re.fullmatch(r"(\d+)\s*(\+)?", norm(value))
+    match = re.fullmatch(r"(\d+)\s*(\+)?(?:\s*bedrooms?)?", norm(value))
     if not match:
         return None
     return int(match.group(1)), bool(match.group(2))
@@ -562,9 +563,7 @@ def cmd_bonds(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def cmd_market_rent(args: argparse.Namespace) -> dict[str, Any]:
-    city, suburb = resolve_market_area(args.area, args.city, args.timeout)
-    if args.suburb:
-        suburb = args.suburb
+    city, suburb = resolve_market_area(args.area, args.city, args.suburb, args.timeout)
 
     payload, source_url = fetch_market_rent(city=city, suburb=suburb, timeout=args.timeout)
     table_rows, finder_meta, period_start = parse_market_rent_table(payload.get("Table", ""))
@@ -668,13 +667,13 @@ def main(argv: list[str] | None = None) -> int:
     bonds.add_argument("--from", dest="from_", help="start month YYYY-MM")
     bonds.add_argument("--to", help="end month YYYY-MM")
     bonds.add_argument("--area", help="location substring match")
-    bonds.add_argument("--scope", choices=["tla", "region"], default="tla", help="dataset scope")
+    bonds.add_argument("--scope", choices=["tla", "region", "quarter"], default="tla", help="dataset scope")
     bonds.add_argument("--limit", type=int, default=0, help="max rows (0 = all)")
     bonds.add_argument("--json", action="store_true", help="emit JSON")
     bonds.set_defaults(func=cmd_bonds)
 
     market = sub.add_parser("market-rent", help="query market-rent rows by suburb")
-    market.add_argument("--area", required=True, help="area (preferred: 'City - Suburb')")
+    market.add_argument("--area", help="area (preferred: 'City - Suburb'); alternatively use --city and --suburb")
     market.add_argument("--city", help="optional city override")
     market.add_argument("--suburb", help="optional suburb override")
     market.add_argument("--property-type", dest="property_type", help="filter property type")

@@ -90,7 +90,7 @@ def test_bonds() -> bool:
 
 
 def test_market_rent() -> bool:
-    result = run(["market-rent", "--area", "Auckland - Avondale", "--period", "2025-10", "--json"], timeout=120)
+    result = run(["market-rent", "--city", "Auckland", "--suburb", "Avondale", "--period", "2025-10", "--bedrooms", "3", "--json"], timeout=120)
     if upstream_unavailable(result):
         print("  [SKIP] upstream unavailable")
         return True
