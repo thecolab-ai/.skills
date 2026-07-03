@@ -1,0 +1,35 @@
+# Tell thecolab-ai/the-for-good-project immediately when main moves, instead
+# of making it wait for its hourly poll. That repo vendors this one as a git
+# submodule and has its own workflow
+# (.github/workflows/update-skills-submodule.yml) that opens a PR bumping the
+# submodule pointer whenever it sees a change — this just wakes it up sooner
+# by firing a repository_dispatch event it listens for.
+#
+# Requires a secret FORGOOD_DISPATCH_TOKEN: a fine-grained PAT scoped to ONLY
+# thecolab-ai/the-for-good-project with "Contents: Read" and "Actions: Read
+# and write" permissions (Actions write is what lets it send a dispatch
+# event). Until that secret exists, this step no-ops — the hourly poll on the
+# other side is the fallback either way, so this workflow is safe to merge
+# before the secret is created.
+name: Notify consumers of main update
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  notify-the-for-good-project:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch skills-updated event
+        env:
+          GH_TOKEN: ${{ secrets.FORGOOD_DISPATCH_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::warning::FORGOOD_DISPATCH_TOKEN not set — skipping. thecolab-ai/the-for-good-project will still pick this up on its hourly poll."
+            exit 0
+          fi
+          gh api repos/thecolab-ai/the-for-good-project/dispatches \
+            -f event_type=skills-updated \
+            -f "client_payload[sha]=${GITHUB_SHA}"
