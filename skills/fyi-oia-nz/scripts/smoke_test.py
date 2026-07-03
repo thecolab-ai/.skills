@@ -3,6 +3,10 @@
 import json
 import subprocess
 import sys
+import argparse
+import contextlib
+import importlib.util
+import io
 from pathlib import Path
 
 SKILL_DIR = Path(__file__).resolve().parents[1]
@@ -73,6 +77,18 @@ def test_authorities():
     return isinstance(payload.get("authorities"), list)
 
 
+def test_authorities_query_ministry():
+    proc = run(["authorities", "--query", "ministry", "--limit", "2", "--json"])
+    if proc.returncode != 0:
+        if is_skip(proc.stderr, proc.stdout):
+            print(f"  [SKIP] upstream unavailable: {proc.stderr.strip()[:180]}")
+            return True
+        print(f"  stderr: {proc.stderr.strip()[:220]}")
+        return False
+    payload = json.loads(proc.stdout)
+    return payload.get("kind") == "authorities" and isinstance(payload.get("authorities"), list)
+
+
 def test_body():
     proc = run(["body", "psc", "--json"])
     if proc.returncode != 0:
@@ -117,6 +133,29 @@ def test_events():
     return payload.get("kind") == "events" and isinstance(payload.get("events"), list)
 
 
+def import_cli_module():
+    spec = importlib.util.spec_from_file_location("fyi_oia_cli", CLI)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_search_failure_not_ok():
+    cli = import_cli_module()
+    def fail_fetch(*_args, **_kwargs):
+        raise cli.CliError("upstream_unavailable: forced test failure", status="upstream_unavailable")
+    cli.fetch_json = fail_fetch
+    cli.fetch_text = fail_fetch
+    args = argparse.Namespace(query_terms=["request"], limit=3, json=True)
+    try:
+        with contextlib.redirect_stdout(io.StringIO()):
+            cli.cmd_search(args)
+    except cli.CliError as exc:
+        return exc.status == "upstream_unavailable"
+    return False
+
+
 def test_search():
     proc = run(["search", "request", "--json", "--limit", "3"])
     if proc.returncode != 0:
@@ -136,6 +175,8 @@ def main() -> None:
     checks = [
         test("--help exits 0", test_help),
         test("authorities --tag returns authorities[]", test_authorities),
+        test("authorities --query handles Botany CSV text", test_authorities_query_ministry),
+        test("search total upstream failure is not OK-empty", test_search_failure_not_ok),
         test("body psc returns authority metadata", test_body),
         test("request 1039 returns request metadata", test_request),
         test("events 1039 returns events list", test_events),

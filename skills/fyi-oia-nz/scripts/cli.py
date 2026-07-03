@@ -42,7 +42,11 @@ BLOCK_MARKERS = (
     "not authorized",
     "you must accept",
     "captcha",
-    "bot",
+    "are you a robot",
+    "robot check",
+    "bot detection",
+    "bot management",
+    "automated access",
 )
 
 
@@ -532,17 +536,22 @@ def cmd_search(args: argparse.Namespace) -> None:
 
     results: list[dict[str, Any]] = []
     source_url = ""
+    last_failure: CliError | None = None
+    saw_successful_response = False
     for candidate in candidate_urls:
         try:
             payload, resolved, content_type = fetch_json(candidate)
+            saw_successful_response = True
             parsed = parse_search_json(payload)
+            source_url = resolved
+            results = parsed
             if parsed:
-                source_url = resolved
-                results = parsed
                 break
         except CliError as exc:
-            # continue to fallback search pages
+            # continue to fallback search pages, but remember failures so total
+            # upstream failure cannot be reported as an OK empty result.
             if exc.status in {"upstream_blocked", "upstream_unavailable", "http_error"}:
+                last_failure = exc
                 continue
             raise
 
@@ -551,15 +560,22 @@ def cmd_search(args: argparse.Namespace) -> None:
         for base in SEARCH_URLS:
             try:
                 html, resolved, _ = fetch_text(f"{base}?query={encoded}")
+                saw_successful_response = True
                 parsed = parse_search_html(html)
+                source_url = resolved
+                results = parsed
                 if parsed:
-                    source_url = resolved
-                    results = parsed
                     break
             except CliError as exc:
                 if exc.status in {"upstream_blocked", "upstream_unavailable", "http_error"}:
+                    last_failure = exc
                     continue
                 raise
+
+    if not saw_successful_response:
+        if last_failure:
+            raise last_failure
+        raise CliError(f"upstream_unavailable: no FYI search endpoint responded for {query!r}", status="upstream_unavailable")
 
     if not source_url:
         source_url = f"{BASE_URL}/search/all?query={encoded}"
