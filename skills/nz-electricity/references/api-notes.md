@@ -58,6 +58,18 @@ Implemented datasets:
   - Data freshness: monthly, historical; latest observed file on 23 May 2026 was `202604_Generation_MD.csv`
   - Units: source columns are kWh by trading period; CLI aggregates to GWh
 
+- `https://www.emi.ea.govt.nz/Retail/Reports/guehmt`
+  - Commands: `dg-trends`, `dg-latest`, `dg-summary`
+  - Official report: Installed distributed generation trends
+  - Download endpoint: `https://www.emi.ea.govt.nz/Retail/Download/DataReport/CSV/GUEHMT`
+  - Parameters used: `DateFrom`, `DateTo`, `RegionType`, `MarketSegment`, `Capacity`, `FuelType`, `Show=Capacity`
+  - Default filters: `FuelType=solar_all`, `MarketSegment=All`, `Capacity=All_Total`, `RegionType=NZ`
+  - Data freshness: monthly retail report data; the CSV includes a `Run at` metadata timestamp
+  - Units: ICP count, uptake percentage, total installed capacity in MW, average installed capacity in kW, new installation count, and average new-installation capacity in kW
+  - Parser note: the CSV starts with report metadata and parameters; the CLI skips rows until the `Month end` header, then parses with `csv.DictReader`
+  - Caveats: market segments are not mutually exclusive; Solar+Batteries and Wind+Batteries registry categories were added in November 2023, so Solar and Other series can show category-change spikes around that period
+  - Source note: values are derived from registry Fuel Type and Generation Capacity fields populated by distributors
+
 ### NZ lines-company public outage feeds
 
 - Command: `outages`
@@ -155,11 +167,15 @@ Implemented feeds:
   - EMI report `Demand (GWh)` and `Demand ($)`
   - EMI point-of-connection `DollarsPerMegawattHour`
   - EMI generation plant trading-period kWh values
+  - EMI GUEHMT distributed-generation ICP, capacity, uptake, and new-installation fields
 
 - Derived by this CLI:
   - `demand` total GWh, average GWh per period, peak period, and average MW conversion
   - `prices` min, max, and average
   - `generation` fuel totals, technology totals, plant totals, GWh conversion, and share percentages
+  - `dg-trends` filtered row counts and summary changes
+  - `dg-latest` latest-month row selection
+  - `dg-summary` overall and year-by-year changes
 
 ## Sources checked but not shipped
 

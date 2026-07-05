@@ -26,6 +26,8 @@ EMI_DATASETS = "https://www.emi.ea.govt.nz/Wholesale/Datasets"
 EMI_FINAL_PRICES = EMI_DATASETS + "/DispatchAndPricing/FinalEnergyPrices"
 EMI_GENERATION_MD = EMI_DATASETS + "/Generation/Generation_MD"
 EMI_DEMAND_REPORT = "https://www.emi.ea.govt.nz/Wholesale/Download/DataReport/CSV/W_GD_C"
+EMI_DG_REPORT = "https://www.emi.ea.govt.nz/Retail/Download/DataReport/CSV/GUEHMT"
+EMI_DG_REPORT_PAGE = "https://www.emi.ea.govt.nz/retail/Reports/guehmt"
 UA = "nz-electricity-skill/1.0 (+https://github.com/thecolab-ai/.skills)"
 
 REGION_ALIASES = {
@@ -72,6 +74,98 @@ DEMAND_REGION_ALIASES = {
     "upper south island": ("ZONE", "USI"),
     "lsi": ("ZONE", "LSI"),
     "lower south island": ("ZONE", "LSI"),
+}
+
+DG_CAVEATS = [
+    "Market segment breakdowns are not mutually exclusive; do not sum segments as unique ICP counts.",
+    "Solar+Batteries and Wind+Batteries registry categories were added in November 2023; Solar and Other series can show category-change spikes around that period.",
+    "Values are derived from registry Fuel Type and Generation Capacity fields populated by distributors.",
+]
+
+DG_FUEL_ALIASES = {
+    "all": "All_Total",
+    "all-total": "All_Total",
+    "all_total": "All_Total",
+    "all combined": "All_Total",
+    "battery-standalone": "standalone batt",
+    "standalone-battery": "standalone batt",
+    "standalone batt": "standalone batt",
+    "battery-ev": "electric vehicl",
+    "ev-battery": "electric vehicl",
+    "electric vehicl": "electric vehicl",
+    "bio-mass": "bio-mass",
+    "biomass": "bio-mass",
+    "fresh-water": "fresh water",
+    "fresh water": "fresh water",
+    "geothermal": "geothermal",
+    "industrial-processes": "industrial proc",
+    "industrial proc": "industrial proc",
+    "liquid-fuel": "liquid fuel",
+    "liquid fuel": "liquid fuel",
+    "natural-gas": "natural gas",
+    "natural gas": "natural gas",
+    "solar": "solar",
+    "solar-without-battery": "solar",
+    "solarplusbattery": "solarplusbattery",
+    "solar-with-battery": "solarplusbattery",
+    "solar_all": "solar_all",
+    "solar-all": "solar_all",
+    "tidal": "tidal",
+    "wind": "wind",
+    "other": "other",
+    "undefined": "undefined",
+}
+
+DG_MARKET_SEGMENT_ALIASES = {
+    "all": "All",
+    "all-icps": "All",
+    "all icps": "All",
+    "res": "Res",
+    "residential": "Res",
+    "sme": "SME",
+    "small-medium-enterprises": "SME",
+    "small medium enterprises": "SME",
+    "com": "Com",
+    "commercial": "Com",
+    "ind": "Ind",
+    "industrial": "Ind",
+}
+
+DG_CAPACITY_ALIASES = {
+    "all": "All_Total",
+    "all-total": "All_Total",
+    "all_total": "All_Total",
+    "all-combined": "All_Total",
+    "all combined": "All_Total",
+    "small": "Small",
+    "less-than-10kw": "Small",
+    "less-than-or-equal-10kw": "Small",
+    "<=10kw": "Small",
+    "large": "Large",
+    "more-than-10kw": "Large",
+    ">10kw": "Large",
+}
+
+DG_REGION_TYPE_ALIASES = {
+    "nz": "NZ",
+    "new-zealand": "NZ",
+    "new zealand": "NZ",
+    "island": "ISLAND_1",
+    "zone": "ZONE",
+    "main-centre": "MAIN_CENTRE",
+    "main-centres": "MAIN_CENTRE",
+    "main centre": "MAIN_CENTRE",
+    "main centres": "MAIN_CENTRE",
+    "regional-council": "REG_COUNCIL",
+    "regional council": "REG_COUNCIL",
+    "network-reporting-region": "NWK_REPORTING_REGION_DIST",
+    "network reporting region": "NWK_REPORTING_REGION_DIST",
+    "network-participant": "NWKP",
+    "network participant": "NWKP",
+    "root-nsp": "NSP_ROOT",
+    "root nsp": "NSP_ROOT",
+    "nsp-root": "NSP_ROOT",
+    "nsp root": "NSP_ROOT",
 }
 
 
@@ -264,12 +358,23 @@ def iso_date_from_emi(raw: str) -> str:
 
 
 def as_float(raw: Any) -> float | None:
-    if raw is None or raw == "":
+    if raw is None:
+        return None
+    if isinstance(raw, str):
+        raw = raw.replace(",", "").strip()
+    if raw == "":
         return None
     try:
         return float(raw)
     except (TypeError, ValueError):
         return None
+
+
+def as_int(raw: Any) -> int | None:
+    value = as_float(raw)
+    if value is None:
+        return None
+    return int(value)
 
 
 def round2(value: float | None) -> float | None:
@@ -423,6 +528,313 @@ def cmd_demand(args: argparse.Namespace) -> None:
         "demand": demand,
     }
     emit(data, args.json, render_demand)
+
+
+def normalise_dg_option(raw: str, aliases: dict[str, str]) -> str:
+    value = raw.strip()
+    key = re.sub(r"\s+", " ", value.lower())
+    for candidate in (key, key.replace("_", "-"), key.replace(" ", "-")):
+        if candidate in aliases:
+            return aliases[candidate]
+    return value
+
+
+def parse_emi_run_at(raw: str | None) -> str | None:
+    if not raw:
+        return None
+    try:
+        return dt.datetime.strptime(raw, "%Y%m%d%H%M%S").isoformat()
+    except ValueError:
+        return None
+
+
+def parse_dg_report_csv(text: str, source_url: str) -> dict[str, Any]:
+    lines = text.splitlines()
+    header_idx = None
+    metadata: dict[str, Any] = {
+        "title": None,
+        "source_statement": None,
+        "run_at": None,
+        "run_at_iso": None,
+        "parameters": {},
+        "source_url": source_url,
+    }
+    in_parameters = False
+
+    for idx, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.lstrip("\ufeff").startswith("Month end,"):
+            header_idx = idx
+            break
+        if not stripped:
+            continue
+        if stripped == "Parameters":
+            in_parameters = True
+            continue
+        if stripped.startswith("Run at:"):
+            run_at = stripped.split(":", 1)[1].strip()
+            metadata["run_at"] = run_at
+            metadata["run_at_iso"] = parse_emi_run_at(run_at)
+            continue
+        if stripped.startswith("From "):
+            metadata["source_statement"] = stripped
+            continue
+        if in_parameters:
+            try:
+                parts = next(csv.reader([line]))
+            except csv.Error as e:
+                die(f"invalid GUEHMT metadata CSV from {source_url}: {e}")
+            if len(parts) >= 2:
+                metadata["parameters"][parts[0].strip()] = parts[1].strip()
+            continue
+        if metadata["title"] is None:
+            metadata["title"] = stripped
+
+    if header_idx is None:
+        die(f"could not find GUEHMT CSV header in response from {source_url}")
+
+    try:
+        reader = csv.DictReader(lines[header_idx:])
+        rows = []
+        for row in reader:
+            if not row or not row.get("Month end"):
+                continue
+            month_end = iso_date_from_emi(row.get("Month end", ""))
+            rows.append(
+                {
+                    "month_end": month_end,
+                    "region_id": row.get("Region ID"),
+                    "region_name": row.get("Region name"),
+                    "capacity_band": row.get("Capacity"),
+                    "fuel_type": row.get("Fuel type"),
+                    "icp_count": as_int(row.get("ICP count")),
+                    "icp_uptake_rate_percent": as_float(row.get("ICP uptake rate (%)")),
+                    "total_capacity_mw": as_float(row.get("Total capacity installed (MW)")),
+                    "avg_capacity_kw": as_float(row.get("Avg. capacity installed (kW)")),
+                    "new_installation_count": as_int(row.get("ICP count - new installations")),
+                    "avg_new_installation_capacity_kw": as_float(row.get("Avg. capacity - new installations (kW)")),
+                }
+            )
+    except csv.Error as e:
+        die(f"invalid GUEHMT CSV from {source_url}: {e}")
+
+    return {"metadata": metadata, "rows": rows}
+
+
+def dg_report_url(
+    fuel: str,
+    market_segment: str,
+    capacity: str,
+    region_type: str,
+    start: dt.date | None,
+    end: dt.date | None,
+) -> str:
+    params: dict[str, str] = {
+        "RegionType": region_type,
+        "MarketSegment": market_segment,
+        "Capacity": capacity,
+        "FuelType": fuel,
+        "Show": "Capacity",
+        "_rsdr": "ALL",
+        "_si": "v|4",
+    }
+    if start:
+        params["DateFrom"] = start.strftime("%Y%m%d")
+    if end:
+        params["DateTo"] = end.strftime("%Y%m%d")
+    return EMI_DG_REPORT + "?" + urllib.parse.urlencode(params)
+
+
+def fetch_dg_report(url: str, timeout: int = 10) -> dict[str, Any]:
+    try:
+        with request(url, timeout=timeout) as resp:
+            final_url = resp.geturl()
+            text = resp.read().decode("utf-8-sig", "replace")
+    except urllib.error.HTTPError as e:
+        raw = e.read().decode("utf-8", "replace")
+        die(f"HTTP {e.code} from {url}: {raw[:240]}")
+    except urllib.error.URLError as e:
+        die(f"network error calling {url}: {e.reason}")
+    except TimeoutError as e:
+        die(f"timeout calling {url}: {e}")
+    return parse_dg_report_csv(text, final_url)
+
+
+def resolve_dg_filters(args: argparse.Namespace) -> tuple[str, str, str, str, dt.date | None, dt.date | None]:
+    fuel = normalise_dg_option(args.fuel, DG_FUEL_ALIASES)
+    market_segment = normalise_dg_option(args.market_segment, DG_MARKET_SEGMENT_ALIASES)
+    capacity = normalise_dg_option(args.capacity, DG_CAPACITY_ALIASES)
+    region_type = normalise_dg_option(args.region_type, DG_REGION_TYPE_ALIASES)
+    start = parse_date(args.from_date) if getattr(args, "from_date", None) else None
+    end = parse_date(args.to_date) if getattr(args, "to_date", None) else None
+    if start and end and end < start:
+        die("--to must be on or after --from")
+    return fuel, market_segment, capacity, region_type, start, end
+
+
+def filter_dg_rows(rows: list[dict[str, Any]], start: dt.date | None, end: dt.date | None) -> list[dict[str, Any]]:
+    if not start and not end:
+        return rows
+    filtered = []
+    for row in rows:
+        month_end = parse_date(row["month_end"])
+        if start and month_end < start:
+            continue
+        if end and month_end > end:
+            continue
+        filtered.append(row)
+    return filtered
+
+
+def sum_number(rows: list[dict[str, Any]], key: str) -> float | int | None:
+    values = [row.get(key) for row in rows if row.get(key) is not None]
+    if not values:
+        return None
+    total = sum(values)
+    return int(total) if all(isinstance(value, int) for value in values) else round(float(total), 3)
+
+
+def summarise_dg_rows(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    if not rows:
+        return {
+            "first_month_end": None,
+            "latest_month_end": None,
+            "region_count": 0,
+            "latest_icp_count": None,
+            "latest_total_capacity_mw": None,
+            "icp_count_change": None,
+            "capacity_change_mw": None,
+            "total_new_installation_count": None,
+        }
+    ordered = sorted(rows, key=lambda row: (row["month_end"], row.get("region_id") or ""))
+    first_month = ordered[0]["month_end"]
+    latest_month = ordered[-1]["month_end"]
+    first_rows = [row for row in ordered if row["month_end"] == first_month]
+    latest_rows = [row for row in ordered if row["month_end"] == latest_month]
+    first_icp = sum_number(first_rows, "icp_count")
+    latest_icp = sum_number(latest_rows, "icp_count")
+    first_capacity = sum_number(first_rows, "total_capacity_mw")
+    latest_capacity = sum_number(latest_rows, "total_capacity_mw")
+    return {
+        "first_month_end": first_month,
+        "latest_month_end": latest_month,
+        "region_count": len({row.get("region_id") for row in rows if row.get("region_id")}),
+        "latest_icp_count": latest_icp,
+        "latest_total_capacity_mw": latest_capacity,
+        "icp_count_change": latest_icp - first_icp if isinstance(first_icp, int) and isinstance(latest_icp, int) else None,
+        "capacity_change_mw": round(latest_capacity - first_capacity, 3)
+        if isinstance(first_capacity, (int, float)) and isinstance(latest_capacity, (int, float))
+        else None,
+        "total_new_installation_count": sum_number(rows, "new_installation_count"),
+    }
+
+
+def yearly_dg_summary(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    grouped: dict[tuple[str, str, str, str], list[dict[str, Any]]] = defaultdict(list)
+    for row in rows:
+        key = (
+            row["month_end"][:4],
+            row.get("region_id") or "",
+            row.get("capacity_band") or "",
+            row.get("fuel_type") or "",
+        )
+        grouped[key].append(row)
+
+    summaries = []
+    for key, group_rows in sorted(grouped.items()):
+        ordered = sorted(group_rows, key=lambda row: row["month_end"])
+        first = ordered[0]
+        latest = ordered[-1]
+        summaries.append(
+            {
+                "year": int(key[0]),
+                "region_id": latest.get("region_id"),
+                "region_name": latest.get("region_name"),
+                "capacity_band": latest.get("capacity_band"),
+                "fuel_type": latest.get("fuel_type"),
+                "months": len(ordered),
+                "first_month_end": first.get("month_end"),
+                "last_month_end": latest.get("month_end"),
+                "start_icp_count": first.get("icp_count"),
+                "end_icp_count": latest.get("icp_count"),
+                "icp_count_change": latest.get("icp_count") - first.get("icp_count")
+                if first.get("icp_count") is not None and latest.get("icp_count") is not None
+                else None,
+                "end_total_capacity_mw": latest.get("total_capacity_mw"),
+                "capacity_change_mw": round(latest.get("total_capacity_mw") - first.get("total_capacity_mw"), 3)
+                if first.get("total_capacity_mw") is not None and latest.get("total_capacity_mw") is not None
+                else None,
+                "new_installation_count": sum_number(ordered, "new_installation_count"),
+            }
+        )
+    return summaries
+
+
+def dg_response_base(args: argparse.Namespace) -> tuple[dict[str, Any], list[dict[str, Any]], float]:
+    fuel, market_segment, capacity, region_type, start, end = resolve_dg_filters(args)
+    started = time.perf_counter()
+    url = dg_report_url(fuel, market_segment, capacity, region_type, start, end)
+    parsed = fetch_dg_report(url)
+    rows = filter_dg_rows(parsed["rows"], start, end)
+    metadata = parsed["metadata"]
+    base = {
+        "source": "EMI Installed distributed generation trends CSV report",
+        "report_code": "GUEHMT",
+        "report_url": EMI_DG_REPORT_PAGE,
+        "source_url": metadata.get("source_url"),
+        "emi_run_at": metadata.get("run_at"),
+        "emi_run_at_iso": metadata.get("run_at_iso"),
+        "emi_metadata": metadata,
+        "filters": {
+            "fuel": fuel,
+            "market_segment": market_segment,
+            "capacity": capacity,
+            "region_type": region_type,
+            "from": start.isoformat() if start else None,
+            "to": end.isoformat() if end else None,
+        },
+        "caveats": DG_CAVEATS,
+    }
+    return base, rows, started
+
+
+def cmd_dg_trends(args: argparse.Namespace) -> None:
+    base, rows, started = dg_response_base(args)
+    data = {
+        **base,
+        "count": len(rows),
+        "summary": summarise_dg_rows(rows),
+        "elapsed_ms": round((time.perf_counter() - started) * 1000),
+        "trends": rows,
+    }
+    emit(data, args.json, render_dg_trends)
+
+
+def cmd_dg_latest(args: argparse.Namespace) -> None:
+    base, rows, started = dg_response_base(args)
+    latest_month = max((row["month_end"] for row in rows), default=None)
+    latest = [row for row in rows if row["month_end"] == latest_month] if latest_month else []
+    data = {
+        **base,
+        "latest_month_end": latest_month,
+        "count": len(latest),
+        "summary": summarise_dg_rows(latest),
+        "elapsed_ms": round((time.perf_counter() - started) * 1000),
+        "latest": latest,
+    }
+    emit(data, args.json, render_dg_latest)
+
+
+def cmd_dg_summary(args: argparse.Namespace) -> None:
+    base, rows, started = dg_response_base(args)
+    data = {
+        **base,
+        "count": len(rows),
+        "summary": summarise_dg_rows(rows),
+        "yearly": yearly_dg_summary(rows) if args.yearly else [],
+        "elapsed_ms": round((time.perf_counter() - started) * 1000),
+    }
+    emit(data, args.json, render_dg_summary)
 
 
 def price_source_urls(day: dt.date) -> list[str]:
@@ -1377,6 +1789,96 @@ def render_generation(data: dict[str, Any]) -> str:
     return "\n".join(lines).rstrip()
 
 
+def number(value: Any, decimals: int = 3) -> str:
+    if value is None:
+        return "-"
+    if isinstance(value, int):
+        return f"{value:,}"
+    if isinstance(value, float):
+        return f"{value:,.{decimals}f}"
+    return str(value)
+
+
+def dg_filter_label(data: dict[str, Any]) -> str:
+    filters = data.get("filters") or {}
+    return (
+        f"fuel={filters.get('fuel')} market_segment={filters.get('market_segment')} "
+        f"capacity={filters.get('capacity')} region_type={filters.get('region_type')}"
+    )
+
+
+def render_dg_rows(rows: list[dict[str, Any]], limit: int = 24) -> list[str]:
+    lines = []
+    for item in rows[:limit]:
+        lines.append(
+            f"{item.get('month_end')}  {str(item.get('region_id') or '').ljust(6)} "
+            f"{str(item.get('region_name') or '').ljust(22)[:22]} "
+            f"ICPs {number(item.get('icp_count'), 0).rjust(8)}  "
+            f"capacity {number(item.get('total_capacity_mw')).rjust(10)} MW  "
+            f"new {number(item.get('new_installation_count'), 0).rjust(6)}"
+        )
+    if len(rows) > limit:
+        lines.append(f"... {len(rows) - limit} more rows; use --json for full output")
+    return lines
+
+
+def render_dg_trends(data: dict[str, Any]) -> str:
+    rows = data.get("trends") or []
+    summary = data.get("summary") or {}
+    lines = [
+        f"EMI distributed generation trends: {data.get('count')} row(s) ({data.get('elapsed_ms')} ms)",
+        dg_filter_label(data),
+        f"EMI run: {data.get('emi_run_at') or '-'}",
+        f"Range: {summary.get('first_month_end') or '-'} to {summary.get('latest_month_end') or '-'}",
+        "",
+    ]
+    lines.extend(render_dg_rows(rows))
+    lines.append("")
+    lines.append("Caveat: market segments are not mutually exclusive; Solar+Batteries categories changed in Nov 2023.")
+    return "\n".join(lines).rstrip()
+
+
+def render_dg_latest(data: dict[str, Any]) -> str:
+    rows = data.get("latest") or []
+    lines = [
+        f"EMI distributed generation latest month: {data.get('latest_month_end') or '-'} ({data.get('elapsed_ms')} ms)",
+        dg_filter_label(data),
+        f"EMI run: {data.get('emi_run_at') or '-'}",
+        "",
+    ]
+    lines.extend(render_dg_rows(rows))
+    return "\n".join(lines).rstrip()
+
+
+def render_dg_summary(data: dict[str, Any]) -> str:
+    summary = data.get("summary") or {}
+    yearly = data.get("yearly") or []
+    lines = [
+        f"EMI distributed generation summary: {data.get('count')} row(s) ({data.get('elapsed_ms')} ms)",
+        dg_filter_label(data),
+        f"Range: {summary.get('first_month_end') or '-'} to {summary.get('latest_month_end') or '-'}",
+        f"Latest ICPs: {number(summary.get('latest_icp_count'), 0)}  "
+        f"capacity: {number(summary.get('latest_total_capacity_mw'))} MW  "
+        f"new installations in rows: {number(summary.get('total_new_installation_count'), 0)}",
+    ]
+    if yearly:
+        lines.append("")
+        lines.append("Yearly")
+        for item in yearly[:30]:
+            lines.append(
+                f"{item.get('year')} {str(item.get('region_id') or '').ljust(6)} "
+                f"ICPs {number(item.get('end_icp_count'), 0).rjust(8)}  "
+                f"change {number(item.get('icp_count_change'), 0).rjust(7)}  "
+                f"capacity {number(item.get('end_total_capacity_mw')).rjust(10)} MW  "
+                f"new {number(item.get('new_installation_count'), 0).rjust(7)}"
+            )
+        if len(yearly) > 30:
+            lines.append(f"... {len(yearly) - 30} more rows; use --json for full output")
+    lines.append("")
+    lines.append("Caveat: market segments are not mutually exclusive; Solar+Batteries categories changed in Nov 2023.")
+    return "\n".join(lines).rstrip()
+
+
 def render_outages(data: dict[str, Any]) -> str:
     outages = data.get("outages") or []
     mode = "current, scheduled, and recent" if data.get("include_scheduled") else "current"
@@ -1435,6 +1937,13 @@ def positive_int(raw: str) -> int:
     return value
 
 
+def add_dg_filter_args(sp: argparse.ArgumentParser) -> None:
+    sp.add_argument("--fuel", default="solar_all", help="GUEHMT FuelType value or alias; default solar_all")
+    sp.add_argument("--market-segment", default="All", help="All, Res, SME, Com, or Ind; default All")
+    sp.add_argument("--capacity", default="All_Total", help="All_Total, Small, or Large; default All_Total")
+    sp.add_argument("--region-type", default="NZ", help="NZ, ZONE, ISLAND_1, MAIN_CENTRE, REG_COUNCIL, NWKP, or NSP_ROOT")
+
+
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(
         description="Read-only NZ electricity data CLI using public EM6 JSON feeds and EMI CSV/report data."
@@ -1456,6 +1965,26 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--to", dest="to_date", help="end date YYYY-MM-DD; defaults to --from")
     sp.add_argument("--json", action="store_true")
     sp.set_defaults(func=cmd_demand)
+
+    sp = sub.add_parser("dg-trends", help="EMI GUEHMT distributed-generation trends by month")
+    add_dg_filter_args(sp)
+    sp.add_argument("--from", dest="from_date", help="start date YYYY-MM-DD")
+    sp.add_argument("--to", dest="to_date", help="end date YYYY-MM-DD")
+    sp.add_argument("--json", action="store_true")
+    sp.set_defaults(func=cmd_dg_trends)
+
+    sp = sub.add_parser("dg-latest", help="latest EMI GUEHMT distributed-generation records")
+    add_dg_filter_args(sp)
+    sp.add_argument("--json", action="store_true")
+    sp.set_defaults(func=cmd_dg_latest)
+
+    sp = sub.add_parser("dg-summary", help="summarise EMI GUEHMT distributed-generation records")
+    add_dg_filter_args(sp)
+    sp.add_argument("--from", dest="from_date", help="start date YYYY-MM-DD")
+    sp.add_argument("--to", dest="to_date", help="end date YYYY-MM-DD")
+    sp.add_argument("--yearly", action="store_true", help="include year-by-year summaries")
+    sp.add_argument("--json", action="store_true")
+    sp.set_defaults(func=cmd_dg_summary)
 
     sp = sub.add_parser("prices", help="historical EMI final/interim energy prices for a node")
     sp.add_argument("--node", required=True, help="point of connection code, e.g. BEN2201")
