@@ -91,6 +91,32 @@ def responses_blocked_or_ok_check() -> None:
         assert data.get("responses")
 
 
+def import_requirements_check() -> None:
+    data = json_command(["import-requirements", "--commodity", "Apple", "--limit", "1", "--json"])
+    if data.get("status") == "blocked":
+        raise Skip("PIER blocked by Incapsula")
+    assert data["status"] == "ok", data
+    assert data["type_choices"], data
+    assert data["searches"], data
+
+
+def import_requirements_no_results_check() -> None:
+    data = json_command(
+        [
+            "import-requirements",
+            "--commodity",
+            "zzzzzzzz unlikely commodity",
+            "--limit",
+            "1",
+            "--json",
+        ]
+    )
+    if data.get("status") == "blocked":
+        raise Skip("PIER blocked by Incapsula")
+    assert data["status"] == "not_found", data
+    assert data["type_choices"] == [], data
+
+
 def main() -> None:
     checks = [
         ("help", help_check),
@@ -98,6 +124,8 @@ def main() -> None:
         ("pest search happy path", pest_search_check),
         ("pest search no results edge", pest_no_results_check),
         ("notifiable filter", notifiable_check),
+        ("import requirements happy path", import_requirements_check),
+        ("import requirements no results edge", import_requirements_no_results_check),
         ("responses ok or blocked", responses_blocked_or_ok_check),
     ]
     ok = [check(name, fn) for name, fn in checks]

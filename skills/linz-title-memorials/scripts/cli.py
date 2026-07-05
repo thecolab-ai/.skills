@@ -15,6 +15,7 @@ from typing import Any
 BASE = "https://data.linz.govt.nz/services/api/v1/"
 TIMEOUT = 10
 UA = "Mozilla/5.0 linz-title-memorials/1.0"
+MIN_CELL_SIZE = 6
 
 SOURCES = [
     {
@@ -243,8 +244,8 @@ def privacy_clause(min_cell_size: int) -> str:
 
 def oia_payload(args: argparse.Namespace) -> dict[str, Any]:
     groups = parse_groups(args.group_by)
-    if args.min_cell_size < 1:
-        raise CliError("--min-cell-size must be at least 1")
+    if args.min_cell_size < MIN_CELL_SIZE:
+        raise CliError(f"--min-cell-size must be at least {MIN_CELL_SIZE}")
 
     group_text = ", ".join(groups)
     clause = privacy_clause(args.min_cell_size)
@@ -350,8 +351,8 @@ def cmd_oia(args: argparse.Namespace) -> int:
 
 def cmd_blocked_count(args: argparse.Namespace) -> int:
     groups = parse_groups(args.group_by)
-    if args.min_cell_size < 1:
-        raise CliError("--min-cell-size must be at least 1")
+    if args.min_cell_size < MIN_CELL_SIZE:
+        raise CliError(f"--min-cell-size must be at least {MIN_CELL_SIZE}")
     output(blocked_payload(args.command_name, groups, args.min_cell_size), args.json)
     return 2
 
@@ -379,7 +380,7 @@ def build_parser() -> argparse.ArgumentParser:
         default="territorial_authority,land_district,year",
         help="comma-separated grouping: territorial_authority, land_district, hazard_type, year, status, or all",
     )
-    oia.add_argument("--min-cell-size", type=int, default=6)
+    oia.add_argument("--min-cell-size", type=int, default=MIN_CELL_SIZE)
     oia.add_argument("--json", action="store_true", help="print JSON")
     oia.set_defaults(func=cmd_oia)
 
@@ -394,7 +395,7 @@ def build_parser() -> argparse.ArgumentParser:
             default="territorial_authority,land_district,year",
             help="comma-separated grouping requested for official aggregates",
         )
-        count.add_argument("--min-cell-size", type=int, default=6)
+        count.add_argument("--min-cell-size", type=int, default=MIN_CELL_SIZE)
         count.add_argument("--json", action="store_true", help="print JSON")
         count.set_defaults(func=cmd_blocked_count, command_name=name)
 

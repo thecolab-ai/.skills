@@ -670,6 +670,29 @@ def output(data: dict[str, Any], as_json: bool) -> None:
         print(json.dumps(data, indent=2, ensure_ascii=False))
 
 
+def output_error(exc: CliError, args: argparse.Namespace) -> None:
+    if getattr(args, "json", False):
+        print(
+            json.dumps(
+                {
+                    "command": getattr(args, "command", None),
+                    "status": "error",
+                    "error": exc.code,
+                    "message": str(exc),
+                    "source_url": exc.source_url,
+                },
+                indent=2,
+                ensure_ascii=False,
+            )
+        )
+        return
+
+    detail = f"legislation-nz: {exc.code}: {exc}"
+    if exc.source_url:
+        detail += f" (source: {exc.source_url})"
+    print(detail, file=sys.stderr)
+
+
 def cmd_get_act(args: argparse.Namespace) -> None:
     root, ref, xml_url = load_xml(args.act_id, version=args.version, timeout=args.timeout)
     act = act_metadata(root, ref, xml_url)
@@ -935,10 +958,7 @@ def main() -> None:
     try:
         args.func(args)
     except CliError as exc:
-        detail = f"legislation-nz: {exc.code}: {exc}"
-        if exc.source_url:
-            detail += f" (source: {exc.source_url})"
-        print(detail, file=sys.stderr)
+        output_error(exc, args)
         raise SystemExit(1)
     except KeyboardInterrupt:
         print("legislation-nz: interrupted", file=sys.stderr)

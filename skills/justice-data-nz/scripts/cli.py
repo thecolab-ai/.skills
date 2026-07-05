@@ -26,7 +26,7 @@ MOJ_TABLES_URL = "https://www.justice.govt.nz/justice-sector-policy/research-dat
 CKAN_PACKAGE_SEARCH = "https://catalogue.data.govt.nz/api/3/action/package_search"
 MOJ_OWNER_ORG = "07e149dd-d4e7-43b5-aad2-29485d7afaf5"
 UA = "justice-data-nz-skill/1.0 (+https://github.com/thecolab-ai/.skills)"
-DEFAULT_TIMEOUT = 20
+DEFAULT_TIMEOUT = 10
 
 XML_NS = {
     "a": "http://schemas.openxmlformats.org/spreadsheetml/2006/main",

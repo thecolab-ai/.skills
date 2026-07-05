@@ -91,11 +91,28 @@ def unsafe_count_is_blocked() -> None:
     assert "oia-template" in data["next_step"]
 
 
+def low_cell_size_is_rejected() -> None:
+    data = json.loads(
+        run(
+            [
+                "oia-template",
+                "--min-cell-size",
+                "1",
+                "--json",
+            ],
+            expect=1,
+        ).stdout
+    )
+    assert data["kind"] == "error"
+    assert "at least 6" in data["message"]
+
+
 checks = [
     ("help", help_works),
     ("metadata is aggregate-safe", metadata_is_aggregate_safe),
     ("OIA template names aggregate counts", oia_template_names_aggregate_counts),
     ("unsafe count command is blocked", unsafe_count_is_blocked),
+    ("low cell-size threshold is rejected", low_cell_size_is_rejected),
 ]
 
 ok = [check(name, func) for name, func in checks]

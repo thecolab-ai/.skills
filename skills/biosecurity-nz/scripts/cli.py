@@ -541,6 +541,19 @@ def cmd_import_requirements(args: argparse.Namespace) -> dict[str, Any]:
     for group in type_groups:
         for item in group.get("names", []):
             type_choices.append({"type": group.get("type"), "id": item.get("id"), "name": item.get("name")})
+    if not type_choices:
+        suggestions = commodity_suggestions(commodity, args.limit)
+        return {
+            "kind": "import_requirements",
+            "status": "not_found",
+            "source": "PIER Search",
+            "commodity": commodity,
+            "message": "PIER did not return any commodity type choices for this query.",
+            "type_choices": [],
+            "searches": [],
+            "country_matches": [],
+            "suggestions": suggestions,
+        }
 
     selected = [c for c in type_choices if str(c["id"]) == str(args.commodity_type_id)] if args.commodity_type_id else type_choices
     selected = selected[: max(1, min(args.limit, 10))]
