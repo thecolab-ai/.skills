@@ -13,6 +13,7 @@ import html
 import json
 import re
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -23,6 +24,15 @@ GRAPHQL_URL = "https://stellate.firsttable.net/graphql"
 USER_AGENT = "Mozilla/5.0 (compatible; thecolab-first-table-nz-skill/1.0)"
 DEFAULT_CITY = "auckland"
 DEFAULT_PEOPLE = 2
+
+# allAvailabilitySearch is backed by an async sync job per restaurant/date/people
+# combo (see syncStatus). Calling the query is itself what enqueues a sync when
+# none is cached; the first response can be a stale/in-flight snapshot while the
+# real check happens in the background. Polling the same query until syncStatus
+# reaches a terminal state gets a freshly-synced answer instead of a cached one.
+SYNC_TERMINAL_STATUSES = {"COMPLETE", "FAILED", "CANCELLED", "NEVER", "EXTERNAL"}
+DEFAULT_MAX_WAIT_SECONDS = 20.0
+DEFAULT_POLL_INTERVAL_SECONDS = 3.0
 
 CITY_HINTS = [
     "auckland", "wellington", "christchurch", "queenstown-lakes", "wanaka",
@@ -113,6 +123,8 @@ fragment AvailabilitySearchFragment on AvailabilitySearch {
   restaurantId
   available
   dataStatus
+  syncStatus
+  syncTime
   syncExpires
   availableTimes {
     __typename
@@ -401,27 +413,83 @@ def cmd_detail(args: argparse.Namespace) -> None:
     print_rows(row, as_json=args.json)
 
 
+def fetch_availability(
+    restaurant_ids: list[int],
+    date: str,
+    people: int,
+    *,
+    refresh: bool = True,
+    max_wait: float = DEFAULT_MAX_WAIT_SECONDS,
+    poll_interval: float = DEFAULT_POLL_INTERVAL_SECONDS,
+) -> tuple[list[dict[str, Any]], bool]:
+    """Query allAvailabilitySearch, optionally polling until each restaurant's
+    background sync job reaches a terminal syncStatus (a live refresh) instead
+    of returning whatever was already cached. Returns (items, timed_out)."""
+    variables = {"restaurantIds": restaurant_ids, "date": date, "people": people}
+    deadline = time.monotonic() + max_wait
+    items: list[dict[str, Any]] = []
+    timed_out = False
+    while True:
+        data = graphql(AVAILABILITY_QUERY, variables)
+        items = [item for item in (data.get("allAvailabilitySearch") or []) if item]
+        if not refresh:
+            break
+        pending = [item for item in items if item.get("syncStatus") not in SYNC_TERMINAL_STATUSES]
+        if not pending:
+            break
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            timed_out = True
+            break
+        time.sleep(min(poll_interval, remaining))
+    return items, timed_out
+
+
 def cmd_availability(args: argparse.Namespace) -> None:
     restaurant_ids_arg = [int(x) for part in args.ids for x in part.split(",") if x.strip()]
     date = args.date or dt.date.today().isoformat()
-    data = graphql(AVAILABILITY_QUERY, {"restaurantIds": restaurant_ids_arg, "date": date, "people": args.people})
+    items, timed_out = fetch_availability(
+        restaurant_ids_arg,
+        date,
+        args.people,
+        refresh=not args.no_refresh,
+        max_wait=args.max_wait,
+        poll_interval=args.poll_interval,
+    )
     rows = []
-    for item in data.get("allAvailabilitySearch") or []:
-        if not item:
-            continue
+    for item in items:
         slots = [slot for slot in item.get("availableTimes") or [] if slot and (not args.available_only or slot.get("available"))]
         rows.append({
             "restaurant_id": item.get("restaurantId"),
             "available": item.get("available"),
             "data_status": item.get("dataStatus"),
+            "sync_status": item.get("syncStatus"),
+            "sync_time": item.get("syncTime"),
             "sync_expires": item.get("syncExpires"),
+            "live": item.get("syncStatus") in SYNC_TERMINAL_STATUSES,
             "slots": slots,
         })
+    returned_ids = {row["restaurant_id"] for row in rows}
+    missing_ids = [rid for rid in restaurant_ids_arg if rid not in returned_ids]
     if args.json:
-        print(json.dumps({"date": date, "people": args.people, "results": rows}, indent=2, ensure_ascii=False))
+        print(json.dumps({
+            "date": date,
+            "people": args.people,
+            "refreshed": not args.no_refresh,
+            "timed_out": timed_out,
+            "results": rows,
+            "no_data_ids": missing_ids,
+        }, indent=2, ensure_ascii=False))
     else:
+        if timed_out:
+            print("warning: one or more restaurants did not finish syncing within --max-wait; treat their rows below as still-cached, not confirmed live", file=sys.stderr)
+        if missing_ids:
+            print(f"warning: no availability record at all for ids {missing_ids} (not offered on First Table for this date/session, or not integrated)", file=sys.stderr)
         for row in rows:
-            print(f"#{row['restaurant_id']} available={row['available']} status={row['data_status']}")
+            freshness = row["sync_status"] or "unknown"
+            if not row["live"]:
+                freshness += " (not confirmed live)"
+            print(f"#{row['restaurant_id']} available={row['available']} status={row['data_status']} sync={freshness}")
             for slot in row["slots"][: args.limit]:
                 marker = "✓" if slot.get("available") else "×"
                 print(f"  {marker} {slot.get('date')} {slot.get('time')} {slot.get('session') or ''} {slot.get('deal') or ''}".rstrip())
@@ -463,6 +531,23 @@ def main() -> int:
     p.add_argument("--available-only", action="store_true")
     p.add_argument("--limit", type=int, default=10)
     p.add_argument("--json", action="store_true")
+    p.add_argument(
+        "--no-refresh",
+        action="store_true",
+        help="Skip polling for a live sync; return whatever is already cached (old, faster behaviour)",
+    )
+    p.add_argument(
+        "--max-wait",
+        type=float,
+        default=DEFAULT_MAX_WAIT_SECONDS,
+        help=f"Max seconds to poll for a live sync before giving up (default {DEFAULT_MAX_WAIT_SECONDS})",
+    )
+    p.add_argument(
+        "--poll-interval",
+        type=float,
+        default=DEFAULT_POLL_INTERVAL_SECONDS,
+        help=f"Seconds between sync polls (default {DEFAULT_POLL_INTERVAL_SECONDS})",
+    )
     p.set_defaults(func=cmd_availability)
 
     args = parser.parse_args()
