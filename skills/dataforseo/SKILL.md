@@ -1,6 +1,6 @@
 ---
 name: dataforseo
-description: Query DataForSEO for SEO data — Google SERP rank checks, keyword search volume and suggestions, domain/competitor analytics, and backlinks. Use when the task involves checking where a site ranks for a keyword, finding keyword ideas and search volumes, analysing what a domain ranks for or who its competitors are, or auditing backlinks. Requires DATAFORSEO_LOGIN and DATAFORSEO_PASSWORD. Every call spends DataForSEO credits.
+description: Query DataForSEO for SEO + market-validation data — Google SERP rank checks, keyword search volume, keyword discovery (semantic ideas, related-search expansion, search-intent classification), domain/competitor analytics, backlinks, and App Store / Play data (which apps rank + review mining). Use when checking where a site ranks, finding or discovering what people search for, validating demand and competition for an app/business idea, analysing a domain or its competitors, auditing backlinks, or mining competitor app reviews for pain points. Requires DATAFORSEO_USERNAME (or DATAFORSEO_LOGIN) and DATAFORSEO_PASSWORD. Every call spends DataForSEO credits.
 ---
 
 # DataForSEO
@@ -137,6 +137,74 @@ Referring domains, ranked by domain rank. (No location.)
 
 ```bash
 python3 skills/dataforseo/scripts/cli.py refdomains grovekeeper.app --limit 25
+```
+
+## Discovery commands (counter confirmation bias)
+
+These surface demand you did **not** seed — the antidote to "I searched my own
+idea and found some volume, so it's validated." Run these before deciding what a
+market wants.
+
+### `ideas <seed...>`
+
+Semantically *related* keywords that need not contain the seed (category match,
+not text match). The workhorse for finding demand you'd never have typed. Review
+the output — semantic matching also surfaces adjacent meanings (a "grow a garden"
+seed can pull in a Roblox game).
+
+```bash
+python3 skills/dataforseo/scripts/cli.py ideas "companion planting" --location us --limit 25
+```
+
+### `related <seed>`
+
+Google's "searches related to" expansion, walked to `--depth` (0-4; default 2 —
+higher is wider and pricier). Lateral exploration of a topic.
+
+```bash
+python3 skills/dataforseo/scripts/cli.py related "raised garden bed" --location us --depth 2
+```
+
+### `intent <keyword...>`
+
+Classifies each keyword as informational / navigational / commercial /
+transactional (with confidence). Tells "wants a free answer" from "wants to buy"
+— use it to separate real commercial demand from idle curiosity. (No location.)
+
+```bash
+python3 skills/dataforseo/scripts/cli.py intent "buy raised garden bed" "how to build raised bed" --language en
+```
+
+## App Store / Play commands (async)
+
+⚠️ **DataForSEO does NOT provide in-store search volume** (App Store / Play ASO
+keyword demand) — nobody does; Apple/Google don't publish it. For apps you get
+**which apps rank, their ratings/review counts, and review text**, so you *infer*
+demand and read competition + pain points directly. Web search `volume` stays
+your quantified demand signal.
+
+These are async (submit + poll), so they take a few seconds and print after
+polling — unlike the instant `live` commands. Raise `--timeout` if one is slow.
+
+### `appsearch <keyword> [--store apple|google]`
+
+Which apps rank in the store for a query, with ratings and review counts (your
+incumbent-strength read). Default store `apple`.
+
+```bash
+python3 skills/dataforseo/scripts/cli.py appsearch "plant identifier" --store apple --location us
+```
+
+### `appreviews <app_id> [--store apple|google] [--worst]`
+
+Mine an app's reviews for pain points (`app_id` comes from `appsearch`). `--worst`
+floats the lowest-rated reviews to the top — the store-agnostic way to find what
+users hate about the incumbent, in their own words. This is the highest-signal,
+lowest-bias input for spotting a gap. Pull a larger `--limit` to reach more
+critical reviews (Apple has no "most critical" API sort).
+
+```bash
+python3 skills/dataforseo/scripts/cli.py appreviews 1252497129 --store apple --worst --limit 30
 ```
 
 ## Notes

@@ -16,6 +16,33 @@ API login/password.
 | `domain` | `v3/dataforseo_labs/google/domain_rank_overview/live` | `target`, `location_code`, `language_code` |
 | `backlinks` | `v3/backlinks/summary/live` | `target` |
 | `refdomains` | `v3/backlinks/referring_domains/live` | `target`, `limit`, `order_by` |
+| `ideas` | `v3/dataforseo_labs/google/keyword_ideas/live` | `keywords[]`, `location_code`, `language_code`, `limit` |
+| `related` | `v3/dataforseo_labs/google/related_keywords/live` | `keyword`, `location_code`, `language_code`, `depth`, `limit` |
+| `intent` | `v3/dataforseo_labs/google/search_intent/live` | `keywords[]`, `language_code` |
+| `appsearch` | `v3/app_data/{apple,google}/app_searches/task_post` + `task_get/advanced/{id}` | `keyword`, `location_code`, `language_code`, `depth` |
+| `appreviews` | `v3/app_data/{apple,google}/app_reviews/task_post` + `task_get/advanced/{id}` | `app_id`, `location_code`, `language_code`, `depth`, `sort_by?` |
+
+**Async note:** `appsearch`/`appreviews` are the only non-`live` commands. They
+`task_post` then poll `task_get/advanced/{id}` (pending codes 20100/40100/40601/
+40602) until the result is ready or `--timeout` is hit.
+
+**`ideas` vs `suggestions`:** `suggestions` is a full-text match (queries that
+literally contain the seed — confirms what you seeded). `ideas` is semantic
+(same category, need not contain the seed — discovers what you didn't). Use
+`ideas` for discovery, `suggestions` to size a known term.
+
+**`related` depth:** 0=seed only, 1≈8 kw, 2≈72, 3≈584, 4≈4,680 (max). Cost scales
+with returned volume.
+
+**App Store sort_by:** apple = `most_recent` | `most_helpful`; google =
+`most_relevant` | `newest`. There is no "most critical" API sort — `appreviews
+--worst` sorts client-side by rating instead.
+
+**No App Store search volume:** DataForSEO's App Data API returns ranking apps,
+ratings, review counts, review text, and listing metadata — but NOT in-store
+keyword search volume (ASO demand). That metric isn't published by Apple/Google
+and is only estimated by ASO-specialist tools. `search_volume` in this API is
+Google *web* search only.
 
 ## Response envelope
 
