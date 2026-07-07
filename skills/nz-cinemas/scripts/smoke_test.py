@@ -14,7 +14,10 @@ def run(args: list) -> subprocess.CompletedProcess:
         capture_output=True,
         text=True,
         cwd=str(SKILL_DIR),
-        timeout=30,
+        # movies/nowplaying fan out across ~10 cinema sites sequentially (~25s
+        # direct); a rotating proxy adds retry latency on any blocked sub-site, so
+        # 30s was too tight — the data is correct, it just needs headroom.
+        timeout=75,
     )
 
 

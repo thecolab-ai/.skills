@@ -11,13 +11,15 @@ import argparse
 import datetime as dt
 import html
 import json
+import pathlib
 import re
 import sys
 import time
-import urllib.error
 import urllib.parse
-import urllib.request
 from typing import Any
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 SITE = "https://www.firsttable.co.nz"
 GRAPHQL_URL = "https://stellate.firsttable.net/graphql"
@@ -156,21 +158,27 @@ def http_json_or_text(url: str, *, data: bytes | None = None, headers: dict[str,
     req_headers = {"User-Agent": USER_AGENT, "Accept": "application/json,text/html;q=0.9,*/*;q=0.8"}
     if headers:
         req_headers.update(headers)
-    req = urllib.request.Request(url, data=data, headers=req_headers)
+    # A POST carries a JSON GraphQL body and expects parsed JSON back (an HTML
+    # answer there is a bot-wall interstitial); a GET fetches the SSR HTML page
+    # (__NEXT_DATA__), where real markup must NOT be mis-flagged as a challenge.
+    is_post = data is not None
     try:
-        with urllib.request.urlopen(req, timeout=30) as response:
-            body = response.read()
-            text = body.decode("utf-8", "replace")
-            ctype = response.headers.get("content-type", "")
-            if "json" in ctype:
-                return json.loads(text), text, response.status
-            return None, text, response.status
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", "replace")[:500]
-        die(f"HTTP {exc.code} for {url}: {detail}")
-    except urllib.error.URLError as exc:
-        die(f"network error for {url}: {exc.reason}")
-    raise AssertionError("unreachable")
+        body, ctype, _final = nzfetch.fetch_bytes(
+            url,
+            data=data,
+            method="POST" if is_post else None,
+            headers=req_headers,
+            timeout=30,
+            expect_json=is_post,
+        )
+    except nzfetch.Blocked as exc:
+        die(f"network error for {url}: {exc}")
+    except nzfetch.FetchError as exc:
+        die(str(exc))
+    text = body.decode("utf-8", "replace")
+    if "json" in ctype:
+        return json.loads(text), text, 200
+    return None, text, 200
 
 
 def graphql(query: str, variables: dict[str, Any]) -> dict[str, Any]:

@@ -16,12 +16,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import pathlib
 import re
 import sys
-import urllib.error
 import urllib.parse
-import urllib.request
 from typing import Any, Callable
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 SERVICE = (
     "https://services6.arcgis.com/ZVM1rEuVZjtC1Wwk/arcgis/rest/services/"
@@ -50,28 +52,19 @@ def die(message: str, code: int = 1) -> None:
     raise SystemExit(code)
 
 
-def request(url: str, timeout: int = 45):
-    req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json"})
-    return urllib.request.urlopen(req, timeout=timeout)
-
-
 def query(layer_url: str, params: dict[str, str], timeout: int = 45) -> dict[str, Any]:
     """Run an ArcGIS REST query and return the decoded JSON body."""
     base = {"f": "json", "returnGeometry": "false"}
     base.update(params)
     url = layer_url + "?" + urllib.parse.urlencode(base, safe="=,'%")
     try:
-        with request(url, timeout=timeout) as resp:
-            text = resp.read().decode("utf-8", "replace")
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        die(f"HTTP {e.code} from feature service: {raw[:240]}")
-    except urllib.error.URLError as e:
-        die(f"network error calling feature service: {e.reason}")
-    try:
-        data = json.loads(text)
-    except json.JSONDecodeError as e:
-        die(f"invalid JSON from feature service: {e}")
+        data = nzfetch.fetch_json(
+            url, timeout=timeout, headers={"User-Agent": UA}, accept="application/json"
+        )
+    except nzfetch.Blocked as e:
+        die(f"network error calling feature service: {e}")
+    except nzfetch.FetchError as e:
+        die(str(e))
     if isinstance(data, dict) and data.get("error"):
         err = data["error"]
         detail = err.get("message") or err

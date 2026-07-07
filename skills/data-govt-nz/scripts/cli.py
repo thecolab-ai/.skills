@@ -1,18 +1,22 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-import argparse, json, sys, urllib.parse, urllib.request, urllib.error
+import argparse, json, pathlib, sys, urllib.parse
 from typing import Any
+
+# Shared fetch helper — browser UA + rotating-proxy retry to clear IP-reputation
+# bot walls (data.govt.nz sits behind Incapsula). Repo lib/, three parents up
+# from this scripts/ dir. See lib/nzfetch.py.
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / 'lib'))
+import nzfetch  # noqa: E402
 BASE='https://catalogue.data.govt.nz/api/3/action/'
-UA='Mozilla/5.0'
 
 def die(msg, code=1): print(f'data-govt-nz: {msg}', file=sys.stderr); raise SystemExit(code)
 def get(action: str, params: dict[str, Any]):
     url=BASE+action+'?'+urllib.parse.urlencode({k:v for k,v in params.items() if v is not None})
-    req=urllib.request.Request(url, headers={'User-Agent':UA,'Accept':'application/json'})
     try:
-        with urllib.request.urlopen(req, timeout=30) as r: data=json.loads(r.read().decode())
-    except urllib.error.HTTPError as e: die(f'HTTP {e.code} from {url}: {e.read().decode("utf-8","replace")[:250]}')
-    except Exception as e: die(f'failed calling {url}: {e}')
+        data=nzfetch.fetch_json(url, timeout=30)  # direct → rotating proxy on a block
+    except nzfetch.Blocked as e: die(f'network error: {e}')
+    except nzfetch.FetchError as e: die(str(e))
     if not data.get('success'): die(f'API returned success=false from {url}: {data.get("error")}')
     return data.get('result'), url
 

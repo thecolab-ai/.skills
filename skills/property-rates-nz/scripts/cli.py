@@ -10,12 +10,14 @@ from __future__ import annotations
 import argparse
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 import json
+import pathlib
 import re
 import sys
 import time
-import urllib.error
-import urllib.request
 from typing import Any
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 PROPERTY_API = "https://experience.aucklandcouncil.govt.nz/nextapi/property"
 SEARCH_PAGE = "https://www.aucklandcouncil.govt.nz/en/property-rates-valuations/find-property-rates-valuation.html"
@@ -54,15 +56,12 @@ def fmt_dollar(value: int | None) -> str:
 
 
 def fetch_text(url: str, headers: dict[str, str] | None = None, timeout: int = 30) -> str:
-    req = urllib.request.Request(url, headers={"User-Agent": UA, **(headers or {})})
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return resp.read().decode("utf-8", "replace")
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")[:300]
-        die(f"HTTP {e.code} from {url}: {raw}")
-    except urllib.error.URLError as e:
-        die(f"network error calling {url}: {e.reason}")
+        return nzfetch.fetch_text(url, timeout=timeout, headers=headers or None)
+    except nzfetch.Blocked as e:
+        die(f"network error: {e}")
+    except nzfetch.FetchError as e:
+        die(str(e))
 
 
 def current_public_token() -> str:

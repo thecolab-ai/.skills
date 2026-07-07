@@ -9,13 +9,15 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import pathlib
 import statistics
 import sys
 import time
-import urllib.error
 import urllib.parse
-import urllib.request
 from typing import Any, Callable
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 try:
     from zoneinfo import ZoneInfo
@@ -56,23 +58,17 @@ def request_json(url: str, timeout: int = 20) -> Any:
         "User-Agent": UA,
         "Referer": NZX_WEB + "/",
     }
-    req = urllib.request.Request(url, headers=headers, method="GET")
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            raw = resp.read().decode("utf-8", "replace")
-            return json.loads(raw) if raw else None
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        try:
-            payload = json.loads(raw)
-            detail = payload.get("message") or payload.get("error") or raw[:240]
-        except Exception:
-            detail = raw[:240]
-        die(f"HTTP {e.code} from {url}: {detail}")
-    except urllib.error.URLError as e:
-        die(f"network error calling {url}: {e.reason}")
-    except TimeoutError:
-        die(f"timeout calling {url}")
+        body, _ct, _final = nzfetch.fetch_bytes(
+            url, timeout=timeout, accept="application/json, text/plain, */*", headers=headers
+        )
+    except nzfetch.Blocked as e:
+        die(f"network error: {e}")
+    except nzfetch.FetchError as e:
+        die(str(e))
+    raw = body.decode("utf-8", "replace")
+    try:
+        return json.loads(raw) if raw else None
     except json.JSONDecodeError as e:
         die(f"invalid JSON from {url}: {e}")
 

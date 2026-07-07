@@ -11,15 +11,16 @@ import os
 import re
 import ssl
 import sys
-import urllib.error
 import urllib.parse
-import urllib.request
 import zipfile
 import xml.etree.ElementTree as ET
 from html.parser import HTMLParser
 from io import BytesIO
 from pathlib import Path
 from typing import Any
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 BASE = "https://www.educationcounts.govt.nz"
 DEFAULT_TIMEOUT = 10
@@ -114,27 +115,22 @@ def fetch_bytes(url: str, timeout: int = DEFAULT_TIMEOUT) -> tuple[bytes, str, s
     if url.startswith("file://"):
         path = Path(urllib.parse.urlparse(url).path)
         return path.read_bytes(), url, "application/octet-stream"
-    req = urllib.request.Request(url, headers=request_headers(url))
     try:
-        with urllib.request.urlopen(req, timeout=timeout, context=ssl.create_default_context()) as resp:
-            return resp.read(), resp.geturl(), (resp.headers.get("Content-Type") or "").lower()
-    except urllib.error.HTTPError as exc:
-        snippet = ""
-        try:
-            snippet = clean_text(exc.read(600).decode("utf-8", errors="replace"))[:240]
-        except Exception:
-            snippet = ""
-        if exc.code in {403, 429}:
-            raise UpstreamBlocked(
-                f"HTTP {exc.code} from Education Counts; the public source may be bot-blocking this network. {snippet}",
-                code="blocked",
-                source_url=url,
-            ) from exc
-        raise SkillError(f"HTTP {exc.code} from {url}. {snippet}", code="upstream_http", source_url=url) from exc
-    except TimeoutError as exc:
-        raise UpstreamBlocked(f"timeout while fetching {url}", code="timeout", source_url=url) from exc
-    except urllib.error.URLError as exc:
-        raise UpstreamBlocked(f"network error contacting {url}: {exc.reason}", code="unreachable", source_url=url) from exc
+        body, content_type, final_url = nzfetch.fetch_bytes(
+            url,
+            timeout=timeout,
+            headers=request_headers(url),
+            context=ssl.create_default_context(),
+        )
+    except nzfetch.Blocked as exc:
+        raise UpstreamBlocked(
+            f"Education Counts blocked this request; the public source may be bot-blocking this network. {exc}",
+            code="blocked",
+            source_url=url,
+        ) from exc
+    except nzfetch.FetchError as exc:
+        raise SkillError(f"{exc}", code="upstream_http", source_url=url) from exc
+    return body, final_url, content_type
 
 
 def fetch_text(url: str, timeout: int = DEFAULT_TIMEOUT) -> tuple[str, str]:

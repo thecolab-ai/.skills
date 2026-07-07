@@ -10,14 +10,16 @@ import csv
 import io
 import json
 import os
+import pathlib
 import re
 import sys
-import urllib.error
 import urllib.parse
-import urllib.request
 from collections import Counter
 from datetime import datetime, timezone
 from typing import Any
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 BASE_URL = "https://fyi.org.nz"
 AUTHORITIES_CSV = BASE_URL + "/body/all-authorities.csv"
@@ -91,31 +93,21 @@ def detect_blocked(body: str, response_url: str) -> None:
 
 
 def fetch_bytes(url: str, timeout: int = REQUEST_TIMEOUT_SECONDS) -> tuple[bytes, str, str]:
-    req = urllib.request.Request(
-        url,
-        headers={
-            "User-Agent": USER_AGENT,
-            "Accept": UA_HTTP_ACCEPT,
-        },
-        method="GET",
-    )
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as response:
-            payload = response.read()
-            response_url = response.geturl()
-            content_type = response.headers.get("Content-Type", "")
-            detect_blocked(payload.decode("utf-8", "replace"), response_url)
-            return payload, response_url, content_type
-    except urllib.error.HTTPError as exc:
-        body = exc.read().decode("utf-8", "replace") if exc.fp else ""
-        detect_blocked(body, url)
-        if exc.code in {403, 429, 503}:
-            raise CliError(f"upstream_blocked: HTTP {exc.code} from {url}: {body[:200]}", status="upstream_blocked")
-        if exc.code >= 500:
-            raise CliError(f"upstream_unavailable: HTTP {exc.code} from {url}: {body[:180]}", status="upstream_unavailable")
-        raise CliError(f"HTTP {exc.code} from {url}: {body[:180]}", status="http_error")
+        payload, content_type, response_url = nzfetch.fetch_bytes(
+            url,
+            timeout=timeout,
+            accept=UA_HTTP_ACCEPT,
+            headers={"User-Agent": USER_AGENT},
+        )
+    except nzfetch.Blocked as exc:
+        raise CliError(f"upstream_blocked: network error from {url}: {exc}", status="upstream_blocked")
+    except nzfetch.FetchError as exc:
+        raise CliError(f"upstream_unavailable: network error for {url}: {exc}", status="upstream_unavailable")
     except (TimeoutError, OSError) as exc:
         raise CliError(f"upstream_unavailable: network failure for {url}: {exc}", status="upstream_unavailable")
+    detect_blocked(payload.decode("utf-8", "replace"), response_url)
+    return payload, response_url, content_type
 
 
 def fetch_json(url: str, timeout: int = REQUEST_TIMEOUT_SECONDS) -> tuple[dict[str, Any] | list[Any], str, str]:

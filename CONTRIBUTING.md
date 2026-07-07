@@ -28,6 +28,70 @@ python3 skills/<name>/scripts/smoke_test.py
 - TypeScript/Node skill helpers are **not accepted** — all scripts must be Python
 - Avoid per-skill doc clutter
 
+## Getting past bot walls — the shared `nzfetch` helper
+
+A lot of official NZ sources (data.govt.nz CKAN, councils, some government portals) sit behind
+**Incapsula / Cloudflare** that block by **IP reputation** — a bare HTTP client gets an HTML
+"checking your browser" challenge instead of the data. Don't hand-roll a fix per skill: use the
+shared **`lib/nzfetch.py`** helper (stdlib only). It sends a browser-shaped User-Agent and, on a
+block, **retries through a rotating proxy** when one is configured — a fresh IP per attempt clears
+IP-reputation walls. With no proxy set it just does the single direct request, so nothing changes
+on a clean network.
+
+Import it from a skill's `scripts/cli.py` (it lives at the repo `lib/`, three parents up):
+
+```python
+import pathlib, sys
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
+
+def get(url):
+    try:
+        return nzfetch.fetch_json(url)          # also: fetch_bytes, fetch_text
+    except nzfetch.Blocked as e:
+        die(f"network error: {e}")              # transient block → smoke tests SKIP, not FAIL
+    except nzfetch.FetchError as e:
+        die(str(e))
+```
+
+`nzfetch.Blocked` is a subclass of `FetchError` — a transient bot-wall, **not** a dead source; a
+skill should report it as a `network error` (so smoke tests skip) rather than crash. Keep your
+smoke test's `is_network_failure()` markers including `blocked` / `network error`. A block includes
+HTTP 403/429/451 **and 406** (Akamai's bot "Not Acceptable", seen on `aucklandcouncil.govt.nz`),
+plus Incapsula/Cloudflare **and AWS-WAF (`goku`) challenge shells served at HTTP 200** — nzfetch
+detects those by body fingerprint so they never slip through as an empty "success".
+
+**Pick the right entry point — it decides challenge handling for you:**
+
+- `fetch_text(url, ...)` for HTML / XML / RSS / CSV / any text. It **never** mis-reads a real page
+  as a challenge, no matter what `accept` you pass — so you don't have to keep `json` out of your
+  `accept` string.
+- `fetch_json(url, ...)` for JSON APIs. An HTML interstitial where JSON was expected **is** treated
+  as a challenge (and retried/rotated), because that's an API being walled.
+- `fetch_bytes(url, ...) -> (body, content_type, final_url)` for binary/ZIP or when you need the
+  final URL or content-type. Pass `expect_json=True/False` to control interstitial detection.
+
+**Header-sensitive hosts.** A few sites (e.g. Interislander, Bluebridge) return a clean 200 to a
+*bare* request but bot-wall the full Client-Hint / `Sec-Fetch-*` header set nzfetch sends by
+default. For those, pass **`browser_headers=False`** — nzfetch then sends only a lean
+`User-Agent + Accept + language + encoding` set (like plain `urllib`) while still giving you the
+rotating-proxy fallback. All headers you pass via `headers={...}` (API keys, auth, Referer),
+POST `data`/`method`, and a custom SSL `context=` are preserved through the proxy either way.
+
+**Proxy config (all optional, all from the environment):**
+
+| Env | Meaning |
+|---|---|
+| `FETCH_PROXY` / `HTTPS_PROXY` | Rotating proxy URL, e.g. `http://user:pass@host:port`. **A SECRET** — never hard-code, print, or commit it; `nzfetch` reads it from the env only. |
+| `PROXY_RETRIES` | Retries through the proxy on a block, a fresh IP each (default 2). Raise it if a source is heavily flagged; lower keeps many-fetch skills fast under a tight timeout. |
+| `NZFETCH_UA` | Override the User-Agent for a source that needs a specific one. |
+
+Even without adopting `nzfetch`, any skill that uses `urllib` already **honours `HTTPS_PROXY`
+natively**, so setting it routes that skill through the proxy — but only `nzfetch` adds the
+retry-rotation + challenge-detection that makes the bypass *reliable*. Migrate a blocked skill by
+swapping its `urllib.request.urlopen(...)` fetch for an `nzfetch` call as above (see
+`skills/data-govt-nz` and `skills/eeca-ev-chargers-nz` for worked examples).
+
 ## Optional browser-assisted mode
 
 Direct public HTTP/API calls are still the default. Only add a `--browser` mode when a public,

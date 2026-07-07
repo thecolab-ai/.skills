@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-import argparse,json,re,sys,urllib.request,urllib.error,html
+import argparse,json,pathlib,re,sys,html
 from html.parser import HTMLParser
 from typing import Any
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 URL='https://www.interest.co.nz/borrowing'
 UA='Mozilla/5.0'
 TERMS=['variable_floating','6_months','1_year','2_years','3_years','4_years','5_years']
@@ -27,9 +29,9 @@ class TableParser(HTMLParser):
    if self.row: self.rows.append(self.row)
   elif self.in_table and tag=='table': self.in_table=False
 def fetch():
- try: return urllib.request.urlopen(urllib.request.Request(URL,headers={'User-Agent':UA}),timeout=30).read().decode('utf-8','replace')
- except urllib.error.HTTPError as e: die(f'HTTP {e.code} from {URL}: {e.read().decode("utf-8","replace")[:250]}')
- except Exception as e: die(f'failed fetching {URL}: {e}')
+ try: return nzfetch.fetch_text(URL, timeout=30)  # direct → rotating proxy on a block
+ except nzfetch.Blocked as e: die(f'network error: {e}')
+ except nzfetch.FetchError as e: die(str(e))
 def num(s):
  s=(s or '').strip();
  if not s: return None

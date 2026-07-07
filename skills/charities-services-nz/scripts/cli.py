@@ -11,12 +11,14 @@ import argparse
 import csv
 import io
 import json
+import pathlib
 import sys
-import urllib.error
 import urllib.parse
-import urllib.request
 import xml.etree.ElementTree as ET
 from typing import Any, NoReturn
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 BASE = "https://www.odata.charities.govt.nz/"
 UA = "Mozilla/5.0 (compatible; thecolab-ai-skills/charities-services-nz; +https://github.com/thecolab-ai/.skills)"
@@ -45,18 +47,18 @@ def clamp_limit(n: int) -> int:
 
 
 def request(url: str, accept: str = "application/json", timeout: int = 20) -> tuple[str, str]:
-    req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": accept})
+    # Route through the shared nzfetch helper (browser-shaped headers + rotating
+    # proxy retry on a bot-block). fetch_bytes preserves the exact per-call Accept
+    # and lets us keep the original utf-8-sig decoding (charities OData/CSV ships a
+    # BOM). expect_json is inferred from `accept`: True for application/json (so an
+    # interstitial is caught), False for text/csv and application/xml.
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return resp.read().decode("utf-8-sig", "replace"), resp.headers.get("content-type", "")
-    except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", "replace")[:500]
-        low = body.lower()
-        if e.code == 403 or "incapsula" in low or "blocked" in low or "request unsuccessful" in low:
-            raise UpstreamBlocked(f"blocked_by_upstream: HTTP {e.code} from {url}") from e
-        raise UpstreamUnavailable(f"HTTP {e.code} from {url}: {body}") from e
-    except (urllib.error.URLError, TimeoutError) as e:
+        body, content_type, _final = nzfetch.fetch_bytes(url, accept=accept, timeout=timeout)
+    except nzfetch.Blocked as e:
+        raise UpstreamBlocked(f"blocked_by_upstream: {e}") from e
+    except nzfetch.FetchError as e:
         raise UpstreamUnavailable(f"network error calling {url}: {e}") from e
+    return body.decode("utf-8-sig", "replace"), content_type
 
 
 def odata_url(entity: str, params: dict[str, Any]) -> str:

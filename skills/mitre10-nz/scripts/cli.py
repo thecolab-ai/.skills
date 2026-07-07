@@ -9,12 +9,14 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import pathlib
 import sys
 import time
-import urllib.error
 import urllib.parse
-import urllib.request
 from typing import Any
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 BASE_WEB = "https://www.mitre10.co.nz"
 BASE_OCC = "https://ccapi.mitre10.co.nz/occ/v2/mitre10"
@@ -56,32 +58,30 @@ def request_json(
 ) -> Any:
     data = None
     req_headers = {
-        "Accept": "application/json, text/plain, */*",
         "Origin": BASE_WEB,
         "Referer": BASE_WEB + "/",
-        "User-Agent": UA,
     }
     if headers:
         req_headers.update(headers)
     if body is not None:
         data = json.dumps(body).encode("utf-8")
         req_headers["Content-Type"] = "application/json"
-    req = urllib.request.Request(url, data=data, headers=req_headers, method=method)
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            raw = resp.read().decode("utf-8", "replace")
-            return json.loads(raw) if raw else None
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        try:
-            payload = json.loads(raw)
-            errors = payload.get("errors") if isinstance(payload, dict) else None
-            detail = payload.get("message") or payload.get("error") or errors or raw[:300]
-        except Exception:
-            detail = raw[:300]
-        die(f"HTTP {e.code} from {url}: {detail}")
-    except urllib.error.URLError as e:
-        die(f"network error calling {url}: {e.reason}")
+        raw_bytes, _ct, _final = nzfetch.fetch_bytes(
+            url,
+            timeout=timeout,
+            accept="application/json, text/plain, */*",
+            headers=req_headers,
+            data=data,
+            method=method,
+        )
+    except nzfetch.Blocked as e:
+        die(f"network error calling {url}: {e}")
+    except nzfetch.FetchError as e:
+        die(str(e))
+    raw = raw_bytes.decode("utf-8", "replace")
+    try:
+        return json.loads(raw) if raw else None
     except json.JSONDecodeError as e:
         die(f"invalid JSON from {url}: {e}")
 

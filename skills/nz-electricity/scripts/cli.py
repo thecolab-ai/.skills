@@ -17,9 +17,13 @@ import sys
 import time
 import urllib.error
 import urllib.parse
-import urllib.request
 from collections import defaultdict
 from typing import Any, Callable, Iterable
+
+import pathlib
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 EM6_BASE = "https://api.em6.co.nz/ords/em6/data_api"
 EMI_DATASETS = "https://www.emi.ea.govt.nz/Wholesale/Datasets"
@@ -174,9 +178,22 @@ def die(message: str, code: int = 1) -> None:
     raise SystemExit(code)
 
 
-def request(url: str, timeout: int = 30) -> urllib.response.addinfourl:
-    req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "*/*"})
-    return urllib.request.urlopen(req, timeout=timeout)
+def request(
+    url: str,
+    timeout: int = 30,
+    *,
+    accept: str = "*/*",
+    headers: dict[str, str] | None = None,
+    data: bytes | None = None,
+    method: str | None = None,
+) -> tuple[bytes, str]:
+    """Fetch *url* via the shared nzfetch helper (browser UA + proxy retry on a
+    bot-block). Returns (body_bytes, final_url); raises nzfetch.Blocked /
+    nzfetch.FetchError, which callers map to their own die/error contract."""
+    body, _ct, final_url = nzfetch.fetch_bytes(
+        url, timeout=timeout, accept=accept, headers=headers, data=data, method=method
+    )
+    return body, final_url
 
 
 def request_json(path: str, params: dict[str, Any] | None = None, timeout: int = 20) -> Any:
@@ -185,19 +202,16 @@ def request_json(path: str, params: dict[str, Any] | None = None, timeout: int =
         clean = {k: str(v) for k, v in params.items() if v is not None}
         url += "?" + urllib.parse.urlencode(clean)
     try:
-        with request(url, timeout=timeout) as resp:
-            raw = resp.read().decode("utf-8", "replace")
-            return json.loads(raw) if raw else None
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        try:
-            payload = json.loads(raw)
-            detail = payload.get("message") or payload.get("title") or raw[:240]
-        except Exception:
-            detail = raw[:240]
-        die(f"HTTP {e.code} from {url}: {detail}")
-    except urllib.error.URLError as e:
-        die(f"network error calling {url}: {e.reason}")
+        body, _final = request(url, timeout=timeout)
+    except nzfetch.Blocked as e:
+        die(f"network error calling {url}: {e}")
+    except nzfetch.FetchError as e:
+        die(str(e))
+    raw = body.decode("utf-8", "replace")
+    if not raw:
+        return None
+    try:
+        return json.loads(raw)
     except json.JSONDecodeError as e:
         die(f"invalid JSON from {url}: {e}")
 
@@ -213,27 +227,34 @@ def request_url_json(
     if params:
         clean = {k: str(v) for k, v in params.items() if v is not None}
         url += "?" + urllib.parse.urlencode(clean)
-    req_headers = {"User-Agent": UA, "Accept": "application/json, */*"}
+    req_headers: dict[str, str] = {}
     if headers:
         req_headers.update(headers)
     data = None
     if body is not None:
         data = json.dumps(body).encode("utf-8")
         req_headers.setdefault("Content-Type", "application/json")
-    req = urllib.request.Request(url, headers=req_headers, data=data, method=method)
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        raw = resp.read().decode("utf-8", "replace")
-        return json.loads(raw) if raw else None
+    method_arg = method if method and method.upper() != "GET" else None
+    payload, _final = request(
+        url,
+        timeout=timeout,
+        accept="application/json, */*",
+        headers=req_headers or None,
+        data=data,
+        method=method_arg,
+    )
+    raw = payload.decode("utf-8", "replace")
+    return json.loads(raw) if raw else None
 
 
 def read_url_text(url: str, timeout: int = 30) -> str:
     try:
-        with request(url, timeout=timeout) as resp:
-            return resp.read().decode("utf-8", "replace")
-    except urllib.error.HTTPError as e:
-        die(f"HTTP {e.code} from {url}")
-    except urllib.error.URLError as e:
-        die(f"network error calling {url}: {e.reason}")
+        body, _final = request(url, timeout=timeout)
+    except nzfetch.Blocked as e:
+        die(f"network error calling {url}: {e}")
+    except nzfetch.FetchError as e:
+        die(str(e))
+    return body.decode("utf-8", "replace")
 
 
 def fetch_csv_rows(
@@ -241,47 +262,36 @@ def fetch_csv_rows(
     keep: Callable[[dict[str, str]], bool],
     timeout: int = 60,
 ) -> tuple[list[dict[str, str]], str]:
+    # nzfetch errors (Blocked/FetchError) propagate so callers such as
+    # try_csv_rows can fall through to the next candidate URL, mirroring the
+    # original HTTPError re-raise behaviour.
+    body, final_url = request(url, timeout=timeout)
+    text = body.decode("utf-8-sig", "replace")
     try:
-        with request(url, timeout=timeout) as resp:
-            final_url = resp.geturl()
-            text = io.TextIOWrapper(resp, encoding="utf-8-sig", newline="")
-            reader = csv.DictReader(text)
-            rows = [row for row in reader if keep(row)]
-            return rows, final_url
-    except urllib.error.HTTPError as e:
-        raise e
-    except urllib.error.URLError as e:
-        die(f"network error calling {url}: {e.reason}")
+        reader = csv.DictReader(io.StringIO(text))
+        rows = [row for row in reader if keep(row)]
     except csv.Error as e:
         die(f"invalid CSV from {url}: {e}")
+    return rows, final_url
 
 
 def try_csv_rows(urls: Iterable[str], keep: Callable[[dict[str, str]], bool]) -> tuple[list[dict[str, str]], str | None]:
-    last_status = None
     for url in urls:
         try:
             return fetch_csv_rows(url, keep)
-        except urllib.error.HTTPError as e:
-            last_status = e.code
-            if e.code in (404, 500):
-                continue
-            raw = e.read().decode("utf-8", "replace")
-            die(f"HTTP {e.code} from {url}: {raw[:240]}")
-    if last_status:
-        return [], None
+        except (nzfetch.Blocked, nzfetch.FetchError):
+            continue
     return [], None
 
 
 def fetch_report_csv_rows(url: str, timeout: int = 60) -> tuple[list[dict[str, str]], str]:
     try:
-        with request(url, timeout=timeout) as resp:
-            final_url = resp.geturl()
-            text = resp.read().decode("utf-8-sig", "replace")
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        die(f"HTTP {e.code} from {url}: {raw[:240]}")
-    except urllib.error.URLError as e:
-        die(f"network error calling {url}: {e.reason}")
+        body, final_url = request(url, timeout=timeout)
+    except nzfetch.Blocked as e:
+        die(f"network error calling {url}: {e}")
+    except nzfetch.FetchError as e:
+        die(str(e))
+    text = body.decode("utf-8-sig", "replace")
 
     lines = text.splitlines()
     for idx, line in enumerate(lines):
@@ -647,16 +657,12 @@ def dg_report_url(
 
 def fetch_dg_report(url: str, timeout: int = 10) -> dict[str, Any]:
     try:
-        with request(url, timeout=timeout) as resp:
-            final_url = resp.geturl()
-            text = resp.read().decode("utf-8-sig", "replace")
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        die(f"HTTP {e.code} from {url}: {raw[:240]}")
-    except urllib.error.URLError as e:
-        die(f"network error calling {url}: {e.reason}")
-    except TimeoutError as e:
-        die(f"timeout calling {url}: {e}")
+        body, final_url = request(url, timeout=timeout)
+    except nzfetch.Blocked as e:
+        die(f"network error calling {url}: {e}")
+    except nzfetch.FetchError as e:
+        die(str(e))
+    text = body.decode("utf-8-sig", "replace")
     return parse_dg_report_csv(text, final_url)
 
 
@@ -973,8 +979,10 @@ def cmd_generation(args: argparse.Namespace) -> None:
 
     try:
         rows, source_url = fetch_csv_rows(generation_url(yyyymm), lambda row: True)
-    except urllib.error.HTTPError as e:
-        die(f"HTTP {e.code} fetching EMI generation file for {month_label(yyyymm)}")
+    except nzfetch.Blocked as e:
+        die(f"network error fetching EMI generation file for {month_label(yyyymm)}: {e}")
+    except nzfetch.FetchError as e:
+        die(f"error fetching EMI generation file for {month_label(yyyymm)}: {e}")
 
     fuel_totals: dict[str, float] = defaultdict(float)
     tech_totals: dict[str, float] = defaultdict(float)

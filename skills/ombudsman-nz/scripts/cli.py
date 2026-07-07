@@ -14,16 +14,18 @@ import csv
 import html
 import io
 import json
+import pathlib
 import re
 import ssl
 import sys
-import urllib.error
 import urllib.parse
-import urllib.request
 import zipfile
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from typing import Any
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 BASE_URL = "https://www.ombudsman.parliament.nz"
 RESOURCES_URL = BASE_URL + "/resources"
@@ -121,47 +123,26 @@ def fetch_text(url: str, timeout: int = DEFAULT_TIMEOUT) -> tuple[str, str]:
 
 
 def fetch_bytes(url: str, timeout: int = DEFAULT_TIMEOUT) -> tuple[bytes, str, str]:
-    req = urllib.request.Request(
-        url,
-        headers={
-            "User-Agent": UA,
-            "Accept": "text/html,application/xml,application/json,text/csv;q=0.9,*/*;q=0.8",
-            "Accept-Language": "en-NZ,en;q=0.9",
-        },
-    )
     try:
-        with urllib.request.urlopen(req, timeout=timeout, context=ssl.create_default_context()) as resp:
-            body = resp.read()
-            return body, resp.geturl(), (resp.headers.get("Content-Type") or "").lower()
-    except urllib.error.HTTPError as exc:
-        snippet = ""
-        try:
-            snippet = exc.read(600).decode("utf-8", errors="replace")
-        except Exception:
-            snippet = ""
-        snippet = safe_strip(snippet)[:220]
-        if exc.code in {403, 429}:
-            raise UpstreamUnavailable(
-                f"HTTP {exc.code} from upstream: likely bot/blocking or bot-protection page. {snippet}",
-                source_url=url,
-                code="upstream_blocked",
-            ) from exc
+        body, content_type, final_url = nzfetch.fetch_bytes(
+            url,
+            timeout=timeout,
+            accept="text/html,application/xml,text/csv;q=0.9,*/*;q=0.8",
+            headers={"Accept-Language": "en-NZ,en;q=0.9"},
+            context=ssl.create_default_context(),
+        )
+        return body, final_url, content_type
+    except nzfetch.Blocked as exc:
+        raise UpstreamUnavailable(
+            f"network error contacting {url}: {exc}",
+            source_url=url,
+            code="upstream_blocked",
+        ) from exc
+    except nzfetch.FetchError as exc:
         raise CliError(
-            f"HTTP {exc.code} from upstream {url}. {snippet}",
+            f"HTTP error from upstream {url}. {exc}",
             source_url=url,
             code="upstream_http",
-        ) from exc
-    except urllib.error.URLError as exc:
-        raise UpstreamUnavailable(
-            f"network error contacting {url}: {exc.reason}",
-            source_url=url,
-            code="upstream_unreachable",
-        ) from exc
-    except TimeoutError as exc:
-        raise UpstreamUnavailable(
-            f"timeout while fetching {url}",
-            source_url=url,
-            code="upstream_timeout",
         ) from exc
 
 

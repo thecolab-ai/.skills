@@ -9,12 +9,14 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import pathlib
 import sys
 import time
-import urllib.error
 import urllib.parse
-import urllib.request
 from typing import Any
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 BASE_WEB = "https://www.woolworths.co.nz"
 BASE_API = BASE_WEB + "/api/v1"
@@ -36,28 +38,21 @@ def request_json(path: str, params: dict[str, Any] | None = None, timeout: int =
         clean = {k: str(v) for k, v in params.items() if v is not None}
         url += "?" + urllib.parse.urlencode(clean)
     headers = {
-        "Accept": "application/json, text/plain, */*",
         "X-Requested-With": "OnlineShopping.WebApp",
         "X-UI-Ver": UI_VER,
         "Referer": BASE_WEB + "/",
         "Origin": BASE_WEB,
-        "User-Agent": UA,
     }
-    req = urllib.request.Request(url, headers=headers, method="GET")
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            raw = resp.read().decode("utf-8", "replace")
-            return json.loads(raw) if raw else None
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        try:
-            payload = json.loads(raw)
-            detail = payload.get("Message") or payload.get("message") or payload.get("Error") or raw[:300]
-        except Exception:
-            detail = raw[:300]
-        die(f"HTTP {e.code} from {url}: {detail}")
-    except urllib.error.URLError as e:
-        die(f"network error calling {url}: {e.reason}")
+        body, _ct, _final = nzfetch.fetch_bytes(
+            url, timeout=timeout, headers=headers, accept="application/json, text/plain, */*"
+        )
+        raw = body.decode("utf-8", "replace")
+        return json.loads(raw) if raw else None
+    except nzfetch.Blocked as e:
+        die(f"network error: {e}")
+    except nzfetch.FetchError as e:
+        die(str(e))
     except json.JSONDecodeError as e:
         die(f"invalid JSON from {url}: {e}")
 

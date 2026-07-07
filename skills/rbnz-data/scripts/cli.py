@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-import argparse,json,sys,urllib.parse,urllib.request,urllib.error,zipfile,io,re,xml.etree.ElementTree as ET
+import argparse,json,sys,urllib.parse,zipfile,io,re,xml.etree.ElementTree as ET
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 BASE='https://catalogue.data.govt.nz/api/3/action/'
 ORG='reserve-bank-of-new-zealand'
 EXCHANGE_RESOURCE='f16aa755-ba94-4679-8c5f-4c1cb6c2901a'
@@ -23,14 +25,15 @@ BROWSER_HEADERS={
 }
 def die(m,c=1): print(f'rbnz-data: {m}',file=sys.stderr); raise SystemExit(c)
 def http_text(url, headers=None, timeout=30):
- try: return urllib.request.urlopen(urllib.request.Request(url,headers=headers or BROWSER_HEADERS),timeout=timeout).read().decode()
- except urllib.error.HTTPError as e: die(f'HTTP {e.code} from {url}: {e.read().decode("utf-8","replace")[:250]}')
- except Exception as e: die(f'failed calling {url}: {e}')
+ try: return nzfetch.fetch_text(url, timeout=timeout, headers=headers or BROWSER_HEADERS)
+ except nzfetch.Blocked as e: die(f'network error: {e}')
+ except nzfetch.FetchError as e: die(str(e))
 def http_bytes(url, timeout=60):
  try:
-  with urllib.request.urlopen(urllib.request.Request(url,headers=BROWSER_HEADERS),timeout=timeout) as r: return r.read(), r.headers.get('content-type')
- except urllib.error.HTTPError as e: die(f'HTTP {e.code} from {url}: {e.read().decode("utf-8","replace")[:250]}')
- except Exception as e: die(f'failed downloading {url}: {e}')
+  body,ct,_final = nzfetch.fetch_bytes(url, timeout=timeout, headers=BROWSER_HEADERS)
+  return body, ct
+ except nzfetch.Blocked as e: die(f'network error: {e}')
+ except nzfetch.FetchError as e: die(str(e))
 def get(action, params):
  url=BASE+action+'?'+urllib.parse.urlencode({k:v for k,v in params.items() if v is not None})
  data=json.loads(http_text(url, {'User-Agent':BROWSER_HEADERS['User-Agent'],'Accept':'application/json'}))

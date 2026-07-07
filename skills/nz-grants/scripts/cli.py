@@ -14,14 +14,16 @@ import csv
 import html as html_lib
 import io
 import json
+import pathlib
 import re
 import sys
 import textwrap
-import urllib.error
 import urllib.parse
-import urllib.request
 from html.parser import HTMLParser
 from typing import Any, Iterable
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 CKAN_BASE = "https://catalogue.data.govt.nz"
 CKAN_ACTION = CKAN_BASE + "/api/3/action/"
@@ -50,31 +52,22 @@ def die(message: str, code: int = 1) -> None:
     raise SystemExit(code)
 
 
-def request(url: str, timeout: int = DEFAULT_TIMEOUT):
-    req = urllib.request.Request(
-        url,
-        headers={
-            "User-Agent": UA,
-            "Accept": "text/html,application/json,text/csv,application/csv,*/*;q=0.8",
-            "Accept-Language": "en-NZ,en;q=0.9",
-        },
-    )
-    return urllib.request.urlopen(req, timeout=timeout)
+ACCEPT_HEADER = "text/html,application/json,text/csv,application/csv,*/*;q=0.8"
 
 
 def fetch_bytes(url: str, timeout: int = DEFAULT_TIMEOUT) -> bytes:
     try:
-        with request(url, timeout=timeout) as resp:
-            return resp.read()
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", "replace")[:240]
-        if exc.code in {403, 429, 500, 502, 503, 504}:
-            raise UpstreamUnavailable(f"HTTP {exc.code} from {url}: {detail}") from exc
-        raise UpstreamUnavailable(f"HTTP {exc.code} from {url}: {detail}") from exc
-    except urllib.error.URLError as exc:
-        raise UpstreamUnavailable(f"network error fetching {url}: {exc.reason}") from exc
-    except TimeoutError as exc:
-        raise UpstreamUnavailable(f"timeout fetching {url}") from exc
+        body, _content_type, _final_url = nzfetch.fetch_bytes(
+            url,
+            timeout=timeout,
+            accept=ACCEPT_HEADER,
+            headers={"Accept-Language": "en-NZ,en;q=0.9"},
+        )
+        return body
+    except nzfetch.Blocked as exc:
+        raise UpstreamUnavailable(f"network error fetching {url}: {exc}") from exc
+    except nzfetch.FetchError as exc:
+        raise UpstreamUnavailable(str(exc)) from exc
 
 
 def fetch_text(url: str, timeout: int = DEFAULT_TIMEOUT) -> str:
@@ -121,16 +114,21 @@ def class4_csv_url(timeout: int = DEFAULT_TIMEOUT) -> tuple[str, list[dict[str, 
 def csv_rows(timeout: int = 90) -> Iterable[dict[str, str]]:
     url, _, _ = class4_csv_url(timeout=min(timeout, DEFAULT_TIMEOUT))
     try:
-        with request(url, timeout=timeout) as resp:
-            text = io.TextIOWrapper(resp, encoding="utf-8-sig", errors="replace", newline="")
-            reader = csv.DictReader(text)
-            for row in reader:
-                yield row
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", "replace")[:240]
-        raise UpstreamUnavailable(f"HTTP {exc.code} downloading Class 4 CSV: {detail}") from exc
-    except urllib.error.URLError as exc:
-        raise UpstreamUnavailable(f"network error downloading Class 4 CSV: {exc.reason}") from exc
+        body, _content_type, _final_url = nzfetch.fetch_bytes(
+            url,
+            timeout=timeout,
+            accept=ACCEPT_HEADER,
+            headers={"Accept-Language": "en-NZ,en;q=0.9"},
+        )
+    except nzfetch.Blocked as exc:
+        raise UpstreamUnavailable(f"network error downloading Class 4 CSV: {exc}") from exc
+    except nzfetch.FetchError as exc:
+        raise UpstreamUnavailable(f"error downloading Class 4 CSV: {exc}") from exc
+    text = io.StringIO(body.decode("utf-8-sig", "replace"))
+    try:
+        reader = csv.DictReader(text)
+        for row in reader:
+            yield row
     except csv.Error as exc:
         raise UpstreamUnavailable(f"invalid Class 4 CSV: {exc}") from exc
 

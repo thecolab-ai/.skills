@@ -12,10 +12,12 @@ import os
 import re
 import sys
 import time
-import urllib.error
+import pathlib
 import urllib.parse
-import urllib.request
 from typing import Any
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 BASE_WEB = "https://www.nzbn.govt.nz"
 PROXY = BASE_WEB + "/api/business/nzbn"
@@ -38,27 +40,28 @@ def nzbn_path(uri: str, timeout: int = 25) -> Any:
         "Referer": BASE_WEB + "/mynzbn/search/",
         "User-Agent": UA,
     }
-    req = urllib.request.Request(url, headers=headers, method="GET")
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            raw = resp.read().decode("utf-8", "replace")
-            if not raw:
-                return None
-            payload = json.loads(raw)
-            # The proxy commonly returns upstream errors as JSON with HTTP 200.
-            if isinstance(payload, dict):
-                status = str(payload.get("status") or payload.get("statusCode") or "")
-                if status and not status.startswith("2"):
-                    msg = payload.get("errorDescription") or payload.get("message") or payload.get("error") or raw[:300]
-                    die(f"upstream error for {uri}: {status} {msg}")
-            return payload
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        die(f"HTTP {e.code} from {url}: {raw[:300]}")
-    except urllib.error.URLError as e:
-        die(f"network error calling {url}: {e.reason}")
+        body, _ct, _final = nzfetch.fetch_bytes(
+            url, timeout=timeout, headers=headers, accept="application/json, text/plain, */*"
+        )
+    except nzfetch.Blocked as e:
+        die(f"network error: {e}")
+    except nzfetch.FetchError as e:
+        die(str(e))
+    raw = body.decode("utf-8", "replace")
+    if not raw:
+        return None
+    try:
+        payload = json.loads(raw)
     except json.JSONDecodeError as e:
         die(f"invalid JSON from {url}: {e}")
+    # The proxy commonly returns upstream errors as JSON with HTTP 200.
+    if isinstance(payload, dict):
+        status = str(payload.get("status") or payload.get("statusCode") or "")
+        if status and not status.startswith("2"):
+            msg = payload.get("errorDescription") or payload.get("message") or payload.get("error") or raw[:300]
+            die(f"upstream error for {uri}: {status} {msg}")
+    return payload
 
 
 def nzbn_url(nzbn: Any) -> str | None:

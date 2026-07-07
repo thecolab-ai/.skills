@@ -10,15 +10,17 @@ import argparse
 import html
 import json
 import os
+import pathlib
 import re
 import sys
 import time
-import urllib.error
 import urllib.parse
-import urllib.request
 from datetime import datetime, timezone, timedelta
 from html.parser import HTMLParser
 from typing import Any
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 try:
     from zoneinfo import ZoneInfo
@@ -72,15 +74,16 @@ def request_text(
     }
     if headers:
         req_headers.update(headers)
-    req = urllib.request.Request(url, headers=req_headers, method="GET")
+    accept = req_headers.pop("Accept")
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return resp.read().decode("utf-8", "replace")
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        raise CliError(f"HTTP {e.code} from {url}: {raw[:300]}")
-    except urllib.error.URLError as e:
-        raise CliError(f"network error calling {url}: {e.reason}")
+        # Lean headers: cinema CDNs answer a bare request directly; the full
+        # Client-Hint / Sec-Fetch-* set adds latency here (this skill fans out
+        # across many sites), so keep it minimal — still gets the proxy fallback.
+        return nzfetch.fetch_text(url, timeout=timeout, accept=accept, headers=req_headers, browser_headers=False)
+    except nzfetch.Blocked as e:
+        raise CliError(f"network error calling {url}: {e}")
+    except nzfetch.FetchError as e:
+        raise CliError(str(e))
 
 
 def request_json(

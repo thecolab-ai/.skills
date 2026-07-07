@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import pathlib
 import re
 import sys
 import urllib.parse
-import urllib.request
 from typing import Any
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 COLLECTION_URL = "https://wellington.govt.nz/rubbish-recycling-and-waste/when-to-put-out-your-rubbish-and-recycling/components/collection-search-results"
 MAIN_PAGE = "https://wellington.govt.nz/rubbish-recycling-and-waste/when-to-put-out-your-rubbish-and-recycling"
@@ -19,13 +22,13 @@ def fetch_text(
     url: str, headers: dict[str, str] | None = None,
     data: bytes | None = None, timeout: int = 30
 ) -> str:
-    req = urllib.request.Request(
+    return nzfetch.fetch_text(
         url,
-        headers={"User-Agent": UA, **(headers or {})},
+        timeout=timeout,
+        headers=headers or None,
         data=data,
+        method="POST" if data is not None else None,
     )
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return resp.read().decode("utf-8", "replace")
 
 
 def get_collection(street_id: str, street_name: str) -> dict[str, Any]:

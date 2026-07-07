@@ -11,14 +11,16 @@ import datetime as dt
 import html
 import json
 import os
+import pathlib
 import re
 import sys
 import time
 import unicodedata
-import urllib.error
 import urllib.parse
-import urllib.request
 from typing import Any
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 try:
     from zoneinfo import ZoneInfo
@@ -170,23 +172,21 @@ def request_text(path_or_url: str, params: dict[str, Any] | None = None, timeout
         if clean:
             sep = "&" if "?" in url else "?"
             url += sep + urllib.parse.urlencode(clean, doseq=True)
-    headers = {
-        "Accept": "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8",
-        "Referer": BASE + "/",
-        "User-Agent": UA,
-    }
-    req = urllib.request.Request(url, headers=headers, method="GET")
+    # Healthpoint serves HTML pages (and JSON from /nearme.do). Keep the Accept
+    # HTML-shaped so nzfetch's challenge check never mistakes a real page for a
+    # JSON interstitial; the one JSON endpoint still parses fine via request_json.
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            raw = resp.read()
-            charset = resp.headers.get_content_charset() or "utf-8"
-            return raw.decode(charset, "replace"), resp.geturl()
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        detail = clean_text(raw[:500])
-        die(f"HTTP {e.code} from {url}: {detail or e.reason}")
-    except urllib.error.URLError as e:
-        die(f"network error calling {url}: {e.reason}")
+        body, _ct, final_url = nzfetch.fetch_bytes(
+            url,
+            timeout=timeout,
+            accept="text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            headers={"User-Agent": UA, "Referer": BASE + "/"},
+        )
+    except nzfetch.Blocked as e:
+        die(f"network error: {e}")
+    except nzfetch.FetchError as e:
+        die(str(e))
+    return body.decode("utf-8", "replace"), final_url
 
 
 def request_json(path_or_url: str, params: dict[str, Any] | None = None, timeout: int = 25) -> Any:

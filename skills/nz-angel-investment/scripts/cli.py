@@ -13,13 +13,15 @@ import argparse
 import html
 from html.parser import HTMLParser
 import json
+import pathlib
 import re
 import sys
 import textwrap
-import urllib.error
 import urllib.parse
-import urllib.request
 from typing import Any
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 NZGCP_BASE = "https://www.nzgcp.co.nz"
 NZGCP_REPORTS_URL = NZGCP_BASE + "/about-us/news-and-media/view/reports"
@@ -194,29 +196,21 @@ def limit_value(value: int) -> int:
     return max(1, min(MAX_LIMIT, value))
 
 
-def request(url: str, timeout: int = DEFAULT_TIMEOUT):
-    req = urllib.request.Request(
-        url,
-        headers={
-            "User-Agent": UA,
-            "Accept": "application/json,text/html,application/xhtml+xml,application/xml,application/pdf,*/*;q=0.8",
-            "Accept-Language": "en-NZ,en;q=0.9",
-        },
-    )
-    return urllib.request.urlopen(req, timeout=timeout)
-
-
 def fetch_bytes(url: str, timeout: int = DEFAULT_TIMEOUT) -> bytes:
+    headers = {
+        "User-Agent": UA,
+        "Accept": "application/json,text/html,application/xhtml+xml,application/xml,application/pdf,*/*;q=0.8",
+        "Accept-Language": "en-NZ,en;q=0.9",
+    }
     try:
-        with request(url, timeout=timeout) as resp:
-            return resp.read()
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", "replace")[:240]
-        raise UpstreamUnavailable(f"HTTP {exc.code} from {url}: {detail}") from exc
-    except urllib.error.URLError as exc:
-        raise UpstreamUnavailable(f"network error fetching {url}: {exc.reason}") from exc
+        body, _ct, _final = nzfetch.fetch_bytes(url, timeout=timeout, headers=headers)
+        return body
+    except nzfetch.Blocked as exc:
+        raise UpstreamUnavailable(f"network error fetching {url}: {exc}") from exc
+    except nzfetch.FetchError as exc:
+        raise UpstreamUnavailable(str(exc)) from exc
     except TimeoutError as exc:
-        raise UpstreamUnavailable(f"timeout fetching {url}") from exc
+        raise UpstreamUnavailable(f"network error fetching {url}: timeout") from exc
 
 
 def fetch_text(url: str, timeout: int = DEFAULT_TIMEOUT) -> str:

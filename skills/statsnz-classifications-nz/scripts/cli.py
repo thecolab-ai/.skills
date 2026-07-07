@@ -6,13 +6,15 @@ from __future__ import annotations
 import argparse
 import html
 import json
+import pathlib
 import re
 import sys
-import urllib.error
 import urllib.parse
-import urllib.request
 from datetime import datetime, timezone
 from typing import Any
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 
 BASE_URL = "https://datainfoplus.stats.govt.nz"
@@ -106,45 +108,35 @@ def decode_response(response: urllib.response.addinfourl) -> str:
 
 
 def request_text(url: str, timeout: int = DEFAULT_TIMEOUT) -> tuple[str, str]:
-    req = urllib.request.Request(
-        url,
-        headers={
-            "User-Agent": UA,
-            "Accept": "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.8",
-        },
-    )
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as response:
-            return decode_response(response), response.geturl()
-    except urllib.error.HTTPError as exc:
-        reason = decode_response(exc).strip() if hasattr(exc, "read") else ""
-        status = "upstream_blocked" if is_upstream_blocked(exc.code, reason) else "upstream_unavailable"
-        raise UpstreamError(status, f"HTTP {exc.code} from {url}", url=url, reason=reason[:240]) from None
-    except (urllib.error.URLError, OSError, TimeoutError) as exc:
+        body, _ct, final_url = nzfetch.fetch_bytes(
+            url,
+            timeout=timeout,
+            accept="text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.8",
+        )
+        return body.decode("utf-8", "replace"), final_url
+    except nzfetch.Blocked as exc:
+        raise UpstreamError("upstream_blocked", f"Network error calling {url}: {exc}", url=url) from None
+    except nzfetch.FetchError as exc:
         raise UpstreamError("upstream_unavailable", f"Network error calling {url}: {exc}", url=url) from None
 
 
 def request_json(url: str, timeout: int = DEFAULT_TIMEOUT) -> tuple[dict[str, Any], str]:
-    req = urllib.request.Request(
-        url,
-        headers={
-            "User-Agent": UA,
-            "Accept": "application/json,text/plain;q=0.8,*/*;q=0.5",
-        },
-    )
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as response:
-            raw = decode_response(response)
-            try:
-                return json.loads(raw), response.geturl()
-            except json.JSONDecodeError as exc:
-                raise UpstreamError("upstream_unavailable", f"Invalid JSON from {url}: {exc}", url=url) from None
-    except urllib.error.HTTPError as exc:
-        reason = decode_response(exc).strip() if hasattr(exc, "read") else ""
-        status = "upstream_blocked" if is_upstream_blocked(exc.code, reason) else "upstream_unavailable"
-        raise UpstreamError(status, f"HTTP {exc.code} from {url}", url=url, reason=reason[:240]) from None
-    except (urllib.error.URLError, OSError, TimeoutError) as exc:
+        body, _ct, final_url = nzfetch.fetch_bytes(
+            url,
+            timeout=timeout,
+            accept="application/json,text/plain;q=0.8,*/*;q=0.5",
+        )
+    except nzfetch.Blocked as exc:
+        raise UpstreamError("upstream_blocked", f"Network error calling {url}: {exc}", url=url) from None
+    except nzfetch.FetchError as exc:
         raise UpstreamError("upstream_unavailable", f"Network error calling {url}: {exc}", url=url) from None
+    raw = body.decode("utf-8", "replace")
+    try:
+        return json.loads(raw), final_url
+    except json.JSONDecodeError as exc:
+        raise UpstreamError("upstream_unavailable", f"Invalid JSON from {url}: {exc}", url=url) from None
 
 
 def item_url(agency: str, identifier: str) -> str:
