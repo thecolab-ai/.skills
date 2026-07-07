@@ -33,12 +33,20 @@ def is_network_failure(result: subprocess.CompletedProcess) -> bool:
             "network error",
             "timed out",
             "timeout",
+            "http 403",
             "http 429",
             "http 500",
             "http 502",
             "http 503",
             "http 504",
             "urlopen error",
+            # data.govt.nz / EECA sit behind Incapsula, which answers API
+            # requests with an HTML bot-challenge (often HTTP 200) — a transient
+            # block, not a real failure. Skip rather than hard-fail on these.
+            "blocked",
+            "bot-challenge",
+            "bot-blocking",
+            "incapsula",
         ]
     )
 
