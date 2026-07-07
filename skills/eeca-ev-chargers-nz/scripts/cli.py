@@ -53,16 +53,42 @@ def request(url: str, timeout: int = 30):
     return urllib.request.urlopen(req, timeout=timeout)
 
 
+def _looks_like_bot_challenge(body: str, content_type: str) -> bool:
+    """A public NZ source behind Incapsula/Cloudflare answers a JSON API request
+    with an HTML interstitial (often HTTP 200). That is a transient *block*, not
+    a dead source or malformed JSON — detect it so callers classify it as such."""
+    if "text/html" in content_type:
+        return True
+    head = body.lstrip()[:512].lower()
+    return (
+        head.startswith("<")
+        or "<!doctype html" in head
+        or "incapsula" in body.lower()
+        or "_incapsula_resource" in body.lower()
+        or "request unsuccessful" in head
+    )
+
+
 def fetch_json(url: str, timeout: int = 30) -> dict[str, Any]:
     try:
         with request(url, timeout=timeout) as resp:
-            return json.loads(resp.read().decode("utf-8", "replace"))
+            raw = resp.read().decode("utf-8", "replace")
+            content_type = (resp.headers.get("Content-Type") or "").lower()
     except urllib.error.HTTPError as e:
         raw = e.read().decode("utf-8", "replace")
+        # 403/429 (with or without an HTML challenge body) mean the public
+        # source is bot-blocking this network — a transient block, so report it
+        # as a network error (callers/smoke tests skip rather than hard-fail).
+        if e.code in (403, 429):
+            die(f"network error: HTTP {e.code} from {url} — the public source is bot-blocking this network (blocked). {raw[:200]}")
         die(f"HTTP {e.code} from {url}: {raw[:240]}")
     except urllib.error.URLError as e:
         die(f"network error calling {url}: {e.reason}")
+    try:
+        return json.loads(raw)
     except json.JSONDecodeError as e:
+        if _looks_like_bot_challenge(raw, content_type):
+            die(f"network error: {url} returned a non-JSON bot-challenge response (blocked — likely an Incapsula/Cloudflare interstitial, not a dead source).")
         die(f"invalid JSON from {url}: {e}")
 
 
