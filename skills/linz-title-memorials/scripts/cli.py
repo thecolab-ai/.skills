@@ -5,11 +5,13 @@ import argparse
 import json
 import sys
 import textwrap
-import urllib.error
+import pathlib
 import urllib.parse
-import urllib.request
 from datetime import datetime, timezone
 from typing import Any
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 
 BASE = "https://data.linz.govt.nz/services/api/v1/"
@@ -114,20 +116,12 @@ class CliError(Exception):
 
 def get_json(path: str) -> dict[str, Any]:
     url = BASE + path
-    request = urllib.request.Request(
-        url,
-        headers={"User-Agent": UA, "Accept": "application/json"},
-    )
     try:
-        with urllib.request.urlopen(request, timeout=TIMEOUT) as response:
-            return json.loads(response.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        body = exc.read().decode("utf-8", "replace")[:250]
-        raise CliError(f"HTTP {exc.code} from {url}: {body}") from None
-    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        return nzfetch.fetch_json(url, timeout=TIMEOUT, accept="application/json")
+    except nzfetch.Blocked as exc:
         raise CliError(f"network failure calling {url}: {exc}") from None
-    except json.JSONDecodeError as exc:
-        raise CliError(f"invalid JSON from {url}: {exc}") from None
+    except nzfetch.FetchError as exc:
+        raise CliError(str(exc)) from None
 
 
 def output(data: dict[str, Any], as_json: bool) -> None:

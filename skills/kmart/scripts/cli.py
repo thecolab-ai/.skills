@@ -10,14 +10,16 @@ import argparse
 import html
 import json
 import os
+import pathlib
 import re
 import sys
 import time
-import urllib.error
 import urllib.parse
-import urllib.request
 import xml.etree.ElementTree as ET
 from typing import Any
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 CONSTRUCTOR_BASE = "https://ac.cnstrc.com"
 COUNTRIES = {
@@ -86,32 +88,18 @@ def country_config(country: str) -> dict[str, Any]:
 
 
 def request_url(url: str, *, accept: str, timeout: int = 25) -> str:
-    headers = {
-        "Accept": accept,
-        "User-Agent": UA,
-    }
-    req = urllib.request.Request(url, headers=headers, method="GET")
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return resp.read().decode("utf-8", "replace")
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        detail = raw[:300].replace("\n", " ")
-        die(f"HTTP {e.code} from {url}: {detail}")
-    except urllib.error.URLError as e:
-        die(f"network error calling {url}: {e.reason}")
+        return nzfetch.fetch_text(url, timeout=timeout, accept=accept)
+    except nzfetch.Blocked as e:
+        die(f"network error calling {url}: {e}")
+    except nzfetch.FetchError as e:
+        die(str(e))
 
 
 def request_url_optional(url: str, *, accept: str, timeout: int = 15) -> str | None:
-    headers = {
-        "Accept": accept,
-        "User-Agent": UA,
-    }
-    req = urllib.request.Request(url, headers=headers, method="GET")
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return resp.read().decode("utf-8", "replace")
-    except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError):
+        return nzfetch.fetch_text(url, timeout=timeout, accept=accept)
+    except (nzfetch.FetchError, TimeoutError):
         return None
 
 

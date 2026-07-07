@@ -13,14 +13,16 @@ import csv
 import html
 import io
 import json
+import pathlib
 import re
 import sys
-import urllib.error
 import urllib.parse
-import urllib.request
 import xml.etree.ElementTree as ET
 import zipfile
 from typing import Any, Callable
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 TIMEOUT = 10
 UA = "energy-hardship-nz-skill/1.0 (+https://github.com/thecolab-ai/.skills)"
@@ -148,30 +150,19 @@ def die(message: str, code: int = 1) -> None:
     raise SystemExit(code)
 
 
-def request(url: str, timeout: int = TIMEOUT):
-    headers = {
-        "User-Agent": UA,
-        "Accept": "text/html,application/json,application/xml,text/csv,*/*",
-    }
-    req = urllib.request.Request(url, headers=headers)
-    return urllib.request.urlopen(req, timeout=timeout)
-
-
 def read_url_bytes(url: str, timeout: int = TIMEOUT) -> bytes:
     try:
-        with request(url, timeout=timeout) as resp:
-            return resp.read()
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace").strip()
-        detail = f"HTTP {e.code} from {url}"
-        if raw:
-            detail += f": {one_line(raw)[:240]}"
-        raise UpstreamError(detail) from None
-    except urllib.error.URLError as e:
-        raise UpstreamError(f"network error calling {url}: {e.reason}") from None
-    except TimeoutError:
-        raise UpstreamError(f"timeout calling {url}") from None
-    except OSError as e:
+        body, _ct, _final = nzfetch.fetch_bytes(
+            url,
+            timeout=timeout,
+            accept="text/html,application/json,application/xml,text/csv,*/*",
+        )
+        return body
+    except nzfetch.Blocked as e:
+        raise UpstreamError(f"network error calling {url}: {e}") from None
+    except nzfetch.FetchError as e:
+        raise UpstreamError(str(e)) from None
+    except (TimeoutError, OSError) as e:
         raise UpstreamError(f"network error calling {url}: {e}") from None
 
 

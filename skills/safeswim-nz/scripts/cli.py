@@ -9,11 +9,13 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import pathlib
 import sys
 import time
-import urllib.error
-import urllib.request
 from typing import Any
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 BASE = "https://safeswim.org.nz/api"
 UA = "thecolab-ai-skills/safeswim-nz (+https://github.com/thecolab-ai/.skills)"
@@ -37,19 +39,14 @@ def fetch(path: str) -> Any:
         if now - ts < _CACHE_TTL:
             return data
     url = BASE + path
-    req = urllib.request.Request(url, headers={"Accept": "application/json", "User-Agent": UA})
     try:
-        with urllib.request.urlopen(req, timeout=25) as resp:
-            data = json.loads(resp.read().decode("utf-8", "replace"))
-            _CACHE[path] = (time.time(), data)
-            return data
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")[:300]
-        die(f"HTTP {e.code} from {url}: {raw}")
-    except urllib.error.URLError as e:
-        die(f"network error calling {url}: {e.reason}")
-    except json.JSONDecodeError as e:
-        die(f"invalid JSON from {url}: {e}")
+        data = nzfetch.fetch_json(url, timeout=25)
+    except nzfetch.Blocked as e:
+        die(f"network error: {e}")
+    except nzfetch.FetchError as e:
+        die(str(e))
+    _CACHE[path] = (time.time(), data)
+    return data
 
 
 def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:

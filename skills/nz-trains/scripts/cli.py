@@ -10,15 +10,17 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import pathlib
 import re
 import sys
 import time
 import unicodedata
-import urllib.error
 import urllib.parse
-import urllib.request
 from datetime import datetime, timezone
 from typing import Any
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 try:
     from zoneinfo import ZoneInfo
@@ -103,26 +105,15 @@ def request_json(path: str, params: dict[str, Any] | None = None, timeout: int =
         "User-Agent": UA,
         "x-api-key": require_api_key(),
     }
-    req = urllib.request.Request(url, headers=headers, method="GET")
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            raw = resp.read().decode("utf-8", "replace")
-            return json.loads(raw) if raw else None
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        detail = raw[:300].strip()
-        try:
-            payload = json.loads(raw)
-            detail = payload.get("error") or payload.get("message") or detail
-        except Exception:
-            pass
-        if e.code in (401, 403):
-            raise CliError(f"authentication failed calling {path}; check METLINK_API_KEY")
-        if e.code == 429:
-            raise CliError(f"rate limited calling {path}; retry later or narrow the query")
-        raise CliError(f"HTTP {e.code} from {path}: {detail}")
-    except urllib.error.URLError as e:
-        raise CliError(f"network error calling {path}: {e.reason}")
+        body, _ct, _final = nzfetch.fetch_bytes(url, timeout=timeout, accept="application/json", headers=headers)
+    except nzfetch.Blocked as e:
+        raise CliError(f"network error: {e}")
+    except nzfetch.FetchError as e:
+        raise CliError(str(e))
+    raw = body.decode("utf-8", "replace")
+    try:
+        return json.loads(raw) if raw else None
     except json.JSONDecodeError as e:
         raise CliError(f"invalid JSON from {path}: {e}")
 

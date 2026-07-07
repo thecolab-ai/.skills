@@ -6,13 +6,15 @@ from __future__ import annotations
 import argparse
 import html
 import json
+import pathlib
 import re
 import sys
-import urllib.error
 import urllib.parse
-import urllib.request
 import zipfile
 from datetime import datetime, timezone
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 from html.parser import HTMLParser
 from io import BytesIO
 import xml.etree.ElementTree as ET
@@ -270,47 +272,20 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def request(url: str, timeout: int, accept: str = "*/*"):
-    req = urllib.request.Request(
-        url,
-        headers={
-            "User-Agent": UA,
-            "Accept": accept,
-            "Accept-Language": "en-NZ,en;q=0.9",
-        },
-    )
-    return urllib.request.urlopen(req, timeout=timeout)
-
-
 def fetch_bytes(url: str, timeout: int = TIMEOUT, accept: str = "*/*") -> tuple[bytes, str, str]:
     try:
-        with request(url, timeout=timeout, accept=accept) as resp:
-            return resp.read(), resp.geturl(), resp.headers.get("content-type") or ""
-    except urllib.error.HTTPError as exc:
-        detail = ""
-        try:
-            detail = clean_text(exc.read(500).decode("utf-8", "replace"))[:220]
-        except Exception:
-            detail = ""
-        if exc.code in {403, 429}:
-            raise UpstreamUnavailable(
-                f"HTTP {exc.code} from upstream; likely bot protection or rate limiting",
-                code="upstream_blocked",
-                source_url=url,
-            ) from exc
-        raise CliError(
-            f"HTTP {exc.code} fetching {url}" + (f": {detail}" if detail else ""),
-            code="upstream_http",
-            source_url=url,
-        ) from exc
-    except TimeoutError as exc:
-        raise UpstreamUnavailable(f"timeout fetching {url}", code="upstream_timeout", source_url=url) from exc
-    except urllib.error.URLError as exc:
+        body, content_type, final_url = nzfetch.fetch_bytes(
+            url, timeout=timeout, accept=accept, headers={"Accept-Language": "en-NZ,en;q=0.9"}
+        )
+        return body, final_url, content_type
+    except nzfetch.Blocked as exc:
         raise UpstreamUnavailable(
-            f"network error fetching {url}: {exc.reason}",
-            code="upstream_unreachable",
+            f"network error fetching {url}; likely bot protection or rate limiting: {exc}",
+            code="upstream_blocked",
             source_url=url,
         ) from exc
+    except nzfetch.FetchError as exc:
+        raise CliError(str(exc), code="upstream_http", source_url=url) from exc
 
 
 def fetch_text(url: str, timeout: int = TIMEOUT) -> tuple[str, str, str]:

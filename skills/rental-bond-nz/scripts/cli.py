@@ -7,13 +7,15 @@ import csv
 import html
 import io
 import json
+import pathlib
 import re
 import sys
-import urllib.error
 import urllib.parse
-import urllib.request
 from datetime import datetime
 from typing import Any
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 SOURCE_NAME = "MBIE / Tenancy Services"
 UA = "rental-bond-nz-skill/1.0 (+https://github.com/thecolab-ai/.skills)"
@@ -110,28 +112,22 @@ def parse_year_month(value: str | None) -> str | None:
     return value if match else None
 
 
-def request(url: str, timeout: int, headers: dict[str, str] | None = None) -> urllib.request.Request:
-    merged_headers = {
-        "User-Agent": UA,
-        "Accept": "application/json,text/html;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-NZ,en;q=0.9",
-    }
+def fetch_bytes(url: str, timeout: int, headers: dict[str, str] | None = None) -> tuple[bytes, str]:
+    merged_headers = {"Accept-Language": "en-NZ,en;q=0.9"}
     if headers:
         merged_headers.update(headers)
-    return urllib.request.Request(url, headers=merged_headers)
-
-
-def fetch_bytes(url: str, timeout: int, headers: dict[str, str] | None = None) -> tuple[bytes, str]:
     try:
-        with urllib.request.urlopen(request(url, timeout=timeout, headers=headers), timeout=timeout) as response:
-            return response.read(), response.geturl()
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", "replace")[:320]
-        raise UpstreamUnavailable(f"HTTP {exc.code} from {url}: {detail}") from exc
-    except urllib.error.URLError as exc:
-        raise UpstreamUnavailable(f"network error calling {url}: {exc.reason}") from exc
-    except TimeoutError as exc:
-        raise UpstreamUnavailable(f"timeout calling {url}") from exc
+        body, _ct, final_url = nzfetch.fetch_bytes(
+            url,
+            timeout=timeout,
+            headers=merged_headers,
+            accept="application/json,text/html;q=0.9,*/*;q=0.8",
+        )
+        return body, final_url
+    except nzfetch.Blocked as exc:
+        raise UpstreamUnavailable(f"network error calling {url}: {exc}") from exc
+    except nzfetch.FetchError as exc:
+        raise UpstreamUnavailable(f"{url}: {exc}") from exc
 
 
 def fetch_text(url: str, timeout: int, headers: dict[str, str] | None = None) -> tuple[str, str]:

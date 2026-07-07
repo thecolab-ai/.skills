@@ -8,14 +8,16 @@ from __future__ import annotations
 import argparse
 import html
 import json
+import pathlib
 import re
 import sys
-import urllib.error
 import urllib.parse
-import urllib.request
 from datetime import datetime
 from typing import Any
 from zoneinfo import ZoneInfo
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 _CONTROL_CHARS_RE = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
 
@@ -138,15 +140,12 @@ def validate_tracking_number(tn: str) -> str:
 
 def _http_get(url: str, headers: dict[str, str], timeout: int = 15) -> str:
     """Perform a GET request and return decoded body, or call die() on error."""
-    req = urllib.request.Request(url, headers=headers, method="GET")
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return resp.read().decode("utf-8", "replace")
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        die(f"HTTP {e.code} from {url}: {raw[:300]}")
-    except urllib.error.URLError as e:
-        die(f"network error calling {url}: {e.reason}")
+        return nzfetch.fetch_text(url, timeout=timeout, headers=headers)
+    except nzfetch.Blocked as e:
+        die(f"network error calling {url}: {e}")
+    except nzfetch.FetchError as e:
+        die(str(e))
 
 
 # ---------------------------------------------------------------------------
@@ -203,10 +202,7 @@ def _geocode_via_keyword(query: str, timeout: int = 15) -> tuple[float, float] |
     url = f"{LOCATIONS_API_BASE}/locations?{params}"
     headers = {"User-Agent": UA, "Referer": REFERER}
     try:
-        req = urllib.request.Request(url, headers=headers, method="GET")
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            raw = resp.read().decode("utf-8", "replace")
-        data = json.loads(raw)
+        data = nzfetch.fetch_json(url, timeout=timeout, headers=headers)
     except Exception:
         return None
 
@@ -237,10 +233,7 @@ def _geocode_via_nominatim(query: str, timeout: int = 15) -> tuple[float, float]
         "Accept-Language": "en",
     }
     try:
-        req = urllib.request.Request(url, headers=headers, method="GET")
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            raw = resp.read().decode("utf-8", "replace")
-        results = json.loads(raw)
+        results = nzfetch.fetch_json(url, timeout=timeout, headers=headers)
     except Exception:
         return None
 

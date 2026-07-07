@@ -56,14 +56,34 @@ def get(url):
 
 `nzfetch.Blocked` is a subclass of `FetchError` — a transient bot-wall, **not** a dead source; a
 skill should report it as a `network error` (so smoke tests skip) rather than crash. Keep your
-smoke test's `is_network_failure()` markers including `blocked` / `network error`.
+smoke test's `is_network_failure()` markers including `blocked` / `network error`. A block includes
+HTTP 403/429/451 **and 406** (Akamai's bot "Not Acceptable", seen on `aucklandcouncil.govt.nz`),
+plus Incapsula/Cloudflare **and AWS-WAF (`goku`) challenge shells served at HTTP 200** — nzfetch
+detects those by body fingerprint so they never slip through as an empty "success".
+
+**Pick the right entry point — it decides challenge handling for you:**
+
+- `fetch_text(url, ...)` for HTML / XML / RSS / CSV / any text. It **never** mis-reads a real page
+  as a challenge, no matter what `accept` you pass — so you don't have to keep `json` out of your
+  `accept` string.
+- `fetch_json(url, ...)` for JSON APIs. An HTML interstitial where JSON was expected **is** treated
+  as a challenge (and retried/rotated), because that's an API being walled.
+- `fetch_bytes(url, ...) -> (body, content_type, final_url)` for binary/ZIP or when you need the
+  final URL or content-type. Pass `expect_json=True/False` to control interstitial detection.
+
+**Header-sensitive hosts.** A few sites (e.g. Interislander, Bluebridge) return a clean 200 to a
+*bare* request but bot-wall the full Client-Hint / `Sec-Fetch-*` header set nzfetch sends by
+default. For those, pass **`browser_headers=False`** — nzfetch then sends only a lean
+`User-Agent + Accept + language + encoding` set (like plain `urllib`) while still giving you the
+rotating-proxy fallback. All headers you pass via `headers={...}` (API keys, auth, Referer),
+POST `data`/`method`, and a custom SSL `context=` are preserved through the proxy either way.
 
 **Proxy config (all optional, all from the environment):**
 
 | Env | Meaning |
 |---|---|
 | `FETCH_PROXY` / `HTTPS_PROXY` | Rotating proxy URL, e.g. `http://user:pass@host:port`. **A SECRET** — never hard-code, print, or commit it; `nzfetch` reads it from the env only. |
-| `PROXY_RETRIES` | Retries through the proxy on a block (default 4). Raise it if a source is heavily flagged. |
+| `PROXY_RETRIES` | Retries through the proxy on a block, a fresh IP each (default 2). Raise it if a source is heavily flagged; lower keeps many-fetch skills fast under a tight timeout. |
 | `NZFETCH_UA` | Override the User-Agent for a source that needs a specific one. |
 
 Even without adopting `nzfetch`, any skill that uses `urllib` already **honours `HTTPS_PROXY`

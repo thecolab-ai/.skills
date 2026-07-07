@@ -15,12 +15,14 @@ import argparse
 import csv
 import io
 import json
+import pathlib
 import re
 import sys
-import urllib.error
-import urllib.request
 from collections import defaultdict
 from typing import Any, Callable
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 BASE = (
     "https://www.msd.govt.nz/documents/about-msd-and-our-work/"
@@ -59,28 +61,21 @@ def die(message: str, code: int = 1) -> None:
     raise SystemExit(code)
 
 
-def request(url: str, timeout: int = 180):
-    req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "*/*"})
-    return urllib.request.urlopen(req, timeout=timeout)
-
-
 def fetch_csv_rows(
     url: str,
     keep: Callable[[dict[str, str]], bool] | None = None,
     timeout: int = 180,
 ) -> tuple[list[dict[str, str]], str]:
     try:
-        with request(url, timeout=timeout) as resp:
-            final_url = resp.geturl()
-            text = io.TextIOWrapper(resp, encoding="utf-8-sig", newline="")
-            reader = csv.DictReader(text)
-            rows = [row for row in reader if keep is None or keep(row)]
-            return rows, final_url
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        die(f"HTTP {e.code} from {url}: {raw[:240]}")
-    except urllib.error.URLError as e:
-        die(f"network error calling {url}: {e.reason}")
+        body, _ct, final_url = nzfetch.fetch_bytes(url, timeout=timeout)
+    except nzfetch.Blocked as e:
+        die(f"network error calling {url}: {e}")
+    except nzfetch.FetchError as e:
+        die(str(e))
+    try:
+        reader = csv.DictReader(io.StringIO(body.decode("utf-8-sig", "replace")))
+        rows = [row for row in reader if keep is None or keep(row)]
+        return rows, final_url
     except csv.Error as e:
         die(f"invalid CSV from {url}: {e}")
     return [], url  # unreachable; keeps type checkers happy

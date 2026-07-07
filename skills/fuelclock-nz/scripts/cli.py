@@ -10,11 +10,13 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import pathlib
 import sys
 import time
-import urllib.error
-import urllib.request
 from typing import Any
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 BASE_URL = "https://fuelclock.nz"
 UA = "fuelclock-nz-skill/1.0 (+https://github.com/thecolab-ai/.skills)"
@@ -37,17 +39,17 @@ def die(message: str, code: int = 1) -> None:
 
 def request_json(path: str, timeout: int = DEFAULT_TIMEOUT) -> Any:
     url = f"{BASE_URL}{path}"
-    headers = {"Accept": "application/json", "User-Agent": UA}
-    req = urllib.request.Request(url, headers=headers, method="GET")
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            raw = resp.read().decode("utf-8", "replace")
-            return json.loads(raw) if raw else None
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        die(f"HTTP {e.code} from {url}: {raw[:300]}")
-    except urllib.error.URLError as e:
-        die(f"network error calling {url}: {e.reason}")
+        body, _ct, _final = nzfetch.fetch_bytes(url, timeout=timeout, accept="application/json")
+    except nzfetch.Blocked as e:
+        die(f"network error calling {url}: {e}")
+    except nzfetch.FetchError as e:
+        die(str(e))
+    except (TimeoutError, OSError) as e:
+        die(f"network error calling {url}: {e}")
+    raw = body.decode("utf-8", "replace")
+    try:
+        return json.loads(raw) if raw else None
     except json.JSONDecodeError as e:
         die(f"invalid JSON from {url}: {e}")
 

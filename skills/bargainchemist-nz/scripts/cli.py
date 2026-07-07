@@ -11,12 +11,16 @@ import argparse
 import json
 import os
 import re
+import pathlib
 import sys
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from typing import Any
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 BASE_WEB = "https://www.bargainchemist.co.nz"
 BOOST_SEARCH_BASE = "https://services.mybcapps.com/bc-sf-filter/search"
@@ -67,17 +71,14 @@ def request_json(url: str, params: dict[str, Any] | None = None, timeout: int = 
         "Referer": BASE_WEB + "/",
         "User-Agent": UA,
     }
-    req = urllib.request.Request(url, headers=headers, method="GET")
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            raw = resp.read().decode("utf-8", "replace")
-            return json.loads(raw), resp.geturl()
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        detail = raw[:300].strip().replace("\n", " ")
-        raise ApiError(f"HTTP {e.code} from {url}: {detail}") from e
-    except urllib.error.URLError as e:
-        raise ApiError(f"network error calling {url}: {e.reason}") from e
+        body, _ct, final_url = nzfetch.fetch_bytes(url, headers=headers, timeout=timeout, accept="application/json, text/plain, */*")
+        raw = body.decode("utf-8", "replace")
+        return json.loads(raw), final_url
+    except nzfetch.Blocked as e:
+        raise ApiError(f"network error calling {url}: {e}") from e
+    except nzfetch.FetchError as e:
+        raise ApiError(str(e)) from e
     except json.JSONDecodeError as e:
         raise ApiError(f"invalid JSON from {url}: {e}") from e
 

@@ -7,12 +7,15 @@ import csv
 import html
 import io
 import json
+import pathlib
 import re
 from datetime import date, datetime, timedelta
 import sys
 from typing import Any
-from urllib import error, request
 from urllib.parse import urlencode, urljoin, urlparse, parse_qs, quote_plus
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 FMA_BASE = "https://www.fma.govt.nz"
 FMA_WARNINGS_LIST_URL = f"{FMA_BASE}/library/warnings-and-alerts/"
@@ -143,31 +146,21 @@ def clean_text(raw: Any) -> str:
 
 
 def fetch_text(url: str, timeout: int = DEFAULT_TIMEOUT) -> str:
-    req = request.Request(
-        url,
-        headers={
-            "User-Agent": UA,
-            "Accept": "text/html,text/csv,*/*;q=0.8",
-            "Accept-Language": "en-NZ,en;q=0.8",
-        },
-    )
     try:
-        with request.urlopen(req, timeout=timeout) as resp:
-            return resp.read().decode("utf-8", "replace")
-    except error.HTTPError as exc:
-        status = getattr(exc, "code", None)
-        body = ""
-        try:
-            body = exc.read().decode("utf-8", "replace")[:240]
-        except Exception:
-            pass
-        if status == 404:
-            raise NotFound(f"HTTP {status} from {url}")
-        raise UpstreamUnavailable(f"HTTP {status} from {url}: {body}")
-    except error.URLError as exc:
-        raise UpstreamUnavailable(f"network error while calling {url}: {exc.reason}")
-    except TimeoutError as exc:
-        raise UpstreamUnavailable(f"timeout while calling {url}")
+        return nzfetch.fetch_text(
+            url,
+            timeout=timeout,
+            accept="text/html,text/csv,*/*;q=0.8",
+            headers={"Accept-Language": "en-NZ,en;q=0.8"},
+        )
+    except nzfetch.Blocked as exc:
+        # Transient bot-block (IP reputation / challenge) — treat as upstream
+        # unavailable so the smoke test SKIPs (returncode 2) rather than failing.
+        raise UpstreamUnavailable(f"network error while calling {url}: {exc}")
+    except nzfetch.FetchError as exc:
+        if "HTTP 404" in str(exc):
+            raise NotFound(f"HTTP 404 from {url}")
+        raise UpstreamUnavailable(f"HTTP error from {url}: {exc}")
 
 
 def to_abs_url(value: str, base: str) -> str:

@@ -6,13 +6,16 @@ from __future__ import annotations
 import argparse
 import html as html_lib
 import json
+import pathlib
 import re
 import sys
 import textwrap
 import urllib.parse
-import urllib.request
 from html.parser import HTMLParser
 from typing import Any
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 BASE_URL = "https://www.publictrust.co.nz"
 GRANTS_URL = f"{BASE_URL}/grants/"
@@ -26,34 +29,27 @@ class UpstreamError(RuntimeError):
 
 
 def fetch_text(url: str, timeout: int = DEFAULT_TIMEOUT) -> str:
-    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": "text/html,application/json"})
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as response:
-            data = response.read()
-            charset = response.headers.get_content_charset() or "utf-8"
-            return data.decode(charset, errors="replace")
-    except Exception as exc:  # noqa: BLE001 - present clear CLI error
+        return nzfetch.fetch_text(url, timeout=timeout, accept="text/html,application/json")
+    except nzfetch.FetchError as exc:
         raise UpstreamError(f"Could not fetch {url}: {exc}") from exc
 
 
 def fetch_json(url: str, payload: dict[str, Any], app_id: str, api_key: str, timeout: int = DEFAULT_TIMEOUT) -> dict[str, Any]:
     body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
-    req = urllib.request.Request(
-        url,
-        data=body,
-        headers={
-            "User-Agent": USER_AGENT,
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-            "X-Algolia-Application-Id": app_id,
-            "X-Algolia-API-Key": api_key,
-        },
-        method="POST",
-    )
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as response:
-            return json.loads(response.read().decode("utf-8"))
-    except Exception as exc:  # noqa: BLE001
+        return nzfetch.fetch_json(
+            url,
+            timeout=timeout,
+            data=body,
+            method="POST",
+            headers={
+                "Content-Type": "application/json",
+                "X-Algolia-Application-Id": app_id,
+                "X-Algolia-API-Key": api_key,
+            },
+        )
+    except nzfetch.FetchError as exc:
         raise UpstreamError(f"Could not query Public Trust Algolia search: {exc}") from exc
 
 

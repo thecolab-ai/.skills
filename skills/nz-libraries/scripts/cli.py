@@ -6,12 +6,16 @@ from __future__ import annotations
 import argparse
 import html as html_lib
 import json
+import pathlib
 import re
 import sys
 import urllib.error
 import urllib.parse
 import urllib.request
 from http.cookiejar import CookieJar
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 
 USER_AGENT = (
@@ -154,7 +158,10 @@ def compact(value):
 def request_text(url, *, headers=None, data=None, method=None, timeout=35, opener=None) -> str:
     req_headers = {
         "User-Agent": USER_AGENT,
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,application/json;q=0.8,*/*;q=0.5",
+        # HTML-shaped default (no "json" token) so nzfetch treats an ordinary page
+        # fetch as HTML, not JSON-expected. JSON callers (Auckland Vega) pass their
+        # own "application/json" Accept, which correctly flips the challenge check.
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.5",
         "Accept-Language": "en-NZ,en;q=0.9",
     }
     if headers:
@@ -162,18 +169,31 @@ def request_text(url, *, headers=None, data=None, method=None, timeout=35, opene
     if isinstance(data, (dict, list)):
         data = json.dumps(data).encode("utf-8")
         req_headers.setdefault("Content-Type", "application/json")
-    req = urllib.request.Request(url, data=data, headers=req_headers, method=method)
+    if opener is not None:
+        # A caller-supplied opener (e.g. the Sirsi cookie-jar processor) needs
+        # urllib's request path; nzfetch can't take a custom opener.
+        req = urllib.request.Request(url, data=data, headers=req_headers, method=method)
+        try:
+            with opener.open(req, timeout=timeout) as response:
+                body = response.read()
+                charset = response.headers.get_content_charset() or "utf-8"
+                return body.decode(charset, "replace")
+        except urllib.error.HTTPError as exc:
+            body = exc.read(800).decode("utf-8", "replace")
+            raise SkillError(f"{url} returned HTTP {exc.code}: {clean_text(body)[:240]}") from exc
+        except urllib.error.URLError as exc:
+            raise SkillError(f"{url} failed: {exc.reason}") from exc
+    # Route the ordinary path through the shared nzfetch helper. The Accept header
+    # drives nzfetch's JSON-vs-HTML challenge check, so hand it over as `accept=`.
+    accept = req_headers.pop("Accept")
     try:
-        handle = opener.open(req, timeout=timeout) if opener else urllib.request.urlopen(req, timeout=timeout)
-        with handle as response:
-            body = response.read()
-            charset = response.headers.get_content_charset() or "utf-8"
-            return body.decode(charset, "replace")
-    except urllib.error.HTTPError as exc:
-        body = exc.read(800).decode("utf-8", "replace")
-        raise SkillError(f"{url} returned HTTP {exc.code}: {clean_text(body)[:240]}") from exc
-    except urllib.error.URLError as exc:
-        raise SkillError(f"{url} failed: {exc.reason}") from exc
+        return nzfetch.fetch_text(
+            url, headers=req_headers, accept=accept, data=data, method=method, timeout=timeout
+        )
+    except nzfetch.Blocked as exc:
+        raise SkillError(f"{url} failed: network error ({exc})") from exc
+    except nzfetch.FetchError as exc:
+        raise SkillError(f"{url} failed: {exc}") from exc
 
 
 def request_json(url, *, headers=None, data=None, method=None, timeout=35, opener=None):

@@ -10,11 +10,13 @@ import argparse
 import datetime as dt
 import json
 import os
+import pathlib
 import sys
 import time
-import urllib.error
-import urllib.request
 from typing import Any
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 BASE_FEED = "https://gaspy-datamine-stats.firebaseio.com/.json"
 UA = os.environ.get(
@@ -47,18 +49,12 @@ def request_json(url: str = BASE_FEED, timeout: int = 20) -> Any:
         "Referer": "https://www.gaspy.nz/stats.html",
         "User-Agent": UA,
     }
-    req = urllib.request.Request(url, headers=headers, method="GET")
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            raw = resp.read().decode("utf-8", "replace")
-            return json.loads(raw) if raw else None
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        die(f"HTTP {e.code} from {url}: {raw[:300]}")
-    except urllib.error.URLError as e:
-        die(f"network error calling {url}: {e.reason}")
-    except json.JSONDecodeError as e:
-        die(f"invalid JSON from {url}: {e}")
+        return nzfetch.fetch_json(url, timeout=timeout, headers=headers)
+    except nzfetch.Blocked as e:
+        die(f"network error: {e}")
+    except nzfetch.FetchError as e:
+        die(str(e))
 
 
 def now_utc() -> str:

@@ -11,12 +11,14 @@ import base64
 import html
 import json
 import os
+import pathlib
 import re
 import sys
-import urllib.error
 import urllib.parse
-import urllib.request
 from datetime import datetime, timezone
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 from typing import Any
 
 try:
@@ -92,41 +94,35 @@ def die(message: str, code: int = 1) -> None:
 
 
 def request_text(url: str, timeout: int = 25) -> str:
+    accept = "text/html,application/xhtml+xml,application/xml;q=0.9,application/json;q=0.8,*/*;q=0.7"
     headers = {
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,application/json;q=0.8,*/*;q=0.7",
+        "Accept": accept,
         "User-Agent": UA,
     }
-    req = urllib.request.Request(url, headers=headers, method="GET")
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            raw = resp.read()
-            charset = resp.headers.get_content_charset() or "utf-8"
-            return raw.decode(charset, "replace")
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        detail = raw[:300].replace("\n", " ")
-        die(f"HTTP {e.code} from {url}: {detail}")
-    except urllib.error.URLError as e:
-        die(f"network error calling {url}: {e.reason}")
+        return nzfetch.fetch_text(url, timeout=timeout, headers=headers, accept=accept)
+    except nzfetch.Blocked as e:
+        die(f"network error: {e}")
+    except nzfetch.FetchError as e:
+        die(str(e))
 
 
 def request_json(url: str, timeout: int = 25) -> Any:
+    accept = "application/json, text/plain, */*"
     headers = {
-        "Accept": "application/json, text/plain, */*",
+        "Accept": accept,
         "Referer": url.rsplit("/", 1)[0] + "/",
         "User-Agent": UA,
     }
-    req = urllib.request.Request(url, headers=headers, method="GET")
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            raw = resp.read().decode("utf-8", "replace")
-            return json.loads(raw) if raw else None
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        detail = raw[:300].replace("\n", " ")
-        die(f"HTTP {e.code} from {url}: {detail}")
-    except urllib.error.URLError as e:
-        die(f"network error calling {url}: {e.reason}")
+        body, _ct, _final = nzfetch.fetch_bytes(url, timeout=timeout, headers=headers, accept=accept)
+    except nzfetch.Blocked as e:
+        die(f"network error: {e}")
+    except nzfetch.FetchError as e:
+        die(str(e))
+    raw = body.decode("utf-8", "replace")
+    try:
+        return json.loads(raw) if raw else None
     except json.JSONDecodeError as e:
         die(f"invalid JSON from {url}: {e}")
 
@@ -140,29 +136,29 @@ def akl_fids_auth_header() -> str:
 
 def request_akl_fids_json(endpoint: str, params: dict[str, str], timeout: int = 25) -> Any:
     url = f"{AKL_FIDS_API}/{endpoint}?" + urllib.parse.urlencode(params)
+    accept = "application/json, text/plain, */*"
     headers = {
-        "Accept": "application/json, text/plain, */*",
+        "Accept": accept,
         "App-Version": AKL_FIDS_APP_VERSION,
         "Authorization": akl_fids_auth_header(),
         "Content-Type": "application/vnd.api+json",
         "User-Agent": UA,
     }
-    req = urllib.request.Request(url, headers=headers, method="GET")
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            raw = resp.read().decode("utf-8", "replace")
-            return json.loads(raw) if raw else None
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        detail = raw[:300].replace("\n", " ")
-        if e.code in (401, 403):
+        body, _ct, _final = nzfetch.fetch_bytes(url, timeout=timeout, headers=headers, accept=accept)
+    except nzfetch.Blocked as e:
+        die(f"network error: {e}")
+    except nzfetch.FetchError as e:
+        msg = str(e)
+        if "HTTP 401" in msg or "HTTP 403" in msg:
             die(
-                f"HTTP {e.code} from Auckland Airport FIDS API; "
+                "HTTP 401/403 from Auckland Airport FIDS API; "
                 "set AKL_API_USERNAME/AKL_API_PASSWORD if the public app credentials have rotated"
             )
-        die(f"HTTP {e.code} from {url}: {detail}")
-    except urllib.error.URLError as e:
-        die(f"network error calling {url}: {e.reason}")
+        die(msg)
+    raw = body.decode("utf-8", "replace")
+    try:
+        return json.loads(raw) if raw else None
     except json.JSONDecodeError as e:
         die(f"invalid JSON from {url}: {e}")
 
@@ -173,15 +169,17 @@ def request_adsb_aircraft(code: str) -> tuple[list[dict[str, Any]], str]:
         "Accept": "application/json",
         "User-Agent": ADSB_UA,
     }
-    req = urllib.request.Request(url, headers=headers, method="GET")
     try:
-        with urllib.request.urlopen(req, timeout=ADSB_TIMEOUT_SECONDS) as resp:
-            raw = resp.read().decode("utf-8", "replace")
+        body, _ct, _final = nzfetch.fetch_bytes(
+            url, timeout=ADSB_TIMEOUT_SECONDS, headers=headers, accept="application/json"
+        )
+    except nzfetch.Blocked as e:
+        return [], f"network error calling adsb.lol: {e}"
+    except nzfetch.FetchError as e:
+        return [], f"adsb.lol fetch failed: {e}"
+    raw = body.decode("utf-8", "replace")
+    try:
         payload = json.loads(raw) if raw else {}
-    except urllib.error.HTTPError as e:
-        return [], f"HTTP {e.code} from adsb.lol"
-    except urllib.error.URLError as e:
-        return [], f"network error calling adsb.lol: {e.reason}"
     except json.JSONDecodeError as e:
         return [], f"invalid JSON from adsb.lol: {e}"
 

@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-import argparse,json,sys,urllib.parse,urllib.request,urllib.error
+import argparse,json,sys,pathlib,urllib.parse
 from typing import Any
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 BASE='https://data.linz.govt.nz/services/api/v1/'
 UA='Mozilla/5.0'
 def die(m,c=1): print(f'linz-data-service: {m}',file=sys.stderr); raise SystemExit(c)
@@ -9,8 +11,9 @@ def get(path, params=None):
     url=BASE+path
     if params: url+='?'+urllib.parse.urlencode({k:v for k,v in params.items() if v is not None})
     try:
-        with urllib.request.urlopen(urllib.request.Request(url,headers={'User-Agent':UA,'Accept':'application/json'}),timeout=30) as r: return json.loads(r.read().decode()), url
-    except urllib.error.HTTPError as e: die(f'HTTP {e.code} from {url}: {e.read().decode("utf-8","replace")[:250]}')
+        return nzfetch.fetch_json(url,timeout=30,accept='application/json'), url
+    except nzfetch.Blocked as e: die(f'network error calling {url}: {e}')
+    except nzfetch.FetchError as e: die(str(e))
     except Exception as e: die(f'failed calling {url}: {e}')
 def norm_layer(x):
     return {k:x.get(k) for k in ['id','type','title','first_published_at','published_at','featured_at','public_access','user_permissions','user_capabilities','url','url_html','url_canonical','thumbnail_url','services','num_views','num_downloads'] if k in x}

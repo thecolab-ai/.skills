@@ -16,13 +16,15 @@ import argparse
 import csv
 import io
 import json
+import pathlib
 import re
 import sys
-import urllib.error
 import urllib.parse
-import urllib.request
 from collections import defaultdict
 from typing import Any, Callable
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 CKAN_BASE = "https://catalogue.data.govt.nz"
 UA = "public-housing-nz-skill/1.0 (+https://github.com/thecolab-ai/.skills)"
@@ -81,22 +83,13 @@ def die(message: str, code: int = 1) -> None:
     raise SystemExit(code)
 
 
-def request(url: str, timeout: int = 60):
-    req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "*/*"})
-    return urllib.request.urlopen(req, timeout=timeout)
-
-
 def fetch_json(url: str, timeout: int = 60) -> dict[str, Any]:
     try:
-        with request(url, timeout=timeout) as resp:
-            return json.loads(resp.read().decode("utf-8", "replace"))
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        die(f"HTTP {e.code} from {url}: {raw[:240]}")
-    except urllib.error.URLError as e:
-        die(f"network error calling {url}: {e.reason}")
-    except json.JSONDecodeError as e:
-        die(f"invalid JSON from {url}: {e}")
+        return nzfetch.fetch_json(url, timeout=timeout)
+    except nzfetch.Blocked as e:
+        die(f"network error: {e}")
+    except nzfetch.FetchError as e:
+        die(str(e))
 
 
 def fetch_csv_rows(
@@ -105,20 +98,18 @@ def fetch_csv_rows(
     timeout: int = 120,
 ) -> tuple[list[dict[str, str]], str]:
     try:
-        with request(url, timeout=timeout) as resp:
-            final_url = resp.geturl()
-            text = io.TextIOWrapper(resp, encoding="utf-8-sig", newline="")
-            reader = csv.DictReader(text)
-            rows = []
-            for row in reader:
-                if keep is None or keep(row):
-                    rows.append(row)
-            return rows, final_url
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        die(f"HTTP {e.code} from {url}: {raw[:240]}")
-    except urllib.error.URLError as e:
-        die(f"network error calling {url}: {e.reason}")
+        body, _ct, final_url = nzfetch.fetch_bytes(url, timeout=timeout)
+    except nzfetch.Blocked as e:
+        die(f"network error: {e}")
+    except nzfetch.FetchError as e:
+        die(str(e))
+    try:
+        reader = csv.DictReader(io.StringIO(body.decode("utf-8-sig", "replace"), newline=""))
+        rows = []
+        for row in reader:
+            if keep is None or keep(row):
+                rows.append(row)
+        return rows, final_url
     except csv.Error as e:
         die(f"invalid CSV from {url}: {e}")
 

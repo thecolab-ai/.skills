@@ -13,14 +13,16 @@ import difflib
 import html
 import json
 import os
+import pathlib
 import re
 import sys
 import time
-import urllib.error
 import urllib.parse
-import urllib.request
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 try:
     from zoneinfo import ZoneInfo
@@ -114,22 +116,19 @@ def die(message: str, code: int = 1) -> None:
     raise SystemExit(code)
 
 
-def request_text(url: str, *, accept: str = "text/html,application/xhtml+xml,application/json;q=0.8,*/*;q=0.7", timeout: int = 25) -> tuple[str, str]:
+def request_text(url: str, *, accept: str = "text/html,application/xhtml+xml,*/*;q=0.7", timeout: int = 25) -> tuple[str, str]:
     headers = {"Accept": accept, "User-Agent": UA}
     if url.startswith(LINZ_SITE):
         headers["Referer"] = LINZ_SITE + "/products-services/tides-and-tidal-streams/tide-predictions"
-    req = urllib.request.Request(url, headers=headers, method="GET")
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            raw = resp.read()
-            charset = resp.headers.get_content_charset() or "utf-8"
-            return raw.decode(charset, "replace"), resp.geturl()
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        detail = re.sub(r"\s+", " ", raw[:300]).strip()
-        die(f"HTTP {e.code} from {url}: {detail or e.reason}")
-    except urllib.error.URLError as e:
-        die(f"network error calling {url}: {e.reason}")
+        body, content_type, final_url = nzfetch.fetch_bytes(url, timeout=timeout, accept=accept, headers=headers)
+    except nzfetch.Blocked as e:
+        die(f"network error: {e}")
+    except nzfetch.FetchError as e:
+        die(str(e))
+    charset_match = re.search(r"charset=([\w-]+)", content_type or "")
+    charset = charset_match.group(1) if charset_match else "utf-8"
+    return body.decode(charset, "replace"), final_url
 
 
 def request_json(url: str, timeout: int = 25) -> Any:

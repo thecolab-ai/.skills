@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 import argparse, html, json, re, sys, urllib.parse, urllib.request, urllib.error
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 from html.parser import HTMLParser
 BASE='https://www.pbtech.co.nz'
 HEADERS={
@@ -17,10 +20,10 @@ def die(m,c=1): print(f'pbtech-nz: {m}',file=sys.stderr); raise SystemExit(c)
 def fetch(url):
  if url.startswith('/'): url=BASE+url
  try:
-  with urllib.request.urlopen(urllib.request.Request(url,headers=HEADERS),timeout=40) as r:
-   return r.read().decode('utf-8','replace'), r.geturl()
- except urllib.error.HTTPError as e: die(f'HTTP {e.code} from {url}: {e.read().decode("utf-8","replace")[:250]}')
- except Exception as e: die(f'failed fetching {url}: {e}')
+  body,_ct,final=nzfetch.fetch_bytes(url,headers=HEADERS,timeout=40)
+  return body.decode('utf-8','replace'), final
+ except nzfetch.Blocked as e: die(f'network error fetching {url}: {e}')
+ except nzfetch.FetchError as e: die(f'failed fetching {url}: {e}')
 def clean(s): return re.sub(r'\s+',' ',html.unescape(re.sub(r'<[^>]+>',' ',s or ''))).strip()
 def abs_url(href):
  if not href: return None

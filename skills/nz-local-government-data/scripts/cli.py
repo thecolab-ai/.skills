@@ -6,15 +6,17 @@ import csv
 import html
 import io
 import json
+import pathlib
 import re
 import sys
-import urllib.error
 import urllib.parse
-import urllib.request
 import zipfile
 import xml.etree.ElementTree as ET
 from html.parser import HTMLParser
 from typing import Any
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 UA = "Mozilla/5.0 (compatible; nz-local-government-data-skill/1.0)"
 TIMEOUT = 10
@@ -96,20 +98,32 @@ def die(message: str, code: int = 1) -> None:
 
 
 def fetch_bytes(url: str, timeout: int = TIMEOUT) -> tuple[bytes, str, str | None]:
-    req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "*/*"})
+    # JSON (CKAN) and binary (XLSX/CSV) fetches are routed through the shared
+    # nzfetch helper: a browser UA + retries via a rotating proxy (when
+    # FETCH_PROXY is set) to clear the Incapsula/Cloudflare walls on
+    # data.govt.nz. nzfetch returns (body, content_type, final_url); this skill's
+    # callers expect (body, final_url, content_type), so the tuple is reordered.
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return resp.read(), resp.geturl(), resp.headers.get("content-type")
-    except urllib.error.HTTPError as exc:
-        body = exc.read(300).decode("utf-8", "replace")
-        raise RuntimeError(f"HTTP {exc.code} fetching {url}: {body}") from exc
-    except Exception as exc:
+        body, content_type, final_url = nzfetch.fetch_bytes(url, timeout=timeout)
+    except nzfetch.Blocked as exc:
+        # A transient bot-wall — keep the "failed fetching" wording so smoke SKIPs.
         raise RuntimeError(f"failed fetching {url}: {exc}") from exc
+    except nzfetch.FetchError as exc:
+        raise RuntimeError(f"failed fetching {url}: {exc}") from exc
+    return body, final_url, content_type
 
 
 def fetch_text(url: str, timeout: int = TIMEOUT) -> tuple[str, str, str | None]:
-    data, final_url, ctype = fetch_bytes(url, timeout=timeout)
-    return data.decode("utf-8", "replace"), final_url, ctype
+    # The DIA / localcouncils index pages scraped for download links are HTML.
+    # These now go through nzfetch (a browser UA + rotating-proxy retries to clear
+    # the Incapsula/Cloudflare walls): the current challenge detector only flags a
+    # real bot-wall fingerprint, so a genuine HTML index page passes through. Reuse
+    # the sibling fetch_bytes helper — it returns (body, final_url, content_type)
+    # and already maps nzfetch.Blocked/FetchError to the "failed fetching" wording
+    # the smoke test treats as a SKIP — then decode to text, preserving this
+    # helper's (text, final_url, content_type) tuple ordering.
+    body, final_url, content_type = fetch_bytes(url, timeout=timeout)
+    return body.decode("utf-8", "replace"), final_url, content_type
 
 
 def ckan_get(action: str, params: dict[str, Any], timeout: int = TIMEOUT) -> tuple[dict[str, Any], str]:

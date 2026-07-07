@@ -10,13 +10,15 @@ import argparse
 import html
 import json
 import os
+import pathlib
 import re
 import sys
 import time
-import urllib.error
 import urllib.parse
-import urllib.request
 from typing import Any, NoReturn
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 BASE = "https://nz.seek.com"
 UA = os.environ.get(
@@ -32,22 +34,22 @@ def die(message: str, code: int = 1) -> NoReturn:
 
 def fetch_text(url: str, *, timeout: int = 30) -> tuple[str, str]:
     headers = {
-        "User-Agent": UA,
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
         "Accept-Language": "en-NZ,en;q=0.9",
         "Referer": "https://www.seek.co.nz/",
         "Upgrade-Insecure-Requests": "1",
     }
-    req = urllib.request.Request(url, headers=headers, method="GET")
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            raw = resp.read().decode("utf-8", "replace")
-            return raw, resp.geturl()
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        die(f"HTTP {e.code} from {url}: {strip_tags(raw)[:240]}")
-    except urllib.error.URLError as e:
-        die(f"network error calling {url}: {e.reason}")
+        body, _ct, final_url = nzfetch.fetch_bytes(
+            url,
+            timeout=timeout,
+            headers=headers,
+            accept="text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        )
+        return body.decode("utf-8", "replace"), final_url
+    except nzfetch.Blocked as e:
+        die(f"network error: {e}")
+    except nzfetch.FetchError as e:
+        die(str(e))
 
 
 def slug(value: str) -> str:
