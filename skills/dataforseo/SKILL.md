@@ -72,6 +72,26 @@ python3 skills/dataforseo/scripts/cli.py <command> [flags]
 Common flags: `--location` (alias like `nz`/`us`/`uk`/`au` or a numeric
 `location_code`), `--language` (default `en`), `--limit`, `--json`.
 
+### `validate <idea>` — one-shot idea scorecard
+
+The flagship for marketing-first validation. Runs discovery + demand + intent +
+SERP + app-store competition in one pass (~6 API calls, one async) and prints a
+scored scorecard: **seed demand** (anchored on the idea's own search volume, not
+the noisiest discovered term), commercial intent, dominant search intent, whether
+the SERP is content- or app-dominated, and app-incumbent strength — plus a
+ready-to-run `appreviews` command to mine the top incumbent's pain points next.
+
+```bash
+python3 skills/dataforseo/scripts/cli.py validate "fruit tree care app" --location us --store apple
+```
+
+Use a **specific** seed that names the actual job (e.g. `"fruit tree care app"`,
+`"garden planner app"`). Broad/ambiguous seeds pollute the discovery table with
+off-target semantic matches — the scorecard flags this, and the seed-anchored
+demand line stays honest regardless, but the discovered-terms table is noisier.
+It deliberately does **not** auto-mine reviews (slow + pricey); it hands you the
+command to do that as the follow-up.
+
 ### `serp <keyword> [--domain <site>]`
 
 Top Google organic results for a keyword. With `--domain`, reports that site's

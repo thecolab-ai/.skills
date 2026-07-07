@@ -22,6 +22,15 @@ API login/password.
 | `appsearch` | `v3/app_data/{apple,google}/app_searches/task_post` + `task_get/advanced/{id}` | `keyword`, `location_code`, `language_code`, `depth` |
 | `appreviews` | `v3/app_data/{apple,google}/app_reviews/task_post` + `task_get/advanced/{id}` | `app_id`, `location_code`, `language_code`, `depth`, `sort_by?` |
 
+**`validate` (composite):** orchestrates ~6 calls — `keyword_ideas` + `related_keywords`
+(discovery) → `search_intent` (top terms) → `keywords_data/.../search_volume` (seed
+anchor) → `serp/.../organic` (seed SERP) → `app_data/.../app_searches` (async app
+competition). Scores are transparent heuristics: demand is bucketed on the **seed's
+own** search volume (100/1k/5k), commercial on seed/median CPC (0.75/2.0), app
+competition on the strongest incumbent's rating count (1k/10k/100k), SERP type on
+how many of the top-10 organic results are app-store URLs. Costs more than a single
+command; does not auto-run `appreviews`.
+
 **Async note:** `appsearch`/`appreviews` are the only non-`live` commands. They
 `task_post` then poll `task_get/advanced/{id}` (pending codes 20100/40100/40601/
 40602) until the result is ready or `--timeout` is hit.

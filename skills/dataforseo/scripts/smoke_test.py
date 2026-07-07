@@ -50,7 +50,7 @@ def t_help():
 def t_subcommand_help():
     # every subcommand should render help without credentials
     for cmd in ["serp", "volume", "suggestions", "ranked", "competitors", "domain", "backlinks",
-                "refdomains", "ideas", "related", "intent", "appsearch", "appreviews"]:
+                "refdomains", "ideas", "related", "intent", "appsearch", "appreviews", "validate"]:
         if run([cmd, "--help"]).returncode != 0:
             print(f"  {cmd} --help failed")
             return False

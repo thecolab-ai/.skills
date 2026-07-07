@@ -24,6 +24,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from collections import Counter
 
 BASE_URL = "https://api.dataforseo.com"
 USER_AGENT = "thecolab-skills-dataforseo/1.0"
@@ -245,7 +246,7 @@ def cmd_serp(args):
         "depth": depth,
     }]
     result = get_client(args).post("v3/serp/google/organic/live/advanced", payload)
-    items = dig(result[0], "items", []) if result else []
+    items = (dig(result[0], "items", []) if result else []) or []
     organic = [i for i in items if i.get("type") == "organic"]
 
     if args.domain:
@@ -317,7 +318,7 @@ def cmd_suggestions(args):
         "limit": args.limit,
     }]
     result = get_client(args).post("v3/dataforseo_labs/google/keyword_suggestions/live", payload)
-    items = dig(result[0], "items", []) if result else []
+    items = (dig(result[0], "items", []) if result else []) or []
     rows = []
     for i in items:
         # keyword_suggestions items are flat (keyword_info.*), unlike ranked_keywords
@@ -346,7 +347,7 @@ def cmd_ranked(args):
         "limit": args.limit,
     }]
     result = get_client(args).post("v3/dataforseo_labs/google/ranked_keywords/live", payload)
-    items = dig(result[0], "items", []) if result else []
+    items = (dig(result[0], "items", []) if result else []) or []
     rows = []
     for i in items:
         kw = dig(i, "keyword_data.keyword")
@@ -369,7 +370,7 @@ def cmd_competitors(args):
         "limit": args.limit,
     }]
     result = get_client(args).post("v3/dataforseo_labs/google/competitors_domain/live", payload)
-    items = dig(result[0], "items", []) if result else []
+    items = (dig(result[0], "items", []) if result else []) or []
     rows = []
     for i in items:
         dom = i.get("domain")
@@ -395,7 +396,7 @@ def cmd_domain(args):
         "language_code": args.language,
     }]
     result = get_client(args).post("v3/dataforseo_labs/google/domain_rank_overview/live", payload)
-    items = dig(result[0], "items", []) if result else []
+    items = (dig(result[0], "items", []) if result else []) or []
     metrics = dig(items[0], "metrics", {}) if items else {}
     organic = metrics.get("organic") or {}
     paid = metrics.get("paid") or {}
@@ -438,7 +439,7 @@ def cmd_refdomains(args):
         "order_by": ["rank,desc"],
     }]
     result = get_client(args).post("v3/backlinks/referring_domains/live", payload)
-    items = dig(result[0], "items", []) if result else []
+    items = (dig(result[0], "items", []) if result else []) or []
     rows = [
         (truncate(i.get("domain"), 40), i.get("backlinks", "-"), i.get("rank", "-"))
         for i in items
@@ -462,7 +463,7 @@ def cmd_ideas(args):
         "limit": args.limit,
     }]
     result = get_client(args).post("v3/dataforseo_labs/google/keyword_ideas/live", payload)
-    items = dig(result[0], "items", []) if result else []
+    items = (dig(result[0], "items", []) if result else []) or []
     rows = []
     for i in items:
         kw = i.get("keyword") or dig(i, "keyword_data.keyword")
@@ -492,7 +493,7 @@ def cmd_related(args):
         "limit": args.limit,
     }]
     result = get_client(args).post("v3/dataforseo_labs/google/related_keywords/live", payload)
-    items = dig(result[0], "items", []) if result else []
+    items = (dig(result[0], "items", []) if result else []) or []
     rows = []
     for i in items:
         kw = dig(i, "keyword_data.keyword")
@@ -513,7 +514,7 @@ def cmd_intent(args):
     """Classify keywords as informational / navigational / commercial / transactional."""
     payload = [{"keywords": args.keywords, "language_code": args.language}]
     result = get_client(args).post("v3/dataforseo_labs/google/search_intent/live", payload)
-    items = dig(result[0], "items", []) if result else []
+    items = (dig(result[0], "items", []) if result else []) or []
     rows = []
     for i in items:
         kw = i.get("keyword")
@@ -553,7 +554,7 @@ def cmd_appsearch(args):
     }]
     base = _store_base(args, "app_searches")
     result = run_task(get_client(args), base, payload, timeout=args.timeout)
-    items = dig(result[0], "items", []) if result else []
+    items = (dig(result[0], "items", []) if result else []) or []
     apps = [i for i in items if i.get("type", "app") != "check_url"][: args.limit]
     rows = []
     for i in apps:
@@ -595,7 +596,7 @@ def cmd_appreviews(args):
         task["sort_by"] = args.sort
     base = _store_base(args, "app_reviews")
     result = run_task(get_client(args), base, [task], timeout=args.timeout)
-    items = dig(result[0], "items", []) if result else []
+    items = (dig(result[0], "items", []) if result else []) or []
     reviews = items[: args.limit]
     if args.worst:
         reviews = sorted(reviews, key=lambda r: (_review_rating(r) is None, _review_rating(r) or 0))
@@ -613,6 +614,191 @@ def cmd_appreviews(args):
         if text:
             lines.append(f"     {truncate(text, 160)}")
     emit(args, lines, {"app_id": args.app_id, "store": args.store, "items": reviews})
+
+
+# ---------------------------------------------------------------------------
+# validate — one-shot market validation (discovery + demand + intent +
+# competition), scored. Runs ~5 calls (one async), so it spends more than a
+# single command. Deliberately does NOT auto-mine reviews (slow/pricey) — it
+# prints the top app_id + a ready `appreviews` command to run next.
+# ---------------------------------------------------------------------------
+
+def _bucket(value, table, default):
+    """table: list of (min_inclusive, label) high→low. Returns first match."""
+    if value is not None:
+        for lo, label in table:
+            if value >= lo:
+                return label
+    return default
+
+
+def cmd_validate(args):
+    seed = args.seed
+    loc = resolve_location(args.location)
+    client = get_client(args)
+
+    # 1. Discovery — semantic ideas (carry intent) + related expansion.
+    ideas = client.post(
+        "v3/dataforseo_labs/google/keyword_ideas/live",
+        [{"keywords": [seed], "location_code": loc, "language_code": args.language, "limit": args.limit}],
+    )
+    idea_items = (dig(ideas[0], "items", []) if ideas else []) or []
+    related = client.post(
+        "v3/dataforseo_labs/google/related_keywords/live",
+        [{"keyword": seed, "location_code": loc, "language_code": args.language, "depth": 2, "limit": args.limit}],
+    )
+    rel_items = (dig(related[0], "items", []) if related else []) or []
+
+    cand = {}
+    for i in idea_items:
+        kw = i.get("keyword")
+        if not kw:
+            continue
+        c = cand.setdefault(kw, {})
+        c["volume"] = dig(i, "keyword_info.search_volume")
+        c["cpc"] = dig(i, "keyword_info.cpc")
+        c["intent"] = dig(i, "search_intent_info.main_intent")
+    for i in rel_items:
+        kw = dig(i, "keyword_data.keyword")
+        if not kw:
+            continue
+        c = cand.setdefault(kw, {})
+        c.setdefault("volume", dig(i, "keyword_data.keyword_info.search_volume"))
+        c.setdefault("cpc", dig(i, "keyword_data.keyword_info.cpc"))
+
+    ranked = sorted(cand.items(), key=lambda kv: (kv[1].get("volume") or 0), reverse=True)
+    top = ranked[:15]
+
+    # 2. Clean intent classification — anchor on the seed plus top discovered terms.
+    top_kws = list(dict.fromkeys([seed] + [k for k, _ in top[:9]]))
+    intents = {}
+    if top_kws:
+        ir = client.post(
+            "v3/dataforseo_labs/google/search_intent/live",
+            [{"keywords": top_kws, "language_code": args.language}],
+        )
+        for it in ((dig(ir[0], "items", []) if ir else []) or []):
+            intents[it.get("keyword")] = dig(it, "keyword_intent.label")
+
+    # 3. Anchor demand on the seed itself — discovered terms drift off-target.
+    sv = client.post(
+        "v3/keywords_data/google_ads/search_volume/live",
+        [{"keywords": [seed], "location_code": loc, "language_code": args.language}],
+    )
+    seed_item = (sv[0] if sv else {}) or {}
+    seed_vol = seed_item.get("search_volume")
+    seed_cpc = seed_item.get("cpc")
+
+    # 4. SERP on the seed — is the actual query owned by content or apps?
+    serp = client.post(
+        "v3/serp/google/organic/live/advanced",
+        [{"keyword": seed, "location_code": loc, "language_code": args.language, "depth": 10}],
+    )
+    serp_organic = [x for x in ((dig(serp[0], "items", []) if serp else []) or []) if x.get("type") == "organic"]
+    app_hosts = {"play.google.com", "apps.apple.com", "itunes.apple.com"}
+    serp_apps = sum(1 for x in serp_organic if (x.get("domain") or "") in app_hosts)
+
+    # 4. App-store competition (async).
+    appbase = _store_base(args, "app_searches")
+    apps = run_task(
+        client, appbase,
+        [{"keyword": seed, "location_code": loc, "language_code": args.language, "depth": max(args.limit, 10)}],
+        timeout=args.timeout,
+    )
+    app_items = (dig(apps[0], "items", []) if apps else []) or []
+    top_apps = [a for a in app_items if a.get("title")][:10]
+
+    def app_votes(a):
+        v = dig(a, "rating.votes_count")
+        return v if isinstance(v, (int, float)) else (a.get("reviews_count") or 0)
+
+    max_votes = max((app_votes(a) for a in top_apps), default=0)
+
+    # ---- scoring (transparent heuristics) ----
+    vols = [c.get("volume") or 0 for _, c in top]
+    max_vol = max(vols, default=0)
+    sum_vol = sum(vols)
+    cpcs = [c["cpc"] for _, c in top if isinstance(c.get("cpc"), (int, float)) and c["cpc"] > 0]
+    median_cpc = sorted(cpcs)[len(cpcs) // 2] if cpcs else 0.0
+    labels = [lbl for lbl in intents.values() if lbl]
+    dom_intent = Counter(labels).most_common(1)[0][0] if labels else None
+
+    demand = _bucket(seed_vol, [(5000, "high"), (1000, "moderate"), (100, "low")], "negligible")
+    anchor_cpc = seed_cpc if isinstance(seed_cpc, (int, float)) and seed_cpc > 0 else median_cpc
+    commercial = _bucket(anchor_cpc, [(2.0, "high"), (0.75, "moderate")], "low")
+    appcomp = _bucket(max_votes, [(100000, "entrenched"), (10000, "strong"), (1000, "moderate")], "open (white space)")
+    serp_type = "content-dominated (SEO-winnable)" if serp_apps <= 1 else (
+        "app-competitive" if serp_apps >= 3 else "mixed")
+
+    flags = []
+    if demand in ("negligible", "low"):
+        flags.append(f"'{seed}' itself gets {seed_vol or 0:,}/mo — category search won't get you found.")
+    elif demand == "high":
+        flags.append(f"'{seed}' gets {seed_vol:,}/mo — real direct demand.")
+    if serp_type.startswith("content"):
+        flags.append(f"'{truncate(seed, 30)}' SERP is content-dominated — an SEO/content channel is winnable.")
+    if appcomp.startswith("open"):
+        flags.append("No entrenched app in this exact niche — genuine white space.")
+    elif appcomp in ("entrenched", "strong"):
+        flags.append(f"Strong app incumbent — up to {max_votes:,} ratings. Needs a sharp wedge.")
+    if commercial == "high":
+        flags.append("High CPC — willingness to pay is real.")
+    elif commercial == "low" and dom_intent == "informational":
+        flags.append("Low CPC + informational — free-answer seekers, not buyers.")
+    if dom_intent:
+        note = {"informational": " (content, not conversion)", "commercial": " (buyers)",
+                "transactional": " (buyers)"}.get(dom_intent, "")
+        flags.append(f"Dominant intent: {dom_intent}{note}.")
+
+    suggestion = None
+    if top_apps:
+        aid = top_apps[0].get("app_id") or top_apps[0].get("id")
+        if aid:
+            suggestion = (f"dataforseo appreviews {aid} --store {args.store} --worst --limit 30"
+                          f"   # mine '{truncate(top_apps[0].get('title'), 30)}' for the wedge")
+
+    payload_out = {
+        "seed": seed, "location": args.location, "store": args.store,
+        "scores": {"demand": demand, "commercial": commercial, "app_competition": appcomp,
+                   "serp_type": serp_type, "dominant_intent": dom_intent},
+        "signals": {"seed_volume": seed_vol, "seed_cpc": seed_cpc, "cluster_ceiling_volume": max_vol,
+                    "sum_top_volume": sum_vol, "median_cpc": round(median_cpc, 2),
+                    "serp_apps_in_top10": serp_apps, "max_app_ratings": max_votes},
+        "top_keywords": [{"keyword": k, **v, "intent": intents.get(k, v.get("intent"))} for k, v in top],
+        "top_apps": top_apps,
+        "next": suggestion,
+    }
+    if args.json:
+        emit(args, [], payload_out)
+        return
+
+    lines = [
+        f"═══ Idea validation: '{seed}'  [{args.location}, {args.store} store] ═══",
+        "",
+        f"  Seed demand     : {demand}   ('{truncate(seed, 28)}' = {seed_vol or 0:,}/mo)",
+        f"  Discovery       : {len([v for v in vols if v])} related terms, ceiling {max_vol:,}/mo (breadth; may drift off-target)",
+        f"  Commercial      : {commercial}   (CPC ${anchor_cpc:.2f})",
+        f"  Dominant intent : {dom_intent or '-'}",
+        f"  SERP (the seed) : {serp_type}   ({serp_apps}/10 results are apps)",
+        f"  App competition : {appcomp}   (strongest incumbent {max_votes:,} ratings)",
+        "",
+        "  Read:",
+    ]
+    lines += [f"   • {f}" for f in flags]
+    lines += ["", "  Top demand (discovered — review for off-target semantic matches):", ""]
+    krows = [(truncate(k, 40), v.get("volume") if v.get("volume") is not None else "-",
+              f"{v['cpc']:.2f}" if isinstance(v.get("cpc"), (int, float)) else "-",
+              intents.get(k) or v.get("intent") or "-") for k, v in top]
+    lines += fmt_table(krows, ["keyword", "volume", "cpc", "intent"])
+    if top_apps:
+        lines += ["", "  Incumbent apps:", ""]
+        arows = [(a.get("rank_absolute", "-"), truncate(a.get("title"), 34),
+                  f"{dig(a, 'rating.value'):.1f}" if isinstance(dig(a, "rating.value"), (int, float)) else "-",
+                  app_votes(a)) for a in top_apps]
+        lines += fmt_table(arows, ["#", "app", "rating", "ratings#"])
+    if suggestion:
+        lines += ["", f"  Next — mine the incumbent's pain points:", f"   $ {suggestion}"]
+    emit(args, lines, payload_out)
 
 
 # ---------------------------------------------------------------------------
@@ -702,6 +888,14 @@ def build_parser():
     p.add_argument("--timeout", type=int, default=180, help="max seconds to poll (default: 180)")
     add_common(p, limit_default=20)
     p.set_defaults(func=cmd_appsearch)
+
+    # --- One-shot idea validation (orchestrates ~5 calls, one async) ---
+    p = sub.add_parser("validate", help="score an app/business idea: demand + intent + competition in one pass")
+    p.add_argument("seed", help="the idea as a keyword phrase, e.g. \"fruit tree care app\"")
+    p.add_argument("--store", default="apple", help="app store for competition check: apple | google (default: apple)")
+    p.add_argument("--timeout", type=int, default=200, help="max seconds to poll the app search (default: 200)")
+    add_common(p, limit_default=25)
+    p.set_defaults(func=cmd_validate)
 
     p = sub.add_parser("appreviews", help="mine an app's reviews for pain points (app_id from appsearch)")
     p.add_argument("app_id")
