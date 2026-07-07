@@ -267,9 +267,13 @@ def cmd_suggestions(args):
     items = dig(result[0], "items", []) if result else []
     rows = []
     for i in items:
-        kw = dig(i, "keyword_data.keyword") or i.get("keyword")
-        vol = dig(i, "keyword_data.keyword_info.search_volume")
-        cpc = dig(i, "keyword_data.keyword_info.cpc")
+        # keyword_suggestions items are flat (keyword_info.*), unlike ranked_keywords
+        # which nests under keyword_data.*; accept either for robustness.
+        kw = i.get("keyword") or dig(i, "keyword_data.keyword")
+        vol = dig(i, "keyword_info.search_volume") or dig(i, "keyword_data.keyword_info.search_volume")
+        cpc = dig(i, "keyword_info.cpc")
+        if cpc is None:
+            cpc = dig(i, "keyword_data.keyword_info.cpc")
         rows.append((
             truncate(kw, 45),
             vol if vol is not None else "-",
