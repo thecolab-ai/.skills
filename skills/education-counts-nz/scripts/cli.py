@@ -94,20 +94,12 @@ def request_headers(url: str) -> dict[str, str]:
         if is_asset
         else "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"
     )
+    # Only semantic headers here; nzfetch owns the browser fingerprint
+    # (User-Agent, sec-ch-ua*, Sec-Fetch-*, Accept-Language, cache hints) as a
+    # consistent Chrome set — passing our own would contradict it.
     return {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
         "Accept": accept,
-        "Accept-Language": "en-NZ,en;q=0.9",
-        "Cache-Control": "no-cache",
-        "Pragma": "no-cache",
-        "Upgrade-Insecure-Requests": "1",
         "Referer": f"{parsed.scheme}://{parsed.netloc}/",
-        "Sec-Fetch-Dest": "document" if not is_asset else "empty",
-        "Sec-Fetch-Mode": "navigate" if not is_asset else "cors",
-        "Sec-Fetch-Site": "same-origin",
-        "sec-ch-ua": '"Chromium";v="146", "Not A(Brand";v="24", "Google Chrome";v="146"',
-        "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-platform": '"macOS"',
     }
 
 

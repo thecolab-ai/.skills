@@ -28,10 +28,6 @@ BOOST_SUGGEST_BASE = "https://services.mybcapps.com/bc-sf-filter/search/suggest"
 SHOP = "bargain-chemist.myshopify.com"
 DEFAULT_LIMIT = 12
 MAX_LIMIT = 50
-UA = os.environ.get(
-    "BARGAINCHEMIST_NZ_USER_AGENT",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
-)
 
 
 class ApiError(Exception):
@@ -69,7 +65,6 @@ def request_json(url: str, params: dict[str, Any] | None = None, timeout: int = 
         "Accept-Language": "en-NZ,en;q=0.9",
         "Origin": BASE_WEB,
         "Referer": BASE_WEB + "/",
-        "User-Agent": UA,
     }
     try:
         body, _ct, final_url = nzfetch.fetch_bytes(url, headers=headers, timeout=timeout, accept="application/json, text/plain, */*")

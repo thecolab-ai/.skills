@@ -23,7 +23,6 @@ import nzfetch  # noqa: E402
 
 SITE = "https://www.firsttable.co.nz"
 GRAPHQL_URL = "https://stellate.firsttable.net/graphql"
-USER_AGENT = "Mozilla/5.0 (compatible; thecolab-first-table-nz-skill/1.0)"
 DEFAULT_CITY = "auckland"
 DEFAULT_PEOPLE = 2
 
@@ -155,7 +154,7 @@ def die(message: str, code: int = 1) -> None:
 
 
 def http_json_or_text(url: str, *, data: bytes | None = None, headers: dict[str, str] | None = None) -> tuple[Any, str, int]:
-    req_headers = {"User-Agent": USER_AGENT, "Accept": "application/json,text/html;q=0.9,*/*;q=0.8"}
+    req_headers = {"Accept": "application/json,text/html;q=0.9,*/*;q=0.8"}
     if headers:
         req_headers.update(headers)
     # A POST carries a JSON GraphQL body and expects parsed JSON back (an HTML

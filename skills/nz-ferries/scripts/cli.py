@@ -546,12 +546,15 @@ def request_text(url: str, *, referer: str | None = None, timeout: int = 25, ope
     if referer:
         headers["Referer"] = referer
     if opener is None:
+        # Let nzfetch own the User-Agent (its own browser UA); the opener cookie-jar
+        # path below keeps the skill UA it was primed with.
+        nz_headers = {k: v for k, v in headers.items() if k.lower() != "user-agent"}
         try:
             return nzfetch.fetch_text(
                 url,
                 timeout=timeout,
                 accept=headers["Accept"],
-                headers=headers,
+                headers=nz_headers,
                 browser_headers=False,
             )
         except nzfetch.Blocked as e:
@@ -612,7 +615,9 @@ def request_json(
             die(f"network error calling {url}: {e.reason}")
         except json.JSONDecodeError as e:
             die(f"invalid JSON from {url}: {e}")
-    extra_headers = {k: v for k, v in headers.items() if k.lower() != "accept"}
+    # Drop Accept (passed via accept=) and User-Agent (nzfetch owns the UA); the
+    # opener cookie-jar path above keeps the skill UA it was primed with.
+    extra_headers = {k: v for k, v in headers.items() if k.lower() not in ("accept", "user-agent")}
     try:
         raw_bytes, _ct, _final = nzfetch.fetch_bytes(
             url,
@@ -838,7 +843,7 @@ def at_request_json(path: str, *, timeout: int = 25) -> Any:
             url,
             timeout=timeout,
             accept="application/json",
-            headers={"Ocp-Apim-Subscription-Key": AT_API_KEY, "User-Agent": UA},
+            headers={"Ocp-Apim-Subscription-Key": AT_API_KEY},
         )
     except nzfetch.Blocked as e:
         die(f"network error calling {url}: {e}")

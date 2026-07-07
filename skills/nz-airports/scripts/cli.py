@@ -27,11 +27,6 @@ except Exception:  # pragma: no cover - Python <3.9 fallback
     ZoneInfo = None  # type: ignore[assignment]
 
 
-UA = os.environ.get(
-    "NZ_AIRPORTS_USER_AGENT",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
-)
-ADSB_UA = "nz-airports-cli/1.0"
 ADSB_TIMEOUT_SECONDS = 6
 ADSB_MAX_AIRCRAFT = 250
 
@@ -97,7 +92,6 @@ def request_text(url: str, timeout: int = 25) -> str:
     accept = "text/html,application/xhtml+xml,application/xml;q=0.9,application/json;q=0.8,*/*;q=0.7"
     headers = {
         "Accept": accept,
-        "User-Agent": UA,
     }
     try:
         return nzfetch.fetch_text(url, timeout=timeout, headers=headers, accept=accept)
@@ -112,7 +106,6 @@ def request_json(url: str, timeout: int = 25) -> Any:
     headers = {
         "Accept": accept,
         "Referer": url.rsplit("/", 1)[0] + "/",
-        "User-Agent": UA,
     }
     try:
         body, _ct, _final = nzfetch.fetch_bytes(url, timeout=timeout, headers=headers, accept=accept)
@@ -142,7 +135,6 @@ def request_akl_fids_json(endpoint: str, params: dict[str, str], timeout: int = 
         "App-Version": AKL_FIDS_APP_VERSION,
         "Authorization": akl_fids_auth_header(),
         "Content-Type": "application/vnd.api+json",
-        "User-Agent": UA,
     }
     try:
         body, _ct, _final = nzfetch.fetch_bytes(url, timeout=timeout, headers=headers, accept=accept)
@@ -167,7 +159,6 @@ def request_adsb_aircraft(code: str) -> tuple[list[dict[str, Any]], str]:
     url = adsb_url(code)
     headers = {
         "Accept": "application/json",
-        "User-Agent": ADSB_UA,
     }
     try:
         body, _ct, _final = nzfetch.fetch_bytes(

@@ -37,7 +37,6 @@ AANZ_DOWNLOAD_REST = AANZ_BASE + "/wp-json/wp/v2/dlm_download"
 DEFAULT_TIMEOUT = 10
 DEFAULT_LIMIT = 25
 MAX_LIMIT = 100
-UA = "nz-angel-investment-skill/1.0 (+https://github.com/thecolab-ai/.skills)"
 
 
 class UpstreamUnavailable(RuntimeError):
@@ -198,7 +197,6 @@ def limit_value(value: int) -> int:
 
 def fetch_bytes(url: str, timeout: int = DEFAULT_TIMEOUT) -> bytes:
     headers = {
-        "User-Agent": UA,
         "Accept": "application/json,text/html,application/xhtml+xml,application/xml,application/pdf,*/*;q=0.8",
         "Accept-Language": "en-NZ,en;q=0.9",
     }

@@ -9,7 +9,6 @@ from __future__ import annotations
 import argparse
 import json
 import math
-import os
 import pathlib
 import sys
 import time
@@ -22,10 +21,6 @@ import nzfetch  # noqa: E402
 BASE_WEB = "https://homes.co.nz"
 BASE_GATEWAY = "https://gateway.homes.co.nz"
 BASE_API = "https://api-gateway.homes.co.nz"
-UA = os.environ.get(
-    "HOMES_NZ_USER_AGENT",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
-)
 
 STATE_LABELS = {
     0: "for_sale",
@@ -63,7 +58,6 @@ def request_json(base: str, path: str, params: dict[str, Any] | None = None, tim
         "Accept": "application/json, text/plain, */*",
         "Origin": BASE_WEB,
         "Referer": BASE_WEB + "/",
-        "User-Agent": UA,
     }
     try:
         return nzfetch.fetch_json(url, timeout=timeout, headers=headers)

@@ -28,7 +28,6 @@ BASE_API = "https://www.chemistwarehouse.co.nz/searchapiv2"
 BASE_WEB = "https://www.chemistwarehouse.co.nz"
 SOURCE = "chemistwarehouse-nz-searchapiv2"
 ROOT_LOCATION = "//catalog01/en_AU/categories<{catalog01_chemnz}"
-UA = os.environ.get("CHEMISTWAREHOUSE_NZ_USER_AGENT", "Mozilla/5.0")
 
 
 class HTMLText(HTMLParser):
@@ -61,12 +60,14 @@ def api_url(path: str, params: dict[str, Any]) -> str:
 def request_json(path: str, params: dict[str, Any], timeout: int = 25) -> tuple[Any, str]:
     url = api_url(path, params)
     headers = {
-        "User-Agent": UA,
         "Accept": "application/json,text/plain,*/*",
         "Referer": BASE_WEB + "/",
     }
     try:
-        body, _ct, _final = nzfetch.fetch_bytes(url, headers=headers, timeout=timeout, accept="application/json,text/plain,*/*")
+        # This searchapiv2 endpoint returns HTTP 500 when sent the full Chrome
+        # Client-Hint / Sec-Fetch-* header set; a lean request (browser_headers
+        # =False) returns real data. Let nzfetch own the UA but skip the hints.
+        body, _ct, _final = nzfetch.fetch_bytes(url, headers=headers, timeout=timeout, accept="application/json,text/plain,*/*", browser_headers=False)
         raw = body.decode("utf-8", "replace")
         return json.loads(raw), url
     except nzfetch.Blocked as e:

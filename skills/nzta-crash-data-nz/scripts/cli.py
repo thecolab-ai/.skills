@@ -38,7 +38,6 @@ CSV_URL = (
     "8d684f1841fa4dbea6afaefc8a1ba0fc/csv?layers=0"
 )
 
-UA = "nzta-crash-data-nz-skill/1.0 (+https://github.com/thecolab-ai/.skills)"
 TIMEOUT = 10
 PAGE_SIZE = 2000
 DEFAULT_LIMIT = 50
@@ -164,7 +163,7 @@ def request_json(
 ) -> dict[str, Any]:
     target = url
     data = None
-    headers = {"User-Agent": UA, "Accept": "application/json"}
+    headers = {"Accept": "application/json"}
     if params:
         encoded = urllib.parse.urlencode(params).encode("utf-8")
         if method == "POST":
@@ -189,7 +188,7 @@ def request_json(
 def request_csv_rows(scan_cap: int) -> tuple[list[dict[str, str]], bool]:
     try:
         body, _ct, _final = nzfetch.fetch_bytes(
-            CSV_URL, timeout=TIMEOUT, accept="text/csv", headers={"User-Agent": UA}
+            CSV_URL, timeout=TIMEOUT, accept="text/csv"
         )
     except nzfetch.Blocked as exc:
         raise DataError(f"network error downloading CKAN/ArcGIS CSV mirror: {exc}") from exc

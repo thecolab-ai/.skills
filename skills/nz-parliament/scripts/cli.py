@@ -25,10 +25,6 @@ import nzfetch  # noqa: E402
 BASE = "https://bills.parliament.nz"
 SEARCH_URL = f"{BASE}/api/data/search"
 BILL_URL = f"{BASE}/api/data/Bill"
-UA = (
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
-)
 GUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
 
 
@@ -39,7 +35,6 @@ class ApiError(RuntimeError):
 def _request(url: str, *, payload: dict[str, Any] | None = None, timeout: int = 15) -> Any:
     data = json.dumps(payload).encode("utf-8") if payload is not None else None
     headers = {
-        "User-Agent": UA,
         "Accept": "application/json",
         "Origin": BASE,
         "Referer": BASE + "/",

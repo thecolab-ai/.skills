@@ -26,10 +26,6 @@ BASE_WEB = "https://www.briscoes.co.nz"
 GRAPHQL_URL = BASE_WEB + "/graphql"
 DEFAULT_KLEVU_HOST = "aucs34.ksearchnet.com"
 DEFAULT_KLEVU_API_KEY = "klevu-173190000117617559"
-UA = os.environ.get(
-    "BRISCOES_NZ_USER_AGENT",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
-)
 
 KLEVU_FIELDS = [
     "isDiscountPrice",
@@ -177,7 +173,6 @@ def request_json(url: str, payload: dict[str, Any], timeout: int = 25) -> Any:
         "Content-Type": "application/json",
         "Origin": BASE_WEB,
         "Referer": BASE_WEB + "/",
-        "User-Agent": UA,
     }
     try:
         raw_bytes, _ct, _final = nzfetch.fetch_bytes(url, data=data, method="POST", headers=headers, timeout=timeout, accept="application/json, text/plain, */*")

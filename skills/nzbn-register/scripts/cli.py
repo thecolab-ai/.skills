@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import re
 import sys
 import time
@@ -21,10 +20,6 @@ import nzfetch  # noqa: E402
 
 BASE_WEB = "https://www.nzbn.govt.nz"
 PROXY = BASE_WEB + "/api/business/nzbn"
-UA = os.environ.get(
-    "NZBN_REGISTER_USER_AGENT",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
-)
 
 
 def die(message: str, code: int = 1) -> None:
@@ -38,7 +33,6 @@ def nzbn_path(uri: str, timeout: int = 25) -> Any:
     headers = {
         "Accept": "application/json, text/plain, */*",
         "Referer": BASE_WEB + "/mynzbn/search/",
-        "User-Agent": UA,
     }
     try:
         body, _ct, _final = nzfetch.fetch_bytes(

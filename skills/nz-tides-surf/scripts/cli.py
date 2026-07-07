@@ -38,11 +38,6 @@ SWELLMAP_SURF_BASE = SWELLMAP_SITE + "/surf-forecasts/new-zealand"
 METOCEAN_DOCS = "https://developer.metservice.com/docs/api-catalog/point-forecast-api/"
 NIWA_SITE = "https://niwa.co.nz"
 
-UA = os.environ.get(
-    "NZ_TIDES_SURF_USER_AGENT",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
-)
-
 NZ_TZ = ZoneInfo("Pacific/Auckland") if ZoneInfo else timezone(timedelta(hours=12))
 
 
@@ -117,7 +112,7 @@ def die(message: str, code: int = 1) -> None:
 
 
 def request_text(url: str, *, accept: str = "text/html,application/xhtml+xml,*/*;q=0.7", timeout: int = 25) -> tuple[str, str]:
-    headers = {"Accept": accept, "User-Agent": UA}
+    headers = {"Accept": accept}
     if url.startswith(LINZ_SITE):
         headers["Referer"] = LINZ_SITE + "/products-services/tides-and-tidal-streams/tide-predictions"
     try:

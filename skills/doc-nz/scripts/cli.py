@@ -26,10 +26,6 @@ BOOKING_API = "https://prod-nz-rdr.recreation-management.tylerapp.com/nzrdr/rdr/
 BOOKING_WEB = "https://bookings.doc.govt.nz/Web/"
 DOC_SITE = "https://www.doc.govt.nz"
 ALERTS_INDEX = DOC_SITE + "/parks-and-recreation/know-before-you-go/alerts/"
-UA = os.environ.get(
-    "DOC_NZ_USER_AGENT",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
-)
 
 
 def die(message: str, code: int = 1) -> None:
@@ -145,7 +141,6 @@ def booking_headers() -> dict[str, str]:
         "Accept": "application/json, text/plain, */*",
         "Origin": "https://bookings.doc.govt.nz",
         "Referer": BOOKING_WEB,
-        "User-Agent": UA,
     }
 
 
@@ -168,7 +163,7 @@ def request_booking_json(path: str, payload: dict[str, Any] | None = None, timeo
 
 def request_doc_json(path: str, timeout: int = 25) -> Any:
     url = DOC_SITE + "/api/" + path.lstrip("/")
-    headers = {"Accept": "application/json, text/plain, */*", "Referer": DOC_SITE + "/", "User-Agent": UA}
+    headers = {"Accept": "application/json, text/plain, */*", "Referer": DOC_SITE + "/"}
     try:
         return nzfetch.fetch_json(url, headers=headers, timeout=timeout)
     except nzfetch.Blocked as e:
@@ -178,7 +173,7 @@ def request_doc_json(path: str, timeout: int = 25) -> Any:
 
 
 def request_text(url: str, timeout: int = 25) -> tuple[str, str]:
-    headers = {"Accept": "text/html,application/xhtml+xml", "User-Agent": UA}
+    headers = {"Accept": "text/html,application/xhtml+xml"}
     try:
         body, _content_type, final_url = nzfetch.fetch_bytes(url, headers=headers, timeout=timeout, expect_json=False)
         return body.decode("utf-8", "replace"), final_url

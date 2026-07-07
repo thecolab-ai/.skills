@@ -41,7 +41,7 @@ BASE = "https://assets-prod.grocer.nz/public"
 MEILI = "https://meilisearch.grocer.nz"
 MEILI_KEY = "7f58239330307ec585c86863f985ab83cbb9ce951a9601c66e158548fb632fd1"
 CACHE = pathlib.Path(os.environ.get("GROCER_NZ_CACHE", "~/.cache/grocer-nz")).expanduser()
-HEADERS = {"User-Agent": "Mozilla/5.0 (Hermes grocer.nz skill)", "Referer": "https://grocer.nz/"}
+HEADERS = {"Referer": "https://grocer.nz/"}
 MAX_LIMIT = 100
 
 

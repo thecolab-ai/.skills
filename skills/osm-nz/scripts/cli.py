@@ -210,6 +210,9 @@ def fetch_overpass(query: str) -> Any:
     """POST an Overpass QL query and return parsed JSON."""
     data = urllib.parse.urlencode({"data": query}).encode("ascii")
     try:
+        # The Overpass API usage policy asks for an identifying User-Agent, so
+        # keep the custom UA and pass browser_headers=False so nzfetch doesn't
+        # add contradictory Chrome Client-Hints on top of it.
         return nzfetch.fetch_json(
             OVERPASS_URL,
             data=data,
@@ -220,6 +223,7 @@ def fetch_overpass(query: str) -> Any:
                 "User-Agent": UA,
                 "Accept": "application/json",
             },
+            browser_headers=False,
         )
     except nzfetch.Blocked as e:
         die(f"network error calling Overpass: {e}")

@@ -19,7 +19,6 @@ from typing import Any
 ADDRESS_SUGGEST_URL = "https://opendata.ccc.govt.nz/CCCSearch/rest/address/suggest"
 COLLECTION_URL = "https://ccc.govt.nz/services/rubbish-and-recycling/collections/getProperty"
 MAIN_PAGE = "https://ccc.govt.nz/services/rubbish-and-recycling/collections/"
-UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"
 
 BIN_LABELS = {
     "Garbage": "Rubbish (red bin)",
@@ -34,7 +33,7 @@ def fetch_json(url: str, headers: dict[str, str] | None = None, timeout: int = 1
     try:
         return nzfetch.fetch_json(
             url,
-            headers={"User-Agent": UA, **(headers or {})},
+            headers=headers,
             timeout=timeout,
             context=ctx,
         )
