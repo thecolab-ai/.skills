@@ -83,7 +83,7 @@ POST `data`/`method`, and a custom SSL `context=` are preserved through the prox
 | Env | Meaning |
 |---|---|
 | `FETCH_PROXY` / `HTTPS_PROXY` | Rotating proxy URL, e.g. `http://user:pass@host:port`. **A SECRET** — never hard-code, print, or commit it; `nzfetch` reads it from the env only. |
-| `PROXY_RETRIES` | Retries through the proxy on a block, a fresh IP each (default 2). Raise it if a source is heavily flagged; lower keeps many-fetch skills fast under a tight timeout. |
+| `PROXY_RETRIES` | Retries through the proxy on a block **or a truncated read** (default 3). A rotating pool gets a fresh IP each retry; a single-IP proxy re-attempts (still clears transient truncations). Raise it for a stubborn wall or a proxy that often truncates large responses. |
 | `NZFETCH_UA` | Override the User-Agent for a source that needs a specific one. |
 
 Even without adopting `nzfetch`, any skill that uses `urllib` already **honours `HTTPS_PROXY`

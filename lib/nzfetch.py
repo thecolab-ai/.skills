@@ -28,9 +28,11 @@ Environment (all optional):
     FETCH_PROXY / HTTPS_PROXY   rotating proxy URL, e.g. http://user:pass@host:port
                                — a SECRET. Never hard-code it, never print it, never
                                commit it. nzfetch reads it from the env only.
-    PROXY_RETRIES              retries through the proxy on a block, a fresh IP each
-                               (default 2). Raise it for a stubborn wall; lower keeps
-                               many-fetch skills fast under a tight test timeout.
+    PROXY_RETRIES              retries through the proxy on a block or a truncated
+                               read (default 3). A rotating pool gets a fresh IP each
+                               retry; a single-IP proxy just re-attempts (which still
+                               clears transient truncations). Raise it for a stubborn
+                               wall or a proxy that often truncates large responses.
     NZFETCH_UA                 override the User-Agent if a source needs a specific one.
 
 No proxy set → nzfetch just does the single direct request (same as before), so a
@@ -39,6 +41,7 @@ skill that imports it keeps working unchanged when no proxy is configured.
 from __future__ import annotations
 
 import gzip
+import http.client
 import json
 import os
 import urllib.error
@@ -244,7 +247,7 @@ def fetch_bytes(
     openers: list = [None]  # attempt 1 = direct
     if proxy:
         handler = urllib.request.ProxyHandler({"http": proxy, "https": proxy})
-        retries = max(1, int(os.environ.get("PROXY_RETRIES", "2")))
+        retries = max(1, int(os.environ.get("PROXY_RETRIES", "3")))
         openers += [urllib.request.build_opener(handler)] * retries
     open_kw = {"timeout": timeout}
     if context is not None:
@@ -271,6 +274,13 @@ def fetch_bytes(
             continue
         except (TimeoutError, OSError) as e:  # bare socket timeout / connection reset
             last = f"network error: {e}"
+            continue
+        except http.client.HTTPException as e:
+            # A truncated / malformed response body — most often
+            # http.client.IncompleteRead when a chunked response is cut off
+            # mid-stream (common through a proxy on a large body). Transient:
+            # retry (a fresh connection / IP usually completes it).
+            last = f"network error: incomplete read ({type(e).__name__})"
             continue
         if _looks_like_challenge(body.decode("utf-8", "replace"), content_type, expected_json=expects_json):
             last = "bot-challenge interstitial"
