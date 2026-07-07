@@ -10,15 +10,18 @@ import argparse
 import csv
 import io
 import json
+import pathlib
 import re
 import statistics
 import sys
-import urllib.error
-import urllib.request
 from collections import defaultdict
 from typing import Any, Callable
 
-UA = "eeca-ev-chargers-nz-skill/1.0 (+https://github.com/thecolab-ai/.skills)"
+# Shared fetch helper — browser UA + rotating-proxy retry to clear IP-reputation
+# bot walls (Incapsula/Cloudflare). Lives at the repo's lib/, three parents up
+# from this skill's scripts/ dir. See lib/nzfetch.py.
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 CKAN_PACKAGE_URL = "https://catalogue.data.govt.nz/api/3/action/package_show?id=public-ev-chargers"
 DATASET_PAGE = "https://catalogue.data.govt.nz/dataset/public-ev-chargers"
 EECA_DASHBOARD = "https://www.eeca.govt.nz/insights/data-tools/public-ev-charger-dashboard/"
@@ -48,62 +51,28 @@ def die(message: str, code: int = 1) -> None:
     raise SystemExit(code)
 
 
-def request(url: str, timeout: int = 30):
-    req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "*/*"})
-    return urllib.request.urlopen(req, timeout=timeout)
-
-
-def _looks_like_bot_challenge(body: str, content_type: str) -> bool:
-    """A public NZ source behind Incapsula/Cloudflare answers a JSON API request
-    with an HTML interstitial (often HTTP 200). That is a transient *block*, not
-    a dead source or malformed JSON — detect it so callers classify it as such."""
-    if "text/html" in content_type:
-        return True
-    head = body.lstrip()[:512].lower()
-    return (
-        head.startswith("<")
-        or "<!doctype html" in head
-        or "incapsula" in body.lower()
-        or "_incapsula_resource" in body.lower()
-        or "request unsuccessful" in head
-    )
-
-
 def fetch_json(url: str, timeout: int = 30) -> dict[str, Any]:
+    # nzfetch tries direct → rotating proxy on a bot-block; a transient block
+    # becomes a 'network error' (smoke tests SKIP), never a hard failure.
     try:
-        with request(url, timeout=timeout) as resp:
-            raw = resp.read().decode("utf-8", "replace")
-            content_type = (resp.headers.get("Content-Type") or "").lower()
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        # 403/429 (with or without an HTML challenge body) mean the public
-        # source is bot-blocking this network — a transient block, so report it
-        # as a network error (callers/smoke tests skip rather than hard-fail).
-        if e.code in (403, 429):
-            die(f"network error: HTTP {e.code} from {url} — the public source is bot-blocking this network (blocked). {raw[:200]}")
-        die(f"HTTP {e.code} from {url}: {raw[:240]}")
-    except urllib.error.URLError as e:
-        die(f"network error calling {url}: {e.reason}")
-    try:
-        return json.loads(raw)
-    except json.JSONDecodeError as e:
-        if _looks_like_bot_challenge(raw, content_type):
-            die(f"network error: {url} returned a non-JSON bot-challenge response (blocked — likely an Incapsula/Cloudflare interstitial, not a dead source).")
-        die(f"invalid JSON from {url}: {e}")
+        return nzfetch.fetch_json(url, timeout=timeout)
+    except nzfetch.Blocked as e:
+        die(f"network error: {e}")
+    except nzfetch.FetchError as e:
+        die(str(e))
+    raise SystemExit(1)  # unreachable (die raises) — keeps type checkers happy
 
 
 def fetch_csv_rows(resource: str, timeout: int = 30) -> tuple[list[dict[str, str]], str]:
     url = RESOURCES[resource]["url"]
     try:
-        with request(url, timeout=timeout) as resp:
-            final_url = resp.geturl()
-            text = io.TextIOWrapper(resp, encoding="utf-8-sig", newline="")
-            return list(csv.DictReader(text)), final_url
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        die(f"HTTP {e.code} from {url}: {raw[:240]}")
-    except urllib.error.URLError as e:
-        die(f"network error calling {url}: {e.reason}")
+        body, _ct, final_url = nzfetch.fetch_bytes(url, timeout=timeout, accept="text/csv,*/*")
+    except nzfetch.Blocked as e:
+        die(f"network error: {e}")
+    except nzfetch.FetchError as e:
+        die(str(e))
+    try:
+        return list(csv.DictReader(io.StringIO(body.decode("utf-8-sig")))), final_url
     except csv.Error as e:
         die(f"invalid CSV from {url}: {e}")
 
