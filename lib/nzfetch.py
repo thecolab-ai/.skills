@@ -49,10 +49,18 @@ import urllib.parse
 import urllib.request
 import zlib
 
+# Keep the UA version and the sec-ch-ua brand list in sync — a real Chrome sends a
+# UA and Client-Hints that agree, and a mismatch is itself a bot signal. Bump this
+# one constant to track current stable Chrome. Values below mirror a real Chrome
+# request captured from DevTools (macOS, Chrome 149).
+CHROME_VERSION = "149"
 DEFAULT_UA = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/125.0 Safari/537.36"
+    f"(KHTML, like Gecko) Chrome/{CHROME_VERSION}.0.0.0 Safari/537.36"
 )
+# The GREASE-style brand list Chrome 149 emits (order + the "Not)A;Brand" token
+# match the real header exactly).
+SEC_CH_UA = f'"Google Chrome";v="{CHROME_VERSION}", "Chromium";v="{CHROME_VERSION}", "Not)A;Brand";v="24"'
 
 
 def _browser_headers(url: str, accept: str) -> dict:
@@ -76,13 +84,16 @@ def _browser_headers(url: str, accept: str) -> dict:
     h = {
         "User-Agent": ua,
         "Accept": accept if accept else "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-NZ,en-AU;q=0.9,en;q=0.8",
+        "Accept-Language": "en-GB,en-US;q=0.9,en;q=0.8",
         "Accept-Encoding": "gzip, deflate",  # only what we can decode in stdlib
         "Cache-Control": "no-cache",
         "Pragma": "no-cache",
-        "sec-ch-ua": '"Chromium";v="125", "Not.A/Brand";v="24", "Google Chrome";v="125"',
+        "sec-ch-ua": SEC_CH_UA,
         "sec-ch-ua-mobile": "?0",
         "sec-ch-ua-platform": '"macOS"',
+        # Chrome's Fetch Priority hint: u=0 (highest) for a document navigation,
+        # u=1 for an API/subresource fetch. Matches a real request exactly.
+        "Priority": "u=0, i" if is_doc else "u=1, i",
         "Sec-Fetch-Dest": "document" if is_doc else "empty",
         "Sec-Fetch-Mode": "navigate" if is_doc else "cors",
         "Sec-Fetch-Site": "same-origin",
