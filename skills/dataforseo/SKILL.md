@@ -36,14 +36,21 @@ Requires DataForSEO **API credentials** (your API login + password from the
 dashboard — these are *not* your website login/password).
 
 1. Get them at https://app.dataforseo.com/api-access
-2. Export them in your shell profile (`~/.zshrc`):
+2. Export them in `~/.zshenv` (not `.zshrc`, not a repo `.env`): `.zshenv` is
+   read by every zsh — interactive and not — so the skill and the DataForSEO
+   MCP subprocess both inherit them, and the secret never lands in a git repo.
    ```bash
-   export DATAFORSEO_LOGIN="your_api_login"
-   export DATAFORSEO_PASSWORD="your_api_password"
+   export DATAFORSEO_USERNAME="your_api_login"   # the email login
+   export DATAFORSEO_PASSWORD="your_api_password" # plaintext — NOT the base64 token
    ```
-3. Reload: `source ~/.zshrc`. The CLI reads these from the environment; it does
-   not check them until a command actually calls the API, so `--help` works
-   without them.
+   Then `chmod 600 ~/.zshenv` and open a fresh shell (or `source ~/.zshenv`).
+3. **Use the plaintext password**, not the pre-encoded "token" the dashboard
+   shows — the CLI does its own base64 encoding, so a token gives auth failures.
+
+The CLI accepts `DATAFORSEO_USERNAME` (the DataForSEO MCP's variable name) or
+`DATAFORSEO_LOGIN` for the login, so one pair of env vars powers both. It does
+not read the credentials until a command actually calls the API, so `--help`
+works without them.
 
 ## Preferred workflow
 

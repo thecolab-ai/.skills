@@ -13,7 +13,10 @@ from pathlib import Path
 
 SKILL_DIR = Path(__file__).parent.parent
 CLI = SKILL_DIR / "scripts" / "cli.py"
-HAVE_CREDS = bool(os.environ.get("DATAFORSEO_LOGIN") and os.environ.get("DATAFORSEO_PASSWORD"))
+HAVE_CREDS = bool(
+    (os.environ.get("DATAFORSEO_LOGIN") or os.environ.get("DATAFORSEO_USERNAME"))
+    and os.environ.get("DATAFORSEO_PASSWORD")
+)
 
 
 def run(args, env=None):
@@ -55,7 +58,8 @@ def t_subcommand_help():
 
 def t_missing_creds():
     # with creds stripped, a live command must fail cleanly (not traceback)
-    env = {k: v for k, v in os.environ.items() if k not in ("DATAFORSEO_LOGIN", "DATAFORSEO_PASSWORD")}
+    stripped = ("DATAFORSEO_LOGIN", "DATAFORSEO_USERNAME", "DATAFORSEO_PASSWORD")
+    env = {k: v for k, v in os.environ.items() if k not in stripped}
     r = run(["serp", "test"], env=env)
     if r.returncode == 0:
         print("  expected non-zero exit without credentials")

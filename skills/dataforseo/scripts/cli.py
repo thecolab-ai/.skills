@@ -57,6 +57,20 @@ def env_required(name):
     return value
 
 
+def env_login(primary):
+    """Resolve the API login, accepting DATAFORSEO_USERNAME as an alias so a
+    single set of env vars powers both this skill and the DataForSEO MCP."""
+    for name in (primary, "DATAFORSEO_USERNAME"):
+        value = os.environ.get(name)
+        if value:
+            return value
+    die(
+        f"missing {primary} (or DATAFORSEO_USERNAME); export your API login and "
+        f"DATAFORSEO_PASSWORD (from https://app.dataforseo.com/api-access) "
+        f"before running this authenticated CLI"
+    )
+
+
 def dig(obj, path, default=None):
     """Safely walk a dotted path through nested dicts."""
     cur = obj
@@ -129,7 +143,7 @@ class DataForSEOClient:
 
 def get_client(args):
     return DataForSEOClient(
-        login=env_required(args.login_env),
+        login=env_login(args.login_env),
         password=env_required(args.password_env),
     )
 
