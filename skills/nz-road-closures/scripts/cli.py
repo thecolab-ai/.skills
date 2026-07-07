@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import pathlib
 import re
 import sys
@@ -20,10 +19,6 @@ import nzfetch  # noqa: E402
 JOURNEY_BASE = "https://www.journeys.nzta.govt.nz"
 DATA_BASE = JOURNEY_BASE + "/assets/map-data-cache"
 CAMERA_BASE = "https://www.trafficnz.info"
-UA = os.environ.get(
-    "NZ_ROAD_CLOSURES_USER_AGENT",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36",
-)
 
 EVENT_TYPE_ALIASES = {
     "closure": {"closures"},
@@ -41,7 +36,6 @@ def fetch_json(filename: str, timeout: int = 30) -> Any:
     headers = {
         "Accept": "application/json",
         "Referer": JOURNEY_BASE + "/highway-conditions",
-        "User-Agent": UA,
     }
     try:
         return nzfetch.fetch_json(url, timeout=timeout, headers=headers)

@@ -33,10 +33,11 @@ def die(message: str, code: int = 1) -> NoReturn:
 
 
 def fetch_text(url: str, *, timeout: int = 30) -> tuple[str, str]:
+    # nzfetch owns the browser fingerprint (User-Agent, sec-ch-ua*, Sec-Fetch-*,
+    # Accept-Language, Upgrade-Insecure-Requests) as one consistent Chrome set;
+    # only the semantic Referer is ours.
     headers = {
-        "Accept-Language": "en-NZ,en;q=0.9",
         "Referer": "https://www.seek.co.nz/",
-        "Upgrade-Insecure-Requests": "1",
     }
     try:
         body, _ct, final_url = nzfetch.fetch_bytes(

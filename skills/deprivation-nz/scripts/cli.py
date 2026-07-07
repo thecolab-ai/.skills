@@ -32,7 +32,6 @@ SERVICE = (
 SA1_LAYER = SERVICE + "/0/query"
 SA2_LAYER = SERVICE + "/1/query"
 ITEM_PAGE = "https://www.arcgis.com/home/item.html?id=d0caefba5f8f42d6918fc52faacec00b"
-UA = "deprivation-nz-skill/1.0 (+https://github.com/thecolab-ai/.skills)"
 
 SA1_FIELDS = "SA12023_code,NZDep2023,NZDep2023_Score,URPopnSA1_2023,SA22023_name"
 SA2_FIELDS = (
@@ -59,7 +58,7 @@ def query(layer_url: str, params: dict[str, str], timeout: int = 45) -> dict[str
     url = layer_url + "?" + urllib.parse.urlencode(base, safe="=,'%")
     try:
         data = nzfetch.fetch_json(
-            url, timeout=timeout, headers={"User-Agent": UA}, accept="application/json"
+            url, timeout=timeout, accept="application/json"
         )
     except nzfetch.Blocked as e:
         die(f"network error calling feature service: {e}")

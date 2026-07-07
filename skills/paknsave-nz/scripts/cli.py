@@ -44,7 +44,6 @@ def money(cents: Any) -> str:
 def request_json(method: str, url: str, data: Any = None, token: str | None = None, timeout: int = 30) -> Any:
     body = None
     headers = {
-        "User-Agent": UA,
         "Accept": "application/json, text/plain, */*",
         "Origin": BASE_WEB,
         "Referer": BASE_WEB + "/",

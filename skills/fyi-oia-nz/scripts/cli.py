@@ -30,10 +30,6 @@ SEARCH_URLS = (
     BASE_URL + "/search",
 )
 
-USER_AGENT = os.environ.get(
-    "FYI_OIA_USER_AGENT",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36",
-)
 REQUEST_TIMEOUT_SECONDS = 30
 UA_HTTP_ACCEPT = "application/json, text/html, application/atom+xml, */*"
 BLOCK_MARKERS = (
@@ -98,7 +94,6 @@ def fetch_bytes(url: str, timeout: int = REQUEST_TIMEOUT_SECONDS) -> tuple[bytes
             url,
             timeout=timeout,
             accept=UA_HTTP_ACCEPT,
-            headers={"User-Agent": USER_AGENT},
         )
     except nzfetch.Blocked as exc:
         raise CliError(f"upstream_blocked: network error from {url}: {exc}", status="upstream_blocked")

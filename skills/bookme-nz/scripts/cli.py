@@ -161,7 +161,6 @@ def request_json(path: str, params: dict[str, Any] | None = None, timeout: int =
     headers = {
         "Accept": "application/json, text/plain, */*",
         "Referer": BASE_WEB + "/",
-        "User-Agent": UA,
         "X-Requested-With": "XMLHttpRequest",
     }
     try:

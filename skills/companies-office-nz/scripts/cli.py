@@ -32,11 +32,6 @@ BASE = "https://app.companiesoffice.govt.nz/companies/app"
 SVC = BASE + "/service/services"
 UI = BASE + "/ui/pages/companies"
 
-UA = os.environ.get(
-    "CO_USER_AGENT",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-)
-
 # entityStatus integer → readable label (observed values only)
 STATUS_MAP = {
     10: "PRE-REGISTRATION",
@@ -63,7 +58,6 @@ def get_json(url: str, timeout: int = 25) -> Any:
             timeout=timeout,
             accept="application/json, text/html, */*",
             headers={
-                "User-Agent": UA,
                 "Referer": BASE + "/ui/pages/companies/search",
                 "X-Requested-With": "XMLHttpRequest",
             },
@@ -80,7 +74,6 @@ def get_html(url: str, timeout: int = 25) -> str:
             url,
             timeout=timeout,
             accept="text/html,*/*",
-            headers={"User-Agent": UA},
         )
     except nzfetch.Blocked as e:
         die(f"network error: {e}")

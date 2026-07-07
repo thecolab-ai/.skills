@@ -22,10 +22,6 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
 import nzfetch  # noqa: E402
 
 BASE = "https://www.comcom.govt.nz"
-UA = (
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
-)
 DOC_EXT_RE = re.compile(r"\.(pdf|docx?|xlsx?|pptx?|csv)$", re.I)
 
 
@@ -38,7 +34,7 @@ def fetch(url: str, timeout: int = 20) -> str:
     try:
         return nzfetch.fetch_text(
             url, timeout=timeout, accept="text/html,*/*",
-            headers={"User-Agent": UA}, context=ctx,
+            context=ctx,
         )
     except nzfetch.Blocked as e:
         raise ApiError(f"network error contacting comcom.govt.nz: {e}") from e

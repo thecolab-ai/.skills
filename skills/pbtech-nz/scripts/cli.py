@@ -6,15 +6,11 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
 import nzfetch  # noqa: E402
 from html.parser import HTMLParser
 BASE='https://www.pbtech.co.nz'
+# Only semantic headers; nzfetch owns the browser fingerprint (User-Agent,
+# sec-ch-ua*, Sec-Fetch-*, Accept-Language) as one consistent Chrome set.
 HEADERS={
- 'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36',
  'Accept':'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
- 'Accept-Language':'en-US,en;q=0.9',
  'Referer':'https://www.pbtech.co.nz/',
- 'Sec-Fetch-Dest':'document','Sec-Fetch-Mode':'navigate','Sec-Fetch-Site':'same-origin','Sec-Fetch-User':'?1',
- 'Upgrade-Insecure-Requests':'1',
- 'sec-ch-ua':'"Chromium";v="146", "Not-A.Brand";v="24", "Google Chrome";v="146"',
- 'sec-ch-ua-mobile':'?0','sec-ch-ua-platform':'"Windows"'
 }
 def die(m,c=1): print(f'pbtech-nz: {m}',file=sys.stderr); raise SystemExit(c)
 def fetch(url):

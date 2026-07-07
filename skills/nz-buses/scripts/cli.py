@@ -23,10 +23,6 @@ import nzfetch  # noqa: E402
 
 BASE_API = os.environ.get("METLINK_API_BASE", "https://api.opendata.metlink.org.nz/v1").rstrip("/")
 BASE_PORTAL = "https://opendata.metlink.org.nz/"
-UA = os.environ.get(
-    "NZ_BUSES_USER_AGENT",
-    "nz-buses-skill/1.0 (+https://opendata.metlink.org.nz/)",
-)
 
 # Metlink uses standard GTFS bus route_type=3 and extended school-bus
 # route_type=712. Rail (2), ferry (4), and cable car (5) are intentionally out
@@ -70,7 +66,6 @@ def request_json(path: str, params: dict[str, Any] | None = None, timeout: int =
         if clean:
             url += "?" + urllib.parse.urlencode(clean)
     headers = {
-        "User-Agent": UA,
         "x-api-key": api_key(),
     }
     try:

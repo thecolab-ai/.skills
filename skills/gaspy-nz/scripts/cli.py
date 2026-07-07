@@ -19,10 +19,6 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
 import nzfetch  # noqa: E402
 
 BASE_FEED = "https://gaspy-datamine-stats.firebaseio.com/.json"
-UA = os.environ.get(
-    "GASPY_NZ_USER_AGENT",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
-)
 
 FUEL_TYPES: dict[str, dict[str, str | None]] = {
     "1": {"fuel": "91", "label": "Unleaded 91", "unit": "c/L", "datamine_key": "91"},
@@ -47,7 +43,6 @@ def request_json(url: str = BASE_FEED, timeout: int = 20) -> Any:
     headers = {
         "Accept": "application/json",
         "Referer": "https://www.gaspy.nz/stats.html",
-        "User-Agent": UA,
     }
     try:
         return nzfetch.fetch_json(url, timeout=timeout, headers=headers)

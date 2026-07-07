@@ -29,7 +29,6 @@ except Exception:
 TICKER_BASE = "https://api.nzx.com/ticker/1.0"
 PUBLIC_BASE = "https://api.nzx.com/public"
 NZX_WEB = "https://www.nzx.com"
-UA = "nzx-skill/1.0 (+https://github.com/thecolab-ai/.skills)"
 DELAY_NOTE = "NZX market data is delayed by 20 minutes and may be cached."
 
 INDEX_ALIASES = {
@@ -55,7 +54,6 @@ def die(message: str, code: int = 1) -> None:
 def request_json(url: str, timeout: int = 20) -> Any:
     headers = {
         "Accept": "application/json, text/plain, */*",
-        "User-Agent": UA,
         "Referer": NZX_WEB + "/",
     }
     try:

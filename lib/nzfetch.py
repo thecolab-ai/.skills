@@ -24,6 +24,17 @@ Handle the two typed errors so a transient block SKIPS rather than hard-fails:
     except nzfetch.FetchError as e:
         die(str(e))
 
+nzfetch owns the browser fingerprint. Every request carries a consistent current
+Chrome header set by default (User-Agent + matching sec-ch-ua / Sec-Fetch-* /
+Accept-Language / Priority). A skill should NOT pass its own fingerprint headers:
+a skill User-Agent or sec-ch-ua that disagrees with the rest of the set is itself
+a bot signal. Pass ``headers={...}`` only for SEMANTIC headers a source needs (an
+API key, Authorization, Referer, Content-Type, X-Requested-With) — those merge
+over the defaults and win. nzfetch stays fully capable of overrides: set
+``NZFETCH_UA`` for the User-Agent, pass any header in ``headers=`` (it wins), or
+use ``browser_headers=False`` for a lean set — but default to nzfetch's headers
+wherever they already work.
+
 Environment (all optional):
     FETCH_PROXY / HTTPS_PROXY   rotating proxy URL, e.g. http://user:pass@host:port
                                — a SECRET. Never hard-code it, never print it, never
@@ -49,10 +60,18 @@ import urllib.parse
 import urllib.request
 import zlib
 
+# Keep the UA version and the sec-ch-ua brand list in sync — a real Chrome sends a
+# UA and Client-Hints that agree, and a mismatch is itself a bot signal. Bump this
+# one constant to track current stable Chrome. Values below mirror a real Chrome
+# request captured from DevTools (macOS, Chrome 149).
+CHROME_VERSION = "149"
 DEFAULT_UA = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/125.0 Safari/537.36"
+    f"(KHTML, like Gecko) Chrome/{CHROME_VERSION}.0.0.0 Safari/537.36"
 )
+# The GREASE-style brand list Chrome 149 emits (order + the "Not)A;Brand" token
+# match the real header exactly).
+SEC_CH_UA = f'"Google Chrome";v="{CHROME_VERSION}", "Chromium";v="{CHROME_VERSION}", "Not)A;Brand";v="24"'
 
 
 def _browser_headers(url: str, accept: str) -> dict:
@@ -76,13 +95,16 @@ def _browser_headers(url: str, accept: str) -> dict:
     h = {
         "User-Agent": ua,
         "Accept": accept if accept else "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-NZ,en-AU;q=0.9,en;q=0.8",
+        "Accept-Language": "en-GB,en-US;q=0.9,en;q=0.8",
         "Accept-Encoding": "gzip, deflate",  # only what we can decode in stdlib
         "Cache-Control": "no-cache",
         "Pragma": "no-cache",
-        "sec-ch-ua": '"Chromium";v="125", "Not.A/Brand";v="24", "Google Chrome";v="125"',
+        "sec-ch-ua": SEC_CH_UA,
         "sec-ch-ua-mobile": "?0",
         "sec-ch-ua-platform": '"macOS"',
+        # Chrome's Fetch Priority hint: u=0 (highest) for a document navigation,
+        # u=1 for an API/subresource fetch. Matches a real request exactly.
+        "Priority": "u=0, i" if is_doc else "u=1, i",
         "Sec-Fetch-Dest": "document" if is_doc else "empty",
         "Sec-Fetch-Mode": "navigate" if is_doc else "cors",
         "Sec-Fetch-Site": "same-origin",
@@ -244,19 +266,24 @@ def fetch_bytes(
     # (fetch_text=False, fetch_json=True) when given; else inferred from accept.
     expects_json = expect_json if expect_json is not None else ("json" in (accept or "").lower())
     proxy = proxy_url()
-    openers: list = [None]  # attempt 1 = direct
+    openers: list = [None]  # attempt 1 = direct (urlopen, which accepts context=)
     if proxy:
         handler = urllib.request.ProxyHandler({"http": proxy, "https": proxy})
+        # A custom SSL context must be baked into an HTTPSHandler on the opener —
+        # OpenerDirector.open() does NOT accept a context= kwarg (passing it raises
+        # TypeError), so it can't be forwarded per-call like urlopen's.
+        extra = [urllib.request.HTTPSHandler(context=context)] if context is not None else []
         retries = max(1, int(os.environ.get("PROXY_RETRIES", "3")))
-        openers += [urllib.request.build_opener(handler)] * retries
-    open_kw = {"timeout": timeout}
+        openers += [urllib.request.build_opener(handler, *extra)] * retries
+    # context= only goes to the direct urlopen; the proxy openers carry it in their handler.
+    direct_kw = {"timeout": timeout}
     if context is not None:
-        open_kw["context"] = context
+        direct_kw["context"] = context
     last = "no attempt made"
     for opener in openers:
         req = urllib.request.Request(url, data=data, headers=hdrs, method=method)
         try:
-            resp = opener.open(req, **open_kw) if opener else urllib.request.urlopen(req, **open_kw)
+            resp = opener.open(req, timeout=timeout) if opener else urllib.request.urlopen(req, **direct_kw)
             body = _decompress(resp.read(), resp.headers.get("Content-Encoding"))
             content_type = (resp.headers.get("Content-Type") or "").lower()
             final_url = resp.geturl()

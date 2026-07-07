@@ -67,7 +67,7 @@ def request(url: str, timeout: int = 30):
 
 def fetch_json(url: str, timeout: int = 30) -> dict[str, Any]:
     try:
-        return nzfetch.fetch_json(url, timeout=timeout, headers={"User-Agent": UA}, accept="*/*")
+        return nzfetch.fetch_json(url, timeout=timeout, accept="*/*")
     except nzfetch.Blocked as e:
         die(f"network error calling {url}: {e}")
     except nzfetch.FetchError as e:
@@ -129,7 +129,7 @@ def clean_row(row: dict[str, str]) -> dict[str, Any]:
 def csv_rows(timeout: int = 90) -> Iterable[dict[str, str]]:
     try:
         body, _ct, _final = nzfetch.fetch_bytes(
-            GRANTS_CSV_URL, timeout=timeout, accept="*/*", headers={"User-Agent": UA}
+            GRANTS_CSV_URL, timeout=timeout, accept="*/*"
         )
     except nzfetch.Blocked as e:
         die(f"network error downloading grants CSV: {e}")

@@ -186,6 +186,9 @@ def request_text(url, *, headers=None, data=None, method=None, timeout=35, opene
     # Route the ordinary path through the shared nzfetch helper. The Accept header
     # drives nzfetch's JSON-vs-HTML challenge check, so hand it over as `accept=`.
     accept = req_headers.pop("Accept")
+    # Let nzfetch own the User-Agent (its own browser UA + matching Client-Hints);
+    # the opener cookie-jar path above keeps USER_AGENT for its urllib request.
+    req_headers.pop("User-Agent", None)
     try:
         return nzfetch.fetch_text(
             url, headers=req_headers, accept=accept, data=data, method=method, timeout=timeout

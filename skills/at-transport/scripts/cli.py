@@ -25,7 +25,6 @@ import nzfetch  # noqa: E402
 
 BASE_URL = "https://api.at.govt.nz"
 API_KEY = os.environ.get("AT_API_KEY", "de42128902d24a7a86a013633f7aa832")
-UA = "at-transport-skill/1.0 (+https://github.com/thecolab-ai/.skills)"
 DEFAULT_TIMEOUT = 15
 
 try:
@@ -45,7 +44,6 @@ def request_json(path: str, timeout: int = DEFAULT_TIMEOUT) -> Any:
     headers = {
         "Accept": "application/json",
         "Ocp-Apim-Subscription-Key": API_KEY,
-        "User-Agent": UA,
     }
     try:
         body, _ct, _final = nzfetch.fetch_bytes(url, headers=headers, timeout=timeout, accept="application/json")

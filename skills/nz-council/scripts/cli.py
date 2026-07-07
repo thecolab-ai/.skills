@@ -1338,7 +1338,6 @@ def fetch_text_result(
     # stay on urllib (localhost, never proxied).
     accept = "text/html,application/xhtml+xml,application/json"
     req_headers = {
-        "User-Agent": UA,
         "Accept": accept,
     }
     if headers:

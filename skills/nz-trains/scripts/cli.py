@@ -29,7 +29,6 @@ except Exception:  # pragma: no cover - old Python fallback
 
 
 BASE_API = "https://api.opendata.metlink.org.nz/v1"
-UA = os.environ.get("NZ_TRAINS_USER_AGENT", "thecolab-nz-trains-skill/1.0")
 NZ_TZ = ZoneInfo("Pacific/Auckland") if ZoneInfo else timezone.utc
 
 LINE_ORDER = ["JVL", "KPL", "HVL", "MEL", "WRL"]
@@ -102,7 +101,6 @@ def request_json(path: str, params: dict[str, Any] | None = None, timeout: int =
         url += "?" + urllib.parse.urlencode(clean)
     headers = {
         "Accept": "application/json",
-        "User-Agent": UA,
         "x-api-key": require_api_key(),
     }
     try:

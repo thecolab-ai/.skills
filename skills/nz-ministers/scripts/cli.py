@@ -34,11 +34,6 @@ import nzfetch  # noqa: E402
 
 BASE = "https://www.beehive.govt.nz"
 RSS_URL = f"{BASE}/rss.xml"
-DEFAULT_UA = os.environ.get(
-    "NZ_MINISTERS_USER_AGENT",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
-)
 CACHE_FILE = os.path.join(tempfile.gettempdir(), "nz-ministers-incap.json")
 CACHE_TTL_SECONDS = 300  # reuse browser-obtained Incapsula clearance (sessions are short-lived)
 ARTICLE_TYPES = ("release", "speech", "feature")
@@ -73,7 +68,7 @@ def is_incapsula(text: str) -> bool:
 def fetch_rss() -> str:
     """The root RSS feed is allowlisted and needs no clearance."""
     try:
-        text = _open(RSS_URL, {"User-Agent": DEFAULT_UA, "Accept": "application/rss+xml, application/xml, */*"})
+        text = _open(RSS_URL, {"Accept": "application/rss+xml, application/xml, */*"})
     except nzfetch.Blocked as e:
         raise ApiError("beehive RSS feed is temporarily blocked; try again shortly") from e
     except nzfetch.FetchError as e:

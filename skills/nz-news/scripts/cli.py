@@ -19,7 +19,6 @@ from typing import Any
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
 import nzfetch  # noqa: E402
 
-UA = "nz-news-cli/1.0 (+https://github.com/thecolab-ai/.skills)"
 DEFAULT_TIMEOUT = 10
 
 # Feed definitions
@@ -214,7 +213,6 @@ def fetch_feed(feed: dict) -> dict:
             feed["url"],
             timeout=DEFAULT_TIMEOUT,
             accept="application/rss+xml,application/atom+xml,application/xml,text/xml,*/*",
-            headers={"User-Agent": UA},
         )
         duration_ms = round((time.monotonic() - start) * 1000)
         items = parse_atom_items(xml, feed) if feed.get("format") == "atom" else parse_rss_items(xml, feed)

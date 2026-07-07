@@ -11,17 +11,11 @@ CHARTS={
  'twi':'{39B96144-129C-4D86-AEA9-DAB75CDE26F4}',
  'retail-rates':'{9E689530-C72C-493C-B41C-C9750BDD2C69}',
 }
+# Only semantic headers; nzfetch owns the browser fingerprint (User-Agent,
+# sec-ch-ua*, Sec-Fetch-*, Accept-Language) as one consistent Chrome set.
 BROWSER_HEADERS={
- 'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36',
  'Accept':'application/json, text/plain, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, */*',
- 'Accept-Language':'en-US,en;q=0.9',
  'Referer':'https://www.rbnz.govt.nz/statistics',
- 'Sec-Fetch-Dest':'empty',
- 'Sec-Fetch-Mode':'cors',
- 'Sec-Fetch-Site':'same-origin',
- 'sec-ch-ua':'"Chromium";v="146", "Not-A.Brand";v="24", "Google Chrome";v="146"',
- 'sec-ch-ua-mobile':'?0',
- 'sec-ch-ua-platform':'"Windows"',
 }
 def die(m,c=1): print(f'rbnz-data: {m}',file=sys.stderr); raise SystemExit(c)
 def http_text(url, headers=None, timeout=30):
@@ -36,7 +30,7 @@ def http_bytes(url, timeout=60):
  except nzfetch.FetchError as e: die(str(e))
 def get(action, params):
  url=BASE+action+'?'+urllib.parse.urlencode({k:v for k,v in params.items() if v is not None})
- data=json.loads(http_text(url, {'User-Agent':BROWSER_HEADERS['User-Agent'],'Accept':'application/json'}))
+ data=json.loads(http_text(url, {'Accept':'application/json'}))
  if not data.get('success'): die(f'API returned success=false: {data.get("error")}')
  return data['result'],url
 def norm_pkg(p):

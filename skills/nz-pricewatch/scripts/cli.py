@@ -22,10 +22,6 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
 import nzfetch  # noqa: E402
 
 BASE_WEB = "https://pricespy.co.nz"
-UA = (
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36"
-)
 
 CATEGORY_ALIASES = {
     "tv": 107,
@@ -110,7 +106,6 @@ def request_text(path_or_url: str, params: dict[str, Any] | None = None, timeout
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "en-NZ,en;q=0.9",
         "Referer": BASE_WEB + "/",
-        "User-Agent": UA,
     }
     try:
         return nzfetch.fetch_text(

@@ -91,7 +91,6 @@ class AkahuClient:
             "Authorization": f"Bearer {self.user_token}",
             "X-Akahu-Id": self.app_token,
             "Accept": "application/json",
-            "User-Agent": "thecolab-skills-akahu-personal/1.0",
         }
         if json_body is not None:
             body = json.dumps(json_body).encode("utf-8")
