@@ -1,12 +1,29 @@
 #!/usr/bin/env python3
 import json
-import os
 import subprocess
 import sys
 from pathlib import Path
 
 SKILL_DIR = Path(__file__).parent.parent
 CLI = SKILL_DIR / "scripts" / "cli.py"
+
+# The CLI ships a working public fallback key, so the smoke test exercises the
+# real network path. Only genuine upstream trouble (rate-limit, auth, 5xx,
+# network) degrades to a graceful SKIP — a shape/parse problem is a real FAIL.
+NETWORK_SKIP_MARKERS = (
+    "network error",
+    "timed out",
+    "timeout",
+    "connection",
+    "http 4",
+    "http 5",
+    "429",
+    "blocked",
+)
+
+
+def is_skip(stderr: str) -> bool:
+    return any(marker in stderr.lower() for marker in NETWORK_SKIP_MARKERS)
 
 
 def run(args: list) -> subprocess.CompletedProcess:
@@ -43,11 +60,11 @@ results.append(test("--help exits 0", test_help))
 
 
 def test_alerts():
-    if not os.environ.get("AT_API_KEY"):
-        print("  [SKIP] requires AT_API_KEY")
-        return True
     result = run(["alerts", "--json"])
     if result.returncode != 0:
+        if is_skip(result.stderr):
+            print(f"  [SKIP] upstream unavailable: {result.stderr.strip()[:180]}")
+            return True
         print(f"  stderr: {result.stderr[:200]}")
         return False
     data = json.loads(result.stdout)
@@ -58,15 +75,15 @@ def test_alerts():
     return True
 
 
-results.append(test("alerts returns alerts[] (skips without AT_API_KEY)", test_alerts))
+results.append(test("alerts returns alerts[]", test_alerts))
 
 
 def test_stops():
-    if not os.environ.get("AT_API_KEY"):
-        print("  [SKIP] requires AT_API_KEY")
-        return True
     result = run(["stops", "britomart", "--json"])
     if result.returncode != 0:
+        if is_skip(result.stderr):
+            print(f"  [SKIP] upstream unavailable: {result.stderr.strip()[:180]}")
+            return True
         print(f"  stderr: {result.stderr[:200]}")
         return False
     data = json.loads(result.stdout)
@@ -77,15 +94,15 @@ def test_stops():
     return True
 
 
-results.append(test("stops britomart returns stops[] (skips without AT_API_KEY)", test_stops))
+results.append(test("stops britomart returns stops[]", test_stops))
 
 
 def test_status():
-    if not os.environ.get("AT_API_KEY"):
-        print("  [SKIP] requires AT_API_KEY")
-        return True
     result = run(["status", "--json"])
     if result.returncode != 0:
+        if is_skip(result.stderr):
+            print(f"  [SKIP] upstream unavailable: {result.stderr.strip()[:180]}")
+            return True
         print(f"  stderr: {result.stderr[:200]}")
         return False
     data = json.loads(result.stdout)
@@ -96,7 +113,7 @@ def test_status():
     return True
 
 
-results.append(test("status returns dict (skips without AT_API_KEY)", test_status))
+results.append(test("status returns dict", test_status))
 
 if all(results):
     print("All tests passed.")

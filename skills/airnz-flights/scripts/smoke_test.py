@@ -11,7 +11,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
 DATE = (date.today() + timedelta(days=7)).isoformat()
-browser_required = os.getenv("HERMES_SMOKE_USE_BROWSER") == "1"
+browser_required = os.getenv("COLAB_SMOKE_USE_BROWSER") == "1"
 use_browser = browser_required or find_spec("cloakbrowser") is not None
 cmd = [sys.executable, str(ROOT / "skills/airnz-flights/scripts/cli.py"), "AKL", "WLG", DATE, "--limit", "3", "--json"]
 if use_browser:

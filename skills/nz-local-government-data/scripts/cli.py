@@ -23,7 +23,10 @@ TIMEOUT = 10
 CKAN = "https://catalogue.data.govt.nz/api/3/action/"
 LOCALCOUNCILS_INDEX = "http://www.localcouncils.govt.nz/lgip.nsf/wpg_url/Resources-Download-Data-Index"
 LOCALCOUNCILS_HTTPS_INDEX = "https://www.localcouncils.govt.nz/lgip.nsf/wpg_url/Resources-Download-Data-Index"
-DIA_PERFORMANCE = "https://www.dia.govt.nz/local-government-performance-metrics"
+# The local government performance metrics / council profiles content moved off
+# dia.govt.nz to mcert.govt.nz. The old URL now 301s to a landing page that no
+# longer carries the XLSX link, so point straight at the council-performance page.
+DIA_PERFORMANCE = "https://www.mcert.govt.nz/our-work/local-government/council-performance/"
 OAG_INSIGHTS = "https://oag.parliament.nz/2025/local-govt"
 PERFORMANCE_XLSX_HINT = "Data release for council profiles"
 
@@ -52,13 +55,13 @@ SOURCES = [
     },
     {
         "id": "dia-performance-metrics",
-        "name": "DIA local government performance metrics / council profiles",
-        "agency": "Department of Internal Affairs",
+        "name": "Local government performance metrics / council profiles",
+        "agency": "mcert.govt.nz (local government performance content, formerly DIA)",
         "url": DIA_PERFORMANCE,
         "formats": ["XLSX data release", "PDF group profiles", "HTML"],
-        "licence_notes": "Source page does not expose a machine-readable licence in page metadata; cite DIA page and workbook/PDF URL.",
+        "licence_notes": "Source page does not expose a machine-readable licence in page metadata; cite the council-performance page and workbook/PDF URL.",
         "cadence": "Current page references July 2025 council profile data release.",
-        "notes": "Machine-readable XLSX is parsed with Python stdlib to list councils and preview metrics.",
+        "notes": "Content moved from dia.govt.nz to mcert.govt.nz; machine-readable XLSX is parsed with Python stdlib to list councils and preview metrics.",
     },
     {
         "id": "oag-local-government-insights-2024",
