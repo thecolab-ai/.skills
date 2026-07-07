@@ -7,7 +7,7 @@ from pathlib import Path
 
 SKILL_DIR = Path(__file__).parent.parent
 CLI = SKILL_DIR / "scripts" / "cli.py"
-USE_BROWSER = os.environ.get("HERMES_SMOKE_USE_BROWSER") == "1"
+USE_BROWSER = os.environ.get("COLAB_SMOKE_USE_BROWSER") == "1"
 
 
 def with_browser(args: list) -> list:
