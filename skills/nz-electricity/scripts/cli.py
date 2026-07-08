@@ -41,6 +41,96 @@ TABLEAU_ENERGY_MARGIN_VIZQL = (
     "https://public.tableau.com/vizql/w/Energymargin/v/Energymargin/startSession/viewing"
     "?%3AshowVizHome=no&%3Aembed=y&%3Adisplay_count=n&%3Aorigin=viz_share_link&%3Aredirect=auth"
 )
+EA_ENERGY_MARGIN_PROJECT = "https://www.ea.govt.nz/projects/all/energy-margin-information/"
+
+# When the exact per-company split cannot be fetched, point the caller at the
+# official surfaces that DO carry per-company or aggregate data. These were
+# confirmed reachable on 2026-07-09; see issue #172 for the full source hunt.
+ENERGY_MARGIN_GUIDANCE = (
+    "The exact official per-company energy-margin dollars for July-December 2024 are not "
+    "machine-retrievable: they existed only in an interactive Tableau dashboard that the "
+    "Electricity Authority has since removed (it was never archived), and the ongoing collection "
+    "from 5 July 2026 (clause 2.16 of the Code) publishes AGGREGATED, averaged monthly data only, "
+    "never a per-company split. Do not reconstruct the split from prices and volumes and present it "
+    "as the EA figure, and do not treat third-party preserved chart copies as an official source. "
+    "For per-company detail, use the official alternatives below (different but related metrics)."
+)
+
+# Official EA aggregate the Authority published in durable form (article text).
+ENERGY_MARGIN_AGGREGATE = {
+    "metric": "energy margin, all gentailers combined",
+    "period": "2024-07 to 2024-12",
+    "scope": "Contact, Genesis, Mercury, Meridian, Manawa, Nova (combined; not split by company)",
+    "weekly_range_million_nzd": [60, 95],
+    "weekly_average_million_nzd": 76,
+    "source": "Electricity Authority, 'Gentailer energy margins in 2024'",
+    "source_url": EA_ENERGY_MARGIN_ARTICLE,
+}
+
+# Reference values and pointers that ARE official and per-company. Figures are the
+# EA's own published values (article text) — included to point callers at the right
+# metric/source, not as a substitute for the removed per-company energy-margin split.
+ENERGY_MARGIN_ALTERNATIVES = [
+    {
+        "what": "EA per-company net profit (weekly average, Jul-Dec 2024)",
+        "metric": "net profit (not energy margin)",
+        "reference_values_million_nzd": {
+            "Meridian": -4.65,
+            "Genesis": 3.6,
+            "Mercury": -2.58,
+            "Contact": 5.46,
+        },
+        "note": (
+            "Official EA-published per-company figures. Net profit, not energy margin, and covers "
+            "only the four listed gentailers (not Manawa/Nova). Closest official per-company number."
+        ),
+        "source_url": EA_ENERGY_MARGIN_ARTICLE,
+    },
+    {
+        "what": "Gentailer interim/annual reports (segment financials)",
+        "metric": "segment EBITDAF, generation volumes, wholesale/retail revenue",
+        "note": (
+            "Auditable per-company financials the EA links to directly. Different framing from the "
+            "EA energy margin, but the underlying official source of company profitability."
+        ),
+        "source_urls": {
+            "Genesis": "https://media.genesisenergy.co.nz/genesis/investor/2025/fy25_genesis_interim_report.pdf",
+            "Mercury": "https://www.mercury.co.nz/-/media/project/mercury/mercury/pdfs-other/investor-relations/2025/mercury_interim_report_2025.pdf",
+            "Meridian": "https://www.meridianenergy.co.nz/public/Investors/Reports-and-presentations/Interim-results-and-reports/2025/Media-Announcement.pdf",
+            "Contact": "https://contact.co.nz/aboutus/investor-centre/reports-and-presentations",
+        },
+    },
+    {
+        "what": "EA retail gross margin dashboard + NZIER retail-margin disclosure",
+        "metric": "retail gross margin (retail side, not generation-side energy margin)",
+        "note": "Per-company retail margins; complements the generation-side energy margin.",
+        "source_urls": {
+            "EA retail gross margin": "https://www.ea.govt.nz/data-and-insights/charts-and-dashboards/retail-gross-margin/",
+            "NZIER report (June 2024)": "https://www.nzier.org.nz/hubfs/Public%20Publications/Client%20reports/Gentailer%20retail%20margin%20disclosure%20report%20June%202024.pdf",
+        },
+    },
+    {
+        "what": "Future EA aggregate energy-margin release (from 5 July 2026)",
+        "metric": "aggregated, averaged energy margin, monthly",
+        "note": (
+            "New clause 2.16 collection. Machine-readable once published, but aggregate-only — it will "
+            "not restore the per-company split. Wire it in here when it goes live."
+        ),
+        "source_url": EA_ENERGY_MARGIN_PROJECT,
+    },
+    {
+        "what": "EA datasets & tools/APIs hubs (raw wholesale data)",
+        "metric": "generation output, dispatch/final energy prices (inputs, not margins)",
+        "note": (
+            "Use the skill's own 'generation' and 'prices' commands, or these hubs, only if you must "
+            "derive an estimate — label any derivation clearly as unofficial."
+        ),
+        "source_urls": {
+            "Datasets": "https://www.ea.govt.nz/data-and-insights/datasets/",
+            "Tools & APIs": "https://www.ea.govt.nz/data-and-insights/tools-and-apis/",
+        },
+    },
+]
 UA = "nz-electricity-skill/1.0 (+https://github.com/thecolab-ai/.skills)"
 
 REGION_ALIASES = {
@@ -1809,6 +1899,16 @@ def cmd_energy_margin(args: argparse.Namespace) -> None:
         if unavailable
         else "The official Tableau workbook did not yield machine-readable per-company rows from this probe."
     )
+    alternatives = ENERGY_MARGIN_ALTERNATIVES
+    if company_filter:
+        # Keep only alternatives that cover the requested company (all cover it except
+        # the four-company net-profit list, which omits Manawa/Nova).
+        alternatives = [
+            alt
+            for alt in alternatives
+            if "reference_values_million_nzd" not in alt
+            or company_filter in alt["reference_values_million_nzd"]
+        ]
     data = {
         "source": "Electricity Authority gentailer energy margin dashboard/article",
         "source_url": EA_ENERGY_MARGIN_DASHBOARD,
@@ -1821,10 +1921,14 @@ def cmd_energy_margin(args: argparse.Namespace) -> None:
         "to": to_date,
         "count": 0,
         "energy_margins": [],
+        "guidance": ENERGY_MARGIN_GUIDANCE,
+        "aggregate_energy_margin": ENERGY_MARGIN_AGGREGATE,
+        "alternatives": alternatives,
         "source_checks": checks,
         "caveats": [
             "This command does not reconstruct margins from prices and generation volumes.",
             "This command does not ship copied chart values or third-party preserved data.",
+            "The per-company energy-margin split is not officially machine-retrievable; use 'alternatives' for related official per-company data.",
             "When the Authority publishes an official CSV/API feed, wire that feed here before returning rows.",
         ],
         "elapsed_ms": round((time.perf_counter() - started) * 1000),
@@ -2090,6 +2194,31 @@ def render_energy_margin(data: dict[str, Any]) -> str:
             )
     else:
         lines.append(data.get("reason") or "No official energy-margin rows returned.")
+        if data.get("guidance"):
+            lines.append("")
+            lines.append(data["guidance"])
+        agg = data.get("aggregate_energy_margin") or {}
+        if agg:
+            lo, hi = (agg.get("weekly_range_million_nzd") or [None, None])[:2]
+            lines.append("")
+            lines.append(
+                f"Official EA aggregate ({agg.get('period')}): ${lo}-{hi}m/week, "
+                f"avg ${agg.get('weekly_average_million_nzd')}m across all gentailers combined."
+            )
+        alternatives = data.get("alternatives") or []
+        if alternatives:
+            lines.append("")
+            lines.append("Where to get official per-company data instead:")
+            for alt in alternatives:
+                lines.append(f"- {alt.get('what')} ({alt.get('metric')})")
+                refs = alt.get("reference_values_million_nzd") or {}
+                for company, value in refs.items():
+                    sign = "-" if value < 0 else ""
+                    lines.append(f"    {company}: {sign}${abs(value)}m")
+                if alt.get("source_url"):
+                    lines.append(f"    {alt['source_url']}")
+                for label, url in (alt.get("source_urls") or {}).items():
+                    lines.append(f"    {label}: {url}")
         lines.append("")
         lines.append("Checked official surfaces:")
         for check in data.get("source_checks") or []:
