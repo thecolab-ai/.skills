@@ -154,6 +154,46 @@ def test_dg_latest_command():
 
 results.append(test("dg-latest returns GUEHMT latest[]", test_dg_latest_command))
 
+
+def test_energy_margin_status():
+    result = run(["energy-margin", "--company", "meridian", "--timeout", "5", "--json"])
+    if result.returncode != 0:
+        print(f"  stderr: {result.stderr[:200]}")
+        return False
+    data = json.loads(result.stdout)
+    if data.get("source") != "Electricity Authority gentailer energy margin dashboard/article":
+        print(f"  stdout: {result.stdout[:200]}")
+        print("  Expected EA energy margin source label")
+        return False
+    if data.get("company_filter") != "Meridian":
+        print(f"  stdout: {result.stdout[:200]}")
+        print("  Expected company filter to normalise to Meridian")
+        return False
+    if not isinstance(data.get("source_checks"), list):
+        print(f"  stdout: {result.stdout[:200]}")
+        print("  Expected source_checks[] diagnostics")
+        return False
+    if data.get("energy_margins") != []:
+        print(f"  stdout: {result.stdout[:200]}")
+        print("  Expected no copied or derived margin rows while the official feed is unavailable")
+        return False
+    return True
+
+
+results.append(test("energy-margin reports official source status", test_energy_margin_status))
+
+
+def test_energy_margin_rejects_unknown_company():
+    result = run(["energy-margin", "--company", "not-a-company", "--json"])
+    if result.returncode == 0:
+        print(f"  stdout: {result.stdout[:200]}")
+        print("  Expected unknown company to fail")
+        return False
+    return "unknown energy-margin company" in result.stderr
+
+
+results.append(test("energy-margin rejects unknown company", test_energy_margin_rejects_unknown_company))
+
 if all(results):
     print("All tests passed.")
     sys.exit(0)
