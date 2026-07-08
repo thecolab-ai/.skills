@@ -17,6 +17,7 @@ import sys
 import time
 import urllib.error
 import urllib.parse
+import urllib.request
 from collections import defaultdict
 from typing import Any, Callable, Iterable
 
@@ -32,6 +33,14 @@ EMI_GENERATION_MD = EMI_DATASETS + "/Generation/Generation_MD"
 EMI_DEMAND_REPORT = "https://www.emi.ea.govt.nz/Wholesale/Download/DataReport/CSV/W_GD_C"
 EMI_DG_REPORT = "https://www.emi.ea.govt.nz/Retail/Download/DataReport/CSV/GUEHMT"
 EMI_DG_REPORT_PAGE = "https://www.emi.ea.govt.nz/retail/Reports/guehmt"
+EA_ENERGY_MARGIN_DASHBOARD = "https://www.ea.govt.nz/data-and-insights/charts-and-dashboards/energy-margin/"
+EA_ENERGY_MARGIN_ARTICLE = "https://www.ea.govt.nz/news/eye-on-electricity/gentailer-energy-margins-in-2024/"
+TABLEAU_ENERGY_MARGIN_VIEW = "https://public.tableau.com/views/Energymargin/Energymargin?:showVizHome=no&:embed=y&:display_count=n&:origin=viz_share_link"
+TABLEAU_ENERGY_MARGIN_PROFILE_API = "https://public.tableau.com/profile/api/single_workbook/Energymargin"
+TABLEAU_ENERGY_MARGIN_VIZQL = (
+    "https://public.tableau.com/vizql/w/Energymargin/v/Energymargin/startSession/viewing"
+    "?%3AshowVizHome=no&%3Aembed=y&%3Adisplay_count=n&%3Aorigin=viz_share_link&%3Aredirect=auth"
+)
 UA = "nz-electricity-skill/1.0 (+https://github.com/thecolab-ai/.skills)"
 
 REGION_ALIASES = {
@@ -170,6 +179,15 @@ DG_REGION_TYPE_ALIASES = {
     "root nsp": "NSP_ROOT",
     "nsp-root": "NSP_ROOT",
     "nsp root": "NSP_ROOT",
+}
+
+ENERGY_MARGIN_COMPANIES = {
+    "contact": "Contact",
+    "genesis": "Genesis",
+    "manawa": "Manawa",
+    "mercury": "Mercury",
+    "meridian": "Meridian",
+    "nova": "Nova",
 }
 
 
@@ -1687,6 +1705,133 @@ def cmd_outages(args: argparse.Namespace) -> None:
     emit(data, args.json, render_outages)
 
 
+def http_probe(
+    url: str,
+    *,
+    timeout: int = 15,
+    method: str = "GET",
+    headers: dict[str, str] | None = None,
+    data: bytes | None = None,
+) -> dict[str, Any]:
+    req_headers = {
+        "User-Agent": nzfetch.DEFAULT_UA,
+        "Accept": "application/json, text/html, */*",
+        "Accept-Language": "en-NZ,en;q=0.8",
+        "Accept-Encoding": "identity",
+    }
+    if headers:
+        req_headers.update(headers)
+    request_obj = urllib.request.Request(url, data=data, headers=req_headers, method=method)
+    try:
+        with urllib.request.urlopen(request_obj, timeout=timeout) as response:
+            body = response.read(6000)
+            status = response.status
+            content_type = response.headers.get("Content-Type", "")
+            final_url = response.geturl()
+    except urllib.error.HTTPError as e:
+        body = e.read(6000)
+        status = e.code
+        content_type = e.headers.get("Content-Type", "")
+        final_url = e.geturl()
+    except urllib.error.URLError as e:
+        return {"url": url, "ok": False, "error": f"network error: {e.reason}"}
+    except TimeoutError as e:
+        return {"url": url, "ok": False, "error": f"timeout: {e}"}
+
+    text = body.decode("utf-8", "replace")
+    lower = text.lower()
+    signals = []
+    if "where's the viz" in lower or "could not be found" in lower or "removed or renamed" in lower:
+        signals.append("tableau_removed_or_renamed")
+    if "awswaf" in lower or "captcha" in lower:
+        signals.append("bot_challenge")
+    return {
+        "url": url,
+        "final_url": final_url,
+        "ok": 200 <= status < 300,
+        "status_code": status,
+        "content_type": content_type,
+        "signals": signals,
+    }
+
+
+def energy_margin_checks(timeout: int) -> list[dict[str, Any]]:
+    viz_location = (
+        "https://public.tableau.com/views/Energymargin/Energymargin"
+        "?%3AshowVizHome=no&%3Aembed=y&%3Adisplay_count=n&%3Aorigin=viz_share_link&%3Aredirect=auth"
+    )
+    return [
+        http_probe(EA_ENERGY_MARGIN_DASHBOARD, timeout=timeout),
+        http_probe(EA_ENERGY_MARGIN_ARTICLE, timeout=timeout),
+        http_probe(TABLEAU_ENERGY_MARGIN_VIEW, timeout=timeout),
+        http_probe(TABLEAU_ENERGY_MARGIN_PROFILE_API, timeout=timeout),
+        http_probe(
+            TABLEAU_ENERGY_MARGIN_VIZQL,
+            timeout=timeout,
+            method="POST",
+            data=b"",
+            headers={
+                "Accept": "application/json",
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Referer": TABLEAU_ENERGY_MARGIN_VIEW,
+                "Tableau-Viz-Location": viz_location,
+                "Tableau-Viz-Path": "/w/Energymargin#0",
+            },
+        ),
+    ]
+
+
+def cmd_energy_margin(args: argparse.Namespace) -> None:
+    started = time.perf_counter()
+    from_date = parse_date(args.from_date).isoformat() if args.from_date else None
+    to_date = parse_date(args.to_date).isoformat() if args.to_date else None
+    if from_date and to_date and to_date < from_date:
+        die("--to must be on or after --from")
+    company_filter = None
+    if args.company:
+        key = args.company.strip().lower()
+        company_filter = ENERGY_MARGIN_COMPANIES.get(key)
+        if not company_filter:
+            valid = ", ".join(sorted(ENERGY_MARGIN_COMPANIES))
+            die(f"unknown energy-margin company '{args.company}'. Supported companies: {valid}")
+
+    checks = energy_margin_checks(args.timeout)
+    tableau_view = next((item for item in checks if item.get("url") == TABLEAU_ENERGY_MARGIN_VIEW), {})
+    profile_api = next((item for item in checks if item.get("url") == TABLEAU_ENERGY_MARGIN_PROFILE_API), {})
+    vizql = next((item for item in checks if item.get("url") == TABLEAU_ENERGY_MARGIN_VIZQL), {})
+    removed = "tableau_removed_or_renamed" in (tableau_view.get("signals") or [])
+    unavailable = removed or profile_api.get("status_code") == 404 or vizql.get("status_code") == 404
+
+    status = "source_unavailable" if unavailable else "source_probe_inconclusive"
+    reason = (
+        "The official Authority-linked Tableau workbook/profile and VizQL session endpoints return 404. "
+        "No official machine-readable per-company energy-margin rows are available from this public surface."
+        if unavailable
+        else "The official Tableau workbook did not yield machine-readable per-company rows from this probe."
+    )
+    data = {
+        "source": "Electricity Authority gentailer energy margin dashboard/article",
+        "source_url": EA_ENERGY_MARGIN_DASHBOARD,
+        "article_url": EA_ENERGY_MARGIN_ARTICLE,
+        "tableau_url": "https://public.tableau.com/app/profile/electricity.authority/viz/Energymargin/Energymargin",
+        "status": status,
+        "reason": reason,
+        "company_filter": company_filter,
+        "from": from_date,
+        "to": to_date,
+        "count": 0,
+        "energy_margins": [],
+        "source_checks": checks,
+        "caveats": [
+            "This command does not reconstruct margins from prices and generation volumes.",
+            "This command does not ship copied chart values or third-party preserved data.",
+            "When the Authority publishes an official CSV/API feed, wire that feed here before returning rows.",
+        ],
+        "elapsed_ms": round((time.perf_counter() - started) * 1000),
+    }
+    emit(data, args.json, render_energy_margin)
+
+
 def money(value: Any) -> str:
     if value is None:
         return "-"
@@ -1928,6 +2073,33 @@ def render_outages(data: dict[str, Any]) -> str:
     return "\n".join(lines).rstrip()
 
 
+def render_energy_margin(data: dict[str, Any]) -> str:
+    rows = data.get("energy_margins") or []
+    lines = [
+        f"EA gentailer energy margins: {data.get('status')} ({data.get('elapsed_ms')} ms)",
+        f"Source: {data.get('source_url')}",
+    ]
+    if data.get("company_filter"):
+        lines.append(f"Company filter: {data.get('company_filter')}")
+    if rows:
+        lines.append("")
+        for item in rows:
+            lines.append(
+                f"{item.get('period') or '-'}  {item.get('company') or '-'}  "
+                f"{number(item.get('energy_margin_million_nzd'))} $m"
+            )
+    else:
+        lines.append(data.get("reason") or "No official energy-margin rows returned.")
+        lines.append("")
+        lines.append("Checked official surfaces:")
+        for check in data.get("source_checks") or []:
+            status = check.get("status_code") if check.get("status_code") is not None else check.get("error")
+            signals = ", ".join(check.get("signals") or [])
+            suffix = f" [{signals}]" if signals else ""
+            lines.append(f"- {status} {check.get('url')}{suffix}")
+    return "\n".join(lines).rstrip()
+
+
 def emit(data: dict[str, Any], as_json: bool, render: Callable[[dict[str, Any]], str]) -> None:
     if as_json:
         print(json.dumps(data, indent=2, ensure_ascii=False))
@@ -2014,6 +2186,14 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--all", action="store_true", help="include planned, scheduled, or recent outage records where feeds expose them")
     sp.add_argument("--json", action="store_true")
     sp.set_defaults(func=cmd_outages)
+
+    sp = sub.add_parser("energy-margin", help="probe official EA gentailer energy-margin source availability")
+    sp.add_argument("--company", help="Contact, Genesis, Manawa, Mercury, Meridian, or Nova")
+    sp.add_argument("--from", dest="from_date", help="requested period start date YYYY-MM-DD; returned as metadata until an official data feed is available")
+    sp.add_argument("--to", dest="to_date", help="requested period end date YYYY-MM-DD; returned as metadata until an official data feed is available")
+    sp.add_argument("--timeout", type=positive_int, default=15, help="per-source probe timeout in seconds; default 15")
+    sp.add_argument("--json", action="store_true")
+    sp.set_defaults(func=cmd_energy_margin)
 
     return ap
 
