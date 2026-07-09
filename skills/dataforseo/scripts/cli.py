@@ -86,6 +86,13 @@ def dig(obj, path, default=None):
     return cur
 
 
+def strip_www(domain):
+    """Drop a leading 'www.' prefix. NOT str.lstrip, which strips a char set
+    (e.g. 'wise.com'.lstrip('www.') -> 'ise.com')."""
+    text = (domain or "").lower()
+    return text[4:] if text.startswith("www.") else text
+
+
 def resolve_location(value):
     text = str(value).strip().lower()
     if text.isdigit():
@@ -250,10 +257,10 @@ def cmd_serp(args):
     organic = [i for i in items if i.get("type") == "organic"]
 
     if args.domain:
-        target = args.domain.lower().lstrip("www.")
+        target = strip_www(args.domain)
         hit = None
         for i in organic:
-            dom = (i.get("domain") or "").lower().lstrip("www.")
+            dom = strip_www(i.get("domain"))
             if dom == target or dom.endswith("." + target) or target.endswith("." + dom):
                 hit = i
                 break

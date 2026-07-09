@@ -7,20 +7,21 @@ description: Query DataForSEO for SEO + market-validation data — Google SERP r
 
 ## Goal
 
-Query DataForSEO's v3 **live** (synchronous) endpoints through a CLI that is easy
-for agents to script and easy for humans to scan — SERP rank checks, keyword
-research, domain/competitor analytics, and backlinks.
+Query DataForSEO's v3 endpoints through a CLI that is easy for agents to script
+and humans to scan — SERP, keyword research + discovery, domain/competitor
+analytics, backlinks, App Store / Play data, and one-shot idea validation.
 
 ## Use this when
 
-- Checking where a site ranks for a keyword (`serp <keyword> --domain <site>`)
-- Listing the top Google organic results for a query
+- Validating an app/business idea in one scored pass (`validate <idea>`)
+- Checking where a site ranks, or listing the top organic results (`serp`)
 - Finding search volume, CPC, and competition for keywords (`volume`)
-- Getting long-tail keyword ideas from a seed term (`suggestions`)
+- Discovering keywords — long-tail (`suggestions`), semantic (`ideas`), related-search (`related`), intent (`intent`)
 - Seeing what keywords a domain already ranks for (`ranked`)
 - Finding a domain's organic competitors (`competitors`)
 - Getting a domain's organic/paid rank overview (`domain`)
 - Auditing a domain's backlinks and referring domains (`backlinks`, `refdomains`)
+- Which apps rank in a store (`appsearch`); mining app reviews (`appreviews`)
 
 ## Do not use this for
 
