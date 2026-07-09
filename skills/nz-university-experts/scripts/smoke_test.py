@@ -74,6 +74,22 @@ def test_search_auckland():
     return "name" in e and "profile_url" in e and "expertise" in e
 
 
+def test_search_massey_no_contact():
+    r = run(["search", "milk", "--uni", "massey", "--limit", "3", "--json"])
+    if is_network_skip(r):
+        return "skip"
+    if r.returncode != 0:
+        print(f"  stderr: {r.stderr.strip()}")
+        return False
+    # Contact details must never leak into output.
+    low = r.stdout.lower()
+    if "@massey" in low or '"email"' in low or '"phone"' in low:
+        print("  LEAK: contact detail present in output")
+        return False
+    d = json.loads(r.stdout)
+    return d.get("university") == "Massey University" and isinstance(d.get("experts"), list)
+
+
 def test_todo_uni_refused():
     r = run(["search", "x", "--uni", "otago"], timeout=20)
     return r.returncode == 1 and "wired up" in (r.stdout + r.stderr)
@@ -86,6 +102,7 @@ def main():
         test("unknown uni errors", test_unknown_uni),
         test("todo uni is refused", test_todo_uni_refused),
         test("auckland search returns experts", test_search_auckland),
+        test("massey search, no contact leak", test_search_massey_no_contact),
     ]
     passed = sum(1 for r in results if r is True)
     skipped = sum(1 for r in results if r == "skip")

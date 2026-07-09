@@ -14,12 +14,30 @@ Each portal exposes a public JSON search API (e.g. University of Auckland's
 from __future__ import annotations
 
 import argparse
+import html
 import json
 import pathlib
+import re
 import sys
+import urllib.parse
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
 import nzfetch  # noqa: E402
+
+_TAG_RE = re.compile(r"<[^>]+>")
+
+
+def html_to_lines(raw):
+    """Turn an HTML snippet of <p>/<li> items into a clean list of strings."""
+    if not raw:
+        return []
+    parts = re.split(r"</?(?:p|li|br|div)[^>]*>", raw, flags=re.IGNORECASE)
+    out = []
+    for p in parts:
+        text = html.unescape(_TAG_RE.sub("", p)).strip()
+        if text and text not in out:
+            out.append(text)
+    return out
 
 
 def die(msg: str, code: int = 1) -> None:
@@ -97,6 +115,51 @@ def auckland_search(query: str, limit: int) -> tuple[list, int]:
     return experts, total
 
 
+# ---------------------------------------------------------------- Massey
+
+
+MASSEY_BASE = "https://www.massey.ac.nz"
+MASSEY_API = (MASSEY_BASE + "/massey/app_templates/_pagetemplates/pagelets/search/"
+              "people/profile_solr_native/profiles_solr_native.cfc")
+
+
+def massey_search(query: str, limit: int) -> tuple[list, int]:
+    """Massey University — public Solr-backed expert search (keyword mode).
+
+    The API returns contact details (email/phone); we deliberately drop them —
+    this skill emits expertise, not a contact list.
+    """
+    body = urllib.parse.urlencode({
+        "experts_keywords_auto_selected": "none", "experts_keywords": query,
+        "experts_position_auto_selected": "none", "experts_position": "",
+        "experts_college": "", "experts_department": "", "solrHost": "tur-solr1",
+        "method": "getExpertsFromSolr", "radioSelect": "keywords",
+    }).encode()
+    data = fetch_json(
+        MASSEY_API, data=body, method="POST",
+        headers={"accept": "application/json, text/javascript, */*; q=0.01",
+                 "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+                 "x-requested-with": "XMLHttpRequest", "user-agent": _UA,
+                 "referer": f"{MASSEY_BASE}/massey/expertise/profile.cfm"},
+    )
+    docs = ((data.get("response") or {}).get("docs")) or []
+    experts = []
+    for r in docs[:limit]:
+        path = r.get("url") or ""
+        experts.append({
+            "name": r.get("known_as") or r.get("last_name"),
+            "title": r.get("position"),
+            "positions": [{"role": r.get("position"),
+                           "department": r.get("department")
+                           or r.get("college")}],
+            "expertise": html_to_lines(r.get("interests")),
+            "profile_url": (MASSEY_BASE + path) if path.startswith("/") else (path or None),
+            "university": "Massey University",
+        })  # note: email/phone/extension fields intentionally NOT collected
+    total = (((data.get("response") or {}).get("numFound")) or len(docs))
+    return experts, total
+
+
 # ---------------------------------------------------------------- registry
 
 
@@ -115,8 +178,9 @@ ADAPTERS = {
             "method": "todo", "portal": "https://people.wgtn.ac.nz"},
     "canterbury": {"name": "University of Canterbury", "method": "todo",
                    "portal": "https://researchprofiles.canterbury.ac.nz"},
-    "massey": {"name": "Massey University", "method": "todo",
-               "portal": "https://www.massey.ac.nz/about/our-people"},
+    "massey": {"name": "Massey University", "method": "api",
+               "portal": MASSEY_BASE + "/massey/expertise/profile.cfm",
+               "search": massey_search},
     "aut": {"name": "Auckland University of Technology", "method": "todo",
             "portal": "https://academics.aut.ac.nz"},
     "waikato": {"name": "University of Waikato", "method": "todo",

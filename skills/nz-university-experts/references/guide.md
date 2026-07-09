@@ -42,10 +42,16 @@ than scraping rendered HTML.
 
 ## Supported / roadmap
 
-- **auckland** — `api`, live. `https://profiles.auckland.ac.nz/api/users`.
-- **otago, vuw, canterbury, massey, aut, waikato, lincoln** — `todo`: each needs its
-  portal's public JSON search endpoint identified (step 2 above). Run `unis` for the
-  current list.
+- **auckland** — `api`, live. `POST /api/users` (JSON body).
+- **massey** — `api`, live. Solr expert search (`.../profiles_solr_native.cfc`,
+  form-encoded, `method=getExpertsFromSolr`). Its docs carry email/phone — the adapter
+  drops them; keep it that way in any new adapter.
+- **otago, vuw, canterbury, aut, waikato, lincoln** — `todo`: each needs its portal's
+  public JSON search endpoint identified (step 2 above). Run `unis` for the current list.
+
+**When a portal returns contact details** (Massey returns email/phone), map only
+name / title / department / expertise / profile_url. Never emit email, phone, or
+image fields — this skill surfaces expertise for a human steward, not a contact list.
 
 ## Reaching non-academics
 

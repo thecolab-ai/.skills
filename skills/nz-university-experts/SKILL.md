@@ -52,6 +52,9 @@ Run via `python3 scripts/cli.py <command>`:
 
 - University of Auckland: `https://profiles.auckland.ac.nz/api/users` (public JSON
   search). Keyless, read-only.
+- Massey University: public Solr expert search (`.../profiles_solr_native.cfc`).
+  Keyless. Its records include email/phone; this skill **deliberately drops** those
+  and emits expertise only.
 
 ## Notes
 
