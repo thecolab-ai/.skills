@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -183,6 +184,52 @@ def test_directory_todo_refused():
     return result.returncode == 1 and "wired up" in (result.stdout + result.stderr)
 
 
+def test_registers():
+    result = run(["registers", "--json"], timeout=20)
+    if result.returncode != 0:
+        return False
+    d = json.loads(result.stdout)
+    slugs = [r["slug"] for r in d.get("registers", [])]
+    return d.get("kind") == "registers" and {"pgdb", "legalaid", "irpnz", "mcnz"} <= set(slugs)
+
+
+def _register_case(which, query):
+    result = run(["register", query, "--which", which, "--limit", "3", "--json"], timeout=90)
+    if is_network_skip(result):
+        return "skip"
+    if result.returncode != 0:
+        print(f"  {which} stderr: {result.stderr.strip()}")
+        return False
+    # Contact details must never leak.
+    low = result.stdout.lower()
+    if re.search(r'[a-z0-9._]+@[a-z]|"email"|phone', low):
+        print(f"  {which} LEAK: contact detail in output")
+        return False
+    d = json.loads(result.stdout)
+    return d.get("kind") == "register-experts" and isinstance(d.get("experts"), list)
+
+
+def test_register_pgdb():
+    return _register_case("pgdb", "smith")
+
+
+def test_register_mcnz():
+    return _register_case("mcnz", "smith")
+
+
+def test_register_legalaid():
+    return _register_case("legalaid", "family")
+
+
+def test_register_irpnz():
+    return _register_case("irpnz", "nutrient")
+
+
+def test_register_unknown():
+    result = run(["register", "x", "--which", "nope"], timeout=20)
+    return result.returncode == 1
+
+
 def main() -> int:
     results = [
         test("help lists subcommands", test_help),
@@ -197,6 +244,12 @@ def main() -> int:
         test("directory auckland", test_directory_auckland),
         test("directory massey, no contact leak", test_directory_massey_no_contact),
         test("directory todo uni refused", test_directory_todo_refused),
+        test("registers lists the four", test_registers),
+        test("register pgdb (trades)", test_register_pgdb),
+        test("register mcnz (doctors)", test_register_mcnz),
+        test("register legalaid (lawyers)", test_register_legalaid),
+        test("register irpnz (rural)", test_register_irpnz),
+        test("register unknown errors", test_register_unknown),
         test("orcid record fetch", test_orcid),
     ]
     passed = sum(1 for r in results if r is True)

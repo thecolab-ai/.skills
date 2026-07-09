@@ -743,6 +743,225 @@ def cmd_directory(args) -> None:
     print("\nNote: ephemeral shortlist from public data — discovery is not consent.")
 
 
+# ---------------------------------------------------------------- registers
+#
+# Professional / practitioner registers — the tier scholarly sources miss.
+# Every adapter returns records shaped {name, role, organisation, expertise[],
+# status, location, profile_url, register} and NEVER emits contact details
+# (email/phone/address are dropped even where the source exposes them).
+
+
+def _strip_html(s: str) -> str:
+    return re.sub(r"\s+", " ", html.unescape(_TAG_RE.sub("", s or ""))).strip()
+
+
+def register_record(**kw) -> dict:
+    base = {"name": None, "role": None, "organisation": None, "expertise": [],
+            "status": None, "location": None, "profile_url": None, "register": None}
+    base.update(kw)
+    return base
+
+
+def pgdb_search(query: str, limit: int) -> tuple[list, int]:
+    """Plumbers, Gasfitters & Drainlayers Board — public register (by name)."""
+    data = fetch_json(
+        f"https://pgdb-api.pgdb.co.nz/v1/Search/PublicRegister?name={urllib.parse.quote(query)}",
+        headers={"accept": "application/json"})
+    contacts = data.get("publicRegisterContacts") or []
+    out = []
+    for r in contacts[:limit]:
+        regs = r.get("registrations") or []
+        types = [g.get("registrationTypeName") for g in regs if g.get("registrationTypeName")]
+        active = [g for g in regs if g.get("registrationStatusCode") == "ACTV"]
+        out.append(register_record(
+            name=r.get("fullName"),
+            role="; ".join(dict.fromkeys(types)) or "Plumber/Gasfitter/Drainlayer",
+            organisation=None,
+            expertise=list(dict.fromkeys(types)),
+            status="Active" if active else (regs[0].get("registrationStatusName") if regs else None),
+            location=r.get("businessCity") or r.get("businessSuburbTown"),
+            profile_url=r.get("url") or "https://www2.pgdb.co.nz/public-register",
+            register="PGDB (Plumbers, Gasfitters & Drainlayers Board)",
+        ))  # publicPhone/publicEmail/address intentionally dropped
+    return out, len(contacts)
+
+
+def legalaid_search(query: str, limit: int) -> tuple[list, int]:
+    """Ministry of Justice legal-aid lawyers — one JSON roster, filtered here."""
+    data = fetch_json(
+        "https://www.justice.govt.nz/courts/going-to-court/legal-aid/get-legal-aid/"
+        "legal-aid-lawyer-finder/roster/",
+        headers={"accept": "application/json", "x-requested-with": "XMLHttpRequest"})
+    lawyers = data.get("lawyers") or []
+    # lawyer.matterTypes reference the taxonomy by hash — resolve to readable names.
+    hashmap = {m.get("hash"): (m.get("mappedColumn") or m.get("matterType"))
+               for m in (data.get("matterTypes") or []) if m.get("hash")}
+    q = query.lower().strip()
+    out = []
+    matched = 0
+    for r in lawyers:
+        matters = [hashmap.get(h, h) for h in (r.get("matterTypes") or [])]
+        hay = " ".join([r.get("name") or "", r.get("firmName") or "",
+                        " ".join(matters), " ".join(r.get("languages") or [])]).lower()
+        if q and q not in hay:
+            continue
+        matched += 1
+        if len(out) >= limit:
+            continue
+        loc = (r.get("locations") or [{}])[0]
+        out.append(register_record(
+            name=r.get("name"),
+            role=f"Legal-aid lawyer ({r.get('providerType')})" if r.get("providerType") else "Legal-aid lawyer",
+            organisation=r.get("firmName"),
+            expertise=matters,
+            status="Legal aid provider",
+            location="; ".join(filter(None, [loc.get("city"), loc.get("region")])) or None,
+            profile_url=None,
+            register="MoJ Legal Aid Lawyer Finder",
+        ))  # locations[].phoneNumber intentionally dropped
+    return out, matched
+
+
+def irpnz_search(query: str, limit: int) -> tuple[list, int]:
+    """Institute of Rural Professionals — 'find a member' (paginated, filtered here)."""
+    base = "https://www.irpnz.co.nz/DataFilter?Action=AjaxList&DataFilter_id=145"
+    q = query.lower().strip()
+    out, scanned = [], 0
+    first = fetch_json(f"{base}&Page=1", headers={"accept": "application/json"})
+    total_pages = first.get("TotalPages") or 1
+    total_items = first.get("TotalItems") or 0
+    page, data = 1, first
+    while True:
+        for r in data.get("Items") or []:
+            scanned += 1
+            hay = " ".join([r.get("PersonProfile_title") or "", r.get("Person_jobtitle") or "",
+                            r.get("Company_name") or "", r.get("PersonProfile_subtitle") or ""]).lower()
+            if q and q not in hay:
+                continue
+            view = r.get("PersonProfile_urlview") or ""
+            out.append(register_record(
+                name=r.get("PersonProfile_title"),
+                role=r.get("Person_jobtitle"),
+                organisation=r.get("Company_name"),
+                expertise=[x for x in [r.get("Person_jobtitle"), r.get("PersonProfile_subtitle")] if x],
+                status="IRPNZ member",
+                location=None,
+                profile_url=f"https://www.irpnz.co.nz/{view}" if view else None,
+                register="Institute of Rural Professionals (IRPNZ)",
+            ))  # Person_mail / phone intentionally dropped
+            if len(out) >= limit:
+                return out, total_items
+        page += 1
+        if page > total_pages:
+            break
+        data = fetch_json(f"{base}&Page={page}", headers={"accept": "application/json"})
+    return out, total_items
+
+
+_MCNZ_TILE = re.compile(r'<a href="([^"]+)"[^>]*title-link[^>]*>(.*?)</a>', re.S)
+_MCNZ_FIELD = re.compile(r'b-doctor-detail__content-(\w+)">(.*?)</li>', re.S)
+
+
+def mcnz_search(query: str, limit: int) -> tuple[list, int]:
+    """Medical Council of NZ — register of doctors (HTML-in-JSON, paginated)."""
+    base = ("https://www.mcnz.org.nz/registration/register-of-doctors/"
+            f"?keyword={urllib.parse.quote(query)}&location=&area=&status=")
+    out, start, total = [], 0, 0
+    while len(out) < limit:
+        data = fetch_json(f"{base}&start={start}",
+                          headers={"accept": "application/json", "x-requested-with": "XMLHttpRequest"})
+        upd = (data.get("content") or {}).get("update") or {}
+        summ = _strip_html(upd.get("#search-results-summary") or "")
+        m = re.search(r"([\d,]+)\s+doctor", summ)
+        if m:
+            total = int(m.group(1).replace(",", ""))
+        wrap = upd.get("#search-results-wrap") or ""
+        tiles = wrap.split("b-search-register-tile b-grid-list__list-item")[1:]
+        if not tiles:
+            break
+        for tile in tiles:
+            am = _MCNZ_TILE.search(tile)
+            if not am:
+                continue
+            fields = {k: _strip_html(v) for k, v in _MCNZ_FIELD.findall(tile)}
+            href = am.group(1)
+            out.append(register_record(
+                name=_strip_html(am.group(2)),
+                role="Doctor",
+                organisation=None,
+                expertise=[fields["speciality"]] if fields.get("speciality") else [],
+                status=fields.get("status"),
+                location=fields.get("location"),
+                profile_url=("https://www.mcnz.org.nz" + href) if href.startswith("/") else href,
+                register="Medical Council of NZ — Register of Doctors",
+            ))
+            if len(out) >= limit:
+                break
+        start += 20
+        if start >= (total or 0):
+            break
+    return out, total
+
+
+REGISTERS = {
+    "pgdb": {"name": "PGDB — plumbers, gasfitters, drainlayers", "reaches": "practitioners",
+             "query": "name", "search": pgdb_search},
+    "legalaid": {"name": "MoJ Legal Aid lawyers", "reaches": "practitioners",
+                 "query": "name / practice area", "search": legalaid_search},
+    "irpnz": {"name": "IRPNZ — rural professionals / farm advisers", "reaches": "practitioners",
+              "query": "name / role / firm", "search": irpnz_search},
+    "mcnz": {"name": "MCNZ — register of doctors", "reaches": "practitioners",
+             "query": "name", "search": mcnz_search},
+}
+
+
+def cmd_registers(args) -> None:
+    rows = [{"slug": s, "name": a["name"], "reaches": a["reaches"], "query": a["query"]}
+            for s, a in REGISTERS.items()]
+    if args.json:
+        print(json.dumps({"kind": "registers", "count": len(rows), "registers": rows}, indent=2))
+        return
+    for r in rows:
+        print(f"{r['slug']:10} {r['name']}  (query: {r['query']})")
+    print("\nProfessional registers reach practitioners scholarly sources miss. "
+          "Contact details are never collected.")
+
+
+def cmd_register(args) -> None:
+    reg = REGISTERS.get(args.which)
+    if not reg:
+        die(f"unknown register '{args.which}'. Run `registers` to list slugs.")
+    experts, total = reg["search"](args.query, args.limit)
+    out = {
+        "kind": "register-experts",
+        "note": "Ephemeral candidate shortlist from a public register. Discovery is "
+        "not consent — do not store or bulk-contact. Contact details not collected.",
+        "register": reg["name"],
+        "query": args.query,
+        "total_available": total,
+        "count": len(experts),
+        "experts": experts,
+    }
+    if args.json:
+        print(json.dumps(out, indent=2))
+        return
+    if not experts:
+        print(f"No matches for {args.query!r} in {reg['name']}.")
+        return
+    print(f"{reg['name']} — {args.query!r} ({len(experts)} of {total}):\n")
+    for i, e in enumerate(experts, 1):
+        org = f" — {e['organisation']}" if e["organisation"] else ""
+        print(f"{i:2}. {e['name']}{org}")
+        line = "; ".join(filter(None, [e["role"], e["location"], e["status"]]))
+        if line:
+            print(f"    {line}")
+        if e["expertise"]:
+            print(f"    Expertise: {', '.join(e['expertise'][:8])}")
+        if e["profile_url"]:
+            print(f"    {e['profile_url']}")
+    print("\nNote: ephemeral shortlist from a public register — discovery is not consent.")
+
+
 # ---------------------------------------------------------------- topics
 
 
@@ -813,6 +1032,19 @@ def main() -> None:
     u = sub.add_parser("unis", help="list supported university directories")
     u.add_argument("--json", action="store_true")
     u.set_defaults(func=cmd_unis)
+
+    rg = sub.add_parser("register",
+                        help="search a professional register (practitioners)")
+    rg.add_argument("query", help="name / practice area / role")
+    rg.add_argument("--which", default="pgdb",
+                    help="register slug (run `registers` to list): pgdb, legalaid, irpnz, mcnz")
+    rg.add_argument("--limit", type=int, default=10, help="people to return")
+    rg.add_argument("--json", action="store_true")
+    rg.set_defaults(func=cmd_register)
+
+    rgs = sub.add_parser("registers", help="list supported professional registers")
+    rgs.add_argument("--json", action="store_true")
+    rgs.set_defaults(func=cmd_registers)
 
     ins = sub.add_parser("institutions",
                          help="resolve NZ universities/CRIs/companies to OpenAlex ids")

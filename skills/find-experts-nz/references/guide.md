@@ -194,3 +194,31 @@ read-only search endpoints only.
 **Never collect contact details.** Massey's API returns email/phone; the adapter
 drops them and emits expertise only. Keep that rule in any new adapter — this skill
 surfaces expertise for a human steward, not a contact list.
+
+## Professional registers (`register` command)
+
+`register` searches an official practitioner register — reaching the **practitioner
+tier** (tradespeople, advisers, clinicians) that publication and directory sources
+miss. Each returns `{name, role, organisation, expertise[], status, location,
+profile_url, register}`.
+
+Wired up:
+
+- **pgdb** — Plumbers, Gasfitters & Drainlayers Board public register (`pgdb-api.pgdb.co.nz`), by name. Registration types (Certifying Plumber…) become the expertise tags.
+- **legalaid** — MoJ Legal Aid Lawyer Finder: one JSON roster of ~3,000 lawyers, filtered here by name / firm / practice area (matter-type hashes resolved to readable names).
+- **irpnz** — Institute of Rural Professionals "find a member": ~650 farm-systems advisers, nutrient specialists, rural consultants; paginated, filtered by name/role/firm.
+- **mcnz** — Medical Council register of doctors (~25k): keyless, HTML-in-JSON, by name, with scope of practice and status.
+
+**Never collect contact details.** PGDB, IRPNZ, and legal-aid records carry
+email/phone/address; every adapter drops them and emits only expertise + a public
+profile link. A smoke test asserts no contact detail reaches output. Keep that rule
+in any new register adapter.
+
+**Confirm terms before bulk use.** These are public lookups; the skill does per-query,
+capped fetches (no full-register mirroring). MoJ Legal Aid data licensing and CAB-style
+acceptable-use should be checked before any redistribution beyond an ephemeral steward
+shortlist. See the source build queue for per-source notes.
+
+**Adding a register:** identify its public JSON (or HTML-in-JSON) search endpoint,
+write an adapter returning the record shape above via `fetch_json`, drop all contact
+fields, and register it in `REGISTERS`.

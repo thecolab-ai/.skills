@@ -26,9 +26,10 @@ whose authors OpenAlex's institution filter often misses. Python stdlib only.
 - Building or storing a contact list. **Discovery is not consent.** Output is an
   *ephemeral* shortlist for a human steward to review — never a mailing list, never
   auto-contacted, never persisted as a `candidate` registry.
-- Finding non-published practitioners (beekeepers, tradespeople, front-line staff).
-  OpenAlex indexes *authors* — it finds academics, not the practitioner in no register.
-  Use industry associations / registers for those (see references).
+- Finding practitioners *via `search`* — OpenAlex/Crossref index *authors*, so they
+  find academics, not the tradesperson or adviser. Use the `register` command for
+  practitioners in a professional register, or the org axis (see references) for those
+  in none.
 - Any personal-data workflow. Emails and addresses are out of scope by design; this
   skill returns names, affiliations, and public profile links only.
 
@@ -61,6 +62,12 @@ Run via `python3 scripts/cli.py <command>`:
   Directory data includes staff who don't publish much and the expertise *they*
   chose to be found by. Contact details are deliberately never collected.
 - `unis [--json]` — list supported university directories (`api`) and roadmap ones.
+- `register QUERY [--which pgdb|legalaid|irpnz|mcnz] [--limit N] [--json]` — search a
+  professional register for named **practitioners** — the tier scholarly sources miss.
+  `pgdb` (plumbers/gasfitters/drainlayers, by name), `legalaid` (MoJ legal-aid lawyers,
+  by name or practice area), `irpnz` (rural professionals / farm advisers, by name/role/
+  firm), `mcnz` (register of doctors, by name). Contact details are never collected.
+- `registers [--json]` — list supported professional registers.
 - `institutions QUERY [--type TYPE] [--country NZ] [--limit N] [--json]` — resolve
   NZ universities, CRIs, companies, and government bodies to OpenAlex institution
   ids. `--type company` lists R&D-active NZ companies; feed an id to
@@ -83,6 +90,9 @@ Run via `python3 scripts/cli.py <command>`:
 - University directories (`directory`): University of Auckland (`/api/users`) and
   Massey (Solr expert search). Keyless. Massey returns email/phone; the skill
   **drops** them and emits expertise only.
+- Professional registers (`register`): PGDB plumbers/gasfitters/drainlayers, MoJ
+  Legal Aid lawyers, IRPNZ rural professionals, MCNZ register of doctors. Keyless.
+  PGDB/IRPNZ/legal-aid expose contact details; the skill **drops** them.
 - ORCID public API: `https://pub.orcid.org/v3.0` (record). Keyless.
 
 ## Reaching beyond academics
