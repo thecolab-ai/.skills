@@ -174,3 +174,23 @@ Non-NZ affiliation: `--country AU`, `--country GB`, etc. (ISO-2 codes).
 
 - `0` success · `1` usage/validation error · `2` `network error` (transient bot-wall
   or upstream outage — smoke tests SKIP rather than FAIL on this).
+
+## University directories (`directory` command)
+
+`directory` searches a university "Find an Expert" portal's public JSON API and
+returns named academics with **curated** expertise tags (what they chose to be found
+by), title, department, and profile URL — complementing the publication-based
+`search`. Wired up: **Auckland** (`POST /api/users`) and **Massey** (Solr expert
+search). Others (`unis` shows them as `todo`) each need their portal's public JSON
+search endpoint identified.
+
+**Adding a university:** open the portal's expert search in a browser, watch the
+Network tab (XHR/fetch) as you search, find the request returning JSON, add an
+adapter in `scripts/cli.py` that calls it via the shared `fetch_json` (POST bodies
+supported) and maps records to `{name, title, positions[], expertise[], profile_url,
+university}`, then register it in `DIRECTORIES` with `"method": "api"`. Public,
+read-only search endpoints only.
+
+**Never collect contact details.** Massey's API returns email/phone; the adapter
+drops them and emits expertise only. Keep that rule in any new adapter — this skill
+surfaces expertise for a human steward, not a contact list.

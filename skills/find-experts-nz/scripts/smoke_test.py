@@ -144,6 +144,45 @@ def test_orcid():
     return data.get("kind") == "orcid-record" and data.get("orcid") == "0000-0002-1801-5687"
 
 
+def test_unis():
+    result = run(["unis", "--json"], timeout=20)
+    if result.returncode != 0:
+        return False
+    d = json.loads(result.stdout)
+    slugs = [u["slug"] for u in d.get("universities", [])]
+    return d.get("kind") == "universities" and "auckland" in slugs and "massey" in slugs
+
+
+def test_directory_auckland():
+    result = run(["directory", "aged care", "--uni", "auckland", "--limit", "3", "--json"])
+    if is_network_skip(result):
+        return "skip"
+    if result.returncode != 0:
+        print(f"  stderr: {result.stderr.strip()}")
+        return False
+    d = json.loads(result.stdout)
+    return d.get("kind") == "university-experts" and isinstance(d.get("experts"), list)
+
+
+def test_directory_massey_no_contact():
+    result = run(["directory", "milk", "--uni", "massey", "--limit", "3", "--json"])
+    if is_network_skip(result):
+        return "skip"
+    if result.returncode != 0:
+        return False
+    low = result.stdout.lower()
+    if "@massey" in low or '"email"' in low or '"phone"' in low:
+        print("  LEAK: contact detail present in output")
+        return False
+    d = json.loads(result.stdout)
+    return d.get("university") == "Massey University"
+
+
+def test_directory_todo_refused():
+    result = run(["directory", "x", "--uni", "otago"], timeout=20)
+    return result.returncode == 1 and "wired up" in (result.stdout + result.stderr)
+
+
 def main() -> int:
     results = [
         test("help lists subcommands", test_help),
@@ -154,6 +193,10 @@ def main() -> int:
         test("wikidata source search", test_search_wikidata),
         test("institutions resolve", test_institutions),
         test("search by institution", test_search_by_institution),
+        test("unis lists auckland+massey", test_unis),
+        test("directory auckland", test_directory_auckland),
+        test("directory massey, no contact leak", test_directory_massey_no_contact),
+        test("directory todo uni refused", test_directory_todo_refused),
         test("orcid record fetch", test_orcid),
     ]
     passed = sum(1 for r in results if r is True)

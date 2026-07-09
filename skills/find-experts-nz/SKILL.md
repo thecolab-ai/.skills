@@ -1,6 +1,6 @@
 ---
 name: find-experts-nz
-description: Discover New Zealand-affiliated researchers and subject experts by topic, using the public OpenAlex scholarly graph and ORCID registry. Use when you need a citable candidate shortlist of who could speak to a research question — expert matching, "find an expert", verifying a finding with a practitioner, or building an SME/advisory candidate list. Returns ephemeral shortlists from public data only — discovery is not consent and output is never a contact list.
+description: Discover New Zealand experts by topic across public sources — the OpenAlex and Crossref scholarly graphs, Wikidata, ORCID, and university "Find an Expert" directories (University of Auckland, Massey). Use when you need a citable candidate shortlist of who could speak to a research question — expert matching, "find an expert", verifying a finding, or building an SME/advisory candidate list. Returns ephemeral shortlists from public data only — discovery is not consent and output is never a contact list.
 ---
 
 # Find Experts (NZ)
@@ -55,6 +55,12 @@ Run via `python3 scripts/cli.py <command>`:
   experts (people with a Wikidata item) across **any** institution — including
   portals with no API — matched by field of work; NZ-only, soft-fails if WDQS is
   rate-limiting.
+- `directory QUERY [--uni SLUG] [--limit N] [--json]` — search a university
+  "Find an Expert" directory (default `--uni auckland`; also `massey`) for named
+  academics with curated expertise tags, title, department, and profile URL.
+  Directory data includes staff who don't publish much and the expertise *they*
+  chose to be found by. Contact details are deliberately never collected.
+- `unis [--json]` — list supported university directories (`api`) and roadmap ones.
 - `institutions QUERY [--type TYPE] [--country NZ] [--limit N] [--json]` — resolve
   NZ universities, CRIs, companies, and government bodies to OpenAlex institution
   ids. `--type company` lists R&D-active NZ companies; feed an id to
@@ -74,13 +80,17 @@ Run via `python3 scripts/cli.py <command>`:
 - Crossref: `https://api.crossref.org/works` (works + author affiliations). Keyless.
 - Wikidata Query Service: `https://query.wikidata.org/sparql` (NZ academics by field
   of work). Keyless, CC0. Notable-only; rate-limited (soft-fails when throttled).
+- University directories (`directory`): University of Auckland (`/api/users`) and
+  Massey (Solr expert search). Keyless. Massey returns email/phone; the skill
+  **drops** them and emits expertise only.
 - ORCID public API: `https://pub.orcid.org/v3.0` (record). Keyless.
 
-## Reaching beyond academics (companion skills)
+## Reaching beyond academics
 
-OpenAlex/Crossref only find *published* people. For practitioners and organisations
-— the beekeeper, the aged-care provider — discover the **organisation** first, then
-a human invites it. Compose these existing skills (see `references/guide.md`):
+`search`/`directory` find *published or directory-listed* people. For practitioners
+and organisations — the beekeeper, the aged-care provider — discover the
+**organisation** first, then a human invites it. Compose these existing skills
+(see `references/guide.md`):
 
 - `nzbn-register` / `companies-office-nz` — find businesses by name; directors,
   industry classification.
@@ -89,12 +99,8 @@ a human invites it. Compose these existing skills (see `references/guide.md`):
 
 To target a specific university or company, use `institutions` then
 `search --institution <id>` (or `--org-type company`) — all keyless via OpenAlex.
-
-University "Find an Expert" portals (Elsevier Pure) and professional registers
-(Engineering NZ, NZ Law Society, Medical Council) have no keyless JSON API and are
-JS-rendered / bot-walled to bare HTTP. They *are* reachable with a real browser
-(CloakBrowser) — a proven but heavier, per-portal route documented as a future
-optional `--browser` companion in `references/guide.md`, not scripted here.
+More university directories can be added under `directory` as each portal's public
+JSON search endpoint is identified — see `references/guide.md`.
 
 ## Notes
 

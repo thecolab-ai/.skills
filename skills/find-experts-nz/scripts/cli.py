@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
-"""find-experts-nz — discover NZ-affiliated researchers/experts by topic.
+"""find-experts-nz — discover NZ experts across public sources.
 
-Read-only, keyless queries against the OpenAlex and ORCID public APIs.
-Produces EPHEMERAL candidate shortlists for a human steward — discovery is
-not consent; never treat output as a contact list. Python stdlib only.
+Read-only, keyless queries across scholarly graphs (OpenAlex, Crossref),
+Wikidata, ORCID, and university "Find an Expert" directories. Produces
+EPHEMERAL candidate shortlists for a human steward — discovery is not consent;
+never treat output as a contact list. Python stdlib only.
 """
 
 from __future__ import annotations
 
 import argparse
+import html
 import json
 import os
 import pathlib
@@ -41,13 +43,29 @@ def die(msg: str, code: int = 1) -> None:
     sys.exit(code)
 
 
-def fetch_json(url: str, headers: dict | None = None):
+def fetch_json(url: str, **kw):
     try:
-        return nzfetch.fetch_json(url, headers=headers)
+        return nzfetch.fetch_json(url, **kw)
     except nzfetch.Blocked as e:
         die(f"network error: upstream_blocked: {e}", 2)
     except nzfetch.FetchError as e:
         die(f"network error: upstream_unavailable: {e}", 2)
+
+
+_TAG_RE = re.compile(r"<[^>]+>")
+
+
+def html_to_lines(raw):
+    """Turn an HTML snippet of <p>/<li> items into a clean list of strings."""
+    if not raw:
+        return []
+    parts = re.split(r"</?(?:p|li|br|div)[^>]*>", raw, flags=re.IGNORECASE)
+    out = []
+    for p in parts:
+        text = html.unescape(_TAG_RE.sub("", p)).strip()
+        if text and text not in out:
+            out.append(text)
+    return out
 
 
 def openalex_url(path: str, params: dict) -> str:
@@ -548,6 +566,183 @@ def cmd_institutions(args) -> None:
     print("\nPass an id to `search --institution <id>` to find its experts on a topic.")
 
 
+# ---------------------------------------------------------------- directories
+
+
+AUCKLAND_BASE = "https://profiles.auckland.ac.nz"
+MASSEY_BASE = "https://www.massey.ac.nz"
+MASSEY_API = (MASSEY_BASE + "/massey/app_templates/_pagetemplates/pagelets/search/"
+              "people/profile_solr_native/profiles_solr_native.cfc")
+
+
+def auckland_search(query: str, limit: int) -> tuple[list, int]:
+    """University of Auckland — public /api/users JSON search."""
+    per_page = 25
+    experts: list[dict] = []
+    total = 0
+    start = 0
+    while len(experts) < limit:
+        payload = json.dumps({
+            "params": {"by": "text", "category": "user", "text": query,
+                       "startFrom": start, "perPage": per_page},
+            "filters": [
+                {"name": n, "matchDocsWithMissingValues": True, "useValuesToFilter": False}
+                for n in ("customFilterOne", "department", "tags",
+                          "customFilterTwo", "customFilterThree")
+            ],
+        }).encode()
+        data = fetch_json(
+            f"{AUCKLAND_BASE}/api/users",
+            data=payload, method="POST",
+            headers={"content-type": "application/json", "accept": "application/json",
+                     "origin": AUCKLAND_BASE,
+                     "referer": f"{AUCKLAND_BASE}/search?by=text&type=user"},
+        )
+        page = data.get("resource") or []
+        total = ((data.get("pagination") or {}).get("total")) or total
+        if not page:
+            break
+        for r in page:
+            positions = [
+                {"role": p.get("position"), "department": p.get("department")}
+                for p in (r.get("positions") or [])
+            ]
+            expertise = [
+                t.get("value") for t in ((r.get("tags") or {}).get("explicit") or [])
+                if t.get("value")
+            ]
+            slug = r.get("discoveryUrlId")
+            experts.append({
+                "name": r.get("firstNameLastName")
+                or " ".join(filter(None, [r.get("firstName"), r.get("lastName")])),
+                "title": r.get("title"),
+                "positions": positions,
+                "expertise": expertise,
+                "profile_url": f"{AUCKLAND_BASE}/{slug}" if slug else None,
+                "university": "University of Auckland",
+            })
+            if len(experts) >= limit:
+                break
+        start += per_page
+        if start >= total:
+            break
+    return experts, total
+
+
+def massey_search(query: str, limit: int) -> tuple[list, int]:
+    """Massey University — public Solr-backed expert search (keyword mode).
+
+    The API returns contact details (email/phone); we deliberately drop them —
+    this skill emits expertise, not a contact list.
+    """
+    body = urllib.parse.urlencode({
+        "experts_keywords_auto_selected": "none", "experts_keywords": query,
+        "experts_position_auto_selected": "none", "experts_position": "",
+        "experts_college": "", "experts_department": "", "solrHost": "tur-solr1",
+        "method": "getExpertsFromSolr", "radioSelect": "keywords",
+    }).encode()
+    data = fetch_json(
+        MASSEY_API, data=body, method="POST",
+        headers={"accept": "application/json, text/javascript, */*; q=0.01",
+                 "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+                 "x-requested-with": "XMLHttpRequest",
+                 "referer": f"{MASSEY_BASE}/massey/expertise/profile.cfm"},
+    )
+    docs = ((data.get("response") or {}).get("docs")) or []
+    experts = []
+    for r in docs[:limit]:
+        path = r.get("url") or ""
+        experts.append({
+            "name": r.get("known_as") or r.get("last_name"),
+            "title": r.get("position"),
+            "positions": [{"role": r.get("position"),
+                           "department": r.get("department") or r.get("college")}],
+            "expertise": html_to_lines(r.get("interests")),
+            "profile_url": (MASSEY_BASE + path) if path.startswith("/") else (path or None),
+            "university": "Massey University",
+        })  # note: email/phone/extension fields intentionally NOT collected
+    total = (((data.get("response") or {}).get("numFound")) or len(docs))
+    return experts, total
+
+
+DIRECTORIES = {
+    "auckland": {"name": "University of Auckland", "method": "api",
+                 "portal": AUCKLAND_BASE, "search": auckland_search},
+    "massey": {"name": "Massey University", "method": "api",
+               "portal": MASSEY_BASE + "/massey/expertise/profile.cfm",
+               "search": massey_search},
+    # Roadmap — each needs its portal's public JSON search endpoint identified
+    # (see references/guide.md, "adding a university"):
+    "otago": {"name": "University of Otago", "method": "todo",
+              "portal": "https://www.otago.ac.nz/profiles"},
+    "vuw": {"name": "Te Herenga Waka — Victoria University of Wellington",
+            "method": "todo", "portal": "https://people.wgtn.ac.nz"},
+    "canterbury": {"name": "University of Canterbury", "method": "todo",
+                   "portal": "https://researchprofiles.canterbury.ac.nz"},
+    "aut": {"name": "Auckland University of Technology", "method": "todo",
+            "portal": "https://academics.aut.ac.nz"},
+    "waikato": {"name": "University of Waikato", "method": "todo",
+                "portal": "https://www.waikato.ac.nz/staff-profiles"},
+    "lincoln": {"name": "Lincoln University", "method": "todo",
+                "portal": "https://researchers.lincoln.ac.nz"},
+}
+
+
+def cmd_unis(args) -> None:
+    rows = [
+        {"slug": s, "name": a["name"], "method": a["method"], "portal": a["portal"]}
+        for s, a in DIRECTORIES.items()
+    ]
+    if args.json:
+        print(json.dumps({"kind": "universities", "count": len(rows),
+                          "universities": rows}, indent=2))
+        return
+    for r in rows:
+        ready = "api" if r["method"] == "api" else r["method"]
+        print(f"{r['slug']:12} [{ready:5}] {r['name']}")
+    print("\nOnly 'api' portals are searchable now; others are roadmap "
+          "(references/guide.md).")
+
+
+def cmd_directory(args) -> None:
+    adapter = DIRECTORIES.get(args.uni)
+    if not adapter:
+        die(f"unknown university '{args.uni}'. Run `unis` to list supported slugs.")
+    if adapter["method"] != "api" or "search" not in adapter:
+        die(f"'{args.uni}' ({adapter['name']}) is not wired up yet "
+            f"(method={adapter['method']}). Run `unis`; see references/guide.md.")
+    experts, total = adapter["search"](args.query, args.limit)
+    out = {
+        "kind": "university-experts",
+        "note": "Ephemeral candidate shortlist from a public directory. "
+        "Discovery is not consent — do not store or bulk-contact.",
+        "university": adapter["name"],
+        "query": args.query,
+        "total_available": total,
+        "count": len(experts),
+        "experts": experts,
+    }
+    if args.json:
+        print(json.dumps(out, indent=2))
+        return
+    if not experts:
+        print(f"No matches for {args.query!r} at {adapter['name']}.")
+        return
+    print(f"Experts for {args.query!r} — {adapter['name']} ({len(experts)} of {total}):\n")
+    for i, e in enumerate(experts, 1):
+        pos = "; ".join(
+            f"{p['role']}, {p['department']}" if p.get("department") else (p.get("role") or "")
+            for p in e["positions"]
+        ) or "(no listed position)"
+        print(f"{i:2}. {e['name']} — {e['title'] or ''}")
+        print(f"    {pos}")
+        if e["expertise"]:
+            print(f"    Expertise: {', '.join(e['expertise'][:8])}")
+        if e["profile_url"]:
+            print(f"    {e['profile_url']}")
+    print("\nNote: ephemeral shortlist from public data — discovery is not consent.")
+
+
 # ---------------------------------------------------------------- topics
 
 
@@ -580,8 +775,9 @@ def cmd_topics(args) -> None:
 def main() -> None:
     p = argparse.ArgumentParser(
         prog="find-experts-nz",
-        description="Discover NZ-affiliated researchers/experts by topic "
-        "(OpenAlex + Crossref + ORCID, public data, ephemeral shortlists only).",
+        description="Discover NZ experts across public sources — scholarly graphs "
+        "(OpenAlex + Crossref + Wikidata + ORCID) and university directories. "
+        "Ephemeral shortlists only; discovery is not consent.",
     )
     sub = p.add_subparsers(dest="cmd", required=True)
 
@@ -604,6 +800,19 @@ def main() -> None:
     s.add_argument("--limit", type=int, default=10, help="experts to return")
     s.add_argument("--json", action="store_true")
     s.set_defaults(func=cmd_search)
+
+    d = sub.add_parser("directory",
+                       help="search a university 'Find an Expert' directory")
+    d.add_argument("query", help="free-text topic / expertise / name")
+    d.add_argument("--uni", default="auckland",
+                   help="university slug (default auckland; run `unis` to list)")
+    d.add_argument("--limit", type=int, default=10, help="experts to return")
+    d.add_argument("--json", action="store_true")
+    d.set_defaults(func=cmd_directory)
+
+    u = sub.add_parser("unis", help="list supported university directories")
+    u.add_argument("--json", action="store_true")
+    u.set_defaults(func=cmd_unis)
 
     ins = sub.add_parser("institutions",
                          help="resolve NZ universities/CRIs/companies to OpenAlex ids")
