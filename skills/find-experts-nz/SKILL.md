@@ -48,11 +48,13 @@ whose authors OpenAlex's institution filter often misses. Python stdlib only.
 
 Run via `python3 scripts/cli.py <command>`:
 
-- `search TOPIC [--source openalex|crossref|both] [--topic-id ID] [--institution IDS] [--org-type TYPE] [--country NZ] [--since YEAR] [--sample N] [--limit N] [--json]`
-  — ranked NZ-affiliated authors who published on the topic. Defaults to `both`;
-  authors found in both sources rank highest (corroboration). `--topic-id`,
-  `--institution`, `--org-type` are OpenAlex-only; Crossref matches NZ affiliation
-  by free-text string.
+- `search TOPIC [--source openalex|crossref|wikidata|both|all] [--topic-id ID] [--institution IDS] [--org-type TYPE] [--country NZ] [--since YEAR] [--sample N] [--limit N] [--json]`
+  — ranked NZ-affiliated experts on the topic. `both` = OpenAlex+Crossref (default);
+  `all` = also Wikidata. Experts found in more sources rank highest. `--topic-id`,
+  `--institution`, `--org-type` are OpenAlex-only. `wikidata` finds *notable* NZ
+  experts (people with a Wikidata item) across **any** institution — including
+  portals with no API — matched by field of work; NZ-only, soft-fails if WDQS is
+  rate-limiting.
 - `institutions QUERY [--type TYPE] [--country NZ] [--limit N] [--json]` — resolve
   NZ universities, CRIs, companies, and government bodies to OpenAlex institution
   ids. `--type company` lists R&D-active NZ companies; feed an id to
@@ -70,6 +72,8 @@ Run via `python3 scripts/cli.py <command>`:
   `OPENALEX_MAILTO=you@example.org` joins the faster "polite pool" (also used as
   Crossref's `mailto`, optional).
 - Crossref: `https://api.crossref.org/works` (works + author affiliations). Keyless.
+- Wikidata Query Service: `https://query.wikidata.org/sparql` (NZ academics by field
+  of work). Keyless, CC0. Notable-only; rate-limited (soft-fails when throttled).
 - ORCID public API: `https://pub.orcid.org/v3.0` (record). Keyless.
 
 ## Reaching beyond academics (companion skills)

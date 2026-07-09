@@ -108,6 +108,8 @@ def new_expert(name: str) -> dict:
         "latest_year": 0,
         "sample_works": [],
         "sources": [],
+        "fields": [],
+        "profile_url": None,
     }
 
 
@@ -202,6 +204,69 @@ def crossref_experts(args) -> dict:
     return experts
 
 
+WIKIDATA_SPARQL = "https://query.wikidata.org/sparql"
+_WD_STOP = {"care", "study", "studies", "research", "zealand", "health", "with",
+            "from", "that", "this", "using", "based", "into", "over"}
+
+
+def wikidata_experts(args) -> dict:
+    """NZ-linked academics from Wikidata whose field-of-work matches the topic.
+
+    Notable-only (people with a Wikidata item), but uniform across every
+    institution — useful where a portal has no API. NZ-only (P27 or NZ employer).
+    """
+    if (args.country or "NZ").upper() != "NZ":
+        print("Note: Wikidata source is NZ-only; skipping.", file=sys.stderr)
+        return {}
+    toks = [t for t in re.findall(r"[a-z]{5,}", (args.topic or "").lower())
+            if t not in _WD_STOP]
+    if not toks:
+        toks = [t for t in re.findall(r"[a-z]{4,}", (args.topic or "").lower())
+                if t not in _WD_STOP]
+    if not toks:
+        return {}
+    toks = toks[:4]
+    filt = " || ".join(f'CONTAINS(LCASE(?fl),"{t}")' for t in toks)
+    query = f"""
+SELECT DISTINCT ?person ?personLabel ?fieldLabel ?employerLabel ?article WHERE {{
+  ?person wdt:P106 ?occ . VALUES ?occ {{ wd:Q1650915 wd:Q3400985 wd:Q1622272 wd:Q901 }}
+  {{ ?person wdt:P27 wd:Q664 }} UNION {{ ?person wdt:P108 ?emp . ?emp wdt:P17 wd:Q664 }}
+  ?person wdt:P101 ?field . ?field rdfs:label ?fl . FILTER(LANG(?fl)="en" && ({filt}))
+  OPTIONAL {{ ?person wdt:P108 ?employer . ?employer wdt:P17 wd:Q664 }}
+  OPTIONAL {{ ?article schema:about ?person ; schema:isPartOf <https://en.wikipedia.org/> }}
+  SERVICE wikibase:label {{ bd:serviceParam wikibase:language "en". }}
+}} LIMIT {min(args.sample, 50)}"""
+    url = f"{WIKIDATA_SPARQL}?{urllib.parse.urlencode({'query': query, 'format': 'json'})}"
+    try:
+        # Soft-fail: WDQS rate-limits aggressively, and a Wikidata block must not
+        # abort a multi-source (--source all) run. nzfetch owns the User-Agent /
+        # fingerprint; we pass only the semantic Accept header.
+        data = nzfetch.fetch_json(
+            url, headers={"accept": "application/sparql-results+json"})
+    except nzfetch.FetchError as e:
+        print(f"Note: Wikidata unavailable (skipped): {e}", file=sys.stderr)
+        return {}
+    experts: dict[str, dict] = {}
+    for b in (data.get("results") or {}).get("bindings", []):
+        name = (b.get("personLabel") or {}).get("value")
+        if not name or name.startswith("Q"):
+            continue
+        e = experts.setdefault(name_key(name), new_expert(name))
+        if "wikidata" not in e["sources"]:
+            e["sources"].append("wikidata")
+        e["matching_works"] += 1
+        emp = (b.get("employerLabel") or {}).get("value")
+        if emp and emp not in e["institutions"]:
+            e["institutions"].append(emp)
+        fld = (b.get("fieldLabel") or {}).get("value")
+        if fld and fld not in e["fields"]:
+            e["fields"].append(fld)
+        art = (b.get("article") or {}).get("value")
+        if art and not e["profile_url"]:
+            e["profile_url"] = art
+    return experts
+
+
 def merge_experts(*maps) -> dict:
     merged: dict[str, dict] = {}
     for m in maps:
@@ -212,11 +277,15 @@ def merge_experts(*maps) -> dict:
             t = merged[key]
             t["openalex_id"] = t["openalex_id"] or e["openalex_id"]
             t["orcid"] = t["orcid"] or e["orcid"]
+            t["profile_url"] = t["profile_url"] or e.get("profile_url")
             t["matching_works"] += e["matching_works"]
             t["latest_year"] = max(t["latest_year"], e["latest_year"])
             for nm in e["institutions"]:
                 if nm not in t["institutions"]:
                     t["institutions"].append(nm)
+            for f in e.get("fields", []):
+                if f not in t["fields"]:
+                    t["fields"].append(f)
             for s in e["sources"]:
                 if s not in t["sources"]:
                     t["sources"].append(s)
@@ -227,15 +296,22 @@ def merge_experts(*maps) -> dict:
 
 
 def cmd_search(args) -> None:
-    sources = ["openalex", "crossref"] if args.source == "both" else [args.source]
+    if args.source == "both":
+        sources = ["openalex", "crossref"]
+    elif args.source == "all":
+        sources = ["openalex", "crossref", "wikidata"]
+    else:
+        sources = [args.source]
     if args.topic_id and "crossref" in sources and args.source != "openalex":
         print("Note: --topic-id is OpenAlex-only; Crossref uses free-text topic.",
               file=sys.stderr)
     inst_filter = args.institution or args.org_type
-    if inst_filter and "crossref" in sources:
-        sources = [s for s in sources if s != "crossref"]
-        print("Note: --institution/--org-type are OpenAlex-only; using OpenAlex.",
-              file=sys.stderr)
+    if inst_filter:
+        dropped = [s for s in ("crossref", "wikidata") if s in sources]
+        if dropped:
+            sources = [s for s in sources if s not in dropped]
+            print("Note: --institution/--org-type are OpenAlex-only; using OpenAlex.",
+                  file=sys.stderr)
     maps = []
     if "openalex" in sources:
         maps.append(openalex_experts(args))
@@ -245,6 +321,12 @@ def cmd_search(args) -> None:
                   file=sys.stderr)
         else:
             maps.append(crossref_experts(args))
+    if "wikidata" in sources:
+        if not args.topic:
+            print("Note: Wikidata needs a free-text topic; skipping Wikidata.",
+                  file=sys.stderr)
+        else:
+            maps.append(wikidata_experts(args))
     experts = merge_experts(*maps)
 
     ranked = sorted(
@@ -281,8 +363,12 @@ def cmd_search(args) -> None:
         print(f"{i:2}. {e['name']} — {insts}")
         print(f"    {e['matching_works']} matching works, latest {e['latest_year']}"
               f"  [{src}]{oid}{orcid}")
+        if e.get("fields"):
+            print(f"    Fields: {', '.join(e['fields'][:6])}")
         for w in e["sample_works"][:2]:
             print(f"      - {w['title']} ({w['year']})")
+        if e.get("profile_url"):
+            print(f"    {e['profile_url']}")
     print("\nNote: ephemeral shortlist from public data — discovery is not consent.")
 
 
@@ -501,8 +587,11 @@ def main() -> None:
 
     s = sub.add_parser("search", help="ranked NZ-affiliated authors for a topic")
     s.add_argument("topic", nargs="?", default=None, help="free-text topic query")
-    s.add_argument("--source", choices=["openalex", "crossref", "both"], default="both",
-                   help="scholarly source(s) to search (default both)")
+    s.add_argument("--source",
+                   choices=["openalex", "crossref", "wikidata", "both", "all"],
+                   default="both",
+                   help="source(s): both=openalex+crossref (default), "
+                   "all=+wikidata (notable NZ experts, any institution)")
     s.add_argument("--topic-id", help="OpenAlex topic id (from `topics`), e.g. T10662")
     s.add_argument("--institution", help="restrict to OpenAlex institution id(s), "
                    "comma-separated (from `institutions`). OpenAlex-only.")

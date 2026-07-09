@@ -85,6 +85,18 @@ def test_search():
     )
 
 
+def test_search_wikidata():
+    # WDQS rate-limits hard; the source soft-fails, so accept an empty list too.
+    result = run(["search", "gerontology", "--source", "wikidata", "--limit", "4", "--json"])
+    if is_network_skip(result):
+        return "skip"
+    if result.returncode != 0:
+        print(f"  stderr: {result.stderr.strip()}")
+        return False
+    data = json.loads(result.stdout)
+    return data.get("sources_used") == ["wikidata"] and isinstance(data.get("experts"), list)
+
+
 def test_search_crossref():
     result = run(["search", "honey bee varroa", "--source", "crossref", "--limit", "4", "--json"])
     if is_network_skip(result):
@@ -139,6 +151,7 @@ def main() -> int:
         test("topics resolves ids", test_topics),
         test("search returns NZ experts", test_search),
         test("crossref source search", test_search_crossref),
+        test("wikidata source search", test_search_wikidata),
         test("institutions resolve", test_institutions),
         test("search by institution", test_search_by_institution),
         test("orcid record fetch", test_orcid),
