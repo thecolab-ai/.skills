@@ -195,9 +195,13 @@ def run_task(client, base, payload, timeout=180, interval=6):
         got = client.get(f"{base}/task_get/advanced/{task_id}")
         t = (got.get("tasks") or [{}])[0]
         code = t.get("status_code")
-        if code == 20000 and t.get("result"):
+        # Task-level 20000 = task complete. Return its result even when empty —
+        # a zero-match query (no ranking apps, no reviews) is a valid empty set,
+        # not a reason to poll until timeout. Still-pending tasks report a
+        # _TASK_PENDING code, never 20000, so this can't return early.
+        if code == 20000:
             return t.get("result") or []
-        if code not in _TASK_PENDING and code != 20000:
+        if code not in _TASK_PENDING:
             die(f"DataForSEO task {task_id} failed ({code}): {t.get('status_message')}")
     die(f"DataForSEO task {task_id} not ready after {timeout}s; try a higher --timeout")
 
@@ -761,7 +765,8 @@ def cmd_validate(args):
     if top_apps:
         aid = top_apps[0].get("app_id") or top_apps[0].get("id")
         if aid:
-            suggestion = (f"dataforseo appreviews {aid} --store {args.store} --worst --limit 30"
+            suggestion = (f"python3 skills/dataforseo/scripts/cli.py appreviews {aid} "
+                          f"--store {args.store} --worst --limit 30"
                           f"   # mine '{truncate(top_apps[0].get('title'), 30)}' for the wedge")
 
     payload_out = {
