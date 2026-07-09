@@ -10,15 +10,17 @@ import argparse
 import html
 import json
 import os
+import pathlib
 import re
 import sys
 import time
-import urllib.error
 import urllib.parse
-import urllib.request
 from datetime import date, datetime, time as dt_time, timedelta, timezone
 from html.parser import HTMLParser
 from typing import Any
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 try:
     from zoneinfo import ZoneInfo
@@ -31,11 +33,6 @@ SKY_WEB = "https://tvguide.sky.co.nz/"
 FREEVIEW_GUIDE = "https://freeviewnz.tv/whats-on/tv-guide/"
 NZ_TZ_NAME = "Pacific/Auckland"
 NZ = ZoneInfo(NZ_TZ_NAME) if ZoneInfo else timezone(timedelta(hours=12))
-
-UA = os.environ.get(
-    "NZ_TV_GUIDE_USER_AGENT",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
-)
 
 SKY_GROUPS = {
     "all": ("4b7LA20J4iHaThwky9iVqn", "All Channels"),
@@ -212,19 +209,20 @@ def request_text(
         url += "?" + urllib.parse.urlencode(params, doseq=True)
     req_headers = {
         "Accept": "text/html,application/json;q=0.9,*/*;q=0.8",
-        "User-Agent": UA,
     }
     if headers:
         req_headers.update(headers)
-    req = urllib.request.Request(url, headers=req_headers, method="GET")
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return resp.read().decode("utf-8", "replace")
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        raise CliError(f"HTTP {e.code} from {url}: {raw[:300]}")
-    except urllib.error.URLError as e:
-        raise CliError(f"network error calling {url}: {e.reason}")
+        return nzfetch.fetch_text(
+            url,
+            timeout=timeout,
+            accept="text/html,application/xhtml+xml,*/*;q=0.8",
+            headers=req_headers,
+        )
+    except nzfetch.Blocked as e:
+        raise CliError(f"network error: {e}")
+    except nzfetch.FetchError as e:
+        raise CliError(str(e))
 
 
 def request_json(

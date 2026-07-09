@@ -4,17 +4,19 @@ from __future__ import annotations
 import argparse
 import html
 import json
+import pathlib
 import re
 import sys
-import urllib.error
 import urllib.parse
-import urllib.request
 import zipfile
 from datetime import datetime, timedelta
 from html.parser import HTMLParser
 from io import BytesIO
 from typing import Any
 from xml.etree import ElementTree as ET
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 
 GETS_BASE = "https://www.gets.govt.nz"
@@ -44,9 +46,6 @@ SSC_DASHBOARD_URL = (
     "https://www.procurement.govt.nz/assets/procurement-property/documents/"
     "significant-services-contract-dashboard.xlsx?m=ca63730c2622cedad7f919fed42e140be24ba4db"
 )
-UA = "Mozilla/5.0 (compatible; gets-procurement-nz/1.0; +https://github.com/thecolab-ai/.skills)"
-
-
 class SkillError(Exception):
     pass
 
@@ -57,29 +56,24 @@ def die(message: str, code: int = 1) -> None:
 
 
 def fetch_bytes(url: str, timeout: int = 10, accept: str = "*/*") -> bytes:
-    request = urllib.request.Request(
-        url,
-        headers={
-            "User-Agent": UA,
-            "Accept": accept,
-            "Accept-Language": "en-NZ,en;q=0.9",
-        },
-    )
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            return response.read()
-    except urllib.error.HTTPError as exc:
-        detail = exc.read(300).decode("utf-8", "replace").strip()
-        suffix = f": {detail}" if detail else ""
-        raise SkillError(f"HTTP {exc.code} from {url}{suffix}") from exc
-    except urllib.error.URLError as exc:
-        raise SkillError(f"network error calling {url}: {exc.reason}") from exc
-    except TimeoutError as exc:
-        raise SkillError(f"timeout after {timeout}s calling {url}") from exc
+        body, _ct, _final = nzfetch.fetch_bytes(
+            url, timeout=timeout, accept=accept, expect_json=False
+        )
+        return body
+    except nzfetch.Blocked as exc:
+        raise SkillError(f"network error calling {url}: {exc}") from exc
+    except nzfetch.FetchError as exc:
+        raise SkillError(str(exc)) from exc
 
 
 def fetch_text(url: str, timeout: int = 10, accept: str = "text/html,*/*") -> str:
-    return fetch_bytes(url, timeout=timeout, accept=accept).decode("utf-8", "replace")
+    try:
+        return nzfetch.fetch_text(url, timeout=timeout, accept=accept)
+    except nzfetch.Blocked as exc:
+        raise SkillError(f"network error calling {url}: {exc}") from exc
+    except nzfetch.FetchError as exc:
+        raise SkillError(str(exc)) from exc
 
 
 def clean_text(value: str) -> str:
@@ -416,8 +410,8 @@ def collect_awards(agency: str | None, pages: int, limit: int, timeout: int) -> 
 
 def ckan_award_sources(timeout: int) -> tuple[list[dict[str, Any]], str | None]:
     try:
-        data = json.loads(fetch_text(CKAN_PACKAGE_URL, timeout=timeout, accept="application/json"))
-    except SkillError:
+        data = nzfetch.fetch_json(CKAN_PACKAGE_URL, timeout=timeout)
+    except nzfetch.FetchError:
         return [], "data.govt.nz package lookup failed"
     if not data.get("success"):
         return [], f"data.govt.nz success=false: {data.get('error')}"

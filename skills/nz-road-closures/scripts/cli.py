@@ -4,24 +4,21 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
+import pathlib
 import re
 import sys
 import time
 import unicodedata
-import urllib.error
 import urllib.parse
-import urllib.request
 from datetime import datetime, timezone
 from typing import Any
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 JOURNEY_BASE = "https://www.journeys.nzta.govt.nz"
 DATA_BASE = JOURNEY_BASE + "/assets/map-data-cache"
 CAMERA_BASE = "https://www.trafficnz.info"
-UA = os.environ.get(
-    "NZ_ROAD_CLOSURES_USER_AGENT",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36",
-)
 
 EVENT_TYPE_ALIASES = {
     "closure": {"closures"},
@@ -39,20 +36,13 @@ def fetch_json(filename: str, timeout: int = 30) -> Any:
     headers = {
         "Accept": "application/json",
         "Referer": JOURNEY_BASE + "/highway-conditions",
-        "User-Agent": UA,
     }
-    req = urllib.request.Request(url, headers=headers, method="GET")
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            raw = resp.read().decode("utf-8", "replace")
-            return json.loads(raw)
-    except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", "replace")
-        raise CliError(f"HTTP {e.code} from {url}: {body[:300]}") from e
-    except urllib.error.URLError as e:
-        raise CliError(f"network error calling {url}: {e.reason}") from e
-    except json.JSONDecodeError as e:
-        raise CliError(f"invalid JSON from {url}: {e}") from e
+        return nzfetch.fetch_json(url, timeout=timeout, headers=headers)
+    except nzfetch.Blocked as e:
+        raise CliError(f"network error calling {url}: {e}") from e
+    except nzfetch.FetchError as e:
+        raise CliError(str(e)) from e
 
 
 def norm_text(value: Any) -> str:

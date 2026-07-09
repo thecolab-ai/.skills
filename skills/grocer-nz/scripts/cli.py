@@ -13,9 +13,10 @@ import pathlib
 import re
 import shutil
 import sys
-import urllib.error
-import urllib.request
 from typing import Any
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 NEEDS = ("duckdb", "pytz")
 try:
@@ -40,25 +41,34 @@ BASE = "https://assets-prod.grocer.nz/public"
 MEILI = "https://meilisearch.grocer.nz"
 MEILI_KEY = "7f58239330307ec585c86863f985ab83cbb9ce951a9601c66e158548fb632fd1"
 CACHE = pathlib.Path(os.environ.get("GROCER_NZ_CACHE", "~/.cache/grocer-nz")).expanduser()
-HEADERS = {"User-Agent": "Mozilla/5.0 (Hermes grocer.nz skill)", "Referer": "https://grocer.nz/"}
+HEADERS = {"Referer": "https://grocer.nz/"}
 MAX_LIMIT = 100
 
 
 def http_get(url: str, *, headers: dict[str, str] | None = None) -> bytes:
-    req = urllib.request.Request(url, headers={**HEADERS, **(headers or {})})
-    with urllib.request.urlopen(req, timeout=120) as r:
-        return r.read()
+    body, _content_type, _final_url = nzfetch.fetch_bytes(
+        url, timeout=120, headers={**HEADERS, **(headers or {})}
+    )
+    return body
 
 
 def http_json(url: str, payload: dict[str, Any], *, headers: dict[str, str] | None = None) -> dict[str, Any]:
     data = json.dumps(payload).encode()
-    req = urllib.request.Request(
+    return nzfetch.fetch_json(
         url,
+        timeout=60,
         data=data,
+        method="POST",
         headers={"Content-Type": "application/json", **HEADERS, **(headers or {})},
     )
-    with urllib.request.urlopen(req, timeout=60) as r:
-        return json.loads(r.read().decode())
+
+
+def _is_missing(err: nzfetch.FetchError) -> bool:
+    """True when a fetch failed with an HTTP 403/404 — grocer treats a missing or
+    forbidden per-store/per-product asset as 'no file' (returns None), matching the
+    original urllib.error.HTTPError code check."""
+    msg = str(err)
+    return "HTTP 403" in msg or "HTTP 404" in msg
 
 
 def download(url: str, path: pathlib.Path, *, force: bool = False) -> pathlib.Path:
@@ -78,8 +88,8 @@ def price_file(store_id: int, force: bool = False) -> pathlib.Path | None:
     path = CACHE / "prices_per_store_v3" / f"public_prices_{store_id}.parquet"
     try:
         return download(f"{BASE}/prices_per_store_v3/public_prices_{store_id}.parquet", path, force=force)
-    except urllib.error.HTTPError as e:
-        if e.code in (403, 404):
+    except nzfetch.FetchError as e:
+        if _is_missing(e):
             return None
         raise
 
@@ -88,8 +98,8 @@ def history_file(product_id: int, force: bool = False) -> pathlib.Path | None:
     path = CACHE / "price_history_v3" / f"price_history_{product_id}.parquet"
     try:
         return download(f"{BASE}/price_history_v3/price_history_{product_id}.parquet", path, force=force)
-    except urllib.error.HTTPError as e:
-        if e.code in (403, 404):
+    except nzfetch.FetchError as e:
+        if _is_missing(e):
             return None
         raise
 

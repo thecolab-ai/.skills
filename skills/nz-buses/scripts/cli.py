@@ -10,21 +10,19 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import pathlib
 import sys
 import time
-import urllib.error
 import urllib.parse
-import urllib.request
 from datetime import datetime, timezone
 from math import atan2, cos, radians, sin, sqrt
 from typing import Any
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
+
 BASE_API = os.environ.get("METLINK_API_BASE", "https://api.opendata.metlink.org.nz/v1").rstrip("/")
 BASE_PORTAL = "https://opendata.metlink.org.nz/"
-UA = os.environ.get(
-    "NZ_BUSES_USER_AGENT",
-    "nz-buses-skill/1.0 (+https://opendata.metlink.org.nz/)",
-)
 
 # Metlink uses standard GTFS bus route_type=3 and extended school-bus
 # route_type=712. Rail (2), ferry (4), and cable car (5) are intentionally out
@@ -68,36 +66,19 @@ def request_json(path: str, params: dict[str, Any] | None = None, timeout: int =
         if clean:
             url += "?" + urllib.parse.urlencode(clean)
     headers = {
-        "Accept": "application/json",
-        "User-Agent": UA,
         "x-api-key": api_key(),
     }
-    req = urllib.request.Request(url, headers=headers, method="GET")
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            raw = resp.read().decode("utf-8", "replace")
-            return json.loads(raw) if raw else None
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        detail = raw[:300]
-        try:
-            payload = json.loads(raw) if raw else {}
-            if isinstance(payload, dict):
-                detail = (
-                    payload.get("message")
-                    or payload.get("Message")
-                    or payload.get("error")
-                    or payload.get("detail")
-                    or detail
-                )
-        except Exception:
-            pass
-        detail = str(detail or e.reason)
-        if e.code in (401, 403):
-            die(f"authentication failed calling Metlink. Check METLINK_API_KEY. Detail: {detail}")
-        die(f"HTTP {e.code} from Metlink: {detail}")
-    except urllib.error.URLError as e:
-        die(f"network error calling Metlink: {e.reason}")
+        body, _ct, _final = nzfetch.fetch_bytes(
+            url, timeout=timeout, accept="application/json", headers=headers
+        )
+    except nzfetch.Blocked as e:
+        die(f"network error calling Metlink: {e}")
+    except nzfetch.FetchError as e:
+        die(f"error calling Metlink: {e}")
+    raw = body.decode("utf-8", "replace")
+    try:
+        return json.loads(raw) if raw else None
     except json.JSONDecodeError as e:
         die(f"invalid JSON from Metlink: {e}")
 

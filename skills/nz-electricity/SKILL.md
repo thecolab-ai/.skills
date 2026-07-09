@@ -1,6 +1,6 @@
 ---
 name: nz-electricity
-description: Query NZ electricity market data: EM6 wholesale spot prices, grid demand, carbon intensity, historical nodal prices, monthly generation by fuel type, distributed-generation solar uptake, and NZ lines-company outage records. No login or API key.
+description: Query NZ electricity market data: EM6 wholesale spot prices, grid demand, carbon intensity, historical nodal prices, monthly generation by fuel type, distributed-generation solar uptake, gentailer energy-margin source status, and NZ lines-company outage records. No login or API key.
 ---
 
 # NZ Electricity
@@ -17,6 +17,7 @@ This skill ships support for:
 - Electricity Authority EMI final/interim historical energy prices by point of connection
 - Electricity Authority EMI monthly generation output by plant, aggregated by fuel type
 - Electricity Authority EMI installed distributed-generation trends, including rooftop solar uptake
+- Electricity Authority gentailer energy-margin official-source availability checks
 - Public outage feeds for supported NZ lines companies
 
 ## Use this when
@@ -27,6 +28,7 @@ This skill ships support for:
 - A user wants historical wholesale spot prices for a node or point of connection
 - A user wants monthly NZ generation output by fuel type or generation plant
 - A user wants installed distributed-generation or rooftop-solar trends by market segment or capacity band
+- A user asks for gentailer energy-margin data and needs to know whether the official Authority source currently exposes machine-readable rows
 - A user asks for current or planned public outages from supported NZ lines companies
 - A workflow needs public, no-login, machine-readable NZ electricity data
 
@@ -35,6 +37,7 @@ This skill ships support for:
 - Retail plan comparison, tariff advice, Powerswitch-style savings, or ICP-specific billing questions
 - Authenticated EMI API products, EM6 paid feeds, private user data, or account actions
 - Current real-time node load, current node generation, or current generation mix; the documented EM6 endpoints for those returned unauthorized in live testing
+- Reconstructing gentailer energy margins from spot prices, generation volumes, hedge positions, or retail demand; the `energy-margin` command reports official source availability and points to official alternatives, but does not derive the per-company split
 - ICP-specific outage status, outage subscriptions, outage reporting, or fault logging
 - Redistributing public-data extracts as a standalone dataset
 
@@ -46,9 +49,10 @@ This skill ships support for:
 4. Use `prices --node ... --from ... --to ...` for historical nodal prices
 5. Use `generation --month ... --type ...` for generation by fuel type from EMI monthly data
 6. Use `dg-trends`, `dg-latest`, or `dg-summary` for installed distributed-generation and rooftop-solar EMI retail report data
-7. Use `outages --company ...` or `outages --region ...` for lines-company public outage records
-8. Use `--json` when another tool or agent needs machine-readable output
-9. Mention the upstream source and whether the value is current EM6 data, EMI report/dataset data, EMI retail report data, or a distributor outage feed
+7. Use `energy-margin --json` when a task needs the current official status of the Authority gentailer energy-margin source
+8. Use `outages --company ...` or `outages --region ...` for lines-company public outage records
+9. Use `--json` when another tool or agent needs machine-readable output
+10. Mention the upstream source and whether the value is current EM6 data, EMI report/dataset data, EMI retail report data, Authority dashboard status, or a distributor outage feed
 
 ## CLI
 
@@ -68,6 +72,7 @@ python3 skills/nz-electricity/scripts/cli.py <command> [flags]
 - `dg-trends [--fuel solar_all] [--market-segment All|Res|SME|Com|Ind] [--capacity All_Total|Small|Large] [--region-type NZ|ZONE|...] [--from DATE] [--to DATE] [--json]` — EMI GUEHMT installed distributed-generation trends
 - `dg-latest [--fuel solar_all] [--market-segment All|Res|SME|Com|Ind] [--capacity All_Total|Small|Large] [--region-type NZ|ZONE|...] [--json]` — latest GUEHMT distributed-generation rows
 - `dg-summary [--fuel solar_all] [--market-segment All|Res|SME|Com|Ind] [--capacity All_Total|Small|Large] [--region-type NZ|ZONE|...] [--from DATE] [--to DATE] [--yearly] [--json]` — summarise GUEHMT distributed-generation trends
+- `energy-margin [--company COMPANY] [--from DATE] [--to DATE] [--json]` — probe the official EA gentailer energy-margin source; when the exact per-company split is not machine-retrievable, return guidance plus the official alternatives (EA per-company net profit, gentailer segment financials, retail gross margin, the aggregate figure, and the post-5-Jul-2026 feed)
 - `outages [--company COMPANY] [--region REGION] [--all] [--json]` — current public outage records from supported NZ lines companies; `--all` also includes planned, scheduled, or recent records where feeds expose them
 
 Examples:
@@ -82,6 +87,7 @@ python3 skills/nz-electricity/scripts/cli.py generation --month 2026-04 --type h
 python3 skills/nz-electricity/scripts/cli.py dg-trends --fuel solar_all --market-segment Res --capacity All_Total --from 2025-01-01 --to 2025-12-31 --json
 python3 skills/nz-electricity/scripts/cli.py dg-latest --fuel solar_all --market-segment All --json
 python3 skills/nz-electricity/scripts/cli.py dg-summary --fuel solar_all --yearly --json
+python3 skills/nz-electricity/scripts/cli.py energy-margin --company meridian --json
 python3 skills/nz-electricity/scripts/cli.py outages --company vector
 python3 skills/nz-electricity/scripts/cli.py outages --region tahawai --json
 ```
@@ -98,6 +104,7 @@ python3 skills/nz-electricity/scripts/cli.py outages --region tahawai --json
 - `demand` uses the public Electricity Authority EMI Demand trends CSV report from `https://www.emi.ea.govt.nz/Wholesale/Reports/W_GD_C`
 - `prices` and `generation` use public Electricity Authority EMI CSV dataset files from `https://www.emi.ea.govt.nz`
 - `dg-trends`, `dg-latest`, and `dg-summary` use the public Electricity Authority EMI GUEHMT retail CSV report from `https://www.emi.ea.govt.nz/Retail/Reports/guehmt`
+- `energy-margin` probes the Electricity Authority energy-margin dashboard/article and linked Tableau public workbook; it returns explicit source-unavailable status while those public official surfaces do not expose machine-readable per-company rows, and points to official alternatives (per-company net profit and segment financials, retail gross margin, the EA aggregate, and the aggregate-only feed due from 5 July 2026) so a caller is not left empty-handed
 - `outages` uses clean public distributor feeds for Vector, Wellington Electricity, Orion, Powerco, Aurora Energy, WEL Networks, Unison, Counties Energy, and Top Energy
 - Vector's public map exposes outage shapes only, so Vector records may only have an approximate centroid and outage type
 - Northpower was checked but not shipped because its outage map uses Livewire snapshot/update state rather than a clean stable public JSON feed
@@ -106,6 +113,7 @@ python3 skills/nz-electricity/scripts/cli.py outages --region tahawai --json
 - EMI final/interim energy prices are half-hourly by point of connection; recent files may be interim until finalized
 - EMI generation output by plant is monthly and historical, not current real-time generation mix
 - EMI distributed-generation trends are monthly retail report data derived from registry fields; market segments are not mutually exclusive, and Solar+Batteries category changes in November 2023 can create Solar/Other series breaks
+- Gentailer energy-margin values are not reconstructed or copied into this skill; the exact per-company split existed only in an EA Tableau dashboard that has been removed (and was never archived), and the collection resuming 5 July 2026 publishes aggregated monthly data only. The `energy-margin` payload's `guidance`, `aggregate_energy_margin`, and `alternatives` fields point callers at the official per-company sources that do exist (net profit, segment financials, retail gross margin)
 - Distributor outage feeds vary by company and may omit cause, customer count, or restoration time
 - Default output is human-readable; every data command supports `--json` for chaining into other tools
 - Avoid high-volume polling; use narrow regions, nodes, date ranges, and months

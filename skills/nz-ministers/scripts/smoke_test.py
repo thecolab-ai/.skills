@@ -2,7 +2,7 @@
 """Live read-only smoke tests for the nz-ministers skill.
 
 `latest` is keyless and always exercised. `minister`/`articles` sit behind
-Incapsula bot protection: when CloakBrowser is available (or HERMES_SMOKE_USE_BROWSER=1)
+Incapsula bot protection: when CloakBrowser is available (or COLAB_SMOKE_USE_BROWSER=1)
 the test clears the challenge with --browser and asserts real data; otherwise it
 asserts the clean machine-readable `clearance_required` blocked state. Network /
 upstream challenges are treated as SKIP, not failures.
@@ -36,7 +36,7 @@ def test(name, fn):
 
 
 def browser_available():
-    if os.environ.get("HERMES_SMOKE_USE_BROWSER"):
+    if os.environ.get("COLAB_SMOKE_USE_BROWSER"):
         return True
     try:
         import cloakbrowser  # noqa: F401

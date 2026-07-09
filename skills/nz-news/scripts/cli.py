@@ -10,14 +10,15 @@ import argparse
 import datetime as dt
 import json
 import re
+import pathlib
 import sys
 import time
-import urllib.error
-import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
-UA = "nz-news-cli/1.0 (+https://github.com/thecolab-ai/.skills)"
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
+
 DEFAULT_TIMEOUT = 10
 
 # Feed definitions
@@ -208,14 +209,18 @@ def parse_atom_items(xml: str, feed: dict) -> list[dict]:
 def fetch_feed(feed: dict) -> dict:
     start = time.monotonic()
     try:
-        req = urllib.request.Request(feed["url"], headers={"User-Agent": UA})
-        with urllib.request.urlopen(req, timeout=DEFAULT_TIMEOUT) as resp:
-            xml = resp.read().decode("utf-8", "replace")
+        xml = nzfetch.fetch_text(
+            feed["url"],
+            timeout=DEFAULT_TIMEOUT,
+            accept="application/rss+xml,application/atom+xml,application/xml,text/xml,*/*",
+        )
         duration_ms = round((time.monotonic() - start) * 1000)
         items = parse_atom_items(xml, feed) if feed.get("format") == "atom" else parse_rss_items(xml, feed)
         return {"feed": feed, "items": items, "ok": True, "error": None, "durationMs": duration_ms}
-    except urllib.error.HTTPError as e:
-        return {"feed": feed, "items": [], "ok": False, "error": f"HTTP {e.code}", "durationMs": round((time.monotonic() - start) * 1000)}
+    except nzfetch.Blocked as e:
+        return {"feed": feed, "items": [], "ok": False, "error": f"network error: {e}", "durationMs": round((time.monotonic() - start) * 1000)}
+    except nzfetch.FetchError as e:
+        return {"feed": feed, "items": [], "ok": False, "error": str(e), "durationMs": round((time.monotonic() - start) * 1000)}
     except Exception as err:
         return {"feed": feed, "items": [], "ok": False, "error": str(err), "durationMs": round((time.monotonic() - start) * 1000)}
 

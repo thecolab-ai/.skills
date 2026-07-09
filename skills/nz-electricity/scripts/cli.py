@@ -21,6 +21,11 @@ import urllib.request
 from collections import defaultdict
 from typing import Any, Callable, Iterable
 
+import pathlib
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
+
 EM6_BASE = "https://api.em6.co.nz/ords/em6/data_api"
 EMI_DATASETS = "https://www.emi.ea.govt.nz/Wholesale/Datasets"
 EMI_FINAL_PRICES = EMI_DATASETS + "/DispatchAndPricing/FinalEnergyPrices"
@@ -28,6 +33,104 @@ EMI_GENERATION_MD = EMI_DATASETS + "/Generation/Generation_MD"
 EMI_DEMAND_REPORT = "https://www.emi.ea.govt.nz/Wholesale/Download/DataReport/CSV/W_GD_C"
 EMI_DG_REPORT = "https://www.emi.ea.govt.nz/Retail/Download/DataReport/CSV/GUEHMT"
 EMI_DG_REPORT_PAGE = "https://www.emi.ea.govt.nz/retail/Reports/guehmt"
+EA_ENERGY_MARGIN_DASHBOARD = "https://www.ea.govt.nz/data-and-insights/charts-and-dashboards/energy-margin/"
+EA_ENERGY_MARGIN_ARTICLE = "https://www.ea.govt.nz/news/eye-on-electricity/gentailer-energy-margins-in-2024/"
+TABLEAU_ENERGY_MARGIN_VIEW = "https://public.tableau.com/views/Energymargin/Energymargin?:showVizHome=no&:embed=y&:display_count=n&:origin=viz_share_link"
+TABLEAU_ENERGY_MARGIN_PROFILE_API = "https://public.tableau.com/profile/api/single_workbook/Energymargin"
+TABLEAU_ENERGY_MARGIN_VIZQL = (
+    "https://public.tableau.com/vizql/w/Energymargin/v/Energymargin/startSession/viewing"
+    "?%3AshowVizHome=no&%3Aembed=y&%3Adisplay_count=n&%3Aorigin=viz_share_link&%3Aredirect=auth"
+)
+EA_ENERGY_MARGIN_PROJECT = "https://www.ea.govt.nz/projects/all/energy-margin-information/"
+
+# When the exact per-company split cannot be fetched, point the caller at the
+# official surfaces that DO carry per-company or aggregate data. These were
+# confirmed reachable on 2026-07-09; see issue #172 for the full source hunt.
+ENERGY_MARGIN_GUIDANCE = (
+    "The exact official per-company energy-margin dollars for July-December 2024 are not "
+    "machine-retrievable: they existed only in an interactive Tableau dashboard that the "
+    "Electricity Authority has since removed (it was never archived), and the ongoing collection "
+    "from 5 July 2026 (clause 2.16 of the Code) publishes AGGREGATED, averaged monthly data only, "
+    "never a per-company split. Do not reconstruct the split from prices and volumes and present it "
+    "as the EA figure, and do not treat third-party preserved chart copies as an official source. "
+    "For per-company detail, use the official alternatives below (different but related metrics)."
+)
+
+# Official EA aggregate the Authority published in durable form (article text).
+ENERGY_MARGIN_AGGREGATE = {
+    "metric": "energy margin, all gentailers combined",
+    "period": "2024-07 to 2024-12",
+    "scope": "Contact, Genesis, Mercury, Meridian, Manawa, Nova (combined; not split by company)",
+    "weekly_range_million_nzd": [60, 95],
+    "weekly_average_million_nzd": 76,
+    "source": "Electricity Authority, 'Gentailer energy margins in 2024'",
+    "source_url": EA_ENERGY_MARGIN_ARTICLE,
+}
+
+# Reference values and pointers that ARE official and per-company. Figures are the
+# EA's own published values (article text) — included to point callers at the right
+# metric/source, not as a substitute for the removed per-company energy-margin split.
+ENERGY_MARGIN_ALTERNATIVES = [
+    {
+        "what": "EA per-company net profit (weekly average, Jul-Dec 2024)",
+        "metric": "net profit (not energy margin)",
+        "reference_values_million_nzd": {
+            "Meridian": -4.65,
+            "Genesis": 3.6,
+            "Mercury": -2.58,
+            "Contact": 5.46,
+        },
+        "note": (
+            "Official EA-published per-company figures. Net profit, not energy margin, and covers "
+            "only the four listed gentailers (not Manawa/Nova). Closest official per-company number."
+        ),
+        "source_url": EA_ENERGY_MARGIN_ARTICLE,
+    },
+    {
+        "what": "Gentailer interim/annual reports (segment financials)",
+        "metric": "segment EBITDAF, generation volumes, wholesale/retail revenue",
+        "note": (
+            "Auditable per-company financials the EA links to directly. Different framing from the "
+            "EA energy margin, but the underlying official source of company profitability."
+        ),
+        "source_urls": {
+            "Genesis": "https://media.genesisenergy.co.nz/genesis/investor/2025/fy25_genesis_interim_report.pdf",
+            "Mercury": "https://www.mercury.co.nz/-/media/project/mercury/mercury/pdfs-other/investor-relations/2025/mercury_interim_report_2025.pdf",
+            "Meridian": "https://www.meridianenergy.co.nz/public/Investors/Reports-and-presentations/Interim-results-and-reports/2025/Media-Announcement.pdf",
+            "Contact": "https://contact.co.nz/aboutus/investor-centre/reports-and-presentations",
+        },
+    },
+    {
+        "what": "EA retail gross margin dashboard + NZIER retail-margin disclosure",
+        "metric": "retail gross margin (retail side, not generation-side energy margin)",
+        "note": "Per-company retail margins; complements the generation-side energy margin.",
+        "source_urls": {
+            "EA retail gross margin": "https://www.ea.govt.nz/data-and-insights/charts-and-dashboards/retail-gross-margin/",
+            "NZIER report (June 2024)": "https://www.nzier.org.nz/hubfs/Public%20Publications/Client%20reports/Gentailer%20retail%20margin%20disclosure%20report%20June%202024.pdf",
+        },
+    },
+    {
+        "what": "Future EA aggregate energy-margin release (from 5 July 2026)",
+        "metric": "aggregated, averaged energy margin, monthly",
+        "note": (
+            "New clause 2.16 collection. Machine-readable once published, but aggregate-only — it will "
+            "not restore the per-company split. Wire it in here when it goes live."
+        ),
+        "source_url": EA_ENERGY_MARGIN_PROJECT,
+    },
+    {
+        "what": "EA datasets & tools/APIs hubs (raw wholesale data)",
+        "metric": "generation output, dispatch/final energy prices (inputs, not margins)",
+        "note": (
+            "Use the skill's own 'generation' and 'prices' commands, or these hubs, only if you must "
+            "derive an estimate — label any derivation clearly as unofficial."
+        ),
+        "source_urls": {
+            "Datasets": "https://www.ea.govt.nz/data-and-insights/datasets/",
+            "Tools & APIs": "https://www.ea.govt.nz/data-and-insights/tools-and-apis/",
+        },
+    },
+]
 UA = "nz-electricity-skill/1.0 (+https://github.com/thecolab-ai/.skills)"
 
 REGION_ALIASES = {
@@ -168,15 +271,37 @@ DG_REGION_TYPE_ALIASES = {
     "nsp root": "NSP_ROOT",
 }
 
+ENERGY_MARGIN_COMPANIES = {
+    "contact": "Contact",
+    "genesis": "Genesis",
+    "manawa": "Manawa",
+    "mercury": "Mercury",
+    "meridian": "Meridian",
+    "nova": "Nova",
+}
+
 
 def die(message: str, code: int = 1) -> None:
     print(f"nz-electricity: {message}", file=sys.stderr)
     raise SystemExit(code)
 
 
-def request(url: str, timeout: int = 30) -> urllib.response.addinfourl:
-    req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "*/*"})
-    return urllib.request.urlopen(req, timeout=timeout)
+def request(
+    url: str,
+    timeout: int = 30,
+    *,
+    accept: str = "*/*",
+    headers: dict[str, str] | None = None,
+    data: bytes | None = None,
+    method: str | None = None,
+) -> tuple[bytes, str]:
+    """Fetch *url* via the shared nzfetch helper (browser UA + proxy retry on a
+    bot-block). Returns (body_bytes, final_url); raises nzfetch.Blocked /
+    nzfetch.FetchError, which callers map to their own die/error contract."""
+    body, _ct, final_url = nzfetch.fetch_bytes(
+        url, timeout=timeout, accept=accept, headers=headers, data=data, method=method
+    )
+    return body, final_url
 
 
 def request_json(path: str, params: dict[str, Any] | None = None, timeout: int = 20) -> Any:
@@ -185,19 +310,16 @@ def request_json(path: str, params: dict[str, Any] | None = None, timeout: int =
         clean = {k: str(v) for k, v in params.items() if v is not None}
         url += "?" + urllib.parse.urlencode(clean)
     try:
-        with request(url, timeout=timeout) as resp:
-            raw = resp.read().decode("utf-8", "replace")
-            return json.loads(raw) if raw else None
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        try:
-            payload = json.loads(raw)
-            detail = payload.get("message") or payload.get("title") or raw[:240]
-        except Exception:
-            detail = raw[:240]
-        die(f"HTTP {e.code} from {url}: {detail}")
-    except urllib.error.URLError as e:
-        die(f"network error calling {url}: {e.reason}")
+        body, _final = request(url, timeout=timeout)
+    except nzfetch.Blocked as e:
+        die(f"network error calling {url}: {e}")
+    except nzfetch.FetchError as e:
+        die(str(e))
+    raw = body.decode("utf-8", "replace")
+    if not raw:
+        return None
+    try:
+        return json.loads(raw)
     except json.JSONDecodeError as e:
         die(f"invalid JSON from {url}: {e}")
 
@@ -213,27 +335,34 @@ def request_url_json(
     if params:
         clean = {k: str(v) for k, v in params.items() if v is not None}
         url += "?" + urllib.parse.urlencode(clean)
-    req_headers = {"User-Agent": UA, "Accept": "application/json, */*"}
+    req_headers: dict[str, str] = {}
     if headers:
         req_headers.update(headers)
     data = None
     if body is not None:
         data = json.dumps(body).encode("utf-8")
         req_headers.setdefault("Content-Type", "application/json")
-    req = urllib.request.Request(url, headers=req_headers, data=data, method=method)
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        raw = resp.read().decode("utf-8", "replace")
-        return json.loads(raw) if raw else None
+    method_arg = method if method and method.upper() != "GET" else None
+    payload, _final = request(
+        url,
+        timeout=timeout,
+        accept="application/json, */*",
+        headers=req_headers or None,
+        data=data,
+        method=method_arg,
+    )
+    raw = payload.decode("utf-8", "replace")
+    return json.loads(raw) if raw else None
 
 
 def read_url_text(url: str, timeout: int = 30) -> str:
     try:
-        with request(url, timeout=timeout) as resp:
-            return resp.read().decode("utf-8", "replace")
-    except urllib.error.HTTPError as e:
-        die(f"HTTP {e.code} from {url}")
-    except urllib.error.URLError as e:
-        die(f"network error calling {url}: {e.reason}")
+        body, _final = request(url, timeout=timeout)
+    except nzfetch.Blocked as e:
+        die(f"network error calling {url}: {e}")
+    except nzfetch.FetchError as e:
+        die(str(e))
+    return body.decode("utf-8", "replace")
 
 
 def fetch_csv_rows(
@@ -241,47 +370,36 @@ def fetch_csv_rows(
     keep: Callable[[dict[str, str]], bool],
     timeout: int = 60,
 ) -> tuple[list[dict[str, str]], str]:
+    # nzfetch errors (Blocked/FetchError) propagate so callers such as
+    # try_csv_rows can fall through to the next candidate URL, mirroring the
+    # original HTTPError re-raise behaviour.
+    body, final_url = request(url, timeout=timeout)
+    text = body.decode("utf-8-sig", "replace")
     try:
-        with request(url, timeout=timeout) as resp:
-            final_url = resp.geturl()
-            text = io.TextIOWrapper(resp, encoding="utf-8-sig", newline="")
-            reader = csv.DictReader(text)
-            rows = [row for row in reader if keep(row)]
-            return rows, final_url
-    except urllib.error.HTTPError as e:
-        raise e
-    except urllib.error.URLError as e:
-        die(f"network error calling {url}: {e.reason}")
+        reader = csv.DictReader(io.StringIO(text))
+        rows = [row for row in reader if keep(row)]
     except csv.Error as e:
         die(f"invalid CSV from {url}: {e}")
+    return rows, final_url
 
 
 def try_csv_rows(urls: Iterable[str], keep: Callable[[dict[str, str]], bool]) -> tuple[list[dict[str, str]], str | None]:
-    last_status = None
     for url in urls:
         try:
             return fetch_csv_rows(url, keep)
-        except urllib.error.HTTPError as e:
-            last_status = e.code
-            if e.code in (404, 500):
-                continue
-            raw = e.read().decode("utf-8", "replace")
-            die(f"HTTP {e.code} from {url}: {raw[:240]}")
-    if last_status:
-        return [], None
+        except (nzfetch.Blocked, nzfetch.FetchError):
+            continue
     return [], None
 
 
 def fetch_report_csv_rows(url: str, timeout: int = 60) -> tuple[list[dict[str, str]], str]:
     try:
-        with request(url, timeout=timeout) as resp:
-            final_url = resp.geturl()
-            text = resp.read().decode("utf-8-sig", "replace")
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        die(f"HTTP {e.code} from {url}: {raw[:240]}")
-    except urllib.error.URLError as e:
-        die(f"network error calling {url}: {e.reason}")
+        body, final_url = request(url, timeout=timeout)
+    except nzfetch.Blocked as e:
+        die(f"network error calling {url}: {e}")
+    except nzfetch.FetchError as e:
+        die(str(e))
+    text = body.decode("utf-8-sig", "replace")
 
     lines = text.splitlines()
     for idx, line in enumerate(lines):
@@ -647,16 +765,12 @@ def dg_report_url(
 
 def fetch_dg_report(url: str, timeout: int = 10) -> dict[str, Any]:
     try:
-        with request(url, timeout=timeout) as resp:
-            final_url = resp.geturl()
-            text = resp.read().decode("utf-8-sig", "replace")
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        die(f"HTTP {e.code} from {url}: {raw[:240]}")
-    except urllib.error.URLError as e:
-        die(f"network error calling {url}: {e.reason}")
-    except TimeoutError as e:
-        die(f"timeout calling {url}: {e}")
+        body, final_url = request(url, timeout=timeout)
+    except nzfetch.Blocked as e:
+        die(f"network error calling {url}: {e}")
+    except nzfetch.FetchError as e:
+        die(str(e))
+    text = body.decode("utf-8-sig", "replace")
     return parse_dg_report_csv(text, final_url)
 
 
@@ -973,8 +1087,10 @@ def cmd_generation(args: argparse.Namespace) -> None:
 
     try:
         rows, source_url = fetch_csv_rows(generation_url(yyyymm), lambda row: True)
-    except urllib.error.HTTPError as e:
-        die(f"HTTP {e.code} fetching EMI generation file for {month_label(yyyymm)}")
+    except nzfetch.Blocked as e:
+        die(f"network error fetching EMI generation file for {month_label(yyyymm)}: {e}")
+    except nzfetch.FetchError as e:
+        die(f"error fetching EMI generation file for {month_label(yyyymm)}: {e}")
 
     fuel_totals: dict[str, float] = defaultdict(float)
     tech_totals: dict[str, float] = defaultdict(float)
@@ -1679,6 +1795,147 @@ def cmd_outages(args: argparse.Namespace) -> None:
     emit(data, args.json, render_outages)
 
 
+def http_probe(
+    url: str,
+    *,
+    timeout: int = 15,
+    method: str = "GET",
+    headers: dict[str, str] | None = None,
+    data: bytes | None = None,
+) -> dict[str, Any]:
+    req_headers = {
+        "User-Agent": nzfetch.DEFAULT_UA,
+        "Accept": "application/json, text/html, */*",
+        "Accept-Language": "en-NZ,en;q=0.8",
+        "Accept-Encoding": "identity",
+    }
+    if headers:
+        req_headers.update(headers)
+    request_obj = urllib.request.Request(url, data=data, headers=req_headers, method=method)
+    try:
+        with urllib.request.urlopen(request_obj, timeout=timeout) as response:
+            body = response.read(6000)
+            status = response.status
+            content_type = response.headers.get("Content-Type", "")
+            final_url = response.geturl()
+    except urllib.error.HTTPError as e:
+        body = e.read(6000)
+        status = e.code
+        content_type = e.headers.get("Content-Type", "")
+        final_url = e.geturl()
+    except urllib.error.URLError as e:
+        return {"url": url, "ok": False, "error": f"network error: {e.reason}"}
+    except TimeoutError as e:
+        return {"url": url, "ok": False, "error": f"timeout: {e}"}
+
+    text = body.decode("utf-8", "replace")
+    lower = text.lower()
+    signals = []
+    if "where's the viz" in lower or "could not be found" in lower or "removed or renamed" in lower:
+        signals.append("tableau_removed_or_renamed")
+    if "awswaf" in lower or "captcha" in lower:
+        signals.append("bot_challenge")
+    return {
+        "url": url,
+        "final_url": final_url,
+        "ok": 200 <= status < 300,
+        "status_code": status,
+        "content_type": content_type,
+        "signals": signals,
+    }
+
+
+def energy_margin_checks(timeout: int) -> list[dict[str, Any]]:
+    viz_location = (
+        "https://public.tableau.com/views/Energymargin/Energymargin"
+        "?%3AshowVizHome=no&%3Aembed=y&%3Adisplay_count=n&%3Aorigin=viz_share_link&%3Aredirect=auth"
+    )
+    return [
+        http_probe(EA_ENERGY_MARGIN_DASHBOARD, timeout=timeout),
+        http_probe(EA_ENERGY_MARGIN_ARTICLE, timeout=timeout),
+        http_probe(TABLEAU_ENERGY_MARGIN_VIEW, timeout=timeout),
+        http_probe(TABLEAU_ENERGY_MARGIN_PROFILE_API, timeout=timeout),
+        http_probe(
+            TABLEAU_ENERGY_MARGIN_VIZQL,
+            timeout=timeout,
+            method="POST",
+            data=b"",
+            headers={
+                "Accept": "application/json",
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Referer": TABLEAU_ENERGY_MARGIN_VIEW,
+                "Tableau-Viz-Location": viz_location,
+                "Tableau-Viz-Path": "/w/Energymargin#0",
+            },
+        ),
+    ]
+
+
+def cmd_energy_margin(args: argparse.Namespace) -> None:
+    started = time.perf_counter()
+    from_date = parse_date(args.from_date).isoformat() if args.from_date else None
+    to_date = parse_date(args.to_date).isoformat() if args.to_date else None
+    if from_date and to_date and to_date < from_date:
+        die("--to must be on or after --from")
+    company_filter = None
+    if args.company:
+        key = args.company.strip().lower()
+        company_filter = ENERGY_MARGIN_COMPANIES.get(key)
+        if not company_filter:
+            valid = ", ".join(sorted(ENERGY_MARGIN_COMPANIES))
+            die(f"unknown energy-margin company '{args.company}'. Supported companies: {valid}")
+
+    checks = energy_margin_checks(args.timeout)
+    tableau_view = next((item for item in checks if item.get("url") == TABLEAU_ENERGY_MARGIN_VIEW), {})
+    profile_api = next((item for item in checks if item.get("url") == TABLEAU_ENERGY_MARGIN_PROFILE_API), {})
+    vizql = next((item for item in checks if item.get("url") == TABLEAU_ENERGY_MARGIN_VIZQL), {})
+    removed = "tableau_removed_or_renamed" in (tableau_view.get("signals") or [])
+    unavailable = removed or profile_api.get("status_code") == 404 or vizql.get("status_code") == 404
+
+    status = "source_unavailable" if unavailable else "source_probe_inconclusive"
+    reason = (
+        "The official Authority-linked Tableau workbook/profile and VizQL session endpoints return 404. "
+        "No official machine-readable per-company energy-margin rows are available from this public surface."
+        if unavailable
+        else "The official Tableau workbook did not yield machine-readable per-company rows from this probe."
+    )
+    alternatives = ENERGY_MARGIN_ALTERNATIVES
+    if company_filter:
+        # Keep only alternatives that cover the requested company (all cover it except
+        # the four-company net-profit list, which omits Manawa/Nova).
+        alternatives = [
+            alt
+            for alt in alternatives
+            if "reference_values_million_nzd" not in alt
+            or company_filter in alt["reference_values_million_nzd"]
+        ]
+    data = {
+        "source": "Electricity Authority gentailer energy margin dashboard/article",
+        "source_url": EA_ENERGY_MARGIN_DASHBOARD,
+        "article_url": EA_ENERGY_MARGIN_ARTICLE,
+        "tableau_url": "https://public.tableau.com/app/profile/electricity.authority/viz/Energymargin/Energymargin",
+        "status": status,
+        "reason": reason,
+        "company_filter": company_filter,
+        "from": from_date,
+        "to": to_date,
+        "count": 0,
+        "energy_margins": [],
+        "guidance": ENERGY_MARGIN_GUIDANCE,
+        "aggregate_energy_margin": ENERGY_MARGIN_AGGREGATE,
+        "alternatives": alternatives,
+        "source_checks": checks,
+        "caveats": [
+            "This command does not reconstruct margins from prices and generation volumes.",
+            "This command does not ship copied chart values or third-party preserved data.",
+            "The per-company energy-margin split is not officially machine-retrievable; use 'alternatives' for related official per-company data.",
+            "When the Authority publishes an official CSV/API feed, wire that feed here before returning rows.",
+        ],
+        "elapsed_ms": round((time.perf_counter() - started) * 1000),
+    }
+    emit(data, args.json, render_energy_margin)
+
+
 def money(value: Any) -> str:
     if value is None:
         return "-"
@@ -1920,6 +2177,58 @@ def render_outages(data: dict[str, Any]) -> str:
     return "\n".join(lines).rstrip()
 
 
+def render_energy_margin(data: dict[str, Any]) -> str:
+    rows = data.get("energy_margins") or []
+    lines = [
+        f"EA gentailer energy margins: {data.get('status')} ({data.get('elapsed_ms')} ms)",
+        f"Source: {data.get('source_url')}",
+    ]
+    if data.get("company_filter"):
+        lines.append(f"Company filter: {data.get('company_filter')}")
+    if rows:
+        lines.append("")
+        for item in rows:
+            lines.append(
+                f"{item.get('period') or '-'}  {item.get('company') or '-'}  "
+                f"{number(item.get('energy_margin_million_nzd'))} $m"
+            )
+    else:
+        lines.append(data.get("reason") or "No official energy-margin rows returned.")
+        if data.get("guidance"):
+            lines.append("")
+            lines.append(data["guidance"])
+        agg = data.get("aggregate_energy_margin") or {}
+        if agg:
+            lo, hi = (agg.get("weekly_range_million_nzd") or [None, None])[:2]
+            lines.append("")
+            lines.append(
+                f"Official EA aggregate ({agg.get('period')}): ${lo}-{hi}m/week, "
+                f"avg ${agg.get('weekly_average_million_nzd')}m across all gentailers combined."
+            )
+        alternatives = data.get("alternatives") or []
+        if alternatives:
+            lines.append("")
+            lines.append("Where to get official per-company data instead:")
+            for alt in alternatives:
+                lines.append(f"- {alt.get('what')} ({alt.get('metric')})")
+                refs = alt.get("reference_values_million_nzd") or {}
+                for company, value in refs.items():
+                    sign = "-" if value < 0 else ""
+                    lines.append(f"    {company}: {sign}${abs(value)}m")
+                if alt.get("source_url"):
+                    lines.append(f"    {alt['source_url']}")
+                for label, url in (alt.get("source_urls") or {}).items():
+                    lines.append(f"    {label}: {url}")
+        lines.append("")
+        lines.append("Checked official surfaces:")
+        for check in data.get("source_checks") or []:
+            status = check.get("status_code") if check.get("status_code") is not None else check.get("error")
+            signals = ", ".join(check.get("signals") or [])
+            suffix = f" [{signals}]" if signals else ""
+            lines.append(f"- {status} {check.get('url')}{suffix}")
+    return "\n".join(lines).rstrip()
+
+
 def emit(data: dict[str, Any], as_json: bool, render: Callable[[dict[str, Any]], str]) -> None:
     if as_json:
         print(json.dumps(data, indent=2, ensure_ascii=False))
@@ -2006,6 +2315,14 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--all", action="store_true", help="include planned, scheduled, or recent outage records where feeds expose them")
     sp.add_argument("--json", action="store_true")
     sp.set_defaults(func=cmd_outages)
+
+    sp = sub.add_parser("energy-margin", help="probe official EA gentailer energy-margin source availability")
+    sp.add_argument("--company", help="Contact, Genesis, Manawa, Mercury, Meridian, or Nova")
+    sp.add_argument("--from", dest="from_date", help="requested period start date YYYY-MM-DD; returned as metadata until an official data feed is available")
+    sp.add_argument("--to", dest="to_date", help="requested period end date YYYY-MM-DD; returned as metadata until an official data feed is available")
+    sp.add_argument("--timeout", type=positive_int, default=15, help="per-source probe timeout in seconds; default 15")
+    sp.add_argument("--json", action="store_true")
+    sp.set_defaults(func=cmd_energy_margin)
 
     return ap
 

@@ -5,11 +5,15 @@ import json
 import os
 import re
 import stat
+import pathlib
 import sys
 import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 DEFAULT_BASE_URL = "https://api.akahu.io/v1"
 ACCOUNT_RE = re.compile(r"\b(?:\d{2}|x{4})-(?:\d{4}|x{4})-(?:\d{6,7}|x{4})-(?:\d{2,4})\b", re.I)
@@ -87,21 +91,18 @@ class AkahuClient:
             "Authorization": f"Bearer {self.user_token}",
             "X-Akahu-Id": self.app_token,
             "Accept": "application/json",
-            "User-Agent": "thecolab-skills-akahu-personal/1.0",
         }
         if json_body is not None:
             body = json.dumps(json_body).encode("utf-8")
             headers["Content-Type"] = "application/json"
-        req = urllib.request.Request(url, data=body, headers=headers, method=method)
         response_body = ""
         try:
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                response_body = resp.read().decode("utf-8")
-        except urllib.error.HTTPError as exc:
-            detail = exc.read().decode("utf-8", "replace")[:500]
-            die(f"Akahu HTTP {exc.code} for {method} {path}: {detail}")
-        except urllib.error.URLError as exc:
-            die(f"Akahu request failed for {method} {path}: {exc.reason}")
+            raw, _ct, _final = nzfetch.fetch_bytes(url, data=body, method=method, headers=headers, timeout=30)
+            response_body = raw.decode("utf-8", "replace")
+        except nzfetch.Blocked as exc:
+            die(f"Akahu request failed for {method} {path}: network error: {exc}")
+        except nzfetch.FetchError as exc:
+            die(f"Akahu request failed for {method} {path}: {exc}")
         if not response_body:
             return None
         try:

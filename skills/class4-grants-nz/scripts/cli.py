@@ -11,6 +11,7 @@ import argparse
 import csv
 import io
 import json
+import pathlib
 import re
 import sys
 import urllib.error
@@ -18,6 +19,9 @@ import urllib.parse
 import urllib.request
 from collections import defaultdict
 from typing import Any, Callable, Iterable
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 CKAN_BASE = "https://catalogue.data.govt.nz"
 CKAN_ACTION = CKAN_BASE + "/api/3/action/"
@@ -63,15 +67,11 @@ def request(url: str, timeout: int = 30):
 
 def fetch_json(url: str, timeout: int = 30) -> dict[str, Any]:
     try:
-        with request(url, timeout=timeout) as resp:
-            return json.loads(resp.read().decode("utf-8", "replace"))
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        die(f"HTTP {e.code} from {url}: {raw[:240]}")
-    except urllib.error.URLError as e:
-        die(f"network error calling {url}: {e.reason}")
-    except json.JSONDecodeError as e:
-        die(f"invalid JSON from {url}: {e}")
+        return nzfetch.fetch_json(url, timeout=timeout, accept="*/*")
+    except nzfetch.Blocked as e:
+        die(f"network error calling {url}: {e}")
+    except nzfetch.FetchError as e:
+        die(str(e))
 
 
 def fetch_text(url: str, timeout: int = 30) -> str:
@@ -128,16 +128,17 @@ def clean_row(row: dict[str, str]) -> dict[str, Any]:
 
 def csv_rows(timeout: int = 90) -> Iterable[dict[str, str]]:
     try:
-        with request(GRANTS_CSV_URL, timeout=timeout) as resp:
-            text = io.TextIOWrapper(resp, encoding="utf-8-sig", errors="replace", newline="")
-            reader = csv.DictReader(text)
-            for row in reader:
-                yield row
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        die(f"HTTP {e.code} downloading grants CSV: {raw[:240]}")
-    except urllib.error.URLError as e:
-        die(f"network error downloading grants CSV: {e.reason}")
+        body, _ct, _final = nzfetch.fetch_bytes(
+            GRANTS_CSV_URL, timeout=timeout, accept="*/*"
+        )
+    except nzfetch.Blocked as e:
+        die(f"network error downloading grants CSV: {e}")
+    except nzfetch.FetchError as e:
+        die(str(e))
+    try:
+        reader = csv.DictReader(io.StringIO(body.decode("utf-8-sig", errors="replace"), newline=""))
+        for row in reader:
+            yield row
     except csv.Error as e:
         die(f"invalid grants CSV: {e}")
 

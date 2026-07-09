@@ -12,21 +12,19 @@ from __future__ import annotations
 
 import argparse
 import json
+import pathlib
 import re
 import ssl
 import sys
-import urllib.error
 import urllib.parse
-import urllib.request
 from typing import Any
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 BASE = "https://bills.parliament.nz"
 SEARCH_URL = f"{BASE}/api/data/search"
 BILL_URL = f"{BASE}/api/data/Bill"
-UA = (
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
-)
 GUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
 
 
@@ -37,22 +35,22 @@ class ApiError(RuntimeError):
 def _request(url: str, *, payload: dict[str, Any] | None = None, timeout: int = 15) -> Any:
     data = json.dumps(payload).encode("utf-8") if payload is not None else None
     headers = {
-        "User-Agent": UA,
         "Accept": "application/json",
         "Origin": BASE,
         "Referer": BASE + "/",
     }
     if data is not None:
         headers["Content-Type"] = "application/json; charset=utf-8"
-    req = urllib.request.Request(url, data=data, headers=headers, method="POST" if data else "GET")
     ctx = ssl.create_default_context()
     try:
-        with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
-            body = resp.read().decode("utf-8", "replace")
-    except urllib.error.HTTPError as e:
-        raise ApiError(f"HTTP {e.code} from {url}") from e
-    except urllib.error.URLError as e:
-        raise ApiError(f"network error contacting bills.parliament.nz: {e.reason}") from e
+        body = nzfetch.fetch_text(
+            url, timeout=timeout, headers=headers, data=data,
+            method="POST" if data else "GET", context=ctx,
+        )
+    except nzfetch.Blocked as e:
+        raise ApiError(f"network error contacting bills.parliament.nz: {e}") from e
+    except nzfetch.FetchError as e:
+        raise ApiError(str(e)) from e
     if not body.strip():
         return {}
     try:

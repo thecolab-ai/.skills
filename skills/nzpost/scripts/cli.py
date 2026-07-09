@@ -8,14 +8,16 @@ from __future__ import annotations
 import argparse
 import html
 import json
+import pathlib
 import re
 import sys
-import urllib.error
 import urllib.parse
-import urllib.request
 from datetime import datetime
 from typing import Any
 from zoneinfo import ZoneInfo
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 _CONTROL_CHARS_RE = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
 
@@ -29,7 +31,6 @@ API_PARCELS = "/parceltrack/parcels"
 LOCATIONS_API_BASE = "https://api.nzpost.co.nz/digital/postshop-locations/v2"
 ADDRESS_API = "https://tools.nzpost.co.nz/legacy/api/suggest"
 
-UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:151.0) Gecko/20100101 Firefox/151.0"
 REFERER = "https://www.nzpost.co.nz/tools/tracking"
 ADDRESS_REFERER = "https://www.nzpost.co.nz/tools/address-postcode-finder"
 
@@ -138,15 +139,12 @@ def validate_tracking_number(tn: str) -> str:
 
 def _http_get(url: str, headers: dict[str, str], timeout: int = 15) -> str:
     """Perform a GET request and return decoded body, or call die() on error."""
-    req = urllib.request.Request(url, headers=headers, method="GET")
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return resp.read().decode("utf-8", "replace")
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        die(f"HTTP {e.code} from {url}: {raw[:300]}")
-    except urllib.error.URLError as e:
-        die(f"network error calling {url}: {e.reason}")
+        return nzfetch.fetch_text(url, timeout=timeout, headers=headers)
+    except nzfetch.Blocked as e:
+        die(f"network error calling {url}: {e}")
+    except nzfetch.FetchError as e:
+        die(str(e))
 
 
 # ---------------------------------------------------------------------------
@@ -160,7 +158,6 @@ def fetch_tracking_multi(tracking_references: list[str], timeout: int = 15) -> d
     )
     url = f"{API_BASE}{API_PARCELS}?{params}"
     headers = {
-        "User-Agent": UA,
         "Referer": REFERER,
         "Content-Type": "application/json",
     }
@@ -201,12 +198,9 @@ def _geocode_via_keyword(query: str, timeout: int = 15) -> tuple[float, float] |
     """Try NZ Post locations KEYWORD API for geocoding. Returns (lat, lng) if found, else None."""
     params = urllib.parse.urlencode({"type": "KEYWORD", "value": query, "max": 1})
     url = f"{LOCATIONS_API_BASE}/locations?{params}"
-    headers = {"User-Agent": UA, "Referer": REFERER}
+    headers = {"Referer": REFERER}
     try:
-        req = urllib.request.Request(url, headers=headers, method="GET")
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            raw = resp.read().decode("utf-8", "replace")
-        data = json.loads(raw)
+        data = nzfetch.fetch_json(url, timeout=timeout, headers=headers)
     except Exception:
         return None
 
@@ -232,15 +226,15 @@ def _geocode_via_nominatim(query: str, timeout: int = 15) -> tuple[float, float]
         "limit": 1,
     })
     url = f"{NOMINATIM_URL}?{params}"
+    # Nominatim's ToS REQUIRES an identifying contact User-Agent, so keep the
+    # custom UA here and pass browser_headers=False so nzfetch doesn't add
+    # contradictory Chrome Client-Hints on top of it.
     headers = {
         "User-Agent": NOMINATIM_UA,
         "Accept-Language": "en",
     }
     try:
-        req = urllib.request.Request(url, headers=headers, method="GET")
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            raw = resp.read().decode("utf-8", "replace")
-        results = json.loads(raw)
+        results = nzfetch.fetch_json(url, timeout=timeout, headers=headers, browser_headers=False)
     except Exception:
         return None
 
@@ -269,7 +263,7 @@ def fetch_locations_by_coords(lat: float, lng: float, max_results: int = 10, tim
     value = json.dumps({"latitude": lat, "longitude": lng})
     params = urllib.parse.urlencode({"type": "NEARBY", "value": value, "max": max_results})
     url = f"{LOCATIONS_API_BASE}/locations?{params}"
-    headers = {"User-Agent": UA, "Referer": REFERER}
+    headers = {"Referer": REFERER}
     raw = _http_get(url, headers, timeout)
     try:
         data = json.loads(raw)
@@ -282,7 +276,7 @@ def fetch_locations_by_keyword(keyword: str, max_results: int = 10, timeout: int
     """Fetch NZ Post locations by keyword. Returns list of location dicts."""
     params = urllib.parse.urlencode({"type": "KEYWORD", "value": keyword, "max": max_results})
     url = f"{LOCATIONS_API_BASE}/locations?{params}"
-    headers = {"User-Agent": UA, "Referer": REFERER}
+    headers = {"Referer": REFERER}
     raw = _http_get(url, headers, timeout)
     try:
         data = json.loads(raw)
@@ -339,7 +333,6 @@ def fetch_addresses(query: str, limit: int = 10, timeout: int = 15) -> list[dict
     params = urllib.parse.urlencode({"q": query, "max": limit})
     url = f"{ADDRESS_API}?{params}"
     headers = {
-        "User-Agent": UA,
         "Referer": ADDRESS_REFERER,
         "Accept": "application/json",
     }

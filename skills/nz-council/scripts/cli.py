@@ -27,6 +27,11 @@ import urllib.parse
 import urllib.request
 from typing import Any
 
+import pathlib
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
+
 EVENTFINDA_BASE = "https://www.eventfinda.co.nz"
 AKL_LEISURE_BASE = "https://www.aucklandleisure.co.nz"
 AKL_LOCATION_ENDPOINT = AKL_LEISURE_BASE + "/umbraco/surface/LocationListing/RenderLocationListing"
@@ -1316,25 +1321,44 @@ def fetch_text_result(
 ) -> tuple[str | None, str, int | None, str | None]:
     url = resolve_url(url_or_path, base)
 
+    # MIGRATED onto the shared nzfetch helper in LEAN-headers mode
+    # (browser_headers=False). These public-page HTML fetches (Eventfinda
+    # listings, Auckland Leisure pool/facility pages, etc.) are served REAL 200
+    # content to a minimal request but a bot-wall CHALLENGE to nzfetch's full
+    # Client-Hint / Sec-Fetch-* header set — so we send only the lean
+    # UA + Accept + language + encoding set (equivalent to the bare urllib request
+    # this replaced) while gaining nzfetch's rotating-proxy fallback. expect_json
+    # is forced False so a real HTML page (even with application/json in Accept)
+    # is never mis-read as a JSON challenge. On a genuine block nzfetch raises
+    # Blocked; we surface it as a network error (never a hard die here) so the
+    # SAME downstream bot-wall / CDP / CloakBrowser fallback the old urllib
+    # challenge/HTTPError routed into (fetch_text_with_cdp / fetch_dud_text /
+    # try_fetch_live_page) still handles it. The JSON POST path (fetch_json_post)
+    # also goes through nzfetch; the CDP browser-control calls to 127.0.0.1:5100
+    # stay on urllib (localhost, never proxied).
+    accept = "text/html,application/xhtml+xml,application/json"
     req_headers = {
-        "User-Agent": UA,
-        "Accept": "text/html,application/xhtml+xml,application/json",
+        "Accept": accept,
     }
     if headers:
         req_headers.update(headers)
-    req = urllib.request.Request(url, headers=req_headers)
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            body = resp.read().decode("utf-8", "replace")
-            return body, resp.geturl(), resp.status, None
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        if allow_http_error:
-            return raw, e.geturl() or url, e.code, None
-        message = strip_tags(raw)[:240] or e.reason
-        return raw, url, e.code, f"HTTP {e.code} from {url}: {message}"
-    except urllib.error.URLError as e:
-        return None, url, None, f"network error calling {url}: {e.reason}"
+        body_bytes, _ct, final_url = nzfetch.fetch_bytes(
+            url,
+            timeout=timeout,
+            accept=accept,
+            headers=req_headers,
+            browser_headers=False,
+            expect_json=False,
+        )
+    except nzfetch.Blocked as e:
+        # Transient bot-block — route to the skill's own bot-wall / CDP /
+        # CloakBrowser fallback exactly as the old urllib challenge/HTTPError did.
+        return None, url, None, f"network error calling {url}: {e}"
+    except nzfetch.FetchError as e:
+        return None, url, None, str(e)
+    body = body_bytes.decode("utf-8", "replace")
+    return body, final_url, 200, None
 
 
 def fetch_text(url_or_path: str, base: str = "", headers: dict[str, str] | None = None, timeout: int = 30) -> tuple[str, str, int]:
@@ -1345,27 +1369,34 @@ def fetch_text(url_or_path: str, base: str = "", headers: dict[str, str] | None 
 
 
 def fetch_json_post(url: str, payload: dict[str, Any], headers: dict[str, str] | None = None, timeout: int = 30) -> tuple[Any, str, int]:
+    # Routed through the shared nzfetch helper (browser UA + rotating-proxy retry
+    # on a bot-block). This is a JSON API, so nzfetch's HTML-challenge detection
+    # does not misfire on real responses.
     req_headers = {
-        "User-Agent": UA,
         "Accept": "application/json",
         "Content-Type": "application/json",
     }
     if headers:
         req_headers.update(headers)
-    req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), headers=req_headers, method="POST")
+    data = json.dumps(payload).encode("utf-8")
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            body = resp.read().decode("utf-8", "replace")
-            try:
-                return json.loads(body), resp.geturl(), resp.status
-            except json.JSONDecodeError as exc:
-                die(f"invalid JSON from {url}: {exc}")
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        message = strip_tags(raw)[:240] or e.reason
-        die(f"HTTP {e.code} from {url}: {message}")
-    except urllib.error.URLError as e:
-        die(f"network error calling {url}: {e.reason}")
+        body_bytes, _ct, final_url = nzfetch.fetch_bytes(
+            url,
+            timeout=timeout,
+            accept="application/json",
+            headers=req_headers,
+            data=data,
+            method="POST",
+        )
+    except nzfetch.Blocked as e:
+        die(f"network error calling {url}: {e}")
+    except nzfetch.FetchError as e:
+        die(str(e))
+    body = body_bytes.decode("utf-8", "replace")
+    try:
+        return json.loads(body), final_url, 200
+    except json.JSONDecodeError as exc:
+        die(f"invalid JSON from {url}: {exc}")
 
 
 def looks_bot_walled(page_html: str) -> bool:

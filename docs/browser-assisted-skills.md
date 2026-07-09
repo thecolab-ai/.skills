@@ -87,13 +87,13 @@ Include the CloakBrowser repo link where useful: <https://github.com/CloakHQ/Clo
 GitHub Actions smoke runs should install CloakBrowser and set:
 
 ```text
-HERMES_SMOKE_WITH_CLOAKBROWSER=1
-HERMES_SMOKE_USE_BROWSER=1
+COLAB_SMOKE_WITH_CLOAKBROWSER=1
+COLAB_SMOKE_USE_BROWSER=1
 ```
 
-`scripts/run_all_smoke.sh` uses `uv run --with cloakbrowser` when `HERMES_SMOKE_WITH_CLOAKBROWSER=1`, so browser-assisted smoke tests can import CloakBrowser without making it a repo-wide static dependency.
+`scripts/run_all_smoke.sh` uses `uv run --with cloakbrowser` when `COLAB_SMOKE_WITH_CLOAKBROWSER=1`, so browser-assisted smoke tests can import CloakBrowser without making it a repo-wide static dependency.
 
-For skills where `--browser` is the richer or more realistic path, the smoke test should prefer `--browser` when CloakBrowser is available or when `HERMES_SMOKE_USE_BROWSER=1` is set. It may still accept a clearly marked blocked/fallback state, for example `fare_search_blocked: true`, when the upstream site returns request-auth/CAPTCHA. A missing CloakBrowser install in CI should fail loudly rather than silently testing only the fallback.
+For skills where `--browser` is the richer or more realistic path, the smoke test should prefer `--browser` when CloakBrowser is available or when `COLAB_SMOKE_USE_BROWSER=1` is set. It may still accept a clearly marked blocked/fallback state, for example `fare_search_blocked: true`, when the upstream site returns request-auth/CAPTCHA. A missing CloakBrowser install in CI should fail loudly rather than silently testing only the fallback.
 
 ## Security and ethics boundary
 

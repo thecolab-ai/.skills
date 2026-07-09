@@ -12,22 +12,20 @@ import datetime as dt
 import html
 import json
 import os
+import pathlib
 import re
 import sys
 import time
-import urllib.error
 import urllib.parse
-import urllib.request
 from typing import Any
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 BOOKING_API = "https://prod-nz-rdr.recreation-management.tylerapp.com/nzrdr/rdr/"
 BOOKING_WEB = "https://bookings.doc.govt.nz/Web/"
 DOC_SITE = "https://www.doc.govt.nz"
 ALERTS_INDEX = DOC_SITE + "/parks-and-recreation/know-before-you-go/alerts/"
-UA = os.environ.get(
-    "DOC_NZ_USER_AGENT",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
-)
 
 
 def die(message: str, code: int = 1) -> None:
@@ -143,7 +141,6 @@ def booking_headers() -> dict[str, str]:
         "Accept": "application/json, text/plain, */*",
         "Origin": "https://bookings.doc.govt.nz",
         "Referer": BOOKING_WEB,
-        "User-Agent": UA,
     }
 
 
@@ -156,57 +153,34 @@ def request_booking_json(path: str, payload: dict[str, Any] | None = None, timeo
         method = "POST"
         headers["Content-Type"] = "application/json"
         data = json.dumps(payload, separators=(",", ":")).encode("utf-8")
-    req = urllib.request.Request(url, data=data, headers=headers, method=method)
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            raw = resp.read().decode("utf-8", "replace")
-            if resp.status == 202 and resp.headers.get("x-amzn-waf-action") == "challenge":
-                die("DOC booking API returned a WAF challenge; retry later or use a browser-sniffed session")
-            return json.loads(raw) if raw else None
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        detail = raw[:300]
-        try:
-            parsed = json.loads(raw)
-            if isinstance(parsed, dict):
-                detail = str(parsed.get("Message") or parsed.get("message") or parsed.get("error") or detail)
-        except Exception:
-            pass
-        die(f"HTTP {e.code} from DOC booking API {url}: {detail or e.reason}")
-    except urllib.error.URLError as e:
-        die(f"network error calling DOC booking API {url}: {e.reason}")
-    except json.JSONDecodeError as e:
-        die(f"invalid JSON from DOC booking API {url}: {e}")
+        return nzfetch.fetch_json(url, headers=headers, data=data, method=method, timeout=timeout)
+    except nzfetch.Blocked as e:
+        die(f"network error calling DOC booking API {url}: {e}")
+    except nzfetch.FetchError as e:
+        die(f"HTTP error from DOC booking API {url}: {e}")
 
 
 def request_doc_json(path: str, timeout: int = 25) -> Any:
     url = DOC_SITE + "/api/" + path.lstrip("/")
-    headers = {"Accept": "application/json, text/plain, */*", "Referer": DOC_SITE + "/", "User-Agent": UA}
-    req = urllib.request.Request(url, headers=headers, method="GET")
+    headers = {"Accept": "application/json, text/plain, */*", "Referer": DOC_SITE + "/"}
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            raw = resp.read().decode("utf-8", "replace")
-            return json.loads(raw) if raw else None
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        die(f"HTTP {e.code} from DOC API {url}: {raw[:300] or e.reason}")
-    except urllib.error.URLError as e:
-        die(f"network error calling DOC API {url}: {e.reason}")
-    except json.JSONDecodeError as e:
-        die(f"invalid JSON from DOC API {url}: {e}")
+        return nzfetch.fetch_json(url, headers=headers, timeout=timeout)
+    except nzfetch.Blocked as e:
+        die(f"network error calling DOC API {url}: {e}")
+    except nzfetch.FetchError as e:
+        die(f"HTTP error from DOC API {url}: {e}")
 
 
 def request_text(url: str, timeout: int = 25) -> tuple[str, str]:
-    headers = {"Accept": "text/html,application/xhtml+xml", "User-Agent": UA}
-    req = urllib.request.Request(url, headers=headers, method="GET")
+    headers = {"Accept": "text/html,application/xhtml+xml"}
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return resp.read().decode("utf-8", "replace"), resp.geturl()
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        die(f"HTTP {e.code} from {url}: {raw[:300] or e.reason}")
-    except urllib.error.URLError as e:
-        die(f"network error calling {url}: {e.reason}")
+        body, _content_type, final_url = nzfetch.fetch_bytes(url, headers=headers, timeout=timeout, expect_json=False)
+        return body.decode("utf-8", "replace"), final_url
+    except nzfetch.Blocked as e:
+        die(f"network error calling {url}: {e}")
+    except nzfetch.FetchError as e:
+        die(f"HTTP error from {url}: {e}")
 
 
 def emit(data: dict[str, Any], as_json: bool, printer: Any) -> None:

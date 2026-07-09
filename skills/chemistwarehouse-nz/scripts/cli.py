@@ -12,19 +12,22 @@ import html
 import json
 import os
 import re
+import pathlib
 import sys
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from html.parser import HTMLParser
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 from typing import Any
 
 BASE_API = "https://www.chemistwarehouse.co.nz/searchapiv2"
 BASE_WEB = "https://www.chemistwarehouse.co.nz"
 SOURCE = "chemistwarehouse-nz-searchapiv2"
 ROOT_LOCATION = "//catalog01/en_AU/categories<{catalog01_chemnz}"
-UA = os.environ.get("CHEMISTWAREHOUSE_NZ_USER_AGENT", "Mozilla/5.0")
 
 
 class HTMLText(HTMLParser):
@@ -57,21 +60,20 @@ def api_url(path: str, params: dict[str, Any]) -> str:
 def request_json(path: str, params: dict[str, Any], timeout: int = 25) -> tuple[Any, str]:
     url = api_url(path, params)
     headers = {
-        "User-Agent": UA,
         "Accept": "application/json,text/plain,*/*",
         "Referer": BASE_WEB + "/",
     }
-    req = urllib.request.Request(url, headers=headers)
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            raw = resp.read().decode("utf-8", "replace")
-            return json.loads(raw), url
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        detail = raw[:300].strip() or e.reason
-        die(f"HTTP {e.code} from {url}: {detail}")
-    except urllib.error.URLError as e:
-        die(f"network error calling {url}: {e.reason}")
+        # This searchapiv2 endpoint returns HTTP 500 when sent the full Chrome
+        # Client-Hint / Sec-Fetch-* header set; a lean request (browser_headers
+        # =False) returns real data. Let nzfetch own the UA but skip the hints.
+        body, _ct, _final = nzfetch.fetch_bytes(url, headers=headers, timeout=timeout, accept="application/json,text/plain,*/*", browser_headers=False)
+        raw = body.decode("utf-8", "replace")
+        return json.loads(raw), url
+    except nzfetch.Blocked as e:
+        die(f"network error calling {url}: {e}")
+    except nzfetch.FetchError as e:
+        die(str(e))
     except json.JSONDecodeError as e:
         die(f"invalid JSON from {url}: {e}")
 

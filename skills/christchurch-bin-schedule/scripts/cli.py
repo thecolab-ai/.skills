@@ -4,18 +4,21 @@ from __future__ import annotations
 
 import argparse
 import json
+import pathlib
 import ssl
 import sys
 import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import date, datetime
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 from typing import Any
 
 ADDRESS_SUGGEST_URL = "https://opendata.ccc.govt.nz/CCCSearch/rest/address/suggest"
 COLLECTION_URL = "https://ccc.govt.nz/services/rubbish-and-recycling/collections/getProperty"
 MAIN_PAGE = "https://ccc.govt.nz/services/rubbish-and-recycling/collections/"
-UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"
 
 BIN_LABELS = {
     "Garbage": "Rubbish (red bin)",
@@ -27,23 +30,21 @@ BIN_LABELS = {
 def fetch_json(url: str, headers: dict[str, str] | None = None, timeout: int = 15) -> Any:
     """Fetch JSON from a URL using the Python standard library."""
     ctx = ssl.create_default_context()
-    req = urllib.request.Request(
-        url,
-        headers={"User-Agent": UA, **(headers or {})},
-    )
     try:
-        with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
-            return json.loads(resp.read().decode("utf-8", "replace"))
-    except urllib.error.HTTPError as e:
-        if e.code == 403:
-            raise RuntimeError(
-                "CCC collection endpoint returned 403 (blocked by bot protection). "
-                "This endpoint works from residential NZ IPs but may block datacenter/VPN IPs. "
-                "Try from a home connection."
-            ) from e
-        raise RuntimeError(f"CCC endpoint returned HTTP {e.code}") from e
-    except urllib.error.URLError as e:
-        raise RuntimeError(f"network error contacting CCC: {e.reason}") from e
+        return nzfetch.fetch_json(
+            url,
+            headers=headers,
+            timeout=timeout,
+            context=ctx,
+        )
+    except nzfetch.Blocked as e:
+        raise RuntimeError(
+            "network error contacting CCC: endpoint blocked by bot protection "
+            "(HTTP 403/challenge). This endpoint works from residential NZ IPs but "
+            f"may block datacenter/VPN IPs. Try from a home connection. ({e})"
+        ) from e
+    except nzfetch.FetchError as e:
+        raise RuntimeError(f"CCC endpoint error: {e}") from e
 
 
 def find_rating_unit_id(address: str) -> dict[str, Any] | None:

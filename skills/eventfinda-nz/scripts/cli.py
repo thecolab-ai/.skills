@@ -9,16 +9,17 @@ from __future__ import annotations
 import argparse
 import html
 import json
+import pathlib
 import re
 import sys
 import time
-import urllib.error
 import urllib.parse
-import urllib.request
 from typing import Any
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
+
 BASE = "https://www.eventfinda.co.nz"
-UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146 Safari/537.36"
 EVENT_TYPES = {"Event", "BusinessEvent", "ChildrensEvent", "ComedyEvent", "CourseInstance", "DanceEvent", "DeliveryEvent", "EducationEvent", "ExhibitionEvent", "Festival", "FoodEvent", "LiteraryEvent", "MusicEvent", "PublicationEvent", "SaleEvent", "ScreeningEvent", "SocialEvent", "SportsEvent", "TheaterEvent", "VisualArtsEvent"}
 
 
@@ -32,16 +33,15 @@ def get(url_or_path: str, timeout: int = 30) -> tuple[str, str, int]:
         url = url_or_path
     else:
         url = BASE + (url_or_path if url_or_path.startswith("/") else "/" + url_or_path)
-    req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "text/html,application/xhtml+xml"})
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            body = resp.read().decode("utf-8", "replace")
-            return body, resp.geturl(), resp.status
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        die(f"HTTP {e.code} from {url}: {strip_tags(raw)[:240]}")
-    except urllib.error.URLError as e:
-        die(f"network error calling {url}: {e.reason}")
+        body, _ct, final_url = nzfetch.fetch_bytes(
+            url, timeout=timeout, accept="text/html,application/xhtml+xml", expect_json=False
+        )
+    except nzfetch.Blocked as e:
+        die(f"network error: {e}")
+    except nzfetch.FetchError as e:
+        die(str(e))
+    return body.decode("utf-8", "replace"), final_url, 200
 
 
 def strip_tags(value: str) -> str:

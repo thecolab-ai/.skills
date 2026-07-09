@@ -11,13 +11,14 @@ import datetime as _dt
 import html
 import json
 import re
+import pathlib
 import sys
 import textwrap
-import urllib.error
-import urllib.parse
-import urllib.request
 from dataclasses import dataclass, asdict
 from typing import Any
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 UA = "nz-ai-policy-skill/1.0 (+https://github.com/thecolab-ai/.skills)"
 DEFAULT_TIMEOUT = 15
@@ -176,14 +177,6 @@ def output(data: Any, as_json: bool) -> None:
         print_human(data)
 
 
-def request(url: str, timeout: int = DEFAULT_TIMEOUT):
-    headers = {
-        "User-Agent": UA,
-        "Accept": "text/html,application/pdf,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    }
-    return urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=timeout)
-
-
 def strip_html(text: str) -> str:
     text = re.sub(r"(?is)<(script|style|noscript|svg).*?</\1>", " ", text)
     text = re.sub(r"(?is)<!--.*?-->", " ", text)
@@ -209,33 +202,35 @@ def is_blocked_html(text: str) -> bool:
 def fetch_source(source: Source, timeout: int = DEFAULT_TIMEOUT, max_chars: int = 4000) -> dict[str, Any]:
     fetched_at = now_utc()
     try:
-        with request(source.url, timeout=timeout) as resp:
-            final_url = resp.geturl()
-            content_type = resp.headers.get("content-type", "")
-            if source.kind == "pdf" or "application/pdf" in content_type.lower():
-                blob = resp.read(4096)
-                return {
-                    "id": source.id,
-                    "title": source.title,
-                    "url": source.url,
-                    "final_url": final_url,
-                    "fetched_at": fetched_at,
-                    "ok": True,
-                    "kind": "pdf",
-                    "content_type": content_type,
-                    "metadata_only": True,
-                    "bytes_previewed": len(blob),
-                    "note": "PDF reached; stdlib skill reports metadata only and does not extract full PDF text.",
-                    "source": source_record(source),
-                }
-            raw = resp.read(max(max_chars * 8, 12000)).decode("utf-8", "replace")
-    except urllib.error.HTTPError as e:
-        detail = e.read(300).decode("utf-8", "replace").strip()
-        return {"id": source.id, "title": source.title, "url": source.url, "fetched_at": fetched_at, "ok": False, "error": f"HTTP {e.code}", "detail": detail, "source": source_record(source)}
-    except urllib.error.URLError as e:
-        return {"id": source.id, "title": source.title, "url": source.url, "fetched_at": fetched_at, "ok": False, "error": "network_error", "detail": str(e.reason), "source": source_record(source)}
+        body, content_type, final_url = nzfetch.fetch_bytes(
+            source.url,
+            timeout=timeout,
+            accept="text/html,application/pdf,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        )
+    except nzfetch.Blocked as e:
+        return {"id": source.id, "title": source.title, "url": source.url, "fetched_at": fetched_at, "ok": False, "blocked": True, "error": "source_blocked_plain_http", "detail": f"The official site returned bot-protection or access-control HTML. {e}", "source": source_record(source)}
+    except nzfetch.FetchError as e:
+        return {"id": source.id, "title": source.title, "url": source.url, "fetched_at": fetched_at, "ok": False, "error": "network_error", "detail": str(e), "source": source_record(source)}
     except TimeoutError:
         return {"id": source.id, "title": source.title, "url": source.url, "fetched_at": fetched_at, "ok": False, "error": "timeout", "source": source_record(source)}
+
+    if source.kind == "pdf" or "application/pdf" in content_type.lower():
+        blob = body[:4096]
+        return {
+            "id": source.id,
+            "title": source.title,
+            "url": source.url,
+            "final_url": final_url,
+            "fetched_at": fetched_at,
+            "ok": True,
+            "kind": "pdf",
+            "content_type": content_type,
+            "metadata_only": True,
+            "bytes_previewed": len(blob),
+            "note": "PDF reached; stdlib skill reports metadata only and does not extract full PDF text.",
+            "source": source_record(source),
+        }
+    raw = body[:max(max_chars * 8, 12000)].decode("utf-8", "replace")
 
     if is_blocked_html(raw):
         return {

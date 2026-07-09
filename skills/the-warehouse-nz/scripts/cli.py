@@ -34,9 +34,12 @@ PRODUCT_PATH = "/on/demandware.store/Sites-twl-Site/default/Product-Show"
 STORES_PATH = "/on/demandware.store/Sites-twl-Site/default/Stores-FindStores"
 PAGE_SIZE = 32
 MAX_LIMIT = 96
+# thewarehouse.co.nz sits behind Cloudflare, which flags the generic Linux/Chrome
+# UA as a bot and serves a "Just a moment..." interstitial. A current desktop
+# Firefox UA is treated as a real browser and returns product HTML directly.
 UA = os.environ.get(
     "THE_WAREHOUSE_NZ_USER_AGENT",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:151.0) Gecko/20100101 Firefox/151.0",
 )
 
 REGIONS = {

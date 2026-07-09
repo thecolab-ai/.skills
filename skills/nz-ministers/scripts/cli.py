@@ -20,24 +20,20 @@ import argparse
 import contextlib
 import json
 import os
+import pathlib
 import re
-import ssl
 import sys
 import tempfile
 import time
-import urllib.error
 import urllib.parse
-import urllib.request
 import xml.etree.ElementTree as ET
 from typing import Any
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
+
 BASE = "https://www.beehive.govt.nz"
 RSS_URL = f"{BASE}/rss.xml"
-DEFAULT_UA = os.environ.get(
-    "NZ_MINISTERS_USER_AGENT",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
-)
 CACHE_FILE = os.path.join(tempfile.gettempdir(), "nz-ministers-incap.json")
 CACHE_TTL_SECONDS = 300  # reuse browser-obtained Incapsula clearance (sessions are short-lived)
 ARTICLE_TYPES = ("release", "speech", "feature")
@@ -56,15 +52,12 @@ class ClearanceUnavailable(RuntimeError):
 # ---------------------------------------------------------------------------
 
 def _open(url: str, headers: dict[str, str], timeout: int = 20) -> str:
-    req = urllib.request.Request(url, headers=headers, method="GET")
-    ctx = ssl.create_default_context()
-    try:
-        with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
-            return resp.read().decode("utf-8", "replace")
-    except urllib.error.HTTPError as e:
-        raise ApiError(f"HTTP {e.code} from {url}") from e
-    except urllib.error.URLError as e:
-        raise ApiError(f"network error contacting beehive.govt.nz: {e.reason}") from e
+    """Fetch `url` as text via the shared nzfetch helper. Raises nzfetch.Blocked
+    on a bot wall / network error and nzfetch.FetchError on a real HTTP error;
+    callers translate those into the skill's own ApiError / clearance flow."""
+    accept = headers.get("Accept") or "*/*"
+    extra = {k: v for k, v in headers.items() if k.lower() != "accept"}
+    return nzfetch.fetch_text(url, headers=extra, accept=accept, timeout=timeout)
 
 
 def is_incapsula(text: str) -> bool:
@@ -74,7 +67,12 @@ def is_incapsula(text: str) -> bool:
 
 def fetch_rss() -> str:
     """The root RSS feed is allowlisted and needs no clearance."""
-    text = _open(RSS_URL, {"User-Agent": DEFAULT_UA, "Accept": "application/rss+xml, application/xml, */*"})
+    try:
+        text = _open(RSS_URL, {"Accept": "application/rss+xml, application/xml, */*"})
+    except nzfetch.Blocked as e:
+        raise ApiError("beehive RSS feed is temporarily blocked; try again shortly") from e
+    except nzfetch.FetchError as e:
+        raise ApiError(f"network error contacting beehive.govt.nz: {e}") from e
     if is_incapsula(text):
         raise ApiError("beehive RSS feed is temporarily blocked; try again shortly")
     return text
@@ -108,16 +106,26 @@ def save_clearance(ua: str, cookie: str) -> None:
 
 
 def _http_get(url: str, clearance: dict[str, str]) -> str:
-    return _open(
-        url,
-        {
-            "User-Agent": clearance["ua"],
-            "Cookie": clearance["cookie"],
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "en-NZ,en;q=0.9",
-            "Referer": BASE + "/",
-        },
-    )
+    try:
+        return _open(
+            url,
+            {
+                "User-Agent": clearance["ua"],
+                "Cookie": clearance["cookie"],
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Language": "en-NZ,en;q=0.9",
+                "Referer": BASE + "/",
+            },
+        )
+    except nzfetch.Blocked:
+        # beehive re-challenged this bare HTTP client (or the network is down).
+        # Return the Incapsula marker fetch_protected already checks for so it
+        # falls back to the browser path exactly as before.
+        return "_incapsula_resource"
+    except nzfetch.FetchError as e:
+        # A real HTTP status (e.g. 404 for an unknown minister slug). Preserve the
+        # "HTTP <code>" text so _resolve_minister's 404 detection still works.
+        raise ApiError(str(e)) from e
 
 
 def _browser_fetch(url: str) -> tuple[str, str, str]:

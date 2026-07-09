@@ -9,13 +9,15 @@ from __future__ import annotations
 import argparse
 import html
 import json
+import pathlib
 import re
 import sys
 import time
-import urllib.error
 import urllib.parse
-import urllib.request
 from typing import Any
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 BASE = "https://www.workandincome.govt.nz"
 UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146 Safari/537.36"
@@ -37,29 +39,19 @@ def urljoin(path_or_url: str) -> str:
 
 def fetch(path_or_url: str, timeout: int = DEFAULT_TIMEOUT) -> tuple[str, str, int]:
     url = urljoin(path_or_url)
-    req = urllib.request.Request(
-        url,
-        headers={
-            "User-Agent": UA,
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "en-NZ,en;q=0.9",
-        },
-    )
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            body = resp.read().decode("utf-8", "replace")
-            return body, resp.geturl(), resp.status
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        text = strip_tags(raw)[:300]
-        if e.code in (403, 429) or "incapsula" in raw.lower() or "request unsuccessful" in raw.lower():
-            raise UpstreamBlocked(f"HTTP {e.code} from Work and Income, likely bot/data-centre protection: {text}")
-        die(f"HTTP {e.code} from {url}: {text}")
+        body, _ct, final_url = nzfetch.fetch_bytes(
+            url,
+            timeout=timeout,
+            headers={"Accept-Language": "en-NZ,en;q=0.9"},
+            accept="text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        )
+        return body.decode("utf-8", "replace"), final_url, 200
+    except nzfetch.Blocked as e:
+        raise UpstreamBlocked(f"HTTP block from Work and Income, likely bot/data-centre protection: {e}") from e
+    except nzfetch.FetchError as e:
+        die(f"{e}")
         raise
-    except urllib.error.URLError as e:
-        raise UpstreamBlocked(f"network error calling Work and Income: {e.reason}") from e
-    except TimeoutError as e:
-        raise UpstreamBlocked("timeout calling Work and Income") from e
 
 
 def strip_tags(value: str) -> str:

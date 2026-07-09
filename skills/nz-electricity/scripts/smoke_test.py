@@ -154,6 +154,79 @@ def test_dg_latest_command():
 
 results.append(test("dg-latest returns GUEHMT latest[]", test_dg_latest_command))
 
+
+def test_energy_margin_status():
+    result = run(["energy-margin", "--company", "meridian", "--timeout", "5", "--json"])
+    if result.returncode != 0:
+        print(f"  stderr: {result.stderr[:200]}")
+        return False
+    data = json.loads(result.stdout)
+    if data.get("source") != "Electricity Authority gentailer energy margin dashboard/article":
+        print(f"  stdout: {result.stdout[:200]}")
+        print("  Expected EA energy margin source label")
+        return False
+    if data.get("company_filter") != "Meridian":
+        print(f"  stdout: {result.stdout[:200]}")
+        print("  Expected company filter to normalise to Meridian")
+        return False
+    if not isinstance(data.get("source_checks"), list):
+        print(f"  stdout: {result.stdout[:200]}")
+        print("  Expected source_checks[] diagnostics")
+        return False
+    if data.get("energy_margins") != []:
+        print(f"  stdout: {result.stdout[:200]}")
+        print("  Expected no copied or derived margin rows while the official feed is unavailable")
+        return False
+    if not data.get("guidance"):
+        print("  Expected guidance text pointing at official alternatives")
+        return False
+    alternatives = data.get("alternatives")
+    if not isinstance(alternatives, list) or not alternatives:
+        print("  Expected non-empty alternatives[] to point AI at official per-company sources")
+        return False
+    if not all(alt.get("source_url") or alt.get("source_urls") for alt in alternatives):
+        print("  Expected every alternative to carry a source URL")
+        return False
+    if not (data.get("aggregate_energy_margin") or {}).get("weekly_average_million_nzd"):
+        print("  Expected official aggregate energy-margin reference")
+        return False
+    return True
+
+
+results.append(test("energy-margin reports official source status", test_energy_margin_status))
+
+
+def test_energy_margin_company_filters_alternatives():
+    # Nova is not in the four-company EA net-profit list, so that alternative must drop out.
+    result = run(["energy-margin", "--company", "nova", "--timeout", "5", "--json"])
+    if result.returncode != 0:
+        print(f"  stderr: {result.stderr[:200]}")
+        return False
+    data = json.loads(result.stdout)
+    for alt in data.get("alternatives") or []:
+        refs = alt.get("reference_values_million_nzd") or {}
+        if refs and "Nova" not in refs:
+            print("  Expected net-profit alternative (no Nova) to be filtered out for --company nova")
+            return False
+    return True
+
+
+results.append(
+    test("energy-margin filters alternatives by company", test_energy_margin_company_filters_alternatives)
+)
+
+
+def test_energy_margin_rejects_unknown_company():
+    result = run(["energy-margin", "--company", "not-a-company", "--json"])
+    if result.returncode == 0:
+        print(f"  stdout: {result.stdout[:200]}")
+        print("  Expected unknown company to fail")
+        return False
+    return "unknown energy-margin company" in result.stderr
+
+
+results.append(test("energy-margin rejects unknown company", test_energy_margin_rejects_unknown_company))
+
 if all(results):
     print("All tests passed.")
     sys.exit(0)

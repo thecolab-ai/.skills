@@ -90,7 +90,7 @@ supplied honorific and tries the bare slug plus the `hon-`, `rt-hon-`, `hon-dr-`
 ## CI / smoke tests
 
 `latest` is exercised on every run (keyless). When CloakBrowser is available
-(`HERMES_SMOKE_WITH_CLOAKBROWSER=1`) or `HERMES_SMOKE_USE_BROWSER=1` is set, the smoke
+(`COLAB_SMOKE_WITH_CLOAKBROWSER=1`) or `COLAB_SMOKE_USE_BROWSER=1` is set, the smoke
 test clears the wall with `--browser` and asserts real minister/article data; otherwise
 it asserts the clean `clearance_required` blocked state. Network errors and bot
 challenges are treated as SKIP.

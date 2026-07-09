@@ -12,13 +12,15 @@ import datetime as dt
 import html
 import json
 import os
+import pathlib
 import re
 import sys
-import urllib.error
 import urllib.parse
-import urllib.request
 import xml.etree.ElementTree as ET
 from typing import Any
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 BASE_URL = "https://www.legislation.govt.nz"
 API_BASE_URL = "https://api.legislation.govt.nz"
@@ -109,50 +111,29 @@ def fetch_bytes(
     method: str = "GET",
     extra_headers: dict[str, str] | None = None,
 ) -> tuple[bytes, str, str]:
-    headers = {
-        "User-Agent": UA,
-        "Accept": accept,
-        "Accept-Language": "en-NZ,en;q=0.9",
-    }
+    headers = {"Accept-Language": "en-NZ,en;q=0.9"}
     if extra_headers:
         headers.update(extra_headers)
-    req = urllib.request.Request(url, headers=headers, method=method)
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            body = resp.read()
-            content_type = (resp.headers.get("Content-Type") or "").lower()
-            if b"verify that you're not a robot" in body[:2000].lower():
-                raise CliError(
-                    "upstream returned a bot-protection challenge instead of data",
-                    code="upstream_bot_protection",
-                    source_url=url,
-                )
-            return body, resp.geturl(), content_type
-    except urllib.error.HTTPError as exc:
-        body = b""
-        try:
-            body = exc.read(1200)
-        except Exception:
-            pass
-        snippet = normalise_text(body.decode("utf-8", errors="replace"))[:280]
-        if exc.code == 401 and "api.legislation.govt.nz" in url:
+        body, content_type, final_url = nzfetch.fetch_bytes(
+            url, timeout=timeout, accept=accept, headers=headers, method=method
+        )
+        return body, final_url, content_type
+    except nzfetch.Blocked as exc:
+        text = str(exc).lower()
+        code = "upstream_bot_protection" if ("robot" in text or "incapsula" in text or "challenge" in text) else "upstream_blocked"
+        raise CliError(f"network error contacting upstream. {exc}", code=code, source_url=url) from exc
+    except nzfetch.FetchError as exc:
+        text = str(exc)
+        if "401" in text and "api.legislation.govt.nz" in url:
             raise CliError(
                 "PCO developer API key is required; set LEGISLATION_NZ_API_KEY or use --source web where supported",
                 code="api_key_required",
                 source_url=url,
             ) from exc
-        if exc.code == 403:
-            code = "upstream_blocked"
-            if "robot" in snippet.lower() or "incapsula" in snippet.lower():
-                code = "upstream_bot_protection"
-            raise CliError(f"HTTP 403 from upstream. {snippet}", code=code, source_url=url) from exc
-        if exc.code == 429:
+        if "429" in text:
             raise CliError("upstream rate limit returned HTTP 429", code="upstream_rate_limited", source_url=url) from exc
-        raise CliError(f"HTTP {exc.code} from upstream. {snippet}", code="upstream_http", source_url=url) from exc
-    except urllib.error.URLError as exc:
-        raise CliError(f"network error contacting upstream: {exc.reason}", code="upstream_unreachable", source_url=url) from exc
-    except TimeoutError as exc:
-        raise CliError("timeout contacting upstream", code="upstream_timeout", source_url=url) from exc
+        raise CliError(f"upstream fetch failed. {exc}", code="upstream_http", source_url=url) from exc
 
 
 def fetch_text(url: str, *, timeout: int = DEFAULT_TIMEOUT, accept: str = "text/html,*/*;q=0.8") -> tuple[str, str]:

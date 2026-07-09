@@ -9,12 +9,14 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import pathlib
 import sys
 import time
-import urllib.error
 import urllib.parse
-import urllib.request
 from typing import Any
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
 UA = "osm-nz-cli/1.0 (https://github.com/thecolab-ai/.skills)"
@@ -207,25 +209,26 @@ def build_query(lat: float, lon: float, radius_m: int, pairs: list[tuple[str, st
 def fetch_overpass(query: str) -> Any:
     """POST an Overpass QL query and return parsed JSON."""
     data = urllib.parse.urlencode({"data": query}).encode("ascii")
-    req = urllib.request.Request(
-        OVERPASS_URL,
-        data=data,
-        headers={
-            "Content-Type": "application/x-www-form-urlencoded",
-            "User-Agent": UA,
-            "Accept": "application/json",
-        },
-    )
     try:
-        with urllib.request.urlopen(req, timeout=35) as resp:
-            return json.loads(resp.read().decode("utf-8", "replace"))
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")[:500]
-        die(f"Overpass HTTP {e.code}: {raw}")
-    except urllib.error.URLError as e:
-        die(f"network error calling Overpass: {e.reason}")
-    except json.JSONDecodeError as e:
-        die(f"invalid JSON from Overpass: {e}")
+        # The Overpass API usage policy asks for an identifying User-Agent, so
+        # keep the custom UA and pass browser_headers=False so nzfetch doesn't
+        # add contradictory Chrome Client-Hints on top of it.
+        return nzfetch.fetch_json(
+            OVERPASS_URL,
+            data=data,
+            method="POST",
+            timeout=35,
+            headers={
+                "Content-Type": "application/x-www-form-urlencoded",
+                "User-Agent": UA,
+                "Accept": "application/json",
+            },
+            browser_headers=False,
+        )
+    except nzfetch.Blocked as e:
+        die(f"network error calling Overpass: {e}")
+    except nzfetch.FetchError as e:
+        die(f"Overpass fetch failed: {e}")
 
 
 # ---------------------------------------------------------------------------

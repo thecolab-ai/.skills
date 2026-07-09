@@ -11,12 +11,16 @@ import html
 import json
 import os
 import re
+import pathlib
 import sys
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from typing import Any
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 BASE_WEB = "https://www.bookme.co.nz"
 CONTEXT = "/things-to-do"
@@ -157,24 +161,16 @@ def request_json(path: str, params: dict[str, Any] | None = None, timeout: int =
     headers = {
         "Accept": "application/json, text/plain, */*",
         "Referer": BASE_WEB + "/",
-        "User-Agent": UA,
         "X-Requested-With": "XMLHttpRequest",
     }
-    req = urllib.request.Request(url, headers=headers, method="GET")
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            raw = resp.read().decode("utf-8", "replace")
-            return json.loads(raw) if raw else None
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        try:
-            payload = json.loads(raw)
-            detail = payload.get("message") or payload.get("error") or raw[:300]
-        except Exception:
-            detail = raw[:300]
-        die(f"HTTP {e.code} from {url}: {detail}")
-    except urllib.error.URLError as e:
-        die(f"network error calling {url}: {e.reason}")
+        body, _ct, _final = nzfetch.fetch_bytes(url, headers=headers, timeout=timeout, accept="application/json, text/plain, */*")
+        raw = body.decode("utf-8", "replace")
+        return json.loads(raw) if raw else None
+    except nzfetch.Blocked as e:
+        die(f"network error calling {url}: {e}")
+    except nzfetch.FetchError as e:
+        die(str(e))
     except json.JSONDecodeError as e:
         die(f"invalid JSON from {url}: {e}")
 

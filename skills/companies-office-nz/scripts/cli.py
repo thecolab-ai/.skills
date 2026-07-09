@@ -18,22 +18,19 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import pathlib
 import re
 import sys
 import time
-import urllib.error
 import urllib.parse
-import urllib.request
 from typing import Any
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 BASE = "https://app.companiesoffice.govt.nz/companies/app"
 SVC = BASE + "/service/services"
 UI = BASE + "/ui/pages/companies"
-
-UA = os.environ.get(
-    "CO_USER_AGENT",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-)
 
 # entityStatus integer → readable label (observed values only)
 STATUS_MAP = {
@@ -54,50 +51,34 @@ def die(msg: str, code: int = 1) -> None:
     raise SystemExit(code)
 
 
-def _req(url: str, timeout: int = 25) -> urllib.request.Request:
-    return urllib.request.Request(
-        url,
-        headers={
-            "Accept": "application/json, text/html, */*",
-            "User-Agent": UA,
-            "Referer": BASE + "/ui/pages/companies/search",
-            "X-Requested-With": "XMLHttpRequest",
-        },
-    )
-
-
 def get_json(url: str, timeout: int = 25) -> Any:
-    req = _req(url, timeout)
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            raw = resp.read().decode("utf-8", "replace")
-            return json.loads(raw)
-    except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", "replace")
-        try:
-            err = json.loads(body)
-            msg = err.get("errors", [{}])[0].get("description") or err.get("exception", {}).get("message") or body[:200]
-        except Exception:
-            msg = body[:200]
-        die(f"HTTP {e.code}: {msg}")
-    except urllib.error.URLError as e:
-        die(f"network error: {e.reason}")
-    except json.JSONDecodeError as e:
-        die(f"invalid JSON: {e}")
+        return nzfetch.fetch_json(
+            url,
+            timeout=timeout,
+            accept="application/json, text/html, */*",
+            headers={
+                "Referer": BASE + "/ui/pages/companies/search",
+                "X-Requested-With": "XMLHttpRequest",
+            },
+        )
+    except nzfetch.Blocked as e:
+        die(f"network error: {e}")
+    except nzfetch.FetchError as e:
+        die(str(e))
 
 
 def get_html(url: str, timeout: int = 25) -> str:
-    req = urllib.request.Request(
-        url,
-        headers={"User-Agent": UA, "Accept": "text/html,*/*"},
-    )
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return resp.read().decode("utf-8", "replace")
-    except urllib.error.HTTPError as e:
-        die(f"HTTP {e.code} fetching {url}")
-    except urllib.error.URLError as e:
-        die(f"network error: {e.reason}")
+        return nzfetch.fetch_text(
+            url,
+            timeout=timeout,
+            accept="text/html,*/*",
+        )
+    except nzfetch.Blocked as e:
+        die(f"network error: {e}")
+    except nzfetch.FetchError as e:
+        die(str(e))
 
 
 # ---------------------------------------------------------------------------

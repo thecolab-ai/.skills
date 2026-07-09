@@ -16,11 +16,15 @@ import json
 import os
 import re
 import sys
+import pathlib
 import urllib.error
 import urllib.parse
 import urllib.request
 from html.parser import HTMLParser
 from typing import Any
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 API_BASE = "https://forecast-v2.metoceanapi.com/point/time"
 WARNINGS_URL = "https://www.metservice.com/warnings/home"
@@ -112,18 +116,18 @@ def query_point_time(request: dict) -> dict:
         "User-Agent": UA,
     }
     body = json.dumps(request).encode("utf-8")
-    req = urllib.request.Request(API_BASE, data=body, headers=headers, method="POST")
     try:
-        with urllib.request.urlopen(req, timeout=DEFAULT_TIMEOUT) as resp:
-            raw = resp.read().decode("utf-8", "replace")
-            return json.loads(raw)
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        die(f"MetOcean API error: HTTP {e.code} {e.reason}: {raw[:300]}")
-    except urllib.error.URLError as e:
-        die(f"network error calling MetOcean API: {e.reason}")
-    except json.JSONDecodeError as e:
-        die(f"invalid JSON from MetOcean API: {e}")
+        return nzfetch.fetch_json(
+            API_BASE,
+            timeout=DEFAULT_TIMEOUT,
+            headers={"x-api-key": api_key, "Content-Type": "application/json"},
+            data=body,
+            method="POST",
+        )
+    except nzfetch.Blocked as e:
+        die(f"network error calling MetOcean API: {e}")
+    except nzfetch.FetchError as e:
+        die(f"MetOcean API error: {e}")
 
 
 def fetch_html(url: str) -> str:

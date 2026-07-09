@@ -4,16 +4,17 @@ from __future__ import annotations
 import argparse
 import html
 import json
+import pathlib
 import re
 import sys
-import urllib.error
 import urllib.parse
-import urllib.request
 from html.parser import HTMLParser
 from typing import Any
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
+
 TIMEOUT = 10
-UA = "Mozilla/5.0 (compatible; biosecurity-nz-skill/1.0)"
 
 ONZPR_BASE = "https://onzpr.mpi.govt.nz"
 PEST_REGISTER_BASE = "https://pierpestregister.mpi.govt.nz"
@@ -63,44 +64,33 @@ def absolutise(base: str, href: str | None) -> str | None:
     return urllib.parse.urljoin(base, html.unescape(href))
 
 
-def is_blocked_html(text: str) -> bool:
-    lower = text[:2000].lower()
-    return (
-        "_incapsula_resource" in lower
-        or "incap_ses_" in lower
-        or ("noindex,nofollow" in lower and "incapsula" in lower)
-    )
-
-
 def fetch_text(url: str, *, data: dict[str, str] | None = None) -> tuple[str, str]:
     body = None
-    headers = {
-        "User-Agent": UA,
-        "Accept": "application/json,text/html;q=0.9,*/*;q=0.8",
-    }
+    method = None
+    accept = "application/json,text/html;q=0.9,*/*;q=0.8"
+    headers = {"Accept": accept}
     if data is not None:
         body = urllib.parse.urlencode(data).encode("utf-8")
+        method = "POST"
         headers["Content-Type"] = "application/x-www-form-urlencoded; charset=UTF-8"
         headers["X-Requested-With"] = "XMLHttpRequest"
-    req = urllib.request.Request(url, data=body, headers=headers)
     try:
-        with urllib.request.urlopen(req, timeout=TIMEOUT) as response:
-            raw = response.read()
-            text = raw.decode(response.headers.get_content_charset() or "utf-8", "replace")
-            final_url = response.geturl()
-    except urllib.error.HTTPError as exc:
-        raw = exc.read()
-        text = raw.decode("utf-8", "replace")
-        if exc.code in (401, 403, 429) or is_blocked_html(text):
-            raise BlockedSource(url, exc.code)
-        raise SkillError(f"HTTP {exc.code} from {url}: {clean_text(text)[:300]}")
-    except urllib.error.URLError as exc:
-        raise SkillError(f"failed to reach {url}: {exc.reason}")
-    except TimeoutError:
-        raise SkillError(f"timed out after {TIMEOUT}s calling {url}")
-    if is_blocked_html(text):
-        raise BlockedSource(final_url)
-    return text, final_url
+        raw, _content_type, final_url = nzfetch.fetch_bytes(
+            url,
+            timeout=TIMEOUT,
+            accept=accept,
+            headers=headers,
+            data=body,
+            method=method,
+            expect_json=False,
+        )
+    except nzfetch.Blocked as exc:
+        # Transient Incapsula/IP-reputation wall — surface via the skill's own
+        # graceful blocked_payload path (callers catch BlockedSource).
+        raise BlockedSource(url) from exc
+    except nzfetch.FetchError as exc:
+        raise SkillError(str(exc)) from exc
+    return raw.decode("utf-8", "replace"), final_url
 
 
 def fetch_json(url: str, *, data: dict[str, str] | None = None) -> tuple[Any, str]:

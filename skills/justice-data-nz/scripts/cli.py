@@ -10,17 +10,19 @@ from __future__ import annotations
 import argparse
 import html
 import json
+import pathlib
 import re
 import ssl
 import sys
-import urllib.error
 import urllib.parse
-import urllib.request
 import zipfile
 import xml.etree.ElementTree as ET
 from html.parser import HTMLParser
 from io import BytesIO
 from typing import Any
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 MOJ_TABLES_URL = "https://www.justice.govt.nz/justice-sector-policy/research-data/justice-statistics/data-tables/"
 CKAN_PACKAGE_SEARCH = "https://catalogue.data.govt.nz/api/3/action/package_search"
@@ -64,38 +66,23 @@ def key_text(value: Any) -> str:
 
 
 def fetch_bytes(url: str, timeout: int = DEFAULT_TIMEOUT) -> tuple[bytes, str, str]:
-    req = urllib.request.Request(
-        url,
-        headers={
-            "User-Agent": UA,
-            "Accept": "text/html,application/json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,*/*;q=0.8",
-            "Accept-Language": "en-NZ,en;q=0.9",
-        },
-    )
     try:
-        with urllib.request.urlopen(req, timeout=timeout, context=ssl.create_default_context()) as resp:
-            return resp.read(), resp.geturl(), (resp.headers.get("Content-Type") or "").lower()
-    except urllib.error.HTTPError as exc:
-        snippet = ""
-        try:
-            snippet = clean_text(exc.read(600).decode("utf-8", errors="replace"))[:240]
-        except Exception:
-            snippet = ""
-        if exc.code in {403, 429}:
-            raise UpstreamUnavailable(
-                f"HTTP {exc.code} from upstream; the Ministry site may be bot-protected or rate-limiting this network. {snippet}",
-                code="upstream_blocked",
-                source_url=url,
-            ) from exc
-        raise CliError(f"HTTP {exc.code} from upstream {url}. {snippet}", code="upstream_http", source_url=url) from exc
-    except urllib.error.URLError as exc:
+        body, content_type, final_url = nzfetch.fetch_bytes(
+            url,
+            timeout=timeout,
+            accept="text/html,application/json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,*/*;q=0.8",
+            headers={"Accept-Language": "en-NZ,en;q=0.9"},
+            context=ssl.create_default_context(),
+        )
+        return body, final_url, content_type
+    except nzfetch.Blocked as exc:
         raise UpstreamUnavailable(
-            f"network error contacting {url}: {exc.reason}",
-            code="upstream_unreachable",
+            f"network error: the Ministry site may be bot-protected or rate-limiting this network. {exc}",
+            code="upstream_blocked",
             source_url=url,
         ) from exc
-    except TimeoutError as exc:
-        raise UpstreamUnavailable(f"timeout while fetching {url}", code="upstream_timeout", source_url=url) from exc
+    except nzfetch.FetchError as exc:
+        raise CliError(f"upstream fetch failed for {url}. {exc}", code="upstream_http", source_url=url) from exc
 
 
 def fetch_text(url: str, timeout: int = DEFAULT_TIMEOUT) -> tuple[str, str]:

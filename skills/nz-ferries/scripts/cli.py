@@ -13,6 +13,7 @@ import html
 import io
 import json
 import os
+import pathlib
 import re
 import sys
 import tempfile
@@ -24,6 +25,9 @@ import zipfile
 from datetime import date, datetime, time as dtime, timedelta, timezone
 from html.parser import HTMLParser
 from typing import Any
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 try:
     from zoneinfo import ZoneInfo
@@ -521,16 +525,45 @@ class OrderedTextParser(HTMLParser):
 
 
 def request_text(url: str, *, referer: str | None = None, timeout: int = 25, opener: urllib.request.OpenerDirector | None = None) -> str:
+    # When an `opener` is supplied, SeaLink is priming / reusing a cookie-jar
+    # session that request_json then reuses — nzfetch cannot carry a cookie
+    # session, so THAT path MUST stay on urllib (kept below, unchanged).
+    #
+    # The plain HTML targets (Interislander/Bluebridge timetables + alerts,
+    # SeaLink alerts — all called with no opener) are served REAL 200 content to a
+    # minimal request but a bot-wall CHALLENGE to nzfetch's full Client-Hint /
+    # Sec-Fetch-* header set. So for the opener-less case we now MIGRATE onto the
+    # shared nzfetch helper in LEAN-headers mode (browser_headers=False): only the
+    # lean UA + Accept + language + encoding set (equivalent to the bare urllib
+    # request this replaced), while gaining nzfetch's rotating-proxy fallback. A
+    # genuine block raises Blocked → surfaced as a network error via the skill's
+    # existing die() contract (SKIP, not FAIL). (JSON/GTFS-zip fetches DO go
+    # through nzfetch above; the SeaLink cookie-jar opener stays on urllib.)
     headers = {
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,application/json;q=0.8,*/*;q=0.7",
         "User-Agent": UA,
     }
     if referer:
         headers["Referer"] = referer
+    if opener is None:
+        # Let nzfetch own the User-Agent (its own browser UA); the opener cookie-jar
+        # path below keeps the skill UA it was primed with.
+        nz_headers = {k: v for k, v in headers.items() if k.lower() != "user-agent"}
+        try:
+            return nzfetch.fetch_text(
+                url,
+                timeout=timeout,
+                accept=headers["Accept"],
+                headers=nz_headers,
+                browser_headers=False,
+            )
+        except nzfetch.Blocked as e:
+            die(f"network error calling {url}: {e}")
+        except nzfetch.FetchError as e:
+            die(str(e))
     req = urllib.request.Request(url, headers=headers, method="GET")
     try:
-        open_fn = opener.open if opener else urllib.request.urlopen
-        with open_fn(req, timeout=timeout) as resp:  # type: ignore[misc]
+        with opener.open(req, timeout=timeout) as resp:  # type: ignore[misc]
             raw = resp.read()
             charset = resp.headers.get_content_charset() or "utf-8"
             return raw.decode(charset, "replace")
@@ -562,23 +595,45 @@ def request_json(
     if body is not None:
         data = json.dumps(body).encode("utf-8")
         headers["Content-Type"] = "application/json"
-    req = urllib.request.Request(url, data=data, headers=headers, method=method)
-    try:
-        open_fn = opener.open if opener else urllib.request.urlopen
-        with open_fn(req, timeout=timeout) as resp:  # type: ignore[misc]
-            raw = resp.read().decode("utf-8", "replace")
-            return json.loads(raw) if raw else None
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        detail = raw[:300]
+    if opener is not None:
+        # SeaLink relies on its primed cookie-jar session; keep this path on urllib.
+        req = urllib.request.Request(url, data=data, headers=headers, method=method)
         try:
-            payload = json.loads(raw)
-            detail = payload.get("title") or payload.get("message") or payload.get("Message") or detail
-        except Exception:
-            detail = clean(strip_html(raw) or detail)
-        die(f"HTTP {e.code} from {url}: {detail}")
-    except urllib.error.URLError as e:
-        die(f"network error calling {url}: {e.reason}")
+            with opener.open(req, timeout=timeout) as resp:  # type: ignore[misc]
+                raw = resp.read().decode("utf-8", "replace")
+                return json.loads(raw) if raw else None
+        except urllib.error.HTTPError as e:
+            raw = e.read().decode("utf-8", "replace")
+            detail = raw[:300]
+            try:
+                payload = json.loads(raw)
+                detail = payload.get("title") or payload.get("message") or payload.get("Message") or detail
+            except Exception:
+                detail = clean(strip_html(raw) or detail)
+            die(f"HTTP {e.code} from {url}: {detail}")
+        except urllib.error.URLError as e:
+            die(f"network error calling {url}: {e.reason}")
+        except json.JSONDecodeError as e:
+            die(f"invalid JSON from {url}: {e}")
+    # Drop Accept (passed via accept=) and User-Agent (nzfetch owns the UA); the
+    # opener cookie-jar path above keeps the skill UA it was primed with.
+    extra_headers = {k: v for k, v in headers.items() if k.lower() not in ("accept", "user-agent")}
+    try:
+        raw_bytes, _ct, _final = nzfetch.fetch_bytes(
+            url,
+            timeout=timeout,
+            accept="application/json, text/plain, */*",
+            headers=extra_headers,
+            data=data,
+            method=(method if method != "GET" else None),
+        )
+    except nzfetch.Blocked as e:
+        die(f"network error calling {url}: {e}")
+    except nzfetch.FetchError as e:
+        die(str(e))
+    raw = raw_bytes.decode("utf-8", "replace")
+    try:
+        return json.loads(raw) if raw else None
     except json.JSONDecodeError as e:
         die(f"invalid JSON from {url}: {e}")
 
@@ -783,27 +838,20 @@ def route_handoff_payload(route_id: str, route: dict[str, Any], command: str) ->
 
 def at_request_json(path: str, *, timeout: int = 25) -> Any:
     url = AT_API_BASE + path
-    headers = {
-        "Accept": "application/json",
-        "Ocp-Apim-Subscription-Key": AT_API_KEY,
-        "User-Agent": UA,
-    }
-    req = urllib.request.Request(url, headers=headers, method="GET")
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            raw = resp.read().decode("utf-8", "replace")
-            return json.loads(raw) if raw else None
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        detail = raw[:300]
-        try:
-            payload = json.loads(raw)
-            detail = payload.get("message") or payload.get("title") or detail
-        except Exception:
-            detail = clean(strip_html(raw) or detail)
-        die(f"AT API HTTP {e.code} from {url}: {detail}")
-    except urllib.error.URLError as e:
-        die(f"network error calling {url}: {e.reason}")
+        raw_bytes, _ct, _final = nzfetch.fetch_bytes(
+            url,
+            timeout=timeout,
+            accept="application/json",
+            headers={"Ocp-Apim-Subscription-Key": AT_API_KEY},
+        )
+    except nzfetch.Blocked as e:
+        die(f"network error calling {url}: {e}")
+    except nzfetch.FetchError as e:
+        die(f"AT API error from {url}: {e}")
+    raw = raw_bytes.decode("utf-8", "replace")
+    try:
+        return json.loads(raw) if raw else None
     except json.JSONDecodeError as e:
         die(f"invalid JSON from {url}: {e}")
 
@@ -819,14 +867,16 @@ def at_gtfs_zip_bytes() -> bytes:
         except OSError:
             pass
 
-    req = urllib.request.Request(AT_GTFS_ZIP, headers={"User-Agent": UA, "Accept": "application/zip,*/*"}, method="GET")
     try:
-        with urllib.request.urlopen(req, timeout=60) as resp:
-            data = resp.read()
-    except urllib.error.HTTPError as e:
-        die(f"HTTP {e.code} fetching AT GTFS zip from {AT_GTFS_ZIP}")
-    except urllib.error.URLError as e:
-        die(f"network error fetching AT GTFS zip: {e.reason}")
+        data, _ct, _final = nzfetch.fetch_bytes(
+            AT_GTFS_ZIP,
+            timeout=60,
+            accept="application/zip,*/*",
+        )
+    except nzfetch.Blocked as e:
+        die(f"network error fetching AT GTFS zip: {e}")
+    except nzfetch.FetchError as e:
+        die(f"error fetching AT GTFS zip from {AT_GTFS_ZIP}: {e}")
 
     if AT_GTFS_CACHE:
         try:

@@ -9,12 +9,14 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import pathlib
 import sys
 import time
-import urllib.error
 import urllib.parse
-import urllib.request
 from typing import Any
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -100,20 +102,14 @@ def request_json(path: str, params: dict[str, Any], timeout: int = 15) -> Any:
     """GET PetrolMate API and return parsed JSON."""
     qs = urllib.parse.urlencode({k: str(v) for k, v in params.items()})
     url = f"{API_BASE}{path}?{qs}"
-    headers = {
-        "Accept": "application/json",
-        "User-Agent": UA,
-    }
-    req = urllib.request.Request(url, headers=headers, method="GET")
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            raw = resp.read().decode("utf-8", "replace")
-            return json.loads(raw) if raw else None
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        die(f"HTTP {e.code} from {url}: {raw[:300]}")
-    except urllib.error.URLError as e:
-        die(f"network error calling {url}: {e.reason}")
+        body, _ct, _final = nzfetch.fetch_bytes(url, timeout=timeout, accept="application/json")
+        raw = body.decode("utf-8", "replace")
+        return json.loads(raw) if raw else None
+    except nzfetch.Blocked as e:
+        die(f"network error: {e}")
+    except nzfetch.FetchError as e:
+        die(str(e))
     except json.JSONDecodeError as e:
         die(f"invalid JSON from {url}: {e}")
 

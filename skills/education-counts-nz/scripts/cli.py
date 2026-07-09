@@ -11,15 +11,16 @@ import os
 import re
 import ssl
 import sys
-import urllib.error
 import urllib.parse
-import urllib.request
 import zipfile
 import xml.etree.ElementTree as ET
 from html.parser import HTMLParser
 from io import BytesIO
 from pathlib import Path
 from typing import Any
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 BASE = "https://www.educationcounts.govt.nz"
 DEFAULT_TIMEOUT = 10
@@ -93,20 +94,12 @@ def request_headers(url: str) -> dict[str, str]:
         if is_asset
         else "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"
     )
+    # Only semantic headers here; nzfetch owns the browser fingerprint
+    # (User-Agent, sec-ch-ua*, Sec-Fetch-*, Accept-Language, cache hints) as a
+    # consistent Chrome set — passing our own would contradict it.
     return {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
         "Accept": accept,
-        "Accept-Language": "en-NZ,en;q=0.9",
-        "Cache-Control": "no-cache",
-        "Pragma": "no-cache",
-        "Upgrade-Insecure-Requests": "1",
         "Referer": f"{parsed.scheme}://{parsed.netloc}/",
-        "Sec-Fetch-Dest": "document" if not is_asset else "empty",
-        "Sec-Fetch-Mode": "navigate" if not is_asset else "cors",
-        "Sec-Fetch-Site": "same-origin",
-        "sec-ch-ua": '"Chromium";v="146", "Not A(Brand";v="24", "Google Chrome";v="146"',
-        "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-platform": '"macOS"',
     }
 
 
@@ -114,27 +107,22 @@ def fetch_bytes(url: str, timeout: int = DEFAULT_TIMEOUT) -> tuple[bytes, str, s
     if url.startswith("file://"):
         path = Path(urllib.parse.urlparse(url).path)
         return path.read_bytes(), url, "application/octet-stream"
-    req = urllib.request.Request(url, headers=request_headers(url))
     try:
-        with urllib.request.urlopen(req, timeout=timeout, context=ssl.create_default_context()) as resp:
-            return resp.read(), resp.geturl(), (resp.headers.get("Content-Type") or "").lower()
-    except urllib.error.HTTPError as exc:
-        snippet = ""
-        try:
-            snippet = clean_text(exc.read(600).decode("utf-8", errors="replace"))[:240]
-        except Exception:
-            snippet = ""
-        if exc.code in {403, 429}:
-            raise UpstreamBlocked(
-                f"HTTP {exc.code} from Education Counts; the public source may be bot-blocking this network. {snippet}",
-                code="blocked",
-                source_url=url,
-            ) from exc
-        raise SkillError(f"HTTP {exc.code} from {url}. {snippet}", code="upstream_http", source_url=url) from exc
-    except TimeoutError as exc:
-        raise UpstreamBlocked(f"timeout while fetching {url}", code="timeout", source_url=url) from exc
-    except urllib.error.URLError as exc:
-        raise UpstreamBlocked(f"network error contacting {url}: {exc.reason}", code="unreachable", source_url=url) from exc
+        body, content_type, final_url = nzfetch.fetch_bytes(
+            url,
+            timeout=timeout,
+            headers=request_headers(url),
+            context=ssl.create_default_context(),
+        )
+    except nzfetch.Blocked as exc:
+        raise UpstreamBlocked(
+            f"Education Counts blocked this request; the public source may be bot-blocking this network. {exc}",
+            code="blocked",
+            source_url=url,
+        ) from exc
+    except nzfetch.FetchError as exc:
+        raise SkillError(f"{exc}", code="upstream_http", source_url=url) from exc
+    return body, final_url, content_type
 
 
 def fetch_text(url: str, timeout: int = DEFAULT_TIMEOUT) -> tuple[str, str]:

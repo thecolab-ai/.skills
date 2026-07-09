@@ -12,12 +12,14 @@ import csv
 import datetime as dt
 import io
 import json
+import pathlib
 import re
 import sys
-import urllib.error
 import urllib.parse
-import urllib.request
 from typing import Any, Callable
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 ARCGIS_LAYER = (
     "https://services.arcgis.com/CXBb7LAjgIIdcsPt/arcgis/rest/services/"
@@ -36,7 +38,6 @@ CSV_URL = (
     "8d684f1841fa4dbea6afaefc8a1ba0fc/csv?layers=0"
 )
 
-UA = "nzta-crash-data-nz-skill/1.0 (+https://github.com/thecolab-ai/.skills)"
 TIMEOUT = 10
 PAGE_SIZE = 2000
 DEFAULT_LIMIT = 50
@@ -162,7 +163,7 @@ def request_json(
 ) -> dict[str, Any]:
     target = url
     data = None
-    headers = {"User-Agent": UA, "Accept": "application/json"}
+    headers = {"Accept": "application/json"}
     if params:
         encoded = urllib.parse.urlencode(params).encode("utf-8")
         if method == "POST":
@@ -170,39 +171,36 @@ def request_json(
             headers["Content-Type"] = "application/x-www-form-urlencoded"
         else:
             target = url + ("&" if "?" in url else "?") + encoded.decode("utf-8")
-    req = urllib.request.Request(target, data=data, headers=headers)
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return json.loads(resp.read().decode("utf-8", "replace"))
-    except TimeoutError as exc:
-        raise DataError(f"network error calling {url}: timed out") from exc
-    except urllib.error.HTTPError as exc:
-        raw = exc.read().decode("utf-8", "replace")
-        raise DataError(f"HTTP {exc.code} from {url}: {raw[:240]}") from exc
-    except urllib.error.URLError as exc:
-        raise DataError(f"network error calling {url}: {exc.reason}") from exc
+        body, _ct, _final = nzfetch.fetch_bytes(
+            target, timeout=timeout, accept="application/json", headers=headers, data=data
+        )
+    except nzfetch.Blocked as exc:
+        raise DataError(f"network error: {exc}") from exc
+    except nzfetch.FetchError as exc:
+        raise DataError(str(exc)) from exc
+    try:
+        return json.loads(body.decode("utf-8", "replace"))
     except json.JSONDecodeError as exc:
         raise DataError(f"invalid JSON from {url}: {exc}") from exc
 
 
 def request_csv_rows(scan_cap: int) -> tuple[list[dict[str, str]], bool]:
-    req = urllib.request.Request(CSV_URL, headers={"User-Agent": UA, "Accept": "text/csv"})
+    try:
+        body, _ct, _final = nzfetch.fetch_bytes(
+            CSV_URL, timeout=TIMEOUT, accept="text/csv"
+        )
+    except nzfetch.Blocked as exc:
+        raise DataError(f"network error downloading CKAN/ArcGIS CSV mirror: {exc}") from exc
+    except nzfetch.FetchError as exc:
+        raise DataError(f"error downloading CKAN/ArcGIS CSV mirror: {exc}") from exc
     rows: list[dict[str, str]] = []
     try:
-        with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
-            text = io.TextIOWrapper(resp, encoding="utf-8-sig", errors="replace", newline="")
-            reader = csv.DictReader(text)
-            for index, row in enumerate(reader, start=1):
-                if index > scan_cap:
-                    return rows, True
-                rows.append(row)
-    except TimeoutError as exc:
-        raise DataError("network error downloading CKAN/ArcGIS CSV mirror: timed out") from exc
-    except urllib.error.HTTPError as exc:
-        raw = exc.read().decode("utf-8", "replace")
-        raise DataError(f"HTTP {exc.code} downloading CKAN/ArcGIS CSV mirror: {raw[:240]}") from exc
-    except urllib.error.URLError as exc:
-        raise DataError(f"network error downloading CKAN/ArcGIS CSV mirror: {exc.reason}") from exc
+        reader = csv.DictReader(io.StringIO(body.decode("utf-8-sig", "replace")))
+        for index, row in enumerate(reader, start=1):
+            if index > scan_cap:
+                return rows, True
+            rows.append(row)
     except csv.Error as exc:
         raise DataError(f"invalid CSV from CKAN/ArcGIS mirror: {exc}") from exc
     return rows, False

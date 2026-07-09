@@ -16,13 +16,15 @@ import argparse
 import csv
 import io
 import json
+import pathlib
 import re
 import sys
-import urllib.error
 import urllib.parse
-import urllib.request
 import zipfile
 from typing import Any, Callable
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 CKAN_BASE = "https://catalogue.data.govt.nz/api/3/action"
 # Default release: the most recent HES "Household Wellbeing" dataset confirmed to
@@ -41,22 +43,13 @@ def die(message: str, code: int = 1) -> None:
     raise SystemExit(code)
 
 
-def request(url: str, timeout: int = 60):
-    req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "*/*"})
-    return urllib.request.urlopen(req, timeout=timeout)
-
-
 def read_json(url: str, timeout: int = 60) -> dict[str, Any]:
     try:
-        with request(url, timeout=timeout) as resp:
-            payload = json.loads(resp.read().decode("utf-8", "replace"))
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        die(f"HTTP {e.code} from {url}: {raw[:240].strip()}")
-    except urllib.error.URLError as e:
-        die(f"network error calling {url}: {e.reason}")
-    except json.JSONDecodeError as e:
-        die(f"invalid JSON from {url}: {e}")
+        payload = nzfetch.fetch_json(url, timeout=timeout)
+    except nzfetch.Blocked as e:
+        die(f"network error calling {url}: {e}")
+    except nzfetch.FetchError as e:
+        die(str(e))
     if not payload.get("success"):
         die(f"CKAN API reported failure for {url}")
     return payload["result"]
@@ -64,12 +57,12 @@ def read_json(url: str, timeout: int = 60) -> dict[str, Any]:
 
 def read_bytes(url: str, timeout: int = 90) -> bytes:
     try:
-        with request(url, timeout=timeout) as resp:
-            return resp.read()
-    except urllib.error.HTTPError as e:
-        die(f"HTTP {e.code} from {url}")
-    except urllib.error.URLError as e:
-        die(f"network error calling {url}: {e.reason}")
+        body, _ct, _final = nzfetch.fetch_bytes(url, timeout=timeout)
+    except nzfetch.Blocked as e:
+        die(f"network error calling {url}: {e}")
+    except nzfetch.FetchError as e:
+        die(str(e))
+    return body
 
 
 def package_show(dataset: str) -> dict[str, Any]:

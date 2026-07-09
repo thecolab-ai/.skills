@@ -9,21 +9,18 @@ from __future__ import annotations
 import argparse
 import json
 import math
-import os
+import pathlib
 import sys
 import time
-import urllib.error
 import urllib.parse
-import urllib.request
 from typing import Any
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 BASE_WEB = "https://homes.co.nz"
 BASE_GATEWAY = "https://gateway.homes.co.nz"
 BASE_API = "https://api-gateway.homes.co.nz"
-UA = os.environ.get(
-    "HOMES_NZ_USER_AGENT",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
-)
 
 STATE_LABELS = {
     0: "for_sale",
@@ -61,25 +58,13 @@ def request_json(base: str, path: str, params: dict[str, Any] | None = None, tim
         "Accept": "application/json, text/plain, */*",
         "Origin": BASE_WEB,
         "Referer": BASE_WEB + "/",
-        "User-Agent": UA,
     }
-    req = urllib.request.Request(url, headers=headers, method="GET")
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            raw = resp.read().decode("utf-8", "replace")
-            return json.loads(raw) if raw else None
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        try:
-            payload = json.loads(raw)
-            detail = payload.get("error") or payload.get("ErrorMessage") or payload.get("message") or raw[:300]
-        except Exception:
-            detail = raw[:300]
-        die(f"HTTP {e.code} from {url}: {detail}".rstrip())
-    except urllib.error.URLError as e:
-        die(f"network error calling {url}: {e.reason}")
-    except json.JSONDecodeError as e:
-        die(f"invalid JSON from {url}: {e}")
+        return nzfetch.fetch_json(url, timeout=timeout, headers=headers)
+    except nzfetch.Blocked as e:
+        die(f"network error: {e}")
+    except nzfetch.FetchError as e:
+        die(str(e))
 
 
 def as_float(value: Any) -> float | None:

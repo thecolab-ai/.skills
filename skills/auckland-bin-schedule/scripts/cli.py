@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import pathlib
 import re
 import sys
 import urllib.parse
-import urllib.request
 from html.parser import HTMLParser
 from typing import Any
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 SEARCH_PAGE = "https://www.aucklandcouncil.govt.nz/en/rubbish-recycling/rubbish-recycling-collections/rubbish-recycling-collection-days.html"
 PROPERTY_API = "https://experience.aucklandcouncil.govt.nz/nextapi/property"
@@ -38,12 +41,20 @@ class VisibleText(HTMLParser):
             self.parts.append(text)
 
 def fetch_text(url: str, headers: dict[str, str] | None = None, timeout: int = 30) -> str:
-    req = urllib.request.Request(url, headers={"User-Agent": UA, **(headers or {})})
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return resp.read().decode("utf-8", "replace")
+    try:
+        return nzfetch.fetch_text(url, headers=headers, timeout=timeout)
+    except nzfetch.Blocked as e:
+        raise RuntimeError(f"network error: {e}") from e
+    except nzfetch.FetchError as e:
+        raise RuntimeError(str(e)) from e
 
 def fetch_json(url: str, headers: dict[str, str] | None = None, timeout: int = 30) -> Any:
-    return json.loads(fetch_text(url, headers=headers, timeout=timeout))
+    try:
+        return nzfetch.fetch_json(url, headers=headers, timeout=timeout)
+    except nzfetch.Blocked as e:
+        raise RuntimeError(f"network error: {e}") from e
+    except nzfetch.FetchError as e:
+        raise RuntimeError(str(e)) from e
 
 def current_public_token() -> str:
     html = fetch_text(SEARCH_PAGE)

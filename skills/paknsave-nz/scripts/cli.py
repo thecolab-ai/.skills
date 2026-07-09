@@ -8,14 +8,15 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import pathlib
 import sys
 import textwrap
 import time
-import urllib.error
-import urllib.parse
-import urllib.request
 from pathlib import Path
 from typing import Any
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 BASE_WEB = "https://www.paknsave.co.nz"
 BASE_API = "https://api-prod.paknsave.co.nz/v1/edge"
@@ -43,7 +44,6 @@ def money(cents: Any) -> str:
 def request_json(method: str, url: str, data: Any = None, token: str | None = None, timeout: int = 30) -> Any:
     body = None
     headers = {
-        "User-Agent": UA,
         "Accept": "application/json, text/plain, */*",
         "Origin": BASE_WEB,
         "Referer": BASE_WEB + "/",
@@ -53,23 +53,18 @@ def request_json(method: str, url: str, data: Any = None, token: str | None = No
     if data is not None:
         body = json.dumps(data).encode("utf-8")
         headers["Content-Type"] = "application/json"
-    req = urllib.request.Request(url, data=body, headers=headers, method=method.upper())
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            raw = resp.read().decode("utf-8", "replace")
-            if not raw:
-                return None
-            return json.loads(raw)
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        try:
-            payload = json.loads(raw)
-            detail = payload.get("message") or payload.get("code") or raw[:300]
-        except Exception:
-            detail = raw[:300]
-        die(f"HTTP {e.code} from {url}: {detail}")
-    except urllib.error.URLError as e:
-        die(f"network error calling {url}: {e.reason}")
+        raw_bytes, _ct, _final = nzfetch.fetch_bytes(
+            url, data=body, method=method.upper(), timeout=timeout, headers=headers
+        )
+    except nzfetch.Blocked as e:
+        die(f"network error calling {url}: {e}")
+    except nzfetch.FetchError as e:
+        die(f"HTTP error from {url}: {e}")
+    raw = raw_bytes.decode("utf-8", "replace")
+    if not raw:
+        return None
+    return json.loads(raw)
 
 
 def get_guest_token(force: bool = False) -> str:

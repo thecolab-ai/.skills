@@ -11,19 +11,17 @@ from __future__ import annotations
 import argparse
 import html as htmllib
 import json
+import pathlib
 import re
 import ssl
 import sys
-import urllib.error
 import urllib.parse
-import urllib.request
 from typing import Any
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
+
 BASE = "https://www.comcom.govt.nz"
-UA = (
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
-)
 DOC_EXT_RE = re.compile(r"\.(pdf|docx?|xlsx?|pptx?|csv)$", re.I)
 
 
@@ -32,15 +30,16 @@ class ApiError(RuntimeError):
 
 
 def fetch(url: str, timeout: int = 20) -> str:
-    req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "text/html,*/*"})
     ctx = ssl.create_default_context()
     try:
-        with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
-            return resp.read().decode("utf-8", "replace")
-    except urllib.error.HTTPError as e:
-        raise ApiError(f"HTTP {e.code} from {url}") from e
-    except urllib.error.URLError as e:
-        raise ApiError(f"network error contacting comcom.govt.nz: {e.reason}") from e
+        return nzfetch.fetch_text(
+            url, timeout=timeout, accept="text/html,*/*",
+            context=ctx,
+        )
+    except nzfetch.Blocked as e:
+        raise ApiError(f"network error contacting comcom.govt.nz: {e}") from e
+    except nzfetch.FetchError as e:
+        raise ApiError(str(e)) from e
 
 
 def clean(text: str) -> str:

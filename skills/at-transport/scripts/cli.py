@@ -12,6 +12,7 @@ import datetime as dt
 import json
 import math
 import os
+import pathlib
 import sys
 import time
 import urllib.error
@@ -19,9 +20,11 @@ import urllib.parse
 import urllib.request
 from typing import Any
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
+
 BASE_URL = "https://api.at.govt.nz"
 API_KEY = os.environ.get("AT_API_KEY", "de42128902d24a7a86a013633f7aa832")
-UA = "at-transport-skill/1.0 (+https://github.com/thecolab-ai/.skills)"
 DEFAULT_TIMEOUT = 15
 
 try:
@@ -41,18 +44,15 @@ def request_json(path: str, timeout: int = DEFAULT_TIMEOUT) -> Any:
     headers = {
         "Accept": "application/json",
         "Ocp-Apim-Subscription-Key": API_KEY,
-        "User-Agent": UA,
     }
-    req = urllib.request.Request(url, headers=headers, method="GET")
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            raw = resp.read().decode("utf-8", "replace")
-            return json.loads(raw) if raw else None
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", "replace")
-        die(f"AT API {path}: HTTP {e.code} {e.reason}: {raw[:300]}")
-    except urllib.error.URLError as e:
-        die(f"network error calling {url}: {e.reason}")
+        body, _ct, _final = nzfetch.fetch_bytes(url, headers=headers, timeout=timeout, accept="application/json")
+        raw = body.decode("utf-8", "replace")
+        return json.loads(raw) if raw else None
+    except nzfetch.Blocked as e:
+        die(f"network error calling {url}: {e}")
+    except nzfetch.FetchError as e:
+        die(f"AT API {path}: {e}")
     except json.JSONDecodeError as e:
         die(f"invalid JSON from {url}: {e}")
 

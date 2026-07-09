@@ -13,11 +13,13 @@ import argparse
 import html
 import json
 import re
+import pathlib
 import sys
 import textwrap
-import urllib.error
-import urllib.request
 from typing import Any
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+import nzfetch  # noqa: E402
 
 UA = "ird-wff-rates-nz-skill/1.0 (+https://github.com/thecolab-ai/.skills)"
 DEFAULT_TIMEOUT = 10
@@ -168,17 +170,13 @@ ALIASES = {
 
 
 def fetch_text(url: str, timeout: int) -> str:
-    req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "text/html,application/xhtml+xml"})
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return resp.read().decode("utf-8", "replace")
+    return nzfetch.fetch_text(url, timeout=timeout, accept="text/html,application/xhtml+xml")
 
 
 def page_probe(url: str, timeout: int) -> dict[str, Any]:
     try:
         raw = fetch_text(url, timeout)
-    except urllib.error.HTTPError as e:
-        return {"url": url, "available": False, "status": e.code, "error": "upstream_unavailable"}
-    except (urllib.error.URLError, TimeoutError, OSError) as e:
+    except (nzfetch.FetchError, TimeoutError, OSError) as e:
         return {"url": url, "available": False, "error": "upstream_unavailable", "detail": str(e)[:160]}
     txt = html.unescape(re.sub(r"<[^>]+>", " ", re.sub(r"<(script|style)[\s\S]*?</\1>", " ", raw, flags=re.I)))
     txt = re.sub(r"\s+", " ", txt).strip()

@@ -70,6 +70,19 @@ Implemented datasets:
   - Caveats: market segments are not mutually exclusive; Solar+Batteries and Wind+Batteries registry categories were added in November 2023, so Solar and Other series can show category-change spikes around that period
   - Source note: values are derived from registry Fuel Type and Generation Capacity fields populated by distributors
 
+### Electricity Authority gentailer energy margin source status
+
+- Provider: Electricity Authority / Tableau Public
+- Authority dashboard: `https://www.ea.govt.nz/data-and-insights/charts-and-dashboards/energy-margin/`
+- Authority article: `https://www.ea.govt.nz/news/eye-on-electricity/gentailer-energy-margins-in-2024/`
+- Linked Tableau workbook: `https://public.tableau.com/app/profile/electricity.authority/viz/Energymargin/Energymargin`
+- Command: `energy-margin`
+- Auth model: none
+- Current behaviour: probes the official Authority pages and linked Tableau surfaces, then reports whether machine-readable per-company margin rows are available.
+- Live status observed on 8 July 2026: the Tableau profile API for `Energymargin` returned `404`, the VizQL session endpoint for `/vizql/w/Energymargin/v/Energymargin/startSession/viewing` returned `404`, and the direct `/views/Energymargin/Energymargin` render path displayed Tableau's removed-or-renamed message. The command therefore returns `status: source_unavailable` and an empty `energy_margins` array rather than fabricating rows.
+- Scope rule: do not reconstruct gentailer margins from spot prices, generation output, retail purchases, hedge positions, or company reports in this command unless the output is explicitly separated as a derived estimate. Issue #172 requested official pre-computed figures only.
+- Future wiring: when the Authority publishes a public CSV/API feed or restores a machine-readable Tableau workbook, update `energy-margin` to parse that feed and preserve the current `source_checks` diagnostics for failure modes.
+
 ### NZ lines-company public outage feeds
 
 - Command: `outages`
@@ -168,6 +181,7 @@ Implemented feeds:
   - EMI point-of-connection `DollarsPerMegawattHour`
   - EMI generation plant trading-period kWh values
   - EMI GUEHMT distributed-generation ICP, capacity, uptake, and new-installation fields
+  - `energy-margin` source availability/status fields from the Authority dashboard/article/Tableau surfaces
 
 - Derived by this CLI:
   - `demand` total GWh, average GWh per period, peak period, and average MW conversion
@@ -176,11 +190,13 @@ Implemented feeds:
   - `dg-trends` filtered row counts and summary changes
   - `dg-latest` latest-month row selection
   - `dg-summary` overall and year-by-year changes
+  - No gentailer energy-margin values are currently derived or copied by this CLI
 
 ## Sources checked but not shipped
 
 - EM6 `price/24hrs/{node_id}`, `current_load/{node_id}`, `recent_load/{node_id}`, `current_generation/{node_id}`, `recent_generation/{node_id}`, `generation_type/24hrs/`, `nz/24hrs/`, and regional peak/load endpoints were documented in the EM6 guide but returned unauthorized or forbidden in live no-login testing from the public API base.
 - EMI Azure API products for real-time prices and dispatch require subscription-key access, so they are out of scope for this no-login skill.
+- Electricity Authority gentailer energy-margin dashboard/article surfaces were checked for official per-company machine-readable rows. The linked Tableau Public workbook currently appears removed or renamed through both the profile app and VizQL render path, so the `energy-margin` command reports an explicit unavailable state instead of returning a derived reconstruction.
 - Powerswitch plan comparison was skipped because it requires user-specific inputs and is not suitable for a stateless read-only market-data CLI.
 - Northpower outage data was checked at `https://northpower.com/electricity/current-outages` and `https://outages.northpower.nz`. The public app renders Livewire snapshots and uses Livewire websocket/update calls with snapshot and CSRF state. No clean stable unauthenticated JSON or ArcGIS FeatureServer feed was found, so `outages --company northpower` reports a warning instead of scraping the rendered app state. The page says the outage list refreshes at least every 15 minutes.
 - Bonus distributors from the follow-up list (Mainpower, Marlborough Lines, Network Tasman, Electra, Westpower, Network Waitaki) were not investigated in this pass after nine of the top-ten target companies were wired.
