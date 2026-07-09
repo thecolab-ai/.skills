@@ -58,7 +58,6 @@ def fetch_json(url, **kw):
 
 
 AUCKLAND_BASE = "https://profiles.auckland.ac.nz"
-_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0 Safari/537.36"
 
 
 def auckland_search(query: str, limit: int) -> tuple[list, int]:
@@ -81,7 +80,7 @@ def auckland_search(query: str, limit: int) -> tuple[list, int]:
             f"{AUCKLAND_BASE}/api/users",
             data=payload, method="POST",
             headers={"content-type": "application/json", "accept": "application/json",
-                     "user-agent": _UA, "origin": AUCKLAND_BASE,
+                     "origin": AUCKLAND_BASE,
                      "referer": f"{AUCKLAND_BASE}/search?by=text&type=user"},
         )
         page = data.get("resource") or []
@@ -139,7 +138,7 @@ def massey_search(query: str, limit: int) -> tuple[list, int]:
         MASSEY_API, data=body, method="POST",
         headers={"accept": "application/json, text/javascript, */*; q=0.01",
                  "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
-                 "x-requested-with": "XMLHttpRequest", "user-agent": _UA,
+                 "x-requested-with": "XMLHttpRequest",
                  "referer": f"{MASSEY_BASE}/massey/expertise/profile.cfm"},
     )
     docs = ((data.get("response") or {}).get("docs")) or []
