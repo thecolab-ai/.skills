@@ -65,7 +65,20 @@ def fetch_rejected(final_url: str) -> bool:
 fixture = '''<script type="application/ld+json">{"@context":"https://schema.org","@type":"Product","@id":"https://www.animates.co.nz/test.html","name":"Fixture Dog Food","sku":"TEST-1","brand":{"@type":"Brand","name":"Fixture"},"offers":{"@type":"Offer","price":"19.95","priceCurrency":"NZD","availability":"https://schema.org/InStock"}}</script>'''
 parsed = cli.parse_product(fixture, "https://www.animates.co.nz/test.html")
 check("fixture Product JSON-LD parses", bool(parsed and parsed["name"] == "Fixture Dog Food" and parsed["price"] == 19.95 and parsed["in_stock"] is True))
-check("non-finite and negative prices fail closed", cli.as_number("nan") is None and cli.as_number(-0.01) is None)
+check("boolean, non-finite and negative prices fail closed", cli.as_number(True) is None and cli.as_number("nan") is None and cli.as_number(-0.01) is None)
+boolean_price_fixture = '''<script type="application/ld+json">{"@type":"Product","name":"Invalid Price","offers":{"price":true}}</script>'''
+boolean_price_product = cli.parse_product(boolean_price_fixture, "https://www.animates.co.nz/invalid.html")
+check("boolean JSON-LD price remains incomplete", bool(boolean_price_product and boolean_price_product["price"] is None))
+original_fetch_text = cli.fetch_text
+setattr(cli, "fetch_text", lambda url, timeout=10, max_bytes=cli.MAX_PAGE_BYTES: (boolean_price_fixture, url))
+try:
+    cli.get_product("https://www.animates.co.nz/invalid.html", 10)
+    boolean_price_rejected = False
+except cli.CliError:
+    boolean_price_rejected = True
+finally:
+    setattr(cli, "fetch_text", original_fetch_text)
+check("complete-product validation rejects boolean JSON-LD price", boolean_price_rejected)
 entity_fixture = '<script type="application/ld+json">{"@type":"Product","name":"A &quot; B"}</script>'
 check("JSON-LD script data is not HTML-unescaped", cli.json_ld_objects(entity_fixture)[0]["name"] == "A &quot; B")
 check("rejects non-canonical storefront origins", not cli.is_allowed_url("https://example.org/x") and not cli.is_allowed_url("http://www.animates.co.nz/x") and not cli.is_allowed_url("https://user@www.animates.co.nz/x") and not cli.is_allowed_url("https://www.animates.co.nz:444/x") and cli.is_allowed_url("https://www.animates.co.nz:443/x"))

@@ -79,7 +79,7 @@ def fetch_text(url: str, timeout: int = 10, max_bytes: int = MAX_PAGE_BYTES) -> 
 
 
 def as_number(value: Any) -> float | None:
-    if value in (None, ""):
+    if isinstance(value, bool) or value in (None, ""):
         return None
     try:
         number = float(value)

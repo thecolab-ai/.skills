@@ -54,7 +54,9 @@ decimal=cli.product({"id":2,"title":"Decimal","handle":"decimal","variants":[{"i
 assert decimal["price_min_nzd"]==6.49
 try:cli.product({});raise AssertionError("malformed product accepted")
 except cli.CliError:pass
-print("[PASS] Shopify price units and malformed product fail-closed behavior")
+try:cli.product({"id":3,"title":"Overflow","handle":"overflow","variants":[{"id":31,"price":10**10000}]});raise AssertionError("overflowing product price accepted")
+except cli.CliError:pass
+print("[PASS] Shopify price units and malformed or overflowing product fail-closed behavior")
 data=live(["search","dog","--limit","2","--json"])
 if data is not None:
  assert data["source_url"] and data["retrieved_at"] and isinstance(data["results"],list)

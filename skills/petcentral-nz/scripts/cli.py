@@ -46,7 +46,7 @@ def get(url: str, timeout: int) -> tuple[bytes, str]:
 def price_nzd(value: Any) -> float | None:
     if isinstance(value, bool): return None
     try: amount = value / 100 if isinstance(value, int) else float(value)
-    except (TypeError, ValueError): return None
+    except (OverflowError, TypeError, ValueError): return None
     return round(amount, 2) if math.isfinite(amount) and amount >= 0 else None
 
 def product(raw: dict[str, Any]) -> dict[str, Any]:
