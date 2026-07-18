@@ -89,7 +89,9 @@ def extract_category_state(markup: str) -> dict[str, Any]:
         state = json.loads(match.group(1))
     except json.JSONDecodeError as exc:
         raise CliError("Baby Factory search state contained invalid JSON") from exc
-    return state if isinstance(state, dict) else {}
+    if not isinstance(state, dict) or not isinstance(state.get("items"), list) or not isinstance(state.get("totalitems"), int) or not isinstance(state.get("totalpages"), int) or not isinstance(state.get("currentpage"), int) or state.get("totalitems", -1) < 0 or state.get("totalpages", -1) < 0 or state.get("currentpage", 0) < 1:
+        raise CliError("Baby Factory search state has an unexpected shape")
+    return state
 
 
 def image_url(raw: dict[str, Any]) -> str | None:

@@ -209,15 +209,19 @@ def normalize_detail(raw: dict[str, Any]) -> dict[str, Any]:
 
 def normalize_search(raw: dict[str, Any]) -> dict[str, Any]:
     handle = str(raw.get("handle") or "")
+    title = str(raw.get("title") or "").strip()
+    price_min = amount(raw.get("price_min", raw.get("price")))
+    if raw.get("id") is None or not handle or not title or price_min is None:
+        raise StorefrontError("unexpected predictive-search product shape")
     compare_at = amount(raw.get("compare_at_price_min"))
     return {
         "id": raw.get("id"),
-        "title": raw.get("title") or "",
+        "title": title,
         "handle": handle,
         "url": absolute_product_url(handle),
         "vendor": raw.get("vendor") or "",
         "product_type": raw.get("type") or "",
-        "price_min": amount(raw.get("price_min", raw.get("price"))),
+        "price_min": price_min,
         "price_max": amount(raw.get("price_max", raw.get("price"))),
         "compare_at_price_min": compare_at if compare_at and compare_at > 0 else None,
         "available_online": bool(raw.get("available")),

@@ -253,6 +253,10 @@ def apply_product_state(product: dict[str, Any], state: dict[str, Any]) -> None:
         evidence = by_sku.get(str(variant.get("sku")))
         if evidence is None:
             raise CliError(f"Petdirect price semantics could not be verified for SKU {variant.get('sku') or 'unknown'}")
+        state_price = cents(evidence.get("discountedUnitPrice"))
+        if state_price is None:
+            raise CliError(f"Petdirect current price could not be verified for SKU {variant.get('sku') or 'unknown'}")
+        variant["price"] = state_price
         variant["rrp"] = cents(evidence.get("rrpPrice"))
         variant["member_price"] = bool(evidence.get("isMemberPrice"))
     priced = [item for item in variants if isinstance(item, dict) and item.get("price") is not None]

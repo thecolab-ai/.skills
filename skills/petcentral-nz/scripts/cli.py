@@ -53,6 +53,8 @@ def product(raw: dict[str, Any]) -> dict[str, Any]:
     raw_variants, raw_images = raw.get("variants"), raw.get("images")
     variants: list[Any] = raw_variants if isinstance(raw_variants, list) else []
     images: list[Any] = raw_images if isinstance(raw_images, list) else []
+    if raw.get("id") is None or not str(raw.get("title") or "").strip() or not str(raw.get("handle") or "").strip() or not variants or not all(isinstance(v, dict) and v.get("id") is not None and price_nzd(v.get("price")) is not None for v in variants):
+        raise CliError("unexpected Pet Central product response shape")
     prices = [price for v in variants if isinstance(v, dict) and (price := price_nzd(v.get("price"))) is not None]
     return {"id": raw.get("id"), "title": raw.get("title") or "", "handle": raw.get("handle") or "", "url": BASE + "/products/" + str(raw.get("handle") or ""), "vendor": raw.get("vendor") or "", "product_type": raw.get("product_type") or "", "tags": raw.get("tags") or [], "available": raw.get("available"), "price_min_nzd": min(prices) if prices else None, "price_max_nzd": max(prices) if prices else None, "variants": [{"id": v.get("id"), "title": v.get("title"), "sku": v.get("sku"), "available": v.get("available"), "price_nzd": price_nzd(v.get("price"))} for v in variants if isinstance(v, dict)], "images": [i.get("src") for i in images if isinstance(i, dict) and i.get("src")]}
 

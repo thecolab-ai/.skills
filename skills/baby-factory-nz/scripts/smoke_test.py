@@ -61,7 +61,7 @@ def fetch_rejected(final_url: str) -> bool:
     return False
 
 
-state_fixture = '<script>window.category = {"items":[{"productid":1,"style":"S1","description":"Fixture Seat","label":"Fixture","stylecolour":{"colour":"black","urlkey":"fixture-seat","variants":[{"barcode":"123","size":"One Size","currency":"NZD","baseunitprice":"199.00","unitprice":"149.00","saleprice":true}]}}],"totalitems":1,"totalpages":1};</script>'
+state_fixture = '<script>window.category = {"items":[{"productid":1,"style":"S1","description":"Fixture Seat","label":"Fixture","stylecolour":{"colour":"black","urlkey":"fixture-seat","variants":[{"barcode":"123","size":"One Size","currency":"NZD","baseunitprice":"199.00","unitprice":"149.00","saleprice":true}]}}],"totalitems":1,"totalpages":1,"currentpage":1};</script>'
 state = cli.extract_category_state(state_fixture)
 item = cli.normalize_search_item(state["items"][0])
 check("fixture category state parses prices", item["name"] == "Fixture Seat" and item["price"] == 149.0 and item["on_sale"] is True)
@@ -73,6 +73,12 @@ try:
 except cli.CliError:
     missing_rejected = True
 check("missing state is not fabricated success", missing_rejected)
+try:
+    cli.extract_category_state('<script>window.category = {};</script>')
+    malformed_rejected = False
+except cli.CliError:
+    malformed_rejected = True
+check("malformed present state is not fabricated no-match", malformed_rejected)
 check("rejects non-canonical storefront origins", not cli.is_allowed_url("https://example.org/x") and not cli.is_allowed_url("http://www.babyfactory.co.nz/x") and not cli.is_allowed_url("https://user@www.babyfactory.co.nz/x") and not cli.is_allowed_url("https://www.babyfactory.co.nz:444/x") and cli.is_allowed_url("https://www.babyfactory.co.nz:443/x"))
 try:
     cli.StorefrontRedirectHandler().redirect_request(None, None, 302, "", {}, "https://example.org/x")

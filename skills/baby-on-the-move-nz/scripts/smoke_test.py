@@ -87,7 +87,14 @@ def main() -> int:
         setattr(module, "fetch_json", original_fetch_json)
     require(malformed_rejected, "malformed predictive-search products must be a concise error")
 
-    require(module.normalize_search({"handle": "fixture", "compare_at_price_min": 0})["compare_at_price_min"] is None, "zero compare-at sentinel must be null")
+    search_fixture = {"id": 1, "handle": "fixture", "title": "Fixture", "price_min": 10.0, "price_max": 10.0, "compare_at_price_min": 0}
+    require(module.normalize_search(search_fixture)["compare_at_price_min"] is None, "zero compare-at sentinel must be null")
+    try:
+        module.normalize_search({})
+        malformed_search_rejected = False
+    except module.StorefrontError:
+        malformed_search_rejected = True
+    require(malformed_search_rejected, "malformed predictive-search item must fail closed")
     for malformed_product in ({}, {"handle": "fixture", "title": "Fixture", "variants": None}, {"handle": "fixture", "title": "Fixture", "variants": []}, {"handle": "fixture", "title": "Fixture", "variants": ["bad"]}, {"handle": "fixture", "title": "Fixture", "variants": [{}]}):
         try:
             module.normalize_detail(malformed_product)
