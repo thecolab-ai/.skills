@@ -119,9 +119,9 @@ def as_number(value: Any) -> float | None:
         return None
     try:
         number = float(value)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return None
-    return round(number, 2) if math.isfinite(number) else None
+    return round(number, 2) if math.isfinite(number) and number >= 0 else None
 
 
 def algolia_queries(requests: list[dict[str, str]], timeout: int) -> tuple[list[dict[str, Any]], str]:

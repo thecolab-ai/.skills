@@ -88,7 +88,16 @@ item = cli.normalise_hit(raw_hit)
 check("fixture preserves SKU without inventing barcode", item["sku"] == "122731000059" and item["gtin"] is None and item["barcode"] is None)
 check("fixture distinguishes standard and Autoship prices", item["price_nzd"] == 66.49 and item["autoship"]["price_nzd"] == 59.84 and item["member_price"]["price_nzd"] is None)
 check("fixture keeps rewards separate from price", item["rewards"]["everyday_rewards_points"] == "66" and item["rewards"]["programmes"][0]["code"] == "PETCASH")
-check("non-finite prices fail closed", cli.as_number("nan") is None and cli.as_number("inf") is None)
+check("malformed prices fail closed", cli.as_number("nan") is None and cli.as_number("inf") is None and cli.as_number(-0.01) is None and cli.as_number(10**10000) is None)
+for field in ("price", "originalPrice"):
+    malformed_hit = dict(raw_hit)
+    malformed_hit[field] = -0.01
+    malformed_item = cli.normalise_hit(malformed_hit)
+    target = "price_nzd" if field == "price" else "original_price_nzd"
+    check(f"negative {field} fails closed through product normalisation", malformed_item[target] is None)
+malformed_hit = dict(raw_hit)
+malformed_hit["subscriptionPrice"] = 10**10000
+check("overflowing Autoship price fails closed through product normalisation", cli.normalise_hit(malformed_hit)["autoship"]["price_nzd"] is None)
 markup = '<script type="application/ld+json">{"@type":"Product","name":"Fixture","offers":[{"price":"12.50","priceCurrency":"NZD"}]}</script>'
 check("fixture Product JSON-LD parses", cli.json_ld_objects(markup)[0]["name"] == "Fixture")
 original_request_bytes = cli.request_bytes
