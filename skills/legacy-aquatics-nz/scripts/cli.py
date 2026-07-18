@@ -43,7 +43,9 @@ class ProductMetadataParser(HTMLParser):
  def handle_endtag(self,tag):
   if tag.casefold()=="script" and self._in_json_ld:self.json_ld.append("".join(self._script));self._in_json_ld=False
 def amount(value):
- try:price=float(str(value).replace(",",""))
+ raw=str(value).strip()
+ if not re.fullmatch(r"(?:[0-9]+|[0-9]{1,3}(?:,[0-9]{3})+)(?:\.[0-9]+)?",raw):return None
+ try:price=float(raw.replace(",",""))
  except (TypeError,ValueError):return None
  return round(price,2) if math.isfinite(price) and price>=0 else None
 def product_nodes(value):
@@ -53,15 +55,16 @@ def product_nodes(value):
   for child in value.values():yield from product_nodes(child)
  elif isinstance(value,list):
   for child in value:yield from product_nodes(child)
+def json_ld_products(raw):
+ try:return list(product_nodes(json.loads(raw)))
+ except (ValueError,RecursionError):return []
 def product_price(page):
  parser=ProductMetadataParser();parser.feed(page)
  for prefix in ("product:price","og:price"):
   price=amount(parser.meta.get(prefix+":amount"));currency=parser.meta.get(prefix+":currency","")
   if price is not None and currency.upper()=="NZD":return price,f"NZ${price:.2f}"
  for raw in parser.json_ld:
-  try:data=json.loads(raw)
-  except json.JSONDecodeError:continue
-  for product in product_nodes(data):
+  for product in json_ld_products(raw):
    offers=product.get("offers",[]);offers=offers if isinstance(offers,list) else [offers]
    for offer in offers:
     if not isinstance(offer,dict):continue

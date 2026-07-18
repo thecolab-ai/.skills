@@ -50,9 +50,19 @@ print("[PASS] rejects empty search and non-HTTPS product URL")
 fixture='<a href="/products/p2">2</a><a href="/product/example"><img alt=""></a><h4><a href="/product/example">Example Product</a></h4>'
 assert cli.links(fixture,cli.BASE)==[{"title":"Example Product","url":cli.BASE+"/product/example"}]
 print("[PASS] catalogue parser excludes pagination and retains product titles")
-price_fixture='''<script type="application/ld+json">{"@context":"https://schema.org","@type":"Product","offers":{"@type":"Offer","price":"9.69","priceCurrency":"NZD"}}</script>'''
+price_fixture='''<script type="application/ld+json">{"@type":"Product","offers":{"@type":"Offer","price":"9.69","priceCurrency":"NZD"}}</script>'''
 assert cli.product_price(price_fixture)==(9.69,"NZ$9.69")
 assert cli.product_price(price_fixture.replace('"priceCurrency":"NZD"',''))==(None,None)
+assert cli.amount("1,234.56")==1234.56 and cli.amount("1,2,3") is None
+assert cli.amount("١٢٣.٤٥") is None
+fallback_fixture='''<meta property="product:price:amount" content="7.25"><meta property="product:price:currency" content="NZD">'''
+hostile_json="["*(sys.getrecursionlimit()+10)+"0"+"]"*(sys.getrecursionlimit()+10)
+assert cli.product_price(f'<script type="application/ld+json">{hostile_json}</script>'+fallback_fixture)==(7.25,"NZ$7.25")
+original_json_loads=cli.json.loads
+try:
+ cli.json.loads=lambda raw:(_ for _ in ()).throw(ValueError("decoder rejected structure"))
+ assert cli.product_price('<script type="application/ld+json">{}</script>'+fallback_fixture)==(7.25,"NZ$7.25")
+finally:cli.json.loads=original_json_loads
 print("[PASS] Product JSON-LD yields price only with explicit NZD evidence")
 data=live(["search","chicken","--limit","2","--json"])
 if data is not None:

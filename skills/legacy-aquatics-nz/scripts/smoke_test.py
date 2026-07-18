@@ -55,6 +55,15 @@ price_fixture='''<meta property="product:price:amount" content="5.99">
 <span class="woocommerce-Price-amount"><bdi><span>$</span></bdi></span>'''
 assert cli.product_price(price_fixture)==(5.99,"NZ$5.99")
 assert cli.product_price('<span class="woocommerce-Price-amount">$</span>')==(None,None)
+assert cli.amount("1,234.56")==1234.56 and cli.amount("1,2,3") is None
+assert cli.amount("١٢٣.٤٥") is None
+hostile_json="["*(sys.getrecursionlimit()+10)+"0"+"]"*(sys.getrecursionlimit()+10)
+assert cli.product_price(f'<script type="application/ld+json">{hostile_json}</script>')==(None,None)
+original_json_loads=cli.json.loads
+try:
+ cli.json.loads=lambda raw:(_ for _ in ()).throw(ValueError("decoder rejected structure"))
+ assert cli.product_price('<script type="application/ld+json">{}</script>')==(None,None)
+finally:cli.json.loads=original_json_loads
 print("[PASS] canonical NZD metadata yields a numeric, truthful product price")
 data=live(["category","aquariums-and-equipment","--limit","2","--json"])
 if data is not None:
