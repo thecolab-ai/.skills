@@ -57,6 +57,20 @@ class StorefrontError(Exception):
     """Expected upstream or input failure."""
 
 
+def is_allowed_storefront_url(url: str) -> bool:
+    parsed = urllib.parse.urlparse(url)
+    base_host = urllib.parse.urlparse(BASE_URL).hostname or ""
+    bare_host = base_host.removeprefix("www.")
+    return parsed.scheme == "https" and parsed.hostname in {base_host, bare_host, "www." + bare_host}
+
+
+class StorefrontRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if not is_allowed_storefront_url(newurl):
+            raise StorefrontError("refusing redirect outside the configured HTTPS storefront")
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
 def retrieved_at() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
@@ -97,9 +111,9 @@ def fetch(url: str, timeout: int, accept: str) -> tuple[bytes, str]:
         },
     )
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        with urllib.request.build_opener(StorefrontRedirectHandler()).open(request, timeout=timeout) as response:
             final_url = response.geturl()
-            if urllib.parse.urlparse(final_url).hostname not in {allowed_host, bare_host, "www." + bare_host}:
+            if not is_allowed_storefront_url(final_url):
                 raise StorefrontError("refusing redirect outside the configured storefront")
             body = response.read(MAX_RESPONSE_BYTES + 1)
             if len(body) > MAX_RESPONSE_BYTES:
