@@ -30,11 +30,15 @@ def get(url,timeout):
  except (urllib.error.URLError,TimeoutError,OSError) as e:raise CliError(f"network error for {url}: {getattr(e,'reason',str(e))}") from e
 def clean(v):return re.sub(r"\s+"," ",html.unescape(re.sub(r"<[^>]+>"," ",v))).strip()
 def product_links(page,base):
- rows=[];seen=set()
+ rows=[];by_url={}
  for href,label in re.findall(r'<a\b[^>]*href=["\']([^"\']+)["\'][^>]*>(.*?)</a>',page,re.I|re.S):
   url=urllib.parse.urljoin(base,html.unescape(href));path=urllib.parse.urlparse(url).path
-  if allowed(url) and "/product/" in path and url not in seen:
-   seen.add(url);rows.append({"title":clean(label),"url":url})
+  if allowed(url) and "/product/" in path:
+   title=clean(label)
+   if url not in by_url:
+    by_url[url]={"title":title,"url":url};rows.append(by_url[url])
+   elif title and not by_url[url]["title"]:
+    by_url[url]["title"]=title
  return rows
 def search(query,page,max_results,timeout):
  if not query.strip():raise CliError("search query must not be empty")

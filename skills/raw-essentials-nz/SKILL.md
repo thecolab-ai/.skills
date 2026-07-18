@@ -10,13 +10,13 @@ Use this skill for bounded live snapshots of Raw Essentials public HTML pages. I
 ## Commands
 
 ```bash
-python3 skills/raw-essentials-nz/scripts/cli.py search treats --pet-type dog --limit 10 --json
-python3 skills/raw-essentials-nz/scripts/cli.py product https://rawessentials.co.nz/products/example --json
+python3 skills/raw-essentials-nz/scripts/cli.py search chicken --pet-type dog --limit 10 --json
+python3 skills/raw-essentials-nz/scripts/cli.py product https://rawessentials.co.nz/product/example --json
 python3 skills/raw-essentials-nz/scripts/cli.py stores --json
 ```
 
 - `search <query> [--pet-type dog|cat] [--page N] [--limit N] [--json]` searches one public listing page.
-- `product <url> [--json]` fetches a same-site public product page.
+- `product <url> [--json]` fetches a same-site public `/product/...` page.
 - `stores [--json]` extracts bounded public store-page headings.
 - `--timeout N` defaults to 10 seconds.
 

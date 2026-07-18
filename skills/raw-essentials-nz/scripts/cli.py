@@ -31,12 +31,15 @@ def get(url, timeout):
  except (urllib.error.URLError,TimeoutError,OSError) as e: raise CliError(f"network error for {url}: {getattr(e,'reason',str(e))}") from e
 def text(value): return re.sub(r"\s+"," ",html.unescape(re.sub(r"<[^>]+>"," ",value))).strip()
 def links(page, base):
- seen=set(); rows=[]
+ by_url={}; rows=[]
  for href,label in re.findall(r'<a\b[^>]*href=["\']([^"\']+)["\'][^>]*>(.*?)</a>',page,re.I|re.S):
   url=urllib.parse.urljoin(base,html.unescape(href)); title=text(label)
-  if allowed(url) and "/products/" in urllib.parse.urlparse(url).path and title and url not in seen:
-   seen.add(url); rows.append({"title":title,"url":url})
- return rows
+  if allowed(url) and urllib.parse.urlparse(url).path.startswith("/product/"):
+   if url not in by_url:
+    by_url[url]={"title":title,"url":url}; rows.append(by_url[url])
+   elif title and not by_url[url]["title"]:
+    by_url[url]["title"]=title
+ return [row for row in rows if row["title"]]
 def search(query, pet_type, page, max_results, timeout):
  if not query.strip(): raise CliError("search query must not be empty")
  url=BASE+"/products?"+urllib.parse.urlencode({"petType":pet_type,"search":query,"page":page})
@@ -44,7 +47,7 @@ def search(query, pet_type, page, max_results, timeout):
  return {"source":"raw-essentials-public-html","source_url":final,"retrieved_at":stamp(),"query":query,"pet_type":pet_type,"page":page,"limit":max_results,"results":rows[:max_results],"note":"Public catalogue snapshot only; raw feeding and supplement suitability are not veterinary advice."}
 def detail(value, timeout):
  url=urllib.parse.urljoin(BASE,value) if not value.startswith("http") else value
- if not allowed(url) or "/products/" not in urllib.parse.urlparse(url).path: raise CliError("provide a Raw Essentials HTTPS /products/ URL")
+ if not allowed(url) or not urllib.parse.urlparse(url).path.startswith("/product/"): raise CliError("provide a Raw Essentials HTTPS /product/ URL")
  body,final=get(url,timeout); title=re.search(r'<h1\b[^>]*>(.*?)</h1>',body,re.I|re.S) or re.search(r'<title>(.*?)</title>',body,re.I|re.S); description=re.search(r'<meta\s+name=["\']description["\']\s+content=["\']([^"\']+)',body,re.I)
  prices=[text(x) for x in re.findall(r'<[^>]+(?:price|Price)[^>]*>(.*?)</[^>]+>',body,re.I|re.S)][:8]
  return {"source":"raw-essentials-public-html","source_url":final,"retrieved_at":stamp(),"product":{"title":text(title.group(1)) if title else "","url":final,"description":html.unescape(description.group(1)) if description else None,"price_text":prices},"note":"Public product page snapshot only; product suitability is not veterinary advice."}

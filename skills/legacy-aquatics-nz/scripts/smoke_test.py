@@ -37,9 +37,12 @@ print("[PASS] rejects an unsafe category slug")
 assert run("search", " ", "--json").returncode != 0
 assert run("product", "http://legacyaquatics.co.nz/product/nope/", "--json").returncode != 0
 print("[PASS] rejects empty search and non-HTTPS product URL")
+fixture='<a href="/product/example/"><img alt=""></a><h4><a href="/product/example/">Example Product</a></h4>'
+assert cli.product_links(fixture,cli.BASE)==[{"title":"Example Product","url":cli.BASE+"/product/example/"}]
+print("[PASS] duplicate product anchors retain the non-empty title")
 data=live(["category","aquariums-and-equipment","--limit","2","--json"])
 if data is not None:
- assert data["source_url"] and data["retrieved_at"] and isinstance(data["results"],list);print("[PASS] category JSON metadata")
+ assert data["source_url"] and data["retrieved_at"] and data["results"] and all(row["title"] for row in data["results"]);print("[PASS] category JSON metadata and titles")
 detail=live(["product","https://legacyaquatics.co.nz/product/fishheatpack40hour/","--json"])
 if detail is not None:assert detail["product"]["url"] and detail["retrieved_at"];print("[PASS] detail JSON")
 search=live(["search","filter","--limit","2","--json"])

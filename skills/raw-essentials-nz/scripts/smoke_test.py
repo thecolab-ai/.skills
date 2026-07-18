@@ -32,15 +32,18 @@ try:cli.StorefrontRedirectHandler().redirect_request(None,None,302,"",{},"https:
 except cli.CliError:pass
 assert fetch_rejected("https://example.org/test") and fetch_rejected(cli.BASE+"/test")
 print("[PASS] canonical origin, redirect, final URL and response-size boundaries")
-assert run("product", "https://example.org/products/nope", "--json").returncode != 0
+assert run("product", "https://example.org/product/nope", "--json").returncode != 0
 print("[PASS] rejects a cross-site product URL")
 assert run("search", " ", "--json").returncode != 0
-assert run("product", "http://rawessentials.co.nz/products/nope", "--json").returncode != 0
+assert run("product", "http://rawessentials.co.nz/product/nope", "--json").returncode != 0
 print("[PASS] rejects empty search and non-HTTPS product URL")
-data=live(["search","treat","--limit","2","--json"])
+fixture='<a href="/products/p2">2</a><a href="/product/example"><img alt=""></a><h4><a href="/product/example">Example Product</a></h4>'
+assert cli.links(fixture,cli.BASE)==[{"title":"Example Product","url":cli.BASE+"/product/example"}]
+print("[PASS] catalogue parser excludes pagination and retains product titles")
+data=live(["search","chicken","--limit","2","--json"])
 if data is not None:
- assert data["source_url"] and data["retrieved_at"] and isinstance(data["results"],list);print("[PASS] search JSON metadata")
-detail=live(["product","https://rawessentials.co.nz/products/treats?petType=dog","--json"])
+ assert data["source_url"] and data["retrieved_at"] and data["results"] and all("/product/" in row["url"] for row in data["results"]);print("[PASS] search JSON metadata and product links")
+detail=live(["product","https://rawessentials.co.nz/product/raw-essentials-chicken-venison-mix","--json"])
 if detail is not None:assert detail["product"]["url"] and detail["retrieved_at"];print("[PASS] detail JSON")
 stores=live(["stores","--json"])
 if stores is not None:assert stores["source_url"] and isinstance(stores["results"],list);print("[PASS] stores JSON")
