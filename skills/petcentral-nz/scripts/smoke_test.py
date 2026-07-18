@@ -47,6 +47,12 @@ print("[PASS] rejects an over-limit request")
 assert run("search", " ", "--json").returncode != 0
 assert run("product", "https://example.org/products/nope", "--json").returncode != 0
 print("[PASS] rejects empty search and cross-site product URL")
+priced=cli.product({"handle":"priced","variants":[{"price":649},{"price":7799}]})
+assert priced["price_min_nzd"]==6.49 and priced["price_max_nzd"]==77.99
+assert [variant["price_nzd"] for variant in priced["variants"]]==[6.49,77.99]
+decimal=cli.product({"handle":"decimal","variants":[{"price":"6.49"}]})
+assert decimal["price_min_nzd"]==6.49
+print("[PASS] Shopify integer cents and decimal catalogue prices use NZD units")
 data=live(["search","dog","--limit","2","--json"])
 if data is not None:
  assert data["source_url"] and data["retrieved_at"] and isinstance(data["results"],list)

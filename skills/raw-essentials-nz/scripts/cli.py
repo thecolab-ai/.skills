@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Read-only Raw Essentials NZ public catalogue and store CLI."""
 from __future__ import annotations
-import argparse, datetime as dt, html, json, re, sys, urllib.error, urllib.parse, urllib.request
+import argparse, datetime as dt, html, json, math, re, sys, urllib.error, urllib.parse, urllib.request
+from html.parser import HTMLParser
 
 BASE="https://rawessentials.co.nz"; UA="TheColabSkills/1.0 (+https://github.com/thecolab-ai/.skills; read-only)"; MAX=50; MAX_BYTES=5_000_000
 class CliError(Exception): pass
@@ -30,6 +31,44 @@ def get(url, timeout):
  except urllib.error.HTTPError as e: raise CliError(f"upstream returned HTTP {e.code} for {url}") from e
  except (urllib.error.URLError,TimeoutError,OSError) as e: raise CliError(f"network error for {url}: {getattr(e,'reason',str(e))}") from e
 def text(value): return re.sub(r"\s+"," ",html.unescape(re.sub(r"<[^>]+>"," ",value))).strip()
+class ProductMetadataParser(HTMLParser):
+ def __init__(self):super().__init__();self.meta={};self.json_ld=[];self._in_json_ld=False;self._script=[]
+ def handle_starttag(self,tag,attrs):
+  values={key.casefold():value for key,value in attrs if value is not None}
+  if tag.casefold()=="meta":
+   key=(values.get("property") or values.get("name") or "").casefold()
+   if key and "content" in values:self.meta[key]=values["content"]
+  if tag.casefold()=="script" and values.get("type","").casefold()=="application/ld+json":self._in_json_ld=True;self._script=[]
+ def handle_data(self,data):
+  if self._in_json_ld:self._script.append(data)
+ def handle_endtag(self,tag):
+  if tag.casefold()=="script" and self._in_json_ld:self.json_ld.append("".join(self._script));self._in_json_ld=False
+def amount(value):
+ try:price=float(str(value).replace(",",""))
+ except (TypeError,ValueError):return None
+ return round(price,2) if math.isfinite(price) and price>=0 else None
+def product_nodes(value):
+ if isinstance(value,dict):
+  kind=value.get("@type",[]);kinds=kind if isinstance(kind,list) else [kind]
+  if any(str(item).casefold()=="product" for item in kinds):yield value
+  for child in value.values():yield from product_nodes(child)
+ elif isinstance(value,list):
+  for child in value:yield from product_nodes(child)
+def product_price(page):
+ parser=ProductMetadataParser();parser.feed(page)
+ for raw in parser.json_ld:
+  try:data=json.loads(raw)
+  except json.JSONDecodeError:continue
+  for product in product_nodes(data):
+   offers=product.get("offers",[]);offers=offers if isinstance(offers,list) else [offers]
+   for offer in offers:
+    if not isinstance(offer,dict):continue
+    price=amount(offer.get("price",offer.get("lowPrice")))
+    if price is not None and str(offer.get("priceCurrency","")).upper()=="NZD":return price,f"NZ${price:.2f}"
+ for prefix in ("product:price","og:price"):
+  price=amount(parser.meta.get(prefix+":amount"));currency=parser.meta.get(prefix+":currency","")
+  if price is not None and currency.upper()=="NZD":return price,f"NZ${price:.2f}"
+ return None,None
 def links(page, base):
  by_url={}; rows=[]
  for href,label in re.findall(r'<a\b[^>]*href=["\']([^"\']+)["\'][^>]*>(.*?)</a>',page,re.I|re.S):
@@ -48,9 +87,8 @@ def search(query, pet_type, page, max_results, timeout):
 def detail(value, timeout):
  url=urllib.parse.urljoin(BASE,value) if not value.startswith("http") else value
  if not allowed(url) or not urllib.parse.urlparse(url).path.startswith("/product/"): raise CliError("provide a Raw Essentials HTTPS /product/ URL")
- body,final=get(url,timeout); title=re.search(r'<h1\b[^>]*>(.*?)</h1>',body,re.I|re.S) or re.search(r'<title>(.*?)</title>',body,re.I|re.S); description=re.search(r'<meta\s+name=["\']description["\']\s+content=["\']([^"\']+)',body,re.I)
- prices=[text(x) for x in re.findall(r'<[^>]+(?:price|Price)[^>]*>(.*?)</[^>]+>',body,re.I|re.S)][:8]
- return {"source":"raw-essentials-public-html","source_url":final,"retrieved_at":stamp(),"product":{"title":text(title.group(1)) if title else "","url":final,"description":html.unescape(description.group(1)) if description else None,"price_text":prices},"note":"Public product page snapshot only; product suitability is not veterinary advice."}
+ body,final=get(url,timeout); title=re.search(r'<h1\b[^>]*>(.*?)</h1>',body,re.I|re.S) or re.search(r'<title>(.*?)</title>',body,re.I|re.S); description=re.search(r'<meta\s+name=["\']description["\']\s+content=["\']([^"\']+)',body,re.I);price,price_text=product_price(body)
+ return {"source":"raw-essentials-public-html","source_url":final,"retrieved_at":stamp(),"product":{"title":text(title.group(1)) if title else "","url":final,"description":html.unescape(description.group(1)) if description else None,"price_nzd":price,"price_text":price_text,"price_note":"Advertised Product offer; variants and unit pricing may differ." if price is not None else None},"note":"Public product page snapshot only; verify variants, pack sizes and unit pricing on the product page. Product suitability is not veterinary advice."}
 def stores(timeout):
  body,final=get(BASE+"/stores",timeout); matches=[]
  for name,address in re.findall(r'<h[2-4][^>]*>(.*?)</h[2-4]>(.{0,1200})',body,re.I|re.S):

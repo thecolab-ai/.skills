@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Read-only Pet Central NZ Shopify catalogue CLI."""
 from __future__ import annotations
-import argparse, datetime as dt, json, re, sys, urllib.error, urllib.parse, urllib.request
+import argparse, datetime as dt, json, math, re, sys, urllib.error, urllib.parse, urllib.request
 from typing import Any
 
 BASE = "https://petcentral.co.nz"
@@ -43,11 +43,18 @@ def get(url: str, timeout: int) -> tuple[bytes, str]:
     except urllib.error.HTTPError as e: raise CliError(f"upstream returned HTTP {e.code} for {url}") from e
     except (urllib.error.URLError, TimeoutError, OSError) as e: raise CliError(f"network error for {url}: {getattr(e, 'reason', str(e))}") from e
 
+def price_nzd(value: Any) -> float | None:
+    if isinstance(value, bool): return None
+    try: amount = value / 100 if isinstance(value, int) else float(value)
+    except (TypeError, ValueError): return None
+    return round(amount, 2) if math.isfinite(amount) and amount >= 0 else None
+
 def product(raw: dict[str, Any]) -> dict[str, Any]:
-    variants = raw.get("variants") if isinstance(raw.get("variants"), list) else []
-    images = raw.get("images") if isinstance(raw.get("images"), list) else []
-    prices = [float(v["price"]) for v in variants if isinstance(v, dict) and str(v.get("price", "")).replace(".", "", 1).isdigit()]
-    return {"id": raw.get("id"), "title": raw.get("title") or "", "handle": raw.get("handle") or "", "url": BASE + "/products/" + str(raw.get("handle") or ""), "vendor": raw.get("vendor") or "", "product_type": raw.get("product_type") or "", "tags": raw.get("tags") or [], "available": raw.get("available"), "price_min_nzd": min(prices) if prices else None, "price_max_nzd": max(prices) if prices else None, "variants": [{"id": v.get("id"), "title": v.get("title"), "sku": v.get("sku"), "available": v.get("available"), "price_nzd": float(v["price"]) if str(v.get("price", "")).replace(".", "", 1).isdigit() else None} for v in variants if isinstance(v, dict)], "images": [i.get("src") for i in images if isinstance(i, dict) and i.get("src")]}
+    raw_variants, raw_images = raw.get("variants"), raw.get("images")
+    variants: list[Any] = raw_variants if isinstance(raw_variants, list) else []
+    images: list[Any] = raw_images if isinstance(raw_images, list) else []
+    prices = [price for v in variants if isinstance(v, dict) and (price := price_nzd(v.get("price"))) is not None]
+    return {"id": raw.get("id"), "title": raw.get("title") or "", "handle": raw.get("handle") or "", "url": BASE + "/products/" + str(raw.get("handle") or ""), "vendor": raw.get("vendor") or "", "product_type": raw.get("product_type") or "", "tags": raw.get("tags") or [], "available": raw.get("available"), "price_min_nzd": min(prices) if prices else None, "price_max_nzd": max(prices) if prices else None, "variants": [{"id": v.get("id"), "title": v.get("title"), "sku": v.get("sku"), "available": v.get("available"), "price_nzd": price_nzd(v.get("price"))} for v in variants if isinstance(v, dict)], "images": [i.get("src") for i in images if isinstance(i, dict) and i.get("src")]}
 
 def fetch_products(page: int, timeout: int) -> tuple[list[dict[str, Any]], str]:
     body, final = get(f"{BASE}/products.json?limit=250&page={page}", timeout)

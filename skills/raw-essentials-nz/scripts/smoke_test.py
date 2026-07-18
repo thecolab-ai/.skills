@@ -50,11 +50,19 @@ print("[PASS] rejects empty search and non-HTTPS product URL")
 fixture='<a href="/products/p2">2</a><a href="/product/example"><img alt=""></a><h4><a href="/product/example">Example Product</a></h4>'
 assert cli.links(fixture,cli.BASE)==[{"title":"Example Product","url":cli.BASE+"/product/example"}]
 print("[PASS] catalogue parser excludes pagination and retains product titles")
+price_fixture='''<script type="application/ld+json">{"@context":"https://schema.org","@type":"Product","offers":{"@type":"Offer","price":"9.69","priceCurrency":"NZD"}}</script>'''
+assert cli.product_price(price_fixture)==(9.69,"NZ$9.69")
+assert cli.product_price(price_fixture.replace('"priceCurrency":"NZD"',''))==(None,None)
+print("[PASS] Product JSON-LD yields price only with explicit NZD evidence")
 data=live(["search","chicken","--limit","2","--json"])
 if data is not None:
  assert data["source_url"] and data["retrieved_at"] and data["results"] and all("/product/" in row["url"] for row in data["results"]);print("[PASS] search JSON metadata and product links")
 detail=live(["product","https://rawessentials.co.nz/product/raw-essentials-chicken-venison-mix","--json"])
-if detail is not None:assert detail["product"]["url"] and detail["retrieved_at"];print("[PASS] detail JSON")
+if detail is not None:
+ assert detail["product"]["url"] and detail["retrieved_at"]
+ assert isinstance(detail["product"]["price_nzd"],(int,float)) and detail["product"]["price_nzd"]>0
+ assert detail["product"]["price_text"] not in (None,"$",[])
+ print("[PASS] detail JSON with evidenced NZD price")
 stores=live(["stores","--json"])
 if stores is not None:assert stores["source_url"] and isinstance(stores["results"],list);print("[PASS] stores JSON")
 print("Smoke test complete.")

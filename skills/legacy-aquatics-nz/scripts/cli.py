@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Read-only Legacy Aquatics NZ WooCommerce public catalogue CLI."""
 from __future__ import annotations
-import argparse, datetime as dt, html, json, re, sys, urllib.error, urllib.parse, urllib.request
+import argparse, datetime as dt, html, json, math, re, sys, urllib.error, urllib.parse, urllib.request
+from html.parser import HTMLParser
 BASE="https://legacyaquatics.co.nz"; UA="TheColabSkills/1.0 (+https://github.com/thecolab-ai/.skills; read-only)"; MAX=50; MAX_BYTES=5_000_000
 class CliError(Exception): pass
 def allowed(url):
@@ -29,6 +30,44 @@ def get(url,timeout):
  except urllib.error.HTTPError as e:raise CliError(f"upstream returned HTTP {e.code} for {url}") from e
  except (urllib.error.URLError,TimeoutError,OSError) as e:raise CliError(f"network error for {url}: {getattr(e,'reason',str(e))}") from e
 def clean(v):return re.sub(r"\s+"," ",html.unescape(re.sub(r"<[^>]+>"," ",v))).strip()
+class ProductMetadataParser(HTMLParser):
+ def __init__(self):super().__init__();self.meta={};self.json_ld=[];self._in_json_ld=False;self._script=[]
+ def handle_starttag(self,tag,attrs):
+  values={key.casefold():value for key,value in attrs if value is not None}
+  if tag.casefold()=="meta":
+   key=(values.get("property") or values.get("name") or "").casefold()
+   if key and "content" in values:self.meta[key]=values["content"]
+  if tag.casefold()=="script" and values.get("type","").casefold()=="application/ld+json":self._in_json_ld=True;self._script=[]
+ def handle_data(self,data):
+  if self._in_json_ld:self._script.append(data)
+ def handle_endtag(self,tag):
+  if tag.casefold()=="script" and self._in_json_ld:self.json_ld.append("".join(self._script));self._in_json_ld=False
+def amount(value):
+ try:price=float(str(value).replace(",",""))
+ except (TypeError,ValueError):return None
+ return round(price,2) if math.isfinite(price) and price>=0 else None
+def product_nodes(value):
+ if isinstance(value,dict):
+  kind=value.get("@type",[]);kinds=kind if isinstance(kind,list) else [kind]
+  if any(str(item).casefold()=="product" for item in kinds):yield value
+  for child in value.values():yield from product_nodes(child)
+ elif isinstance(value,list):
+  for child in value:yield from product_nodes(child)
+def product_price(page):
+ parser=ProductMetadataParser();parser.feed(page)
+ for prefix in ("product:price","og:price"):
+  price=amount(parser.meta.get(prefix+":amount"));currency=parser.meta.get(prefix+":currency","")
+  if price is not None and currency.upper()=="NZD":return price,f"NZ${price:.2f}"
+ for raw in parser.json_ld:
+  try:data=json.loads(raw)
+  except json.JSONDecodeError:continue
+  for product in product_nodes(data):
+   offers=product.get("offers",[]);offers=offers if isinstance(offers,list) else [offers]
+   for offer in offers:
+    if not isinstance(offer,dict):continue
+    price=amount(offer.get("price",offer.get("lowPrice")))
+    if price is not None and str(offer.get("priceCurrency","")).upper()=="NZD":return price,f"NZ${price:.2f}"
+ return None,None
 def product_links(page,base):
  rows=[];by_url={}
  for href,label in re.findall(r'<a\b[^>]*href=["\']([^"\']+)["\'][^>]*>(.*?)</a>',page,re.I|re.S):
@@ -52,8 +91,8 @@ def category(slug,page,max_results,timeout):
 def detail(value,timeout):
  url=urllib.parse.urljoin(BASE,value) if not value.startswith("http") else value
  if not allowed(url) or "/product/" not in urllib.parse.urlparse(url).path:raise CliError("provide a Legacy Aquatics HTTPS /product/ URL")
- body,final=get(url,timeout);m=re.search(r'<h1\b[^>]*>(.*?)</h1>',body,re.I|re.S) or re.search(r'<title>(.*?)</title>',body,re.I|re.S);price=clean(" ".join(re.findall(r'<[^>]*woocommerce-Price-amount[^>]*>(.*?)</[^>]+>',body,re.I|re.S)[:3]));desc=re.search(r'<meta\s+name=["\']description["\']\s+content=["\']([^"\']+)',body,re.I)
- return {"source":"woocommerce-public-html","source_url":final,"retrieved_at":stamp(),"product":{"title":clean(m.group(1)) if m else "","url":final,"price_text":price or None,"description":html.unescape(desc.group(1)) if desc else None},"note":"Public product data only; verify aquarium/reptile setup and care with an appropriate expert."}
+ body,final=get(url,timeout);m=re.search(r'<h1\b[^>]*>(.*?)</h1>',body,re.I|re.S) or re.search(r'<title>(.*?)</title>',body,re.I|re.S);price,price_text=product_price(body);desc=re.search(r'<meta\s+name=["\']description["\']\s+content=["\']([^"\']+)',body,re.I)
+ return {"source":"woocommerce-public-html","source_url":final,"retrieved_at":stamp(),"product":{"title":clean(m.group(1)) if m else "","url":final,"price_nzd":price,"price_text":price_text,"description":html.unescape(desc.group(1)) if desc else None},"note":"Public product data only; verify aquarium/reptile setup and care with an appropriate expert."}
 def emit(data,as_json):
  if as_json:print(json.dumps(data,ensure_ascii=False,indent=2));return
  for r in data.get("results",[data.get("product")] if data.get("product") else []):print(f"{r.get('title','')} | {r.get('url','')}")

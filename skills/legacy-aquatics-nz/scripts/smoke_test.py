@@ -50,11 +50,21 @@ print("[PASS] rejects empty search and non-HTTPS product URL")
 fixture='<a href="/product/example/"><img alt=""></a><h4><a href="/product/example/">Example Product</a></h4>'
 assert cli.product_links(fixture,cli.BASE)==[{"title":"Example Product","url":cli.BASE+"/product/example/"}]
 print("[PASS] duplicate product anchors retain the non-empty title")
+price_fixture='''<meta property="product:price:amount" content="5.99">
+<meta property="product:price:currency" content="NZD">
+<span class="woocommerce-Price-amount"><bdi><span>$</span></bdi></span>'''
+assert cli.product_price(price_fixture)==(5.99,"NZ$5.99")
+assert cli.product_price('<span class="woocommerce-Price-amount">$</span>')==(None,None)
+print("[PASS] canonical NZD metadata yields a numeric, truthful product price")
 data=live(["category","aquariums-and-equipment","--limit","2","--json"])
 if data is not None:
  assert data["source_url"] and data["retrieved_at"] and data["results"] and all(row["title"] for row in data["results"]);print("[PASS] category JSON metadata and titles")
 detail=live(["product","https://legacyaquatics.co.nz/product/fishheatpack40hour/","--json"])
-if detail is not None:assert detail["product"]["url"] and detail["retrieved_at"];print("[PASS] detail JSON")
+if detail is not None:
+ assert detail["product"]["url"] and detail["retrieved_at"]
+ assert isinstance(detail["product"]["price_nzd"],(int,float)) and detail["product"]["price_nzd"]>0
+ assert detail["product"]["price_text"] not in (None,"$","$ $ $")
+ print("[PASS] detail JSON with evidenced NZD price")
 search=live(["search","filter","--limit","2","--json"])
 if search is not None:assert search["source_url"] and isinstance(search["results"],list);print("[PASS] search JSON")
 print("Smoke test complete.")
