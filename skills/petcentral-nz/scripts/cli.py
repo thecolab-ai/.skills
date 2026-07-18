@@ -12,8 +12,12 @@ MAX_RESPONSE_BYTES = 5_000_000
 class CliError(Exception): pass
 
 def allowed(url: str) -> bool:
-    parsed = urllib.parse.urlparse(url)
-    return parsed.scheme == "https" and parsed.hostname in {"petcentral.co.nz", "www.petcentral.co.nz"}
+    try:
+        parsed = urllib.parse.urlparse(url)
+        port = parsed.port
+    except ValueError:
+        return False
+    return parsed.scheme == "https" and parsed.hostname in {"petcentral.co.nz", "www.petcentral.co.nz"} and parsed.username is None and parsed.password is None and port in (None, 443)
 
 class StorefrontRedirectHandler(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):

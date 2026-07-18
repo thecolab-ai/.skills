@@ -58,10 +58,14 @@ class StorefrontError(Exception):
 
 
 def is_allowed_storefront_url(url: str) -> bool:
-    parsed = urllib.parse.urlparse(url)
+    try:
+        parsed = urllib.parse.urlparse(url)
+        port = parsed.port
+    except ValueError:
+        return False
     base_host = urllib.parse.urlparse(BASE_URL).hostname or ""
     bare_host = base_host.removeprefix("www.")
-    return parsed.scheme == "https" and parsed.hostname in {base_host, bare_host, "www." + bare_host}
+    return parsed.scheme == "https" and parsed.hostname in {base_host, bare_host, "www." + bare_host} and parsed.username is None and parsed.password is None and port in (None, 443)
 
 
 class StorefrontRedirectHandler(urllib.request.HTTPRedirectHandler):
@@ -94,12 +98,7 @@ def timeout_arg(value: str) -> int:
 
 
 def fetch(url: str, timeout: int, accept: str) -> tuple[bytes, str]:
-    parsed = urllib.parse.urlparse(url)
-    allowed_host = urllib.parse.urlparse(BASE_URL).hostname
-    if allowed_host is None:
-        raise RuntimeError("configured storefront has no hostname")
-    bare_host = allowed_host.removeprefix("www.")
-    if parsed.scheme != "https" or parsed.hostname not in {allowed_host, bare_host, "www." + bare_host}:
+    if not is_allowed_storefront_url(url):
         raise StorefrontError("refusing request outside the configured HTTPS storefront")
     request = urllib.request.Request(
         url,

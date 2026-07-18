@@ -6,7 +6,9 @@ import argparse, datetime as dt, html, json, re, sys, urllib.error, urllib.parse
 BASE="https://rawessentials.co.nz"; UA="TheColabSkills/1.0 (+https://github.com/thecolab-ai/.skills; read-only)"; MAX=50; MAX_BYTES=5_000_000
 class CliError(Exception): pass
 def allowed(url):
- p=urllib.parse.urlparse(url);return p.scheme=="https" and p.hostname in {"rawessentials.co.nz","www.rawessentials.co.nz"}
+ try:p=urllib.parse.urlparse(url);port=p.port
+ except ValueError:return False
+ return p.scheme=="https" and p.hostname in {"rawessentials.co.nz","www.rawessentials.co.nz"} and p.username is None and p.password is None and port in (None,443)
 class StorefrontRedirectHandler(urllib.request.HTTPRedirectHandler):
  def redirect_request(self,req,fp,code,msg,headers,newurl):
   if not allowed(newurl):raise CliError("refusing redirect outside the Raw Essentials HTTPS storefront")

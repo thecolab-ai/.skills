@@ -31,6 +31,31 @@ def live_or_skip(result: subprocess.CompletedProcess[str]) -> bool:
     raise AssertionError(f"command failed ({result.returncode}): {result.stderr[:400]}")
 
 
+class FakeResponse:
+    def __init__(self, final_url: str): self.final_url = final_url
+    def __enter__(self): return self
+    def __exit__(self, *args): return False
+    def geturl(self): return self.final_url
+    def read(self, size: int): return b"x" * size
+
+
+class FakeOpener:
+    def __init__(self, final_url: str): self.final_url = final_url
+    def open(self, request, timeout): return FakeResponse(self.final_url)
+
+
+def fetch_rejected(module, final_url: str) -> bool:
+    original = module.urllib.request.build_opener
+    module.urllib.request.build_opener = lambda *handlers: FakeOpener(final_url)
+    try:
+        module.fetch(module.BASE_URL + "/test", 1, "text/html")
+    except module.StorefrontError:
+        return True
+    finally:
+        module.urllib.request.build_opener = original
+    return False
+
+
 def main() -> int:
     spec = importlib.util.spec_from_file_location("retailer_cli", CLI)
     if spec is None or spec.loader is None:
@@ -40,6 +65,17 @@ def main() -> int:
     require(module.is_allowed_storefront_url(module.BASE_URL + "/products/example"), "storefront HTTPS URL rejected")
     require(not module.is_allowed_storefront_url("http://" + module.BASE_URL.split("//", 1)[1]), "HTTP redirect allowed")
     require(not module.is_allowed_storefront_url("https://evil.example/products/example"), "off-domain redirect allowed")
+    require(not module.is_allowed_storefront_url(module.BASE_URL.replace("https://", "https://user@")), "userinfo allowed")
+    require(not module.is_allowed_storefront_url(module.BASE_URL + ":444/test"), "non-default port allowed")
+    require(module.is_allowed_storefront_url(module.BASE_URL + ":443/test"), "default HTTPS port rejected")
+    try:
+        module.StorefrontRedirectHandler().redirect_request(None, None, 302, "", {}, "https://evil.example/test")
+        redirect_rejected = False
+    except module.StorefrontError:
+        redirect_rejected = True
+    require(redirect_rejected, "redirect handler did not intercept foreign origin")
+    require(fetch_rejected(module, "https://evil.example/test"), "foreign final URL was accepted")
+    require(fetch_rejected(module, module.BASE_URL + "/test"), "oversized response was accepted")
     original_fetch_json = getattr(module, "fetch_json")
     setattr(module, "fetch_json", lambda url, timeout: ({"resources": {"results": {"products": {}}}}, url))
     try:

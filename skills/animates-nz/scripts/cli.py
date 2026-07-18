@@ -27,8 +27,18 @@ class CliError(RuntimeError):
 
 
 def is_allowed_url(url: str) -> bool:
-    parsed = urllib.parse.urlparse(url)
-    return parsed.scheme == "https" and parsed.hostname in {"animates.co.nz", "www.animates.co.nz"}
+    try:
+        parsed = urllib.parse.urlparse(url)
+        port = parsed.port
+    except ValueError:
+        return False
+    return (
+        parsed.scheme == "https"
+        and parsed.hostname in {"animates.co.nz", "www.animates.co.nz"}
+        and parsed.username is None
+        and parsed.password is None
+        and port in (None, 443)
+    )
 
 
 class StorefrontRedirectHandler(urllib.request.HTTPRedirectHandler):
@@ -121,6 +131,8 @@ def parse_product(markup: str, source_url: str) -> dict[str, Any] | None:
 
 
 def search_ids(query: str, limit: int, timeout: int) -> tuple[list[str], int | None, str]:
+    if not query.strip():
+        raise CliError("search query must not be empty")
     params = {
         "searchCriteria[requestName]": "quick_search_container",
         "searchCriteria[filterGroups][0][filters][0][field]": "search_term",
@@ -142,8 +154,7 @@ def search_ids(query: str, limit: int, timeout: int) -> tuple[list[str], int | N
 def product_url(value: str) -> str:
     value = value.strip()
     if value.startswith("https://"):
-        parsed = urllib.parse.urlparse(value)
-        if parsed.hostname not in {"animates.co.nz", "www.animates.co.nz"}:
+        if not is_allowed_url(value):
             raise CliError("product URL must be on animates.co.nz")
         return value
     if value.isdigit():

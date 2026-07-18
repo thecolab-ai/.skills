@@ -35,20 +35,56 @@ def outage(result: subprocess.CompletedProcess[str]) -> bool:
     return any(marker in text for marker in ("network error", "timed out", "http 429", "http 500", "http 502", "http 503", "http 504"))
 
 
+class FakeResponse:
+    def __init__(self, final_url: str): self.final_url = final_url
+    def __enter__(self): return self
+    def __exit__(self, *args): return False
+    def geturl(self): return self.final_url
+    def read(self, size: int): return b"x" * size
+
+
+class FakeOpener:
+    def __init__(self, final_url: str): self.final_url = final_url
+    def open(self, request, timeout): return FakeResponse(self.final_url)
+
+
+def fetch_rejected(final_url: str) -> bool:
+    original = cli.urllib.request.build_opener
+    cli.urllib.request.build_opener = lambda *handlers: FakeOpener(final_url)
+    try:
+        cli.fetch_text(cli.BASE + "/test")
+    except cli.CliError:
+        return True
+    finally:
+        cli.urllib.request.build_opener = original
+    return False
+
+
 state_fixture = '<script>window.category = {"items":[{"productid":1,"style":"S1","description":"Fixture Seat","label":"Fixture","stylecolour":{"colour":"black","urlkey":"fixture-seat","variants":[{"barcode":"123","size":"One Size","currency":"NZD","baseunitprice":"199.00","unitprice":"149.00","saleprice":true}]}}],"totalitems":1,"totalpages":1};</script>'
 state = cli.extract_category_state(state_fixture)
 item = cli.normalize_search_item(state["items"][0])
 check("fixture category state parses prices", item["name"] == "Fixture Seat" and item["price"] == 149.0 and item["on_sale"] is True)
+entity_fixture = '<script type="application/ld+json">{"@type":"Product","name":"A &quot; B"}</script>'
+check("JSON-LD script data is not HTML-unescaped", cli.json_ld_objects(entity_fixture)[0]["name"] == "A &quot; B")
 try:
     cli.extract_category_state("<html></html>")
     missing_rejected = False
 except cli.CliError:
     missing_rejected = True
 check("missing state is not fabricated success", missing_rejected)
-check("rejects non-storefront and non-HTTPS URLs", not cli.is_allowed_url("https://example.org/x") and not cli.is_allowed_url("http://www.babyfactory.co.nz/x"))
+check("rejects non-canonical storefront origins", not cli.is_allowed_url("https://example.org/x") and not cli.is_allowed_url("http://www.babyfactory.co.nz/x") and not cli.is_allowed_url("https://user@www.babyfactory.co.nz/x") and not cli.is_allowed_url("https://www.babyfactory.co.nz:444/x") and cli.is_allowed_url("https://www.babyfactory.co.nz:443/x"))
+try:
+    cli.StorefrontRedirectHandler().redirect_request(None, None, 302, "", {}, "https://example.org/x")
+    redirect_rejected = False
+except cli.CliError:
+    redirect_rejected = True
+check("redirect interception rejects foreign origins", redirect_rejected)
+check("final URL rejection is enforced", fetch_rejected("https://example.org/x"))
+check("oversized responses are rejected", fetch_rejected(cli.BASE + "/test"))
 help_result = run("--help")
 check("--help exits zero", help_result.returncode == 0, help_result.stderr[:200])
 check("page and timeout are bounded", run("search", "seat", "--page", "51").returncode != 0 and run("--timeout", "61", "search", "seat").returncode != 0)
+check("empty search query is rejected", run("search", " ", "--json").returncode != 0)
 
 live = run("search", "car seat", "--limit", "1", "--json")
 if live.returncode and outage(live):

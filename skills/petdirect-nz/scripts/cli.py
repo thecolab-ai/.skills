@@ -27,8 +27,18 @@ class CliError(RuntimeError):
 
 
 def is_allowed_url(url: str) -> bool:
-    parsed = urllib.parse.urlparse(url)
-    return parsed.scheme == "https" and parsed.hostname in {"petdirect.co.nz", "www.petdirect.co.nz"}
+    try:
+        parsed = urllib.parse.urlparse(url)
+        port = parsed.port
+    except ValueError:
+        return False
+    return (
+        parsed.scheme == "https"
+        and parsed.hostname in {"petdirect.co.nz", "www.petdirect.co.nz"}
+        and parsed.username is None
+        and parsed.password is None
+        and port in (None, 443)
+    )
 
 
 class StorefrontRedirectHandler(urllib.request.HTTPRedirectHandler):
@@ -218,8 +228,7 @@ def normalize_ld_product(raw: dict[str, Any], source_url: str) -> dict[str, Any]
 def product_url(value: str) -> str:
     value = value.strip()
     if value.startswith("https://"):
-        parsed = urllib.parse.urlparse(value)
-        if parsed.hostname not in {"petdirect.co.nz", "www.petdirect.co.nz"}:
+        if not is_allowed_url(value):
             raise CliError("product URL must be on petdirect.co.nz")
         return value
     if value.startswith("/p/"):
@@ -244,6 +253,8 @@ def get_product(value: str, timeout: int) -> tuple[dict[str, Any], str]:
 
 
 def search(query: str, limit: int, page: int, timeout: int) -> dict[str, Any]:
+    if not query.strip():
+        raise CliError("search query must not be empty")
     url = BASE + "/search?" + urllib.parse.urlencode({"q": query, "page": page})
     # Current search HTML repeats its server state later in the document. The
     # complete first state object is inside this bounded prefix, so deliberately

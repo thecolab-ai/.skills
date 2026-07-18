@@ -1,8 +1,24 @@
 #!/usr/bin/env python3
 """Live, outage-tolerant smoke tests for Legacy Aquatics NZ."""
-import json, subprocess, sys
+import importlib.util, json, subprocess, sys
 from pathlib import Path
 CLI=Path(__file__).with_name("cli.py")
+spec=importlib.util.spec_from_file_location("legacy_aquatics_cli",CLI);assert spec and spec.loader
+cli=importlib.util.module_from_spec(spec);spec.loader.exec_module(cli)
+class FakeResponse:
+ def __init__(self,url):self.url=url
+ def __enter__(self):return self
+ def __exit__(self,*args):return False
+ def read(self,size):return b"x"*size
+class FakeOpener:
+ def __init__(self,url):self.url=url
+ def open(self,request,timeout):return FakeResponse(self.url)
+def fetch_rejected(final_url):
+ original=cli.urllib.request.build_opener;cli.urllib.request.build_opener=lambda *handlers:FakeOpener(final_url)
+ try:cli.get(cli.BASE+"/test",1)
+ except cli.CliError:return True
+ finally:cli.urllib.request.build_opener=original
+ return False
 def run(*args):return subprocess.run([sys.executable,str(CLI),*args],capture_output=True,text=True,timeout=30)
 def live(args):
  r=run(*args)
@@ -11,6 +27,11 @@ def live(args):
  except json.JSONDecodeError:print("[FAIL] invalid JSON:",r.stdout[:180]);raise SystemExit(1)
 if run("--help").returncode:raise SystemExit("[FAIL] help")
 print("[PASS] help")
+assert cli.allowed(cli.BASE+":443/test") and not cli.allowed("https://user@legacyaquatics.co.nz/test") and not cli.allowed(cli.BASE+":444/test")
+try:cli.StorefrontRedirectHandler().redirect_request(None,None,302,"",{},"https://example.org/test");raise AssertionError("foreign redirect allowed")
+except cli.CliError:pass
+assert fetch_rejected("https://example.org/test") and fetch_rejected(cli.BASE+"/test")
+print("[PASS] canonical origin, redirect, final URL and response-size boundaries")
 assert run("category", "../../not-a-category", "--json").returncode != 0
 print("[PASS] rejects an unsafe category slug")
 assert run("search", " ", "--json").returncode != 0
