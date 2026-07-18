@@ -18,10 +18,24 @@ UA = "TheColab-petdirect-nz/1.0 (+https://github.com/thecolab-ai/.skills)"
 MAX_RESULTS = 24
 MAX_SEARCH_BYTES = 2_700_000
 MAX_PAGE_BYTES = 1_500_000
+MAX_PAGE = 50
+MAX_TIMEOUT = 60
 
 
 class CliError(RuntimeError):
     pass
+
+
+def is_allowed_url(url: str) -> bool:
+    parsed = urllib.parse.urlparse(url)
+    return parsed.scheme == "https" and parsed.hostname in {"petdirect.co.nz", "www.petdirect.co.nz"}
+
+
+class StorefrontRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if not is_allowed_url(newurl):
+            raise CliError("refusing redirect outside the Petdirect HTTPS storefront")
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
 def timestamp() -> str:
@@ -35,13 +49,18 @@ def fetch_text(
     *,
     allow_truncated: bool = False,
 ) -> tuple[str, str]:
+    if not is_allowed_url(url):
+        raise CliError("refusing request outside the Petdirect HTTPS storefront")
     request = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "text/html", "Accept-Language": "en-NZ,en;q=0.9"}, method="GET")
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        with urllib.request.build_opener(StorefrontRedirectHandler()).open(request, timeout=timeout) as response:
+            final_url = response.geturl()
+            if not is_allowed_url(final_url):
+                raise CliError("refusing response outside the Petdirect HTTPS storefront")
             body = response.read(max_bytes + 1)
             if len(body) > max_bytes and not allow_truncated:
                 raise CliError(f"response from {url} exceeded the {max_bytes}-byte safety limit")
-            return body[:max_bytes].decode("utf-8", "replace"), response.geturl()
+            return body[:max_bytes].decode("utf-8", "replace"), final_url
     except urllib.error.HTTPError as exc:
         raise CliError(f"HTTP {exc.code} from {url}") from exc
     except urllib.error.URLError as exc:
@@ -112,6 +131,7 @@ def normalize_hit(raw: dict[str, Any]) -> dict[str, Any]:
     cheapest_raw = raw.get("cheapestVariant")
     cheapest = normalize_variant(cheapest_raw) if isinstance(cheapest_raw, dict) else None
     path = raw.get("bcCustomUrl") or ""
+    source_url = urllib.parse.urljoin(BASE, str(path))
     return {
         "id": raw.get("objectID") or raw.get("id"),
         "code": raw.get("code"),
@@ -124,7 +144,7 @@ def normalize_hit(raw: dict[str, Any]) -> dict[str, Any]:
         "rating": raw.get("averageRating"),
         "image": raw.get("imageUrl"),
         "variants": variants,
-        "source_url": urllib.parse.urljoin(BASE, str(path)),
+        "source_url": source_url if is_allowed_url(source_url) else None,
     }
 
 
@@ -133,7 +153,7 @@ def json_ld_objects(markup: str) -> list[dict[str, Any]]:
     pattern = re.compile(r"<script[^>]*type=[\"']application/ld\+json[\"'][^>]*>(.*?)</script>", re.I | re.S)
     for match in pattern.finditer(markup):
         try:
-            value = json.loads(html.unescape(match.group(1)).strip())
+            value = json.loads(match.group(1).strip())
         except (json.JSONDecodeError, TypeError):
             continue
         candidates = value.get("@graph", []) if isinstance(value, dict) and isinstance(value.get("@graph"), list) else [value]
@@ -282,14 +302,28 @@ def positive_int(value: str) -> int:
     return number_value
 
 
+def bounded_page(value: str) -> int:
+    number_value = positive_int(value)
+    if number_value > MAX_PAGE:
+        raise argparse.ArgumentTypeError(f"must be between 1 and {MAX_PAGE}")
+    return number_value
+
+
+def bounded_timeout(value: str) -> int:
+    number_value = positive_int(value)
+    if number_value > MAX_TIMEOUT:
+        raise argparse.ArgumentTypeError(f"must be between 1 and {MAX_TIMEOUT}")
+    return number_value
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="petdirect-nz", description="Read-only Petdirect NZ product search and price snapshots.")
-    parser.add_argument("--timeout", type=positive_int, default=10, help="network timeout in seconds (default: 10)")
+    parser.add_argument("--timeout", type=bounded_timeout, default=10, help=f"network timeout in seconds (1-{MAX_TIMEOUT}; default: 10)")
     sub = parser.add_subparsers(dest="command", required=True)
     search_parser = sub.add_parser("search", help="search public Petdirect product HTML state")
     search_parser.add_argument("query")
     search_parser.add_argument("--limit", type=bounded_limit, default=10)
-    search_parser.add_argument("--page", type=positive_int, default=1)
+    search_parser.add_argument("--page", type=bounded_page, default=1)
     search_parser.add_argument("--json", action="store_true")
     for command, help_text in (("product", "fetch a product URL or slug"), ("price-snapshot", "capture current public prices")):
         item_parser = sub.add_parser(command, help=help_text)

@@ -19,10 +19,23 @@ UA = "TheColab-animates-nz/1.0 (+https://github.com/thecolab-ai/.skills)"
 MAX_RESULTS = 10
 MAX_SEARCH_BYTES = 1_000_000
 MAX_PAGE_BYTES = 1_000_000
+MAX_TIMEOUT = 60
 
 
 class CliError(RuntimeError):
     pass
+
+
+def is_allowed_url(url: str) -> bool:
+    parsed = urllib.parse.urlparse(url)
+    return parsed.scheme == "https" and parsed.hostname in {"animates.co.nz", "www.animates.co.nz"}
+
+
+class StorefrontRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if not is_allowed_url(newurl):
+            raise CliError("refusing redirect outside the Animates HTTPS storefront")
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
 def timestamp() -> str:
@@ -30,17 +43,22 @@ def timestamp() -> str:
 
 
 def fetch_text(url: str, timeout: int = 10, max_bytes: int = MAX_PAGE_BYTES) -> tuple[str, str]:
+    if not is_allowed_url(url):
+        raise CliError("refusing request outside the Animates HTTPS storefront")
     request = urllib.request.Request(
         url,
         headers={"User-Agent": UA, "Accept": "text/html,application/json", "Accept-Language": "en-NZ,en;q=0.9"},
         method="GET",
     )
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        with urllib.request.build_opener(StorefrontRedirectHandler()).open(request, timeout=timeout) as response:
+            final_url = response.geturl()
+            if not is_allowed_url(final_url):
+                raise CliError("refusing response outside the Animates HTTPS storefront")
             body = response.read(max_bytes + 1)
             if len(body) > max_bytes:
                 raise CliError(f"response from {url} exceeded the {max_bytes}-byte safety limit")
-            return body.decode("utf-8", "replace"), response.geturl()
+            return body.decode("utf-8", "replace"), final_url
     except urllib.error.HTTPError as exc:
         raise CliError(f"HTTP {exc.code} from {url}") from exc
     except urllib.error.URLError as exc:
@@ -61,7 +79,7 @@ def json_ld_objects(markup: str) -> list[dict[str, Any]]:
     pattern = re.compile(r"<script[^>]*type=[\"']application/ld\+json[\"'][^>]*>(.*?)</script>", re.I | re.S)
     for match in pattern.finditer(markup):
         try:
-            value = json.loads(html.unescape(match.group(1)).strip())
+            value = json.loads(match.group(1).strip())
         except (json.JSONDecodeError, TypeError):
             continue
         candidates = value.get("@graph", []) if isinstance(value, dict) and isinstance(value.get("@graph"), list) else [value]
@@ -214,9 +232,16 @@ def positive_limit(value: str) -> int:
     return number
 
 
+def timeout_arg(value: str) -> int:
+    number = int(value)
+    if not 1 <= number <= MAX_TIMEOUT:
+        raise argparse.ArgumentTypeError(f"must be between 1 and {MAX_TIMEOUT}")
+    return number
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="animates-nz", description="Read-only Animates NZ product search and price snapshots.")
-    parser.add_argument("--timeout", type=int, default=10, help="network timeout in seconds (default: 10)")
+    parser.add_argument("--timeout", type=timeout_arg, default=10, help=f"network timeout in seconds (1-{MAX_TIMEOUT}; default: 10)")
     sub = parser.add_subparsers(dest="command", required=True)
     search_parser = sub.add_parser("search", help="search products using public Magento search and detail pages")
     search_parser.add_argument("query")

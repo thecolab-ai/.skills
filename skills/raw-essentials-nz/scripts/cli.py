@@ -3,8 +3,14 @@
 from __future__ import annotations
 import argparse, datetime as dt, html, json, re, sys, urllib.error, urllib.parse, urllib.request
 
-BASE="https://rawessentials.co.nz"; UA="TheColabSkills/1.0 (+https://github.com/thecolab-ai/.skills; read-only)"; MAX=50
+BASE="https://rawessentials.co.nz"; UA="TheColabSkills/1.0 (+https://github.com/thecolab-ai/.skills; read-only)"; MAX=50; MAX_BYTES=5_000_000
 class CliError(Exception): pass
+def allowed(url):
+ p=urllib.parse.urlparse(url);return p.scheme=="https" and p.hostname in {"rawessentials.co.nz","www.rawessentials.co.nz"}
+class StorefrontRedirectHandler(urllib.request.HTTPRedirectHandler):
+ def redirect_request(self,req,fp,code,msg,headers,newurl):
+  if not allowed(newurl):raise CliError("refusing redirect outside the Raw Essentials HTTPS storefront")
+  return super().redirect_request(req,fp,code,msg,headers,newurl)
 def stamp(): return dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00","Z")
 def number(v):
  try: n=int(v)
@@ -12,8 +18,13 @@ def number(v):
  if not 1<=n<=MAX: raise argparse.ArgumentTypeError(f"must be 1-{MAX}")
  return n
 def get(url, timeout):
+ if not allowed(url): raise CliError("refusing request outside the Raw Essentials HTTPS storefront")
  try:
-  with urllib.request.urlopen(urllib.request.Request(url,headers={"User-Agent":UA,"Accept":"text/html,application/xhtml+xml"}),timeout=timeout) as r:return r.read().decode("utf-8","replace"),r.url
+  with urllib.request.build_opener(StorefrontRedirectHandler()).open(urllib.request.Request(url,headers={"User-Agent":UA,"Accept":"text/html,application/xhtml+xml"}),timeout=timeout) as r:
+   if not allowed(r.url): raise CliError("refusing response outside the Raw Essentials HTTPS storefront")
+   body=r.read(MAX_BYTES+1)
+   if len(body)>MAX_BYTES: raise CliError("upstream response exceeded the 5 MB safety limit")
+   return body.decode("utf-8","replace"),r.url
  except urllib.error.HTTPError as e: raise CliError(f"upstream returned HTTP {e.code} for {url}") from e
  except (urllib.error.URLError,TimeoutError,OSError) as e: raise CliError(f"network error for {url}: {getattr(e,'reason',str(e))}") from e
 def text(value): return re.sub(r"\s+"," ",html.unescape(re.sub(r"<[^>]+>"," ",value))).strip()
@@ -21,16 +32,17 @@ def links(page, base):
  seen=set(); rows=[]
  for href,label in re.findall(r'<a\b[^>]*href=["\']([^"\']+)["\'][^>]*>(.*?)</a>',page,re.I|re.S):
   url=urllib.parse.urljoin(base,html.unescape(href)); title=text(label)
-  if "/products/" in urllib.parse.urlparse(url).path and title and url not in seen:
+  if allowed(url) and "/products/" in urllib.parse.urlparse(url).path and title and url not in seen:
    seen.add(url); rows.append({"title":title,"url":url})
  return rows
 def search(query, pet_type, page, max_results, timeout):
+ if not query.strip(): raise CliError("search query must not be empty")
  url=BASE+"/products?"+urllib.parse.urlencode({"petType":pet_type,"search":query,"page":page})
  body,final=get(url,timeout); needle=query.casefold(); rows=[r for r in links(body,final) if needle in r["title"].casefold() or needle in r["url"].casefold()]
  return {"source":"raw-essentials-public-html","source_url":final,"retrieved_at":stamp(),"query":query,"pet_type":pet_type,"page":page,"limit":max_results,"results":rows[:max_results],"note":"Public catalogue snapshot only; raw feeding and supplement suitability are not veterinary advice."}
 def detail(value, timeout):
  url=urllib.parse.urljoin(BASE,value) if not value.startswith("http") else value
- if urllib.parse.urlparse(url).netloc not in {"rawessentials.co.nz","www.rawessentials.co.nz"} or "/products/" not in urllib.parse.urlparse(url).path: raise CliError("provide a Raw Essentials /products/ URL")
+ if not allowed(url) or "/products/" not in urllib.parse.urlparse(url).path: raise CliError("provide a Raw Essentials HTTPS /products/ URL")
  body,final=get(url,timeout); title=re.search(r'<h1\b[^>]*>(.*?)</h1>',body,re.I|re.S) or re.search(r'<title>(.*?)</title>',body,re.I|re.S); description=re.search(r'<meta\s+name=["\']description["\']\s+content=["\']([^"\']+)',body,re.I)
  prices=[text(x) for x in re.findall(r'<[^>]+(?:price|Price)[^>]*>(.*?)</[^>]+>',body,re.I|re.S)][:8]
  return {"source":"raw-essentials-public-html","source_url":final,"retrieved_at":stamp(),"product":{"title":text(title.group(1)) if title else "","url":final,"description":html.unescape(description.group(1)) if description else None,"price_text":prices},"note":"Public product page snapshot only; product suitability is not veterinary advice."}

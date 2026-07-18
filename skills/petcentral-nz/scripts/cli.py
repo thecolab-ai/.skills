@@ -7,8 +7,18 @@ from typing import Any
 BASE = "https://petcentral.co.nz"
 UA = "TheColabSkills/1.0 (+https://github.com/thecolab-ai/.skills; read-only)"
 MAX_LIMIT = 50
+MAX_RESPONSE_BYTES = 5_000_000
 
 class CliError(Exception): pass
+
+def allowed(url: str) -> bool:
+    parsed = urllib.parse.urlparse(url)
+    return parsed.scheme == "https" and parsed.hostname in {"petcentral.co.nz", "www.petcentral.co.nz"}
+
+class StorefrontRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if not allowed(newurl): raise CliError("refusing redirect outside the Pet Central HTTPS storefront")
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 def timestamp() -> str: return dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z")
 def limit(value: str) -> int:
@@ -18,9 +28,14 @@ def limit(value: str) -> int:
     return n
 
 def get(url: str, timeout: int) -> tuple[bytes, str]:
+    if not allowed(url): raise CliError("refusing request outside the Pet Central HTTPS storefront")
     req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json, text/html;q=0.8"})
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as r: return r.read(), r.url
+        with urllib.request.build_opener(StorefrontRedirectHandler()).open(req, timeout=timeout) as r:
+            if not allowed(r.url): raise CliError("refusing response outside the Pet Central HTTPS storefront")
+            body = r.read(MAX_RESPONSE_BYTES + 1)
+            if len(body) > MAX_RESPONSE_BYTES: raise CliError("upstream response exceeded the 5 MB safety limit")
+            return body, r.url
     except urllib.error.HTTPError as e: raise CliError(f"upstream returned HTTP {e.code} for {url}") from e
     except (urllib.error.URLError, TimeoutError, OSError) as e: raise CliError(f"network error for {url}: {getattr(e, 'reason', str(e))}") from e
 
@@ -37,14 +52,19 @@ def fetch_products(page: int, timeout: int) -> tuple[list[dict[str, Any]], str]:
     return [p for p in data.get("products", []) if isinstance(p, dict)], final
 
 def search(query: str, page: int, max_results: int, timeout: int) -> dict[str, Any]:
+    if not query.strip(): raise CliError("search query must not be empty")
     rows, url = fetch_products(page, timeout)
     needle = query.casefold()
     matches = [product(p) for p in rows if needle in (str(p.get("title", "")) + " " + str(p.get("vendor", "")) + " " + str(p.get("product_type", "")) + " " + " ".join(p.get("tags", []) if isinstance(p.get("tags"), list) else [])).casefold()]
     return {"source": "shopify-products-json", "source_url": url, "retrieved_at": timestamp(), "query": query, "page": page, "limit": max_results, "results": matches[:max_results], "catalogue_page_count": len(rows), "note": "Public catalogue snapshot only; product suitability is not veterinary advice."}
 
 def detail(value: str, timeout: int) -> dict[str, Any]:
+    if "://" in value:
+        parsed = urllib.parse.urlparse(value)
+        if not allowed(value) or "/products/" not in parsed.path: raise CliError("provide a Pet Central HTTPS /products/<handle> URL")
+        value = parsed.path.split("/products/", 1)[1]
     handle = urllib.parse.unquote(value.rstrip("/").split("/products/")[-1].split("?")[0]).removesuffix(".js")
-    if not handle or "/" in handle: raise CliError("provide a Pet Central product handle or /products/<handle> URL")
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", handle): raise CliError("provide a Pet Central product handle or HTTPS /products/<handle> URL")
     url = f"{BASE}/products/{urllib.parse.quote(handle)}.js"
     body, final = get(url, timeout)
     try: raw = json.loads(body)

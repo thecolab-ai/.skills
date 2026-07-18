@@ -236,6 +236,8 @@ def search_products(query: str, limit: int, timeout: int) -> dict[str, Any]:
         raw_products = payload["resources"]["results"]["products"]
     except (KeyError, TypeError) as exc:
         raise StorefrontError("unexpected predictive-search response shape") from exc
+    if not isinstance(raw_products, list):
+        raise StorefrontError("unexpected predictive-search products shape")
     products = [normalize_search(item) for item in raw_products[:limit] if isinstance(item, dict)]
     stamp = retrieved_at()
     return {

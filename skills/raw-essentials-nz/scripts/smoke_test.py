@@ -13,6 +13,9 @@ if run("--help").returncode:raise SystemExit("[FAIL] help")
 print("[PASS] help")
 assert run("product", "https://example.org/products/nope", "--json").returncode != 0
 print("[PASS] rejects a cross-site product URL")
+assert run("search", " ", "--json").returncode != 0
+assert run("product", "http://rawessentials.co.nz/products/nope", "--json").returncode != 0
+print("[PASS] rejects empty search and non-HTTPS product URL")
 data=live(["search","treat","--limit","2","--json"])
 if data is not None:
  assert data["source_url"] and data["retrieved_at"] and isinstance(data["results"],list);print("[PASS] search JSON metadata")

@@ -13,6 +13,9 @@ if run("--help").returncode:raise SystemExit("[FAIL] help")
 print("[PASS] help")
 assert run("category", "../../not-a-category", "--json").returncode != 0
 print("[PASS] rejects an unsafe category slug")
+assert run("search", " ", "--json").returncode != 0
+assert run("product", "http://legacyaquatics.co.nz/product/nope/", "--json").returncode != 0
+print("[PASS] rejects empty search and non-HTTPS product URL")
 data=live(["category","aquariums-and-equipment","--limit","2","--json"])
 if data is not None:
  assert data["source_url"] and data["retrieved_at"] and isinstance(data["results"],list);print("[PASS] category JSON metadata")

@@ -14,6 +14,9 @@ if run("--help").returncode: raise SystemExit("[FAIL] help")
 print("[PASS] help")
 assert run("search", "dog", "--limit", "51", "--json").returncode != 0
 print("[PASS] rejects an over-limit request")
+assert run("search", " ", "--json").returncode != 0
+assert run("product", "https://example.org/products/nope", "--json").returncode != 0
+print("[PASS] rejects empty search and cross-site product URL")
 data=live(["search","dog","--limit","2","--json"])
 if data is not None:
  assert data["source_url"] and data["retrieved_at"] and isinstance(data["results"],list)

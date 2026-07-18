@@ -39,9 +39,13 @@ def outage(result: subprocess.CompletedProcess[str]) -> bool:
 fixture = '''<script type="application/ld+json">{"@context":"https://schema.org","@type":"Product","@id":"https://www.animates.co.nz/test.html","name":"Fixture Dog Food","sku":"TEST-1","brand":{"@type":"Brand","name":"Fixture"},"offers":{"@type":"Offer","price":"19.95","priceCurrency":"NZD","availability":"https://schema.org/InStock"}}</script>'''
 parsed = cli.parse_product(fixture, "https://www.animates.co.nz/test.html")
 check("fixture Product JSON-LD parses", bool(parsed and parsed["name"] == "Fixture Dog Food" and parsed["price"] == 19.95 and parsed["in_stock"] is True))
+entity_fixture = '<script type="application/ld+json">{"@type":"Product","name":"A &quot; B"}</script>'
+check("JSON-LD script data is not HTML-unescaped", cli.json_ld_objects(entity_fixture)[0]["name"] == "A &quot; B")
+check("rejects non-storefront and non-HTTPS URLs", not cli.is_allowed_url("https://example.org/x") and not cli.is_allowed_url("http://www.animates.co.nz/x"))
 check("empty HTML is not fabricated success", cli.parse_product("<html></html>", "https://example.invalid") is None)
 help_result = run("--help")
 check("--help exits zero", help_result.returncode == 0, help_result.stderr[:200])
+check("timeout is bounded", run("--timeout", "61", "search", "dog").returncode != 0)
 
 live = run("search", "dog food", "--limit", "1", "--json")
 if live.returncode and outage(live):

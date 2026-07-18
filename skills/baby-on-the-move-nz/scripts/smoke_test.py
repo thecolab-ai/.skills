@@ -40,6 +40,16 @@ def main() -> int:
     require(module.is_allowed_storefront_url(module.BASE_URL + "/products/example"), "storefront HTTPS URL rejected")
     require(not module.is_allowed_storefront_url("http://" + module.BASE_URL.split("//", 1)[1]), "HTTP redirect allowed")
     require(not module.is_allowed_storefront_url("https://evil.example/products/example"), "off-domain redirect allowed")
+    original_fetch_json = getattr(module, "fetch_json")
+    setattr(module, "fetch_json", lambda url, timeout: ({"resources": {"results": {"products": {}}}}, url))
+    try:
+        module.search_products("cot", 1, 1)
+        malformed_rejected = False
+    except module.StorefrontError:
+        malformed_rejected = True
+    finally:
+        setattr(module, "fetch_json", original_fetch_json)
+    require(malformed_rejected, "malformed predictive-search products must be a concise error")
 
     help_result = run("--help")
     require(help_result.returncode == 0, help_result.stderr)

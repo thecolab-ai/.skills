@@ -45,8 +45,10 @@ try:
 except cli.CliError:
     missing_rejected = True
 check("missing state is not fabricated success", missing_rejected)
+check("rejects non-storefront and non-HTTPS URLs", not cli.is_allowed_url("https://example.org/x") and not cli.is_allowed_url("http://petdirect.co.nz/x"))
 help_result = run("--help")
 check("--help exits zero", help_result.returncode == 0, help_result.stderr[:200])
+check("page and timeout are bounded", run("search", "food", "--page", "51").returncode != 0 and run("--timeout", "61", "search", "food").returncode != 0)
 
 live = run("search", "dog food", "--limit", "1", "--json")
 if live.returncode and outage(live):

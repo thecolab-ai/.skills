@@ -2,8 +2,14 @@
 """Read-only Legacy Aquatics NZ WooCommerce public catalogue CLI."""
 from __future__ import annotations
 import argparse, datetime as dt, html, json, re, sys, urllib.error, urllib.parse, urllib.request
-BASE="https://legacyaquatics.co.nz"; UA="TheColabSkills/1.0 (+https://github.com/thecolab-ai/.skills; read-only)"; MAX=50
+BASE="https://legacyaquatics.co.nz"; UA="TheColabSkills/1.0 (+https://github.com/thecolab-ai/.skills; read-only)"; MAX=50; MAX_BYTES=5_000_000
 class CliError(Exception): pass
+def allowed(url):
+ p=urllib.parse.urlparse(url);return p.scheme=="https" and p.hostname in {"legacyaquatics.co.nz","www.legacyaquatics.co.nz"}
+class StorefrontRedirectHandler(urllib.request.HTTPRedirectHandler):
+ def redirect_request(self,req,fp,code,msg,headers,newurl):
+  if not allowed(newurl):raise CliError("refusing redirect outside the Legacy Aquatics HTTPS storefront")
+  return super().redirect_request(req,fp,code,msg,headers,newurl)
 def stamp(): return dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00","Z")
 def number(v):
  try:n=int(v)
@@ -11,8 +17,13 @@ def number(v):
  if not 1<=n<=MAX:raise argparse.ArgumentTypeError(f"must be 1-{MAX}")
  return n
 def get(url,timeout):
+ if not allowed(url):raise CliError("refusing request outside the Legacy Aquatics HTTPS storefront")
  try:
-  with urllib.request.urlopen(urllib.request.Request(url,headers={"User-Agent":UA,"Accept":"text/html,application/xhtml+xml"}),timeout=timeout) as r:return r.read().decode("utf-8","replace"),r.url
+  with urllib.request.build_opener(StorefrontRedirectHandler()).open(urllib.request.Request(url,headers={"User-Agent":UA,"Accept":"text/html,application/xhtml+xml"}),timeout=timeout) as r:
+   if not allowed(r.url):raise CliError("refusing response outside the Legacy Aquatics HTTPS storefront")
+   body=r.read(MAX_BYTES+1)
+   if len(body)>MAX_BYTES:raise CliError("upstream response exceeded the 5 MB safety limit")
+   return body.decode("utf-8","replace"),r.url
  except urllib.error.HTTPError as e:raise CliError(f"upstream returned HTTP {e.code} for {url}") from e
  except (urllib.error.URLError,TimeoutError,OSError) as e:raise CliError(f"network error for {url}: {getattr(e,'reason',str(e))}") from e
 def clean(v):return re.sub(r"\s+"," ",html.unescape(re.sub(r"<[^>]+>"," ",v))).strip()
@@ -20,10 +31,11 @@ def product_links(page,base):
  rows=[];seen=set()
  for href,label in re.findall(r'<a\b[^>]*href=["\']([^"\']+)["\'][^>]*>(.*?)</a>',page,re.I|re.S):
   url=urllib.parse.urljoin(base,html.unescape(href));path=urllib.parse.urlparse(url).path
-  if "/product/" in path and url not in seen:
+  if allowed(url) and "/product/" in path and url not in seen:
    seen.add(url);rows.append({"title":clean(label),"url":url})
  return rows
 def search(query,page,max_results,timeout):
+ if not query.strip():raise CliError("search query must not be empty")
  url=BASE+"/?"+urllib.parse.urlencode({"s":query,"post_type":"product","paged":page})
  body,final=get(url,timeout);rows=[x for x in product_links(body,final) if query.casefold() in (x["title"]+" "+x["url"]).casefold()]
  return {"source":"woocommerce-public-html","source_url":final,"retrieved_at":stamp(),"query":query,"page":page,"limit":max_results,"results":rows[:max_results],"note":"Public aquarium/reptile catalogue snapshot only; product fitment and husbandry are not advice."}
@@ -33,7 +45,7 @@ def category(slug,page,max_results,timeout):
  body,final=get(url,timeout);return {"source":"woocommerce-public-html","source_url":final,"retrieved_at":stamp(),"category":slug,"page":page,"limit":max_results,"results":product_links(body,final)[:max_results],"note":"Public catalogue snapshot only; product fitment and husbandry are not advice."}
 def detail(value,timeout):
  url=urllib.parse.urljoin(BASE,value) if not value.startswith("http") else value
- if urllib.parse.urlparse(url).netloc not in {"legacyaquatics.co.nz","www.legacyaquatics.co.nz"} or "/product/" not in urllib.parse.urlparse(url).path:raise CliError("provide a Legacy Aquatics /product/ URL")
+ if not allowed(url) or "/product/" not in urllib.parse.urlparse(url).path:raise CliError("provide a Legacy Aquatics HTTPS /product/ URL")
  body,final=get(url,timeout);m=re.search(r'<h1\b[^>]*>(.*?)</h1>',body,re.I|re.S) or re.search(r'<title>(.*?)</title>',body,re.I|re.S);price=clean(" ".join(re.findall(r'<[^>]*woocommerce-Price-amount[^>]*>(.*?)</[^>]+>',body,re.I|re.S)[:3]));desc=re.search(r'<meta\s+name=["\']description["\']\s+content=["\']([^"\']+)',body,re.I)
  return {"source":"woocommerce-public-html","source_url":final,"retrieved_at":stamp(),"product":{"title":clean(m.group(1)) if m else "","url":final,"price_text":price or None,"description":html.unescape(desc.group(1)) if desc else None},"note":"Public product data only; verify aquarium/reptile setup and care with an appropriate expert."}
 def emit(data,as_json):
