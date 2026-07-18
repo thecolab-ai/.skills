@@ -321,11 +321,15 @@ def fetch_bytes(
             if e.code in (403, 406, 429, 451):
                 last = f"HTTP {e.code}"
                 last_status = e.code
-                last_retry_after = (
+                retry_after = (
                     e.headers.get("Retry-After")
                     if e.code == 429 and e.headers is not None
                     else None
                 )
+                if e.code != 429:
+                    last_retry_after = None
+                elif retry_after is not None:
+                    last_retry_after = retry_after
                 continue
             raise FetchError(f"HTTP {e.code} from {url}") from e
         except urllib.error.URLError as e:

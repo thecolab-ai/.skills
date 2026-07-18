@@ -165,6 +165,23 @@ class NzfetchTests(unittest.TestCase):
 
     @mock.patch("nzfetch.urllib.request.build_opener")
     @mock.patch("nzfetch.urllib.request.urlopen")
+    def test_final_429_without_header_keeps_most_recent_retry_after(
+        self, urlopen, build_opener
+    ):
+        os.environ["FETCH_PROXY"] = "http://proxy.test:8080"
+        os.environ["PROXY_RETRIES"] = "1"
+        urlopen.side_effect = http_error(429, "60")
+        opener = mock.Mock()
+        opener.open.side_effect = http_error(429)
+        build_opener.return_value = opener
+
+        with self.assertRaises(nzfetch.RateLimited) as caught:
+            nzfetch.fetch_bytes("https://example.test/data")
+
+        self.assertEqual(caught.exception.retry_after, "60")
+
+    @mock.patch("nzfetch.urllib.request.build_opener")
+    @mock.patch("nzfetch.urllib.request.urlopen")
     def test_final_non_429_status_remains_blocked(self, urlopen, build_opener):
         os.environ["FETCH_PROXY"] = "http://proxy.test:8080"
         os.environ["PROXY_RETRIES"] = "1"
