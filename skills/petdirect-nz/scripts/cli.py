@@ -108,6 +108,19 @@ def extract_server_state(markup: str) -> dict[str, Any]:
     return state if isinstance(state, dict) else {}
 
 
+def extract_product_state(markup: str) -> dict[str, Any]:
+    match = re.search(r"window\.__PRODUCT__\s*=\s*(\{.*?\});\s*</script>", markup, re.S)
+    if not match:
+        raise CliError("Petdirect product state was not found; member-price semantics cannot be verified")
+    try:
+        state = json.loads(match.group(1))
+    except json.JSONDecodeError as exc:
+        raise CliError("Petdirect product state contained invalid JSON") from exc
+    if not isinstance(state, dict) or not isinstance(state.get("variants"), list):
+        raise CliError("Petdirect product state has no variants list")
+    return state
+
+
 def search_result(state: dict[str, Any]) -> dict[str, Any]:
     initial = state.get("initialResults")
     if not isinstance(initial, dict):
@@ -149,6 +162,7 @@ def normalize_hit(raw: dict[str, Any]) -> dict[str, Any]:
         "brand": raw.get("brandName"),
         "price": cheapest.get("price") if cheapest else None,
         "rrp": cheapest.get("rrp") if cheapest else None,
+        "member_price": cheapest.get("member_price") if cheapest else None,
         "in_stock": cheapest.get("in_stock") if cheapest else None,
         "categories": raw.get("categories") or [],
         "rating": raw.get("averageRating"),
@@ -225,6 +239,30 @@ def normalize_ld_product(raw: dict[str, Any], source_url: str) -> dict[str, Any]
     }
 
 
+def apply_product_state(product: dict[str, Any], state: dict[str, Any]) -> None:
+    state_variants = state.get("variants")
+    if not isinstance(state_variants, list):
+        raise CliError("Petdirect product state has no variants list")
+    by_sku = {str(item.get("sku")): item for item in state_variants if isinstance(item, dict) and item.get("sku")}
+    variants = product.get("variants")
+    if not isinstance(variants, list):
+        raise CliError("Petdirect Product JSON-LD has no variants list")
+    for variant in variants:
+        if not isinstance(variant, dict):
+            continue
+        evidence = by_sku.get(str(variant.get("sku")))
+        if evidence is None:
+            raise CliError(f"Petdirect price semantics could not be verified for SKU {variant.get('sku') or 'unknown'}")
+        variant["rrp"] = cents(evidence.get("rrpPrice"))
+        variant["member_price"] = bool(evidence.get("isMemberPrice"))
+    priced = [item for item in variants if isinstance(item, dict) and item.get("price") is not None]
+    if priced:
+        cheapest = min(priced, key=lambda item: item["price"])
+        product["price"] = cheapest["price"]
+        product["rrp"] = cheapest.get("rrp")
+        product["member_price"] = cheapest.get("member_price")
+
+
 def product_url(value: str) -> str:
     value = value.strip()
     if value.startswith("https://"):
@@ -248,6 +286,7 @@ def get_product(value: str, timeout: int) -> tuple[dict[str, Any], str]:
     product = normalize_ld_product(raw, final_url)
     if not product.get("name") or product.get("price") is None:
         raise CliError(f"incomplete Product JSON-LD at {final_url}")
+    apply_product_state(product, extract_product_state(markup))
     product["source_url"] = final_url
     return product, final_url
 
@@ -280,9 +319,21 @@ def snapshot(value: str, timeout: int) -> dict[str, Any]:
     product, source_url = get_product(value, timeout)
     return {
         "retailer": "Petdirect NZ", "command": "price-snapshot", "sku": product.get("sku"), "name": product.get("name"),
-        "price": product.get("price"), "currency": product.get("currency"), "availability": product.get("availability"),
+        "price": product.get("price"), "rrp": product.get("rrp"), "member_price": product.get("member_price"),
+        "currency": product.get("currency"), "availability": product.get("availability"),
         "variants": product.get("variants"), "source_url": source_url, "retrieved_at": timestamp(),
     }
+
+
+def display_price(item: dict[str, Any]) -> str:
+    price = item.get("price")
+    rendered = f"${price:.2f}" if isinstance(price, (int, float)) else "price unavailable"
+    if item.get("member_price") is True:
+        rendered += " Pet Perks member price"
+    rrp = item.get("rrp")
+    if isinstance(rrp, (int, float)) and rrp > 0:
+        rendered += f" (RRP ${rrp:.2f})"
+    return rendered
 
 
 def emit(data: dict[str, Any], json_output: bool) -> None:
@@ -291,12 +342,12 @@ def emit(data: dict[str, Any], json_output: bool) -> None:
     elif data["command"] == "search":
         print(f"{data['count']} Petdirect result(s) for {data['query']!r}")
         for item in data["results"]:
-            print(f"${item.get('price', 0):.2f}  {item.get('name')}\n          {item.get('source_url')}")
+            print(f"{display_price(item)}  {item.get('name')}\n          {item.get('source_url')}")
     elif data["command"] == "product":
         item = data["product"]
-        print(f"{item.get('name')}\nFrom ${item.get('price', 0):.2f} {item.get('currency')}\n{data['source_url']}")
+        print(f"{item.get('name')}\nFrom {display_price(item)} {item.get('currency')}\n{data['source_url']}")
     else:
-        print(f"{data.get('name')}: from ${data.get('price', 0):.2f} {data.get('currency')}\n{data['source_url']}")
+        print(f"{data.get('name')}: from {display_price(data)} {data.get('currency')}\n{data['source_url']}")
 
 
 def bounded_limit(value: str) -> int:

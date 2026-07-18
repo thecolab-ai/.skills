@@ -34,7 +34,7 @@ Retrieve current public Animates NZ product search and detail data without login
 ```bash
 python3 skills/animates-nz/scripts/cli.py search "dog food" --limit 3 --json
 python3 skills/animates-nz/scripts/cli.py product 18463 --json
-python3 skills/animates-nz/scripts/cli.py price-snapshot https://www.animates.co.nz/example.html --json
+python3 skills/animates-nz/scripts/cli.py price-snapshot 18463 --json
 ```
 
 The global `--timeout N` option goes before the command and defaults to 10 seconds.

@@ -71,6 +71,20 @@ def product_price(page):
     price=amount(offer.get("price",offer.get("lowPrice")))
     if price is not None and str(offer.get("priceCurrency","")).upper()=="NZD":return price,f"NZ${price:.2f}"
  return None,None
+def product_availability(page):
+ parser=ProductMetadataParser();parser.feed(page)
+ for raw in parser.json_ld:
+  for product in json_ld_products(raw):
+   offers=product.get("offers",[]);offers=offers if isinstance(offers,list) else [offers]
+   for offer in offers:
+    if isinstance(offer,dict) and offer.get("availability"):
+     value=str(offer["availability"]).rsplit("/",1)[-1]
+     return value,value.casefold()=="instock"
+ for index in range(1,5):
+  if parser.meta.get(f"twitter:label{index}","").casefold()=="availability":
+   value=parser.meta.get(f"twitter:data{index}","").strip()
+   if value:return ("InStock",True) if value.casefold() in {"in stock","instock"} else (value,False)
+ return None,None
 def product_links(page,base):
  rows=[];by_url={}
  for href,label in re.findall(r'<a\b[^>]*href=["\']([^"\']+)["\'][^>]*>(.*?)</a>',page,re.I|re.S):
@@ -94,8 +108,8 @@ def category(slug,page,max_results,timeout):
 def detail(value,timeout):
  url=urllib.parse.urljoin(BASE,value) if not value.startswith("http") else value
  if not allowed(url) or "/product/" not in urllib.parse.urlparse(url).path:raise CliError("provide a Legacy Aquatics HTTPS /product/ URL")
- body,final=get(url,timeout);m=re.search(r'<h1\b[^>]*>(.*?)</h1>',body,re.I|re.S) or re.search(r'<title>(.*?)</title>',body,re.I|re.S);price,price_text=product_price(body);desc=re.search(r'<meta\s+name=["\']description["\']\s+content=["\']([^"\']+)',body,re.I)
- return {"source":"woocommerce-public-html","source_url":final,"retrieved_at":stamp(),"product":{"title":clean(m.group(1)) if m else "","url":final,"price_nzd":price,"price_text":price_text,"description":html.unescape(desc.group(1)) if desc else None},"note":"Public product data only; verify aquarium/reptile setup and care with an appropriate expert."}
+ body,final=get(url,timeout);m=re.search(r'<h1\b[^>]*>(.*?)</h1>',body,re.I|re.S) or re.search(r'<title>(.*?)</title>',body,re.I|re.S);price,price_text=product_price(body);availability,in_stock=product_availability(body);desc=re.search(r'<meta\s+name=["\']description["\']\s+content=["\']([^"\']+)',body,re.I)
+ return {"source":"woocommerce-public-html","source_url":final,"retrieved_at":stamp(),"product":{"title":clean(m.group(1)) if m else "","url":final,"price_nzd":price,"price_text":price_text,"availability":availability,"in_stock":in_stock,"description":html.unescape(desc.group(1)) if desc else None},"note":"Public product data only; verify aquarium/reptile setup and care with an appropriate expert."}
 def emit(data,as_json):
  if as_json:print(json.dumps(data,ensure_ascii=False,indent=2));return
  for r in data.get("results",[data.get("product")] if data.get("product") else []):print(f"{r.get('title','')} | {r.get('url','')}")

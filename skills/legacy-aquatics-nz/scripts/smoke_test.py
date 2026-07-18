@@ -65,6 +65,9 @@ try:
  assert cli.product_price('<script type="application/ld+json">{}</script>')==(None,None)
 finally:cli.json.loads=original_json_loads
 print("[PASS] canonical NZD metadata yields a numeric, truthful product price")
+availability_fixture='<meta name="twitter:data2" content="In stock"><meta name="twitter:label2" content="Availability">'
+assert cli.product_availability(availability_fixture)==("InStock",True)
+print("[PASS] evidenced product availability is normalized")
 data=live(["category","aquariums-and-equipment","--limit","2","--json"])
 if data is not None:
  assert data["source_url"] and data["retrieved_at"] and data["results"] and all(row["title"] for row in data["results"]);print("[PASS] category JSON metadata and titles")

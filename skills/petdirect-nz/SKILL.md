@@ -24,8 +24,8 @@ Retrieve current public Petdirect NZ search, product, variant, and price data wi
 ## Workflow
 
 1. Use `search` for discovery. Results are capped at 24 and come from embedded public search state.
-2. Use `product` for a Petdirect product URL, `/p/` path, or slug.
-3. Use `price-snapshot` for current ProductGroup variant prices.
+2. Use `product` for a Petdirect product URL, `/p/` path, or slug. Variant `member_price` and `rrp` fields distinguish conditional Pet Perks pricing from ordinary prices.
+3. Use `price-snapshot` for current ProductGroup variant prices and their member-price status.
 4. Add `--json` for agent chaining. Every command reports `source_url` and UTC `retrieved_at`.
 5. Treat member prices, promotions, and availability as live public observations that may change.
 
@@ -43,7 +43,7 @@ The global `--timeout N` option goes before the command and defaults to 10 secon
 
 - Uses Python standard library only and unauthenticated GET requests.
 - Search parses the first bounded `window.__SERVER_STATE__` object and never emits the raw multi-megabyte page.
-- Detail commands parse Product or ProductGroup JSON-LD defensively.
+- Detail commands join Product or ProductGroup JSON-LD to the public product state by SKU so RRP and member-price semantics are not lost.
 - Responses are size-capped; missing or incomplete product data is an error rather than empty success.
 
 ## Resources

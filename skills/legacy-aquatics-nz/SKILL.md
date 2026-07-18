@@ -12,7 +12,7 @@ Use this skill for bounded snapshots of public Legacy Aquatics WooCommerce HTML.
 ```bash
 python3 skills/legacy-aquatics-nz/scripts/cli.py category aquariums-and-equipment --limit 10 --json
 python3 skills/legacy-aquatics-nz/scripts/cli.py search filter --limit 10 --json
-python3 skills/legacy-aquatics-nz/scripts/cli.py product https://legacyaquatics.co.nz/product/example/ --json
+python3 skills/legacy-aquatics-nz/scripts/cli.py product https://legacyaquatics.co.nz/product/hailea-hang-on-filter-he-200/ --json
 ```
 
 - `category <slug> [--page N] [--limit N] [--json]` lists bounded public category product links.

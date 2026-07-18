@@ -87,6 +87,18 @@ def main() -> int:
         setattr(module, "fetch_json", original_fetch_json)
     require(malformed_rejected, "malformed predictive-search products must be a concise error")
 
+    require(module.normalize_search({"handle": "fixture", "compare_at_price_min": 0})["compare_at_price_min"] is None, "zero compare-at sentinel must be null")
+    for malformed_product in ({}, {"handle": "fixture", "title": "Fixture", "variants": None}, {"handle": "fixture", "title": "Fixture", "variants": []}, {"handle": "fixture", "title": "Fixture", "variants": ["bad"]}, {"handle": "fixture", "title": "Fixture", "variants": [{}]}):
+        try:
+            module.normalize_detail(malformed_product)
+            product_rejected = False
+        except module.StorefrontError:
+            product_rejected = True
+        require(product_rejected, "malformed product payload must be a concise error")
+    title_parser = module.PageMetadataParser()
+    title_parser.feed("<html><head><title>Store locations</title></head><body><svg><title>Visa</title></svg></body></html>")
+    require(title_parser.title == "Store locations", "store-page title must ignore SVG titles")
+
     help_result = run("--help")
     require(help_result.returncode == 0, help_result.stderr)
     require("search" in help_result.stdout and "product" in help_result.stdout, "help missing commands")

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import importlib.util
+import contextlib
+import io
 import json
 import subprocess
 import sys
@@ -85,6 +87,15 @@ help_result = run("--help")
 check("--help exits zero", help_result.returncode == 0, help_result.stderr[:200])
 check("page and timeout are bounded", run("search", "food", "--page", "51").returncode != 0 and run("--timeout", "61", "search", "food").returncode != 0)
 check("empty search query is rejected", run("search", " ", "--json").returncode != 0)
+product_state_fixture = '<script>window.__PRODUCT__ = {"variants":[{"sku":"MEMBER-1","discountedUnitPrice":5099,"rrpPrice":5999,"isMemberPrice":true,"isInStock":true}]};</script>'
+ld_fixture = {"@type":"ProductGroup","name":"Fixture Food","hasVariant":[{"@type":"Product","sku":"MEMBER-1","name":"3kg","offers":{"price":"50.99","priceCurrency":"NZD","availability":"https://schema.org/InStock"}}]}
+normalized = cli.normalize_ld_product(ld_fixture, cli.BASE+"/p/fixture/")
+cli.apply_product_state(normalized, cli.extract_product_state(product_state_fixture))
+check("member price semantics survive product normalization", normalized["variants"][0]["price"] == 50.99 and normalized["variants"][0]["rrp"] == 59.99 and normalized["variants"][0]["member_price"] is True)
+plain = io.StringIO()
+with contextlib.redirect_stdout(plain):
+    cli.emit({"command":"price-snapshot","name":"Fixture Food","price":50.99,"rrp":59.99,"member_price":True,"currency":"NZD","source_url":"https://petdirect.co.nz/p/fixture/"}, False)
+check("plain output labels member price and RRP", "Pet Perks member price" in plain.getvalue() and "RRP $59.99" in plain.getvalue())
 
 live = run("search", "dog food", "--limit", "1", "--json")
 if live.returncode and outage(live):

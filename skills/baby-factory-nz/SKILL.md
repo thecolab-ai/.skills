@@ -34,7 +34,7 @@ Retrieve current public Baby Factory NZ search, product, offer, and price data w
 ```bash
 python3 skills/baby-factory-nz/scripts/cli.py search "car seat" --limit 5 --json
 python3 skills/baby-factory-nz/scripts/cli.py product disney-baby-everslim-4-in-1-convertible-car-seat-vintage-disney-4020561-black-grey --json
-python3 skills/baby-factory-nz/scripts/cli.py price-snapshot https://www.babyfactory.co.nz/example-product --json
+python3 skills/baby-factory-nz/scripts/cli.py price-snapshot https://www.babyfactory.co.nz/disney-baby-everslim-4-in-1-convertible-car-seat-vintage-disney-4020561-black-grey --json
 ```
 
 The global `--timeout N` option goes before the command and defaults to 10 seconds.

@@ -183,16 +183,22 @@ def normalize_variant(raw: dict[str, Any]) -> dict[str, Any]:
 
 def normalize_detail(raw: dict[str, Any]) -> dict[str, Any]:
     handle = str(raw.get("handle") or "")
-    variants = [normalize_variant(item) for item in raw.get("variants", []) if isinstance(item, dict)]
-    images = [str(item) for item in raw.get("images", []) if isinstance(item, str)]
+    title = str(raw.get("title") or "").strip()
+    variants_value = raw.get("variants")
+    product_price = amount(raw.get("price"), cents=True)
+    if not handle or not title or raw.get("id") is None or product_price is None or not isinstance(variants_value, list) or not variants_value or not all(isinstance(item, dict) and item.get("id") is not None and amount(item.get("price"), cents=True) is not None for item in variants_value):
+        raise StorefrontError("unexpected product response shape")
+    variants = [normalize_variant(item) for item in variants_value if isinstance(item, dict)]
+    images_value = raw.get("images")
+    images = [str(item) for item in images_value if isinstance(item, str)] if isinstance(images_value, list) else []
     return {
         "id": raw.get("id"),
-        "title": raw.get("title") or "",
+        "title": title,
         "handle": handle,
         "url": absolute_product_url(handle),
         "vendor": raw.get("vendor") or "",
         "product_type": raw.get("type") or "",
-        "price": amount(raw.get("price"), cents=True),
+        "price": product_price,
         "compare_at_price": amount(raw.get("compare_at_price"), cents=True),
         "available_online": bool(raw.get("available")),
         "availability_scope": AVAILABILITY_SCOPE,
@@ -203,6 +209,7 @@ def normalize_detail(raw: dict[str, Any]) -> dict[str, Any]:
 
 def normalize_search(raw: dict[str, Any]) -> dict[str, Any]:
     handle = str(raw.get("handle") or "")
+    compare_at = amount(raw.get("compare_at_price_min"))
     return {
         "id": raw.get("id"),
         "title": raw.get("title") or "",
@@ -212,7 +219,7 @@ def normalize_search(raw: dict[str, Any]) -> dict[str, Any]:
         "product_type": raw.get("type") or "",
         "price_min": amount(raw.get("price_min", raw.get("price"))),
         "price_max": amount(raw.get("price_max", raw.get("price"))),
-        "compare_at_price_min": amount(raw.get("compare_at_price_min")),
+        "compare_at_price_min": compare_at if compare_at and compare_at > 0 else None,
         "available_online": bool(raw.get("available")),
         "availability_scope": AVAILABILITY_SCOPE,
         "image_url": raw.get("image"),
@@ -276,11 +283,12 @@ class PageMetadataParser(HTMLParser):
         super().__init__()
         self.title_parts: list[str] = []
         self.in_title = False
+        self.title = ""
         self.description = ""
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         attributes = dict(attrs)
-        if tag == "title":
+        if tag == "title" and not self.title and not self.title_parts:
             self.in_title = True
         if tag == "meta" and (attributes.get("name") or "").lower() == "description":
             self.description = attributes.get("content") or ""
@@ -288,6 +296,8 @@ class PageMetadataParser(HTMLParser):
     def handle_endtag(self, tag: str) -> None:
         if tag == "title":
             self.in_title = False
+            if not self.title:
+                self.title = " ".join(part for part in self.title_parts if part)
 
     def handle_data(self, data: str) -> None:
         if self.in_title:
@@ -304,7 +314,7 @@ def store_page(timeout: int) -> dict[str, Any]:
     return {
         "retailer": LABEL,
         "store_page_url": source_url,
-        "title": " ".join(part for part in parser.title_parts if part),
+        "title": parser.title,
         "description": parser.description,
         "inventory_note": "This page identifies physical locations; online variant availability is not store stock.",
         "source_url": source_url,

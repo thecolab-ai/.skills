@@ -50,6 +50,10 @@ print("[PASS] rejects empty search and non-HTTPS product URL")
 fixture='<a href="/products/p2">2</a><a href="/product/example"><img alt=""></a><h4><a href="/product/example">Example Product</a></h4>'
 assert cli.links(fixture,cli.BASE)==[{"title":"Example Product","url":cli.BASE+"/product/example"}]
 print("[PASS] catalogue parser excludes pagination and retains product titles")
+assert cli.catalogue_url("chicken", "dog", 2).startswith(cli.BASE+"/products/p2?")
+store_fixture='<a href="/p/raw-essentials-grey-lynn">Grey Lynn</a><a href="/stores">Stores</a>'
+assert cli.store_links(store_fixture,cli.BASE)==[{"name":"Grey Lynn","url":cli.BASE+"/p/raw-essentials-grey-lynn"}]
+print("[PASS] catalogue pagination path and store-location links are parsed")
 price_fixture='''<script type="application/ld+json">{"@type":"Product","offers":{"@type":"Offer","price":"9.69","priceCurrency":"NZD"}}</script>'''
 assert cli.product_price(price_fixture)==(9.69,"NZ$9.69")
 assert cli.product_price(price_fixture.replace('"priceCurrency":"NZD"',''))==(None,None)

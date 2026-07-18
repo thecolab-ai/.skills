@@ -213,16 +213,20 @@ def get_product(value: str, timeout: int) -> tuple[dict[str, Any], str]:
 def search(query: str, limit: int, page: int, timeout: int) -> dict[str, Any]:
     if not query.strip():
         raise CliError("search query must not be empty")
-    url = BASE + "/search?" + urllib.parse.urlencode({"q": query, "page": page})
+    url = BASE + "/search?" + urllib.parse.urlencode({"q": query, "p": page})
     markup, final_url = fetch_text(url, timeout)
-    state = extract_category_state(markup)
+    decoded_markup = html.unescape(markup)
+    if re.search(r"Sorry,\s+we (?:could not|couldn't) find any products to match your search", decoded_markup, re.I):
+        state: dict[str, Any] = {"items": [], "totalitems": 0, "totalpages": 0, "currentpage": page}
+    else:
+        state = extract_category_state(markup)
     items_value = state.get("items")
     items = [normalize_search_item(item) for item in items_value if isinstance(item, dict)][:limit] if isinstance(items_value, list) else []
     total = state.get("totalitems")
     if isinstance(total, int) and total > 0 and not items:
         raise CliError("search reported matches but no products could be normalized")
     return {
-        "retailer": "Baby Factory NZ", "command": "search", "query": query, "page": page,
+        "retailer": "Baby Factory NZ", "command": "search", "query": query, "page": state.get("currentpage", page),
         "count": len(items), "total": total, "total_pages": state.get("totalpages"), "results": items,
         "source_url": final_url, "retrieved_at": timestamp(),
     }

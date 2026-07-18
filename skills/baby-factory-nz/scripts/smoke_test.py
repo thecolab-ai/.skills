@@ -6,6 +6,7 @@ import importlib.util
 import json
 import subprocess
 import sys
+import urllib.parse
 from pathlib import Path
 
 CLI = Path(__file__).with_name("cli.py")
@@ -85,6 +86,26 @@ help_result = run("--help")
 check("--help exits zero", help_result.returncode == 0, help_result.stderr[:200])
 check("page and timeout are bounded", run("search", "seat", "--page", "51").returncode != 0 and run("--timeout", "61", "search", "seat").returncode != 0)
 check("empty search query is rejected", run("search", " ", "--json").returncode != 0)
+captured_url = ""
+original_fetch_text = cli.fetch_text
+def fake_search_page(url: str, timeout: int = 10):
+    global captured_url
+    captured_url = url
+    return '<script>window.category = {"items":[],"totalitems":0,"totalpages":0,"currentpage":2};</script>', url
+setattr(cli, "fetch_text", fake_search_page)
+try:
+    empty = cli.search("no match", 1, 2, 1)
+finally:
+    setattr(cli, "fetch_text", original_fetch_text)
+check("search uses the retailer p parameter", urllib.parse.parse_qs(urllib.parse.urlparse(captured_url).query).get("p") == ["2"])
+check("legitimate no-match is empty success", empty["results"] == [] and empty["count"] == 0)
+no_match_markup = '<p class="category__search-subheading">Sorry, we couldn&apos;t find any products to match your search.</p>'
+setattr(cli, "fetch_text", lambda url, timeout=10: (no_match_markup, url))
+try:
+    decoded_empty = cli.search("no match", 1, 1, 1)
+finally:
+    setattr(cli, "fetch_text", original_fetch_text)
+check("HTML-encoded no-match message is recognized", decoded_empty["results"] == [] and decoded_empty["count"] == 0)
 
 live = run("search", "car seat", "--limit", "1", "--json")
 if live.returncode and outage(live):
