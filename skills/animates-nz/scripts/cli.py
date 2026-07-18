@@ -6,6 +6,7 @@ import argparse
 import datetime as dt
 import html
 import json
+import math
 import re
 import sys
 import urllib.error
@@ -78,10 +79,13 @@ def fetch_text(url: str, timeout: int = 10, max_bytes: int = MAX_PAGE_BYTES) -> 
 
 
 def as_number(value: Any) -> float | None:
-    try:
-        return round(float(value), 2) if value not in (None, "") else None
-    except (TypeError, ValueError):
+    if value in (None, ""):
         return None
+    try:
+        number = float(value)
+    except (OverflowError, TypeError, ValueError):
+        return None
+    return round(number, 2) if math.isfinite(number) and number >= 0 else None
 
 
 def json_ld_objects(markup: str) -> list[dict[str, Any]]:

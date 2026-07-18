@@ -89,6 +89,7 @@ def main() -> int:
 
     search_fixture = {"id": 1, "handle": "fixture", "title": "Fixture", "price_min": 10.0, "price_max": 10.0, "compare_at_price_min": 0}
     require(module.normalize_search(search_fixture)["compare_at_price_min"] is None, "zero compare-at sentinel must be null")
+    require(module.amount("nan") is None and module.amount(-0.01) is None, "non-finite and negative prices must fail closed")
     try:
         module.normalize_search({})
         malformed_search_rejected = False

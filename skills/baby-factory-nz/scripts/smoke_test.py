@@ -65,6 +65,7 @@ state_fixture = '<script>window.category = {"items":[{"productid":1,"style":"S1"
 state = cli.extract_category_state(state_fixture)
 item = cli.normalize_search_item(state["items"][0])
 check("fixture category state parses prices", item["name"] == "Fixture Seat" and item["price"] == 149.0 and item["on_sale"] is True)
+check("non-finite and negative prices fail closed", cli.number("nan") is None and cli.number(-0.01) is None)
 entity_fixture = '<script type="application/ld+json">{"@type":"Product","name":"A &quot; B"}</script>'
 check("JSON-LD script data is not HTML-unescaped", cli.json_ld_objects(entity_fixture)[0]["name"] == "A &quot; B")
 try:

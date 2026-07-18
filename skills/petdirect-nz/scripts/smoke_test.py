@@ -66,6 +66,7 @@ state_fixture = '<script>window.__SERVER_STATE__ = {"initialResults":{"idx":{"re
 result_set = cli.search_result(cli.extract_server_state(state_fixture))
 item = cli.normalize_hit(result_set["hits"][0])
 check("fixture search state parses cents", item["name"] == "Fixture Food" and item["price"] == 12.99 and item["in_stock"] is True)
+check("non-finite and negative prices fail closed", cli.cents("nan") is None and cli.cents(-1) is None and cli.number("nan") is None and cli.number(-0.01) is None)
 entity_fixture = '<script type="application/ld+json">{"@type":"Product","name":"A &quot; B"}</script>'
 check("JSON-LD script data is not HTML-unescaped", cli.json_ld_objects(entity_fixture)[0]["name"] == "A &quot; B")
 try:

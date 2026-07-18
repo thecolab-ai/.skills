@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import re
 import socket
 import sys
@@ -140,11 +141,11 @@ def amount(value: Any, *, cents: bool = False) -> float | None:
         return None
     try:
         result = float(value)
-    except (TypeError, ValueError):
+    except (OverflowError, TypeError, ValueError):
         return None
     if cents:
         result /= 100
-    return round(result, 2)
+    return round(result, 2) if math.isfinite(result) and result >= 0 else None
 
 
 def clean_handle(value: str) -> str:

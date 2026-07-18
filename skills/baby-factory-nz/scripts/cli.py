@@ -6,6 +6,7 @@ import argparse
 import datetime as dt
 import html
 import json
+import math
 import re
 import sys
 import urllib.error
@@ -76,9 +77,10 @@ def number(value: Any) -> float | None:
     if isinstance(value, bool) or value in (None, ""):
         return None
     try:
-        return round(float(value), 2)
-    except (TypeError, ValueError):
+        result = float(value)
+    except (OverflowError, TypeError, ValueError):
         return None
+    return round(result, 2) if math.isfinite(result) and result >= 0 else None
 
 
 def extract_category_state(markup: str) -> dict[str, Any]:

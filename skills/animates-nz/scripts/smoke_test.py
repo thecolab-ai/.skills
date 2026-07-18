@@ -65,6 +65,7 @@ def fetch_rejected(final_url: str) -> bool:
 fixture = '''<script type="application/ld+json">{"@context":"https://schema.org","@type":"Product","@id":"https://www.animates.co.nz/test.html","name":"Fixture Dog Food","sku":"TEST-1","brand":{"@type":"Brand","name":"Fixture"},"offers":{"@type":"Offer","price":"19.95","priceCurrency":"NZD","availability":"https://schema.org/InStock"}}</script>'''
 parsed = cli.parse_product(fixture, "https://www.animates.co.nz/test.html")
 check("fixture Product JSON-LD parses", bool(parsed and parsed["name"] == "Fixture Dog Food" and parsed["price"] == 19.95 and parsed["in_stock"] is True))
+check("non-finite and negative prices fail closed", cli.as_number("nan") is None and cli.as_number(-0.01) is None)
 entity_fixture = '<script type="application/ld+json">{"@type":"Product","name":"A &quot; B"}</script>'
 check("JSON-LD script data is not HTML-unescaped", cli.json_ld_objects(entity_fixture)[0]["name"] == "A &quot; B")
 check("rejects non-canonical storefront origins", not cli.is_allowed_url("https://example.org/x") and not cli.is_allowed_url("http://www.animates.co.nz/x") and not cli.is_allowed_url("https://user@www.animates.co.nz/x") and not cli.is_allowed_url("https://www.animates.co.nz:444/x") and cli.is_allowed_url("https://www.animates.co.nz:443/x"))
