@@ -160,6 +160,18 @@ class Blocked(FetchError):
     skip / soft-fail, never treat it as a citation defect."""
 
 
+class RateLimited(Blocked):
+    """Bounded attempts ended with HTTP 429.
+
+    ``retry_after`` preserves the raw upstream header because it may be either
+    delta-seconds or an HTTP date.
+    """
+
+    def __init__(self, message: str, *, retry_after: str | None = None):
+        super().__init__(message)
+        self.retry_after = retry_after
+
+
 def proxy_url() -> str:
     """The configured rotating-proxy URL, or "" for direct. A SECRET — read from
     the env only, never returned to logs by callers."""
@@ -169,6 +181,15 @@ def proxy_url() -> str:
         or os.environ.get("https_proxy")
         or ""
     )
+
+
+def _proxy_retries() -> int:
+    """Return the configured retry count with the existing minimum of one."""
+    raw = os.environ.get("PROXY_RETRIES", "3")
+    try:
+        return max(1, int(raw))
+    except ValueError as exc:
+        raise FetchError("PROXY_RETRIES must be an integer") from exc
 
 
 # Reliable bot-wall fingerprints — a real page NEVER contains these, so they flag
@@ -273,13 +294,15 @@ def fetch_bytes(
         # OpenerDirector.open() does NOT accept a context= kwarg (passing it raises
         # TypeError), so it can't be forwarded per-call like urlopen's.
         extra = [urllib.request.HTTPSHandler(context=context)] if context is not None else []
-        retries = max(1, int(os.environ.get("PROXY_RETRIES", "3")))
+        retries = _proxy_retries()
         openers += [urllib.request.build_opener(handler, *extra)] * retries
     # context= only goes to the direct urlopen; the proxy openers carry it in their handler.
     direct_kw = {"timeout": timeout}
     if context is not None:
         direct_kw["context"] = context
     last = "no attempt made"
+    last_status = None
+    last_retry_after = None
     for opener in openers:
         req = urllib.request.Request(url, data=data, headers=hdrs, method=method)
         try:
@@ -294,13 +317,23 @@ def fetch_bytes(
             # attempt hits it, it surfaces as Blocked (SKIP-able / not a defect).
             if e.code in (403, 406, 429, 451):
                 last = f"HTTP {e.code}"
+                last_status = e.code
+                last_retry_after = (
+                    e.headers.get("Retry-After")
+                    if e.code == 429 and e.headers is not None
+                    else None
+                )
                 continue
             raise FetchError(f"HTTP {e.code} from {url}") from e
         except urllib.error.URLError as e:
             last = f"network error: {e.reason}"
+            last_status = None
+            last_retry_after = None
             continue
         except (TimeoutError, OSError) as e:  # bare socket timeout / connection reset
             last = f"network error: {e}"
+            last_status = None
+            last_retry_after = None
             continue
         except http.client.HTTPException as e:
             # A truncated / malformed response body — most often
@@ -308,11 +341,20 @@ def fetch_bytes(
             # mid-stream (common through a proxy on a large body). Transient:
             # retry (a fresh connection / IP usually completes it).
             last = f"network error: incomplete read ({type(e).__name__})"
+            last_status = None
+            last_retry_after = None
             continue
         if _looks_like_challenge(body.decode("utf-8", "replace"), content_type, expected_json=expects_json):
             last = "bot-challenge interstitial"
+            last_status = None
+            last_retry_after = None
             continue  # rotate and retry
         return body, content_type, final_url
+    if last_status == 429:
+        raise RateLimited(
+            f"{url} rate-limited after {len(openers)} attempt(s); retry later.",
+            retry_after=last_retry_after,
+        )
     raise Blocked(
         f"{url} blocked after {len(openers)} attempt(s) ({last}). The public source is "
         f"bot-blocking this network; set a rotating FETCH_PROXY to clear it."
