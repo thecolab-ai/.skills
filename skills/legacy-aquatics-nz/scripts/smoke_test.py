@@ -57,10 +57,14 @@ assert cli.product_price(price_fixture)==(5.99,"NZ$5.99")
 assert cli.product_price('<span class="woocommerce-Price-amount">$</span>')==(None,None)
 assert cli.amount("1,234.56")==1234.56 and cli.amount("1,2,3") is None
 assert cli.amount("١٢٣.٤٥") is None
+huge_price=10**10000
+assert cli.amount(huge_price) is None
 hostile_json="["*(sys.getrecursionlimit()+10)+"0"+"]"*(sys.getrecursionlimit()+10)
 assert cli.product_price(f'<script type="application/ld+json">{hostile_json}</script>')==(None,None)
 original_json_loads=cli.json.loads
 try:
+ cli.json.loads=lambda raw:{"@type":"Product","offers":{"price":huge_price,"priceCurrency":"NZD"}}
+ assert cli.product_price('<script type="application/ld+json">{}</script>')==(None,None)
  cli.json.loads=lambda raw:(_ for _ in ()).throw(ValueError("decoder rejected structure"))
  assert cli.product_price('<script type="application/ld+json">{}</script>')==(None,None)
 finally:cli.json.loads=original_json_loads

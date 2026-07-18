@@ -43,9 +43,10 @@ class ProductMetadataParser(HTMLParser):
  def handle_endtag(self,tag):
   if tag.casefold()=="script" and self._in_json_ld:self.json_ld.append("".join(self._script));self._in_json_ld=False
 def amount(value):
- raw=str(value).strip()
- if not re.fullmatch(r"(?:[0-9]+|[0-9]{1,3}(?:,[0-9]{3})+)(?:\.[0-9]+)?",raw):return None
- try:price=float(raw.replace(",",""))
+ try:
+  raw=str(value).strip()
+  if not re.fullmatch(r"(?:[0-9]+|[0-9]{1,3}(?:,[0-9]{3})+)(?:\.[0-9]+)?",raw):return None
+  price=float(raw.replace(",",""))
  except (TypeError,ValueError):return None
  return round(price,2) if math.isfinite(price) and price>=0 else None
 def product_nodes(value):
