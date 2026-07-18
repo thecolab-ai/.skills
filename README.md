@@ -45,6 +45,12 @@ Recommended convention:
 - Browser-assisted skills must stay read-only and stop before login, checkout, payment, booking, cart mutation, or protected account actions.
 - CAPTCHA, request-auth, and bot challenges are blocked states, not puzzles to defeat; return an explicit blocked flag or clear error and use a public fallback when one exists.
 
+## Access policy
+
+Skills prefer official APIs, feeds, and downloads that respond to public, unauthenticated requests. The shared [`lib/nzfetch.py`](lib/nzfetch.py) helper makes one direct request first and, when a user has configured a proxy, may make a bounded set of retries for blocked responses, rate limits, truncated reads, or recognised challenge pages. Proxy settings are optional secrets loaded from the environment; skills must never commit, print, or include them in errors.
+
+If the bounded attempts cannot retrieve the public resource, the skill must return an explicit blocked or rate-limited outcome rather than an empty success. The repository does not provide CAPTCHA solving, authentication bypass, protected-token forgery, account operation, checkout, booking, payment, or transaction automation. Full contributor guidance is in [CONTRIBUTING.md](CONTRIBUTING.md), and source operators can request removal, attribution, rate changes, or a different supported integration through [COMPLAINTS.md](COMPLAINTS.md).
+
 ## About this repository
 
 This repo is intentionally structured like a proper skills library.
@@ -64,7 +70,7 @@ If you operate a service that one of these skills connects to and you'd prefer w
 
 But before you do, hear us out on why we built this.
 
-These skills access endpoints that respond to unauthenticated public requests. We don't bypass authentication or circumvent technical access controls. Users of these skills are responsible for complying with the terms of service of the underlying provider. What we've done is make that data legible to AI agents, so a Kiwi using an LLM can actually get useful answers about NZ fuel prices, bus times, pharmacy stock, or property data without us all reinventing the same wrapper a thousand times.
+These skills access endpoints that respond to unauthenticated public requests. Requests may use an optional user-configured proxy with bounded retries, as described in the access policy above. We don't bypass authentication, solve CAPTCHAs, forge protected tokens, or operate accounts and transactions. Users of these skills are responsible for complying with the terms of service of the underlying provider. What we've done is make public data legible to AI agents, so a Kiwi using an LLM can actually get useful answers about NZ fuel prices, bus times, pharmacy stock, or property data without us all reinventing the same wrapper a thousand times.
 
 The thing is, agents are going to access this data either way. The only question is whether they do it well, with one clean shared connector, or badly, with ten thousand half-broken scrapers hammering your servers. We think one clean connector is better for everyone, you included.
 

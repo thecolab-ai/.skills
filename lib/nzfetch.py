@@ -1,10 +1,9 @@
 """nzfetch — shared HTTP helper for For Good skills (Python stdlib only).
 
-Gets past the IP-reputation bot walls (Incapsula / Cloudflare) that guard a lot
-of official NZ sources — data.govt.nz (CKAN), councils, some government portals.
-It sends a browser-shaped User-Agent and, on a block, RETRIES through a rotating
-proxy when one is configured: a fresh IP per attempt clears IP-reputation walls
-probabilistically (some rotated IPs are clean).
+Fetches public, unauthenticated NZ sources through one consistent HTTP policy.
+It sends a browser-shaped User-Agent and, on a block, retries through a proxy
+when one is configured. A rotating pool may provide a different route for each
+bounded attempt; a single-IP proxy re-attempts through the same route.
 
 Import it from a skill's `scripts/cli.py` (it lives at the repo's `lib/`, three
 parents up from the skill's scripts dir):
@@ -15,10 +14,12 @@ parents up from the skill's scripts dir):
 
     data = nzfetch.fetch_json("https://catalogue.data.govt.nz/api/3/action/...")
 
-Handle the two typed errors so a transient block SKIPS rather than hard-fails:
+Handle the typed errors so an exhausted block SKIPS rather than hard-fails:
 
     try:
         data = nzfetch.fetch_json(url)
+    except nzfetch.RateLimited as e:
+        die(f"network error: rate_limited: retry_after={e.retry_after}: {e}")
     except nzfetch.Blocked as e:
         die(f"network error: {e}")        # smoke tests treat 'network error' as SKIP
     except nzfetch.FetchError as e:
@@ -39,11 +40,10 @@ Environment (all optional):
     FETCH_PROXY / HTTPS_PROXY   rotating proxy URL, e.g. http://user:pass@host:port
                                — a SECRET. Never hard-code it, never print it, never
                                commit it. nzfetch reads it from the env only.
-    PROXY_RETRIES              retries through the proxy on a block or a truncated
-                               read (default 3). A rotating pool gets a fresh IP each
-                               retry; a single-IP proxy just re-attempts (which still
-                               clears transient truncations). Raise it for a stubborn
-                               wall or a proxy that often truncates large responses.
+    PROXY_RETRIES              bounded retries through the proxy on a block or a
+                               truncated read (default 3, minimum 1). Must be an
+                               integer. A rotating pool may provide a different route
+                               per retry; a single-IP proxy uses the same route.
     NZFETCH_UA                 override the User-Agent if a source needs a specific one.
 
 No proxy set → nzfetch just does the single direct request (same as before), so a
@@ -155,9 +155,12 @@ class FetchError(Exception):
 
 
 class Blocked(FetchError):
-    """Every attempt hit a bot wall (HTTP 403/429 or an HTML challenge). This is a
-    TRANSIENT block (tooling / IP reputation), NOT a dead source — callers should
-    skip / soft-fail, never treat it as a citation defect."""
+    """Bounded attempts ended at a block or challenge, not a dead source.
+
+    Callers should return an explicit blocked state or soft-fail rather than
+    treating it as a citation defect. ``RateLimited`` is the compatible subtype
+    for a terminal HTTP 429.
+    """
 
 
 class RateLimited(Blocked):
@@ -276,10 +279,10 @@ def fetch_bytes(
       Client-Hint / Sec-Fetch-* set — the fetch still gets the rotating-proxy
       fallback without the headers that make it worse than plain urllib.
 
-    Tries a DIRECT request first; on a bot-block (HTTP 403/429 or an HTML
-    challenge) retries through the rotating proxy when one is configured, a fresh
-    IP per attempt. Raises ``Blocked`` if every attempt is blocked, ``FetchError``
-    for other HTTP/URL failures."""
+    Tries a DIRECT request first; on HTTP 403/406/429/451 or a recognised HTML
+    challenge, runs the configured bounded proxy attempts. Raises ``RateLimited``
+    if the final attempt is HTTP 429, ``Blocked`` for other exhausted block or
+    challenge outcomes, and ``FetchError`` for other HTTP/URL failures."""
     hdrs = _browser_headers(url, accept) if browser_headers else _minimal_headers(accept)
     if headers:
         hdrs.update(headers)  # caller headers (API key, auth, custom UA/Accept) win
@@ -314,7 +317,7 @@ def fetch_bytes(
             # WAF bot-walls: 403/429 classic, 406 is Akamai's "Not Acceptable"
             # bot block (seen on aucklandcouncil.govt.nz — a bare curl gets it
             # too), 451 some edge WAFs. Rotate to a fresh IP and retry; if every
-            # attempt hits it, it surfaces as Blocked (SKIP-able / not a defect).
+            # attempt hits it, it surfaces as a typed blocked/rate-limited state.
             if e.code in (403, 406, 429, 451):
                 last = f"HTTP {e.code}"
                 last_status = e.code
@@ -357,7 +360,8 @@ def fetch_bytes(
         )
     raise Blocked(
         f"{url} blocked after {len(openers)} attempt(s) ({last}). The public source is "
-        f"bot-blocking this network; set a rotating FETCH_PROXY to clear it."
+        f"blocking this network; use an official fallback or configure FETCH_PROXY "
+        f"for bounded proxy retries."
     )
 
 
