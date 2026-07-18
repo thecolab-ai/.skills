@@ -3,6 +3,7 @@
 import importlib.util, json, subprocess, sys
 from pathlib import Path
 CLI=Path(__file__).with_name("cli.py")
+OUTAGE_MARKERS=("network error","timed out","http 429","http 500","http 502","http 503","http 504")
 spec=importlib.util.spec_from_file_location("legacy_aquatics_cli",CLI);assert spec and spec.loader
 cli=importlib.util.module_from_spec(spec);spec.loader.exec_module(cli)
 class FakeResponse:
@@ -22,7 +23,10 @@ def fetch_rejected(final_url):
 def run(*args):return subprocess.run([sys.executable,str(CLI),*args],capture_output=True,text=True,timeout=30)
 def live(args):
  r=run(*args)
- if r.returncode:print("[SKIP] live endpoint unavailable:",r.stderr.strip()[:180]);return None
+ if r.returncode:
+  detail=(r.stderr+r.stdout).lower()
+  if any(marker in detail for marker in OUTAGE_MARKERS):print("[SKIP] live endpoint unavailable:",r.stderr.strip()[:180]);return None
+  raise SystemExit(f"[FAIL] live command failed ({r.returncode}): {r.stderr[:300]}")
  try:return json.loads(r.stdout)
  except json.JSONDecodeError:print("[FAIL] invalid JSON:",r.stdout[:180]);raise SystemExit(1)
 if run("--help").returncode:raise SystemExit("[FAIL] help")
