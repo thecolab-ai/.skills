@@ -28,6 +28,8 @@ Browser-assisted mode must be opt-in and honest:
 - treat CAPTCHA, request-auth, bot challenges, or protected flows as blocked states, not puzzles to defeat;
 - if the browser path is blocked but a public fallback exists, return the fallback data and include an explicit blocked flag such as `fare_search_blocked: true`.
 
+This browser boundary is separate from the shared direct-HTTP policy. For public, unauthenticated resources, `lib/nzfetch.py` may use a user-configured proxy for routing and its existing bounded retry sequence. Browser-assisted mode must still stop at CAPTCHA, request-auth, login, protected-token, and account boundaries rather than trying to solve or cross them.
+
 Example JSON error:
 
 ```json
@@ -97,6 +99,6 @@ For skills where `--browser` is the richer or more realistic path, the smoke tes
 
 ## Security and ethics boundary
 
-Browser-assisted mode is not CAPTCHA bypass tooling. Do not ship code whose purpose is to evade technical access controls, forge protected tokens, operate accounts, place orders, hold bookings, or complete transactions.
+Browser-assisted mode is not CAPTCHA or authentication-bypass tooling. Do not ship code whose purpose is to solve challenges, forge protected tokens, cross login or account boundaries, place orders, hold bookings, or complete transactions.
 
 The acceptable use case is narrow: use a real browser context to read the same public information a normal visitor can see, then convert that information into deterministic, agent-readable output.

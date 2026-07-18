@@ -28,15 +28,15 @@ python3 skills/<name>/scripts/smoke_test.py
 - TypeScript/Node skill helpers are **not accepted** — all scripts must be Python
 - Avoid per-skill doc clutter
 
-## Getting past bot walls — the shared `nzfetch` helper
+## Shared public HTTP access — the `nzfetch` helper
 
 A lot of official NZ sources (data.govt.nz CKAN, councils, some government portals) sit behind
 **Incapsula / Cloudflare** that block by **IP reputation** — a bare HTTP client gets an HTML
 "checking your browser" challenge instead of the data. Don't hand-roll a fix per skill: use the
 shared **`lib/nzfetch.py`** helper (stdlib only). It sends a browser-shaped User-Agent and, on a
-block, **retries through a rotating proxy** when one is configured — a fresh IP per attempt clears
-IP-reputation walls. With no proxy set it just does the single direct request, so nothing changes
-on a clean network.
+block, **retries through a proxy** when one is configured. A rotating pool may provide a different
+route for each bounded attempt; a single-IP proxy re-attempts through the same route. With no proxy
+set it makes only the direct request, so nothing changes on a clean network.
 
 Import it from a skill's `scripts/cli.py` (it lives at the repo `lib/`, three parents up):
 
@@ -48,18 +48,25 @@ import nzfetch  # noqa: E402
 def get(url):
     try:
         return nzfetch.fetch_json(url)          # also: fetch_bytes, fetch_text
+    except nzfetch.RateLimited as e:
+        die(f"network error: rate_limited: retry_after={e.retry_after}: {e}")
     except nzfetch.Blocked as e:
         die(f"network error: {e}")              # transient block → smoke tests SKIP, not FAIL
     except nzfetch.FetchError as e:
         die(str(e))
 ```
 
-`nzfetch.Blocked` is a subclass of `FetchError` — a transient bot-wall, **not** a dead source; a
+`nzfetch.Blocked` is a subclass of `FetchError` — an exhausted bot-wall, **not** a dead source; a
 skill should report it as a `network error` (so smoke tests skip) rather than crash. Keep your
-smoke test's `is_network_failure()` markers including `blocked` / `network error`. A block includes
-HTTP 403/429/451 **and 406** (Akamai's bot "Not Acceptable", seen on `aucklandcouncil.govt.nz`),
+smoke test's `is_network_failure()` markers including `blocked` / `network error`. Block retries
+include HTTP 403/429/451 **and 406** (Akamai's bot "Not Acceptable", seen on `aucklandcouncil.govt.nz`),
 plus Incapsula/Cloudflare **and AWS-WAF (`goku`) challenge shells served at HTTP 200** — nzfetch
 detects those by body fingerprint so they never slip through as an empty "success".
+
+`nzfetch.RateLimited` subclasses `Blocked`, so existing callers remain compatible. It is raised
+when the final bounded attempt ends in HTTP 429 and exposes the raw upstream `Retry-After` value as
+`retry_after` (`None` when absent). Preserve that value in structured output so a caller can decide
+when to schedule a later request; do not turn rate limiting into an empty result.
 
 **Pick the right entry point — it decides challenge handling for you:**
 
@@ -83,12 +90,12 @@ POST `data`/`method`, and a custom SSL `context=` are preserved through the prox
 | Env | Meaning |
 |---|---|
 | `FETCH_PROXY` / `HTTPS_PROXY` | Rotating proxy URL, e.g. `http://user:pass@host:port`. **A SECRET** — never hard-code, print, or commit it; `nzfetch` reads it from the env only. |
-| `PROXY_RETRIES` | Retries through the proxy on a block **or a truncated read** (default 3). A rotating pool gets a fresh IP each retry; a single-IP proxy re-attempts (still clears transient truncations). Raise it for a stubborn wall or a proxy that often truncates large responses. |
+| `PROXY_RETRIES` | Bounded retries through the proxy on a block **or a truncated read** (default 3, minimum 1). A rotating pool may provide a different route each retry; a single-IP proxy re-attempts through the same route. Set an integer and increase it only deliberately. |
 | `NZFETCH_UA` | Override the User-Agent for a source that needs a specific one. |
 
 Even without adopting `nzfetch`, any skill that uses `urllib` already **honours `HTTPS_PROXY`
 natively**, so setting it routes that skill through the proxy — but only `nzfetch` adds the
-retry-rotation + challenge-detection that makes the bypass *reliable*. Migrate a blocked skill by
+bounded retry + challenge-detection contract used across this repository. Migrate a blocked skill by
 swapping its `urllib.request.urlopen(...)` fetch for an `nzfetch` call as above (see
 `skills/data-govt-nz` and `skills/eeca-ev-chargers-nz` for worked examples).
 
