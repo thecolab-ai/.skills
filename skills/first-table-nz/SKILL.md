@@ -1,6 +1,27 @@
 ---
 name: first-table-nz
-description: Query First Table NZ restaurants, 50%-off early-table deals, city/suburb discovery, cuisine search, and availability slots. Read-only; no booking, login, or payment.
+description: "Query First Table NZ restaurants, 50%-off early-table deals, city/suburb discovery, cuisine search, and availability slots. Read-only; no booking, login, or payment."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "events-and-media"
+  thecolab.source_owner: "First Table"
+  thecolab.source_type: "commercial"
+  thecolab.auth: "none"
+  thecolab.access_mode: "html-readonly"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "low"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "html-readonly"
+  thecolab.pack: "nz-commercial-web"
+  thecolab.source_url: "https://www.firsttable.co.nz"
+  thecolab.allowed_domains: "stellate.firsttable.net,www.firsttable.co.nz"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "healthy"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # First Table NZ

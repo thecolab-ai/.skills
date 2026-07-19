@@ -1,6 +1,27 @@
 ---
 name: dataforseo
-description: Query DataForSEO for SEO + market-validation data — Google SERP rank checks, keyword search volume, keyword discovery (semantic ideas, related-search expansion, search-intent classification), domain/competitor analytics, backlinks, and App Store / Play data (which apps rank + review mining). Use when checking where a site ranks, finding or discovering what people search for, validating demand and competition for an app/business idea, analysing a domain or its competitors, auditing backlinks, or mining competitor app reviews for pain points. Requires DATAFORSEO_USERNAME (or DATAFORSEO_LOGIN) and DATAFORSEO_PASSWORD. Every call spends DataForSEO credits.
+description: "Query DataForSEO for SEO + market-validation data — Google SERP rank checks, keyword search volume, keyword discovery (semantic ideas, related-search expansion, search-intent classification), domain/competitor analytics, backlinks, and App Store / Play data (which apps rank + review mining). Use when checking where a site ranks, finding or discovering what people search for, validating demand and competition for an app/business idea, analysing a domain or its competitors, auditing backlinks, or mining competitor app reviews for pain points. Requires DATAFORSEO_USERNAME (or DATAFORSEO_LOGIN) and DATAFORSEO_PASSWORD. Every call spends DataForSEO credits."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "finance"
+  thecolab.source_owner: "DataForSEO"
+  thecolab.source_type: "commercial"
+  thecolab.auth: "paid-credential"
+  thecolab.access_mode: "public-api"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "medium"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "public-api"
+  thecolab.pack: "paid-data-connectors"
+  thecolab.source_url: "https://api.dataforseo.com"
+  thecolab.allowed_domains: "api.dataforseo.com,app.dataforseo.com"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "gated"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # DataForSEO

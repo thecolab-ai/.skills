@@ -245,6 +245,49 @@ class NzfetchTests(unittest.TestCase):
         self.assertNotIn("user:secret", message)
         self.assertNotIn("proxy.test", message)
 
+    @mock.patch("nzfetch.urllib.request.build_opener")
+    def test_allowlist_rejects_initial_undeclared_host_before_network(self, build_opener):
+        with self.assertRaisesRegex(nzfetch.FetchError, "declared allowlist"):
+            nzfetch.fetch_bytes(
+                "https://attacker.example/data",
+                allowed_hosts={"example.test"},
+            )
+        build_opener.assert_not_called()
+
+    def test_allowlist_redirect_handler_rejects_undeclared_host(self):
+        handler = nzfetch._AllowlistRedirectHandler(frozenset({"example.test"}))
+        with self.assertRaisesRegex(nzfetch.FetchError, "declared allowlist"):
+            handler.redirect_request(
+                object(), None, 302, "Found", {}, "https://attacker.example/collect"
+            )
+
+    @mock.patch("nzfetch.urllib.request.build_opener")
+    def test_allowlisted_request_accepts_exact_host(self, build_opener):
+        opener = mock.Mock()
+        opener.open.return_value = FakeResponse(body=b"safe")
+        build_opener.return_value = opener
+
+        body, _content_type, final_url = nzfetch.fetch_bytes(
+            "https://example.test/data",
+            allowed_hosts={"example.test"},
+        )
+
+        self.assertEqual(body, b"safe")
+        self.assertEqual(final_url, "https://example.test/data")
+        opener.open.assert_called_once()
+
+    @mock.patch("nzfetch.urllib.request.build_opener")
+    def test_allowlisted_request_rejects_escaped_final_url(self, build_opener):
+        opener = mock.Mock()
+        opener.open.return_value = FakeResponse(final_url="https://attacker.example/collect")
+        build_opener.return_value = opener
+
+        with self.assertRaisesRegex(nzfetch.FetchError, "declared allowlist"):
+            nzfetch.fetch_bytes(
+                "https://example.test/data",
+                allowed_hosts={"example.test"},
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -100,8 +100,8 @@ def print_json(data: Any) -> None:
 
 def cmd_token(args: argparse.Namespace) -> None:
     token = get_guest_token(force=args.refresh)
-    if args.raw:
-        print(token)
+    if args.json:
+        print_json({"ok": True, "token_length": len(token), "cached_at": str(TOKEN_FILE)})
     else:
         print(f"guest token ok ({len(token)} chars, cached at {TOKEN_FILE})")
 
@@ -277,7 +277,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     sp = sub.add_parser("token", help="fetch/cache a guest token")
     sp.add_argument("--refresh", action="store_true")
-    sp.add_argument("--raw", action="store_true")
+    sp.add_argument("--json", action="store_true")
     sp.set_defaults(func=cmd_token)
 
     sp = sub.add_parser("stores", help="list PAK'nSAVE stores")

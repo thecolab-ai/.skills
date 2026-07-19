@@ -59,6 +59,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import zlib
+from collections.abc import Iterable
 
 # Keep the UA version and the sec-ch-ua brand list in sync — a real Chrome sends a
 # UA and Client-Hints that agree, and a mismatch is itself a bot signal. Bump this
@@ -83,7 +84,7 @@ def _browser_headers(url: str, accept: str) -> dict:
 
     NOTE: this cannot change urllib's TLS ClientHello fingerprint (a Python
     signature some advanced WAFs still detect) — for those, the stealth browser
-    (fetch.mjs's cloak rung) remains the strongest bypass. Browser-shaped headers
+    (fetch.mjs's cloak rung) remains the strongest public-page fallback. Browser-shaped headers
     plus a rotating IP clear the common cases."""
     ua = os.environ.get("NZFETCH_UA") or DEFAULT_UA
     try:
@@ -175,6 +176,41 @@ class RateLimited(Blocked):
         self.retry_after = retry_after
 
 
+def _normalise_allowed_hosts(allowed_hosts: Iterable[str] | None) -> frozenset[str] | None:
+    if allowed_hosts is None:
+        return None
+    return frozenset(str(host).strip().lower().rstrip(".") for host in allowed_hosts if str(host).strip())
+
+
+def _validate_outbound_url(url: str, allowed_hosts: frozenset[str]) -> None:
+    try:
+        parsed = urllib.parse.urlparse(url)
+        port = parsed.port
+    except ValueError as exc:
+        raise FetchError(f"invalid outbound URL: {url!r}") from exc
+    hostname = (parsed.hostname or "").lower().rstrip(".")
+    default_port = 443 if parsed.scheme == "https" else 80 if parsed.scheme == "http" else None
+    if (
+        parsed.scheme not in {"http", "https"}
+        or not hostname
+        or hostname not in allowed_hosts
+        or parsed.username is not None
+        or parsed.password is not None
+        or port not in {None, default_port}
+    ):
+        raise FetchError(f"outbound URL host is not in the declared allowlist: {hostname or url!r}")
+
+
+class _AllowlistRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def __init__(self, allowed_hosts: frozenset[str]):
+        super().__init__()
+        self.allowed_hosts = allowed_hosts
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        _validate_outbound_url(newurl, self.allowed_hosts)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
 def proxy_url() -> str:
     """The configured rotating-proxy URL, or "" for direct. A SECRET — read from
     the env only, never returned to logs by callers."""
@@ -256,6 +292,7 @@ def fetch_bytes(
     context=None,
     expect_json: bool | None = None,
     browser_headers: bool = True,
+    allowed_hosts: Iterable[str] | None = None,
 ) -> tuple[bytes, str, str]:
     """Fetch *url* → (body, content_type, final_url). GET by default; pass
     ``data`` (bytes) for a POST. A full drop-in for a skill's own
@@ -278,11 +315,17 @@ def fetch_bytes(
       for the few hosts that 200 on a bare request but bot-wall the full
       Client-Hint / Sec-Fetch-* set — the fetch still gets the rotating-proxy
       fallback without the headers that make it worse than plain urllib.
+    - ``allowed_hosts`` — optional exact host allowlist. The initial URL and
+      every redirect are rejected before a request can leave the declared host
+      set. Credential-bearing callers must provide this.
 
     Tries a DIRECT request first; on HTTP 403/406/429/451 or a recognised HTML
     challenge, runs the configured bounded proxy attempts. Raises ``RateLimited``
     if the final attempt is HTTP 429, ``Blocked`` for other exhausted block or
     challenge outcomes, and ``FetchError`` for other HTTP/URL failures."""
+    allowed = _normalise_allowed_hosts(allowed_hosts)
+    if allowed is not None:
+        _validate_outbound_url(url, allowed)
     hdrs = _browser_headers(url, accept) if browser_headers else _minimal_headers(accept)
     if headers:
         hdrs.update(headers)  # caller headers (API key, auth, custom UA/Accept) win
@@ -290,13 +333,21 @@ def fetch_bytes(
     # (fetch_text=False, fetch_json=True) when given; else inferred from accept.
     expects_json = expect_json if expect_json is not None else ("json" in (accept or "").lower())
     proxy = proxy_url()
-    openers: list = [None]  # attempt 1 = direct (urlopen, which accepts context=)
+    if allowed is None:
+        openers: list = [None]  # attempt 1 = direct urlopen for backwards compatibility
+    else:
+        direct_handlers: list = [_AllowlistRedirectHandler(allowed)]
+        if context is not None:
+            direct_handlers.append(urllib.request.HTTPSHandler(context=context))
+        openers = [urllib.request.build_opener(*direct_handlers)]
     if proxy:
         handler = urllib.request.ProxyHandler({"http": proxy, "https": proxy})
         # A custom SSL context must be baked into an HTTPSHandler on the opener —
         # OpenerDirector.open() does NOT accept a context= kwarg (passing it raises
         # TypeError), so it can't be forwarded per-call like urlopen's.
-        extra = [urllib.request.HTTPSHandler(context=context)] if context is not None else []
+        extra = [_AllowlistRedirectHandler(allowed)] if allowed is not None else []
+        if context is not None:
+            extra.append(urllib.request.HTTPSHandler(context=context))
         retries = _proxy_retries()
         openers += [urllib.request.build_opener(handler, *extra)] * retries
     # context= only goes to the direct urlopen; the proxy openers carry it in their handler.
@@ -310,9 +361,11 @@ def fetch_bytes(
         req = urllib.request.Request(url, data=data, headers=hdrs, method=method)
         try:
             resp = opener.open(req, timeout=timeout) if opener else urllib.request.urlopen(req, **direct_kw)
+            final_url = resp.geturl()
+            if allowed is not None:
+                _validate_outbound_url(final_url, allowed)
             body = _decompress(resp.read(), resp.headers.get("Content-Encoding"))
             content_type = (resp.headers.get("Content-Type") or "").lower()
-            final_url = resp.geturl()
         except urllib.error.HTTPError as e:
             # WAF bot-walls: 403/429 classic, 406 is Akamai's "Not Acceptable"
             # bot block (seen on aucklandcouncil.govt.nz — a bare curl gets it

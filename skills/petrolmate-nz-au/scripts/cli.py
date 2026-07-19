@@ -409,9 +409,8 @@ def cmd_search(args: argparse.Namespace) -> None:
     )
 
 
-def cmd_locations(_args: argparse.Namespace) -> None:
+def cmd_locations(args: argparse.Namespace) -> None:
     """List known location names."""
-    print("Known locations (AU + NZ):")
     nz = {k: v for k, v in LOCATIONS.items() if k in {
         "auckland", "auckland cbd", "st heliers", "wellington", "christchurch",
         "queenstown", "hamilton", "tauranga", "dunedin", "napier",
@@ -419,6 +418,12 @@ def cmd_locations(_args: argparse.Namespace) -> None:
         "invercargill", "gisborne",
     }}
     au = {k: v for k, v in LOCATIONS.items() if k not in nz}
+
+    if args.json:
+        print(json.dumps({"nz": nz, "au": au}, indent=2, ensure_ascii=False))
+        return
+
+    print("Known locations (AU + NZ):")
 
     print("\nNZ:")
     for name in sorted(nz):
@@ -430,8 +435,11 @@ def cmd_locations(_args: argparse.Namespace) -> None:
         print(f"  {name:20s}  {lat:8.4f}, {lon:8.4f}")
 
 
-def cmd_fuel_types(_args: argparse.Namespace) -> None:
+def cmd_fuel_types(args: argparse.Namespace) -> None:
     """List fuel types."""
+    if args.json:
+        print(json.dumps(FUEL_TYPES, indent=2, ensure_ascii=False))
+        return
     print("Fuel types:")
     for code, label in FUEL_TYPES.items():
         print(f"  {code:<15} {label}")
@@ -473,10 +481,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     # locations
     sp = sub.add_parser("locations", help="list known location names")
+    sp.add_argument("--json", action="store_true", help="JSON output")
     sp.set_defaults(func=cmd_locations)
 
     # fuel-types
     sp = sub.add_parser("fuel-types", help="list available fuel types")
+    sp.add_argument("--json", action="store_true", help="JSON output")
     sp.set_defaults(func=cmd_fuel_types)
 
     return ap

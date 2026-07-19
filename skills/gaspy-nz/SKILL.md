@@ -1,6 +1,27 @@
 ---
 name: gaspy-nz
-description: Query Gaspy NZ public crowd-sourced fuel price statistics through a lightweight no-login CLI. Use when the task involves Gaspy crowd-sourced NZ fuel price snapshots, national observed averages, top cheapest 91 stations, station/brand counts, or recent confirmation totals. Read-only; no login or price reporting.
+description: "Query Gaspy NZ public crowd-sourced fuel price statistics through a lightweight no-login CLI. Use when the task involves Gaspy crowd-sourced NZ fuel price snapshots, national observed averages, top cheapest 91 stations, station/brand counts, or recent confirmation totals. Read-only; no login or price reporting."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "food-and-fuel"
+  thecolab.source_owner: "Gaspy"
+  thecolab.source_type: "commercial"
+  thecolab.auth: "none"
+  thecolab.access_mode: "html-readonly"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "low"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "html-readonly"
+  thecolab.pack: "nz-commercial-web"
+  thecolab.source_url: "https://gaspy-datamine-stats.firebaseio.com/.json"
+  thecolab.allowed_domains: "gaspy-datamine-stats.firebaseio.com,www.gaspy.nz"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "healthy"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # Gaspy NZ

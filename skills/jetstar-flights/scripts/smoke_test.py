@@ -11,6 +11,10 @@ DATE = (date.today() + timedelta(days=45)).isoformat()
 cmd = ["node", str(ROOT / "skills/jetstar-flights/scripts/cli.mjs"), "search", "AKL", "WLG", DATE, "--days", "7", "--json"]
 proc = subprocess.run(cmd, text=True, capture_output=True, timeout=60)
 if proc.returncode != 0:
+    detail = (proc.stderr or proc.stdout).strip()
+    if "fetch failed" in detail.lower() or "network" in detail.lower() or "timed out" in detail.lower():
+        print(f"[SKIP] Jetstar live assertion: upstream unavailable ({detail[:160]})")
+        raise SystemExit(0)
     raise SystemExit(proc.stderr or proc.stdout)
 payload = json.loads(proc.stdout)
 flights = payload.get("flights") or []

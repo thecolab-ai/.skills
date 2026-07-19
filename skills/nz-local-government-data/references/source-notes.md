@@ -1,5 +1,10 @@
 # NZ local government data source notes
 
+- Primary source: https://catalogue.data.govt.nz/api/3/action/
+- Declared outbound hosts: catalogue.data.govt.nz, oag.parliament.nz, www.localcouncils.govt.nz, www.mcert.govt.nz
+- Authentication: none
+- Last verified: 2026-07-19
+
 ## Stats NZ / data.govt.nz local authority statistics
 
 - Issue starting point: `https://catalogue.data.govt.nz/dataset/groups/local-authority-statistics`

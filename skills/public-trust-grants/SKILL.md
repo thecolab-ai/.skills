@@ -1,6 +1,27 @@
 ---
 name: public-trust-grants
-description: Query Public Trust New Zealand public grants and scholarships through the unauthenticated grants search index and public detail pages. Use when the task involves finding Public Trust-managed NZ grant or scholarship opportunities by keyword, organisation/individual type, region, sector, or application-open status, or checking public grant criteria text. Read-only; no login, application submission, SmartyGrants form access, or paywalled/commercial grant database scraping.
+description: "Query Public Trust New Zealand public grants and scholarships through the unauthenticated grants search index and public detail pages. Use when the task involves finding Public Trust-managed NZ grant or scholarship opportunities by keyword, organisation/individual type, region, sector, or application-open status, or checking public grant criteria text. Read-only; no login, application submission, SmartyGrants form access, or paywalled/commercial grant database scraping."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "public-data"
+  thecolab.source_owner: "Public Trust"
+  thecolab.source_type: "official"
+  thecolab.auth: "none"
+  thecolab.access_mode: "public-api"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "low"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "public-api"
+  thecolab.pack: "nz-public-data"
+  thecolab.source_url: "https://www.publictrust.co.nz"
+  thecolab.allowed_domains: "www.publictrust.co.nz,00gcmopt4b-dsn.algolia.net"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "healthy"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # Public Trust Grants

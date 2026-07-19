@@ -1,8 +1,28 @@
 ---
 name: grocer-nz
-description: Query grocer.nz public NZ supermarket price data — store lookup, product search, current per-store prices, and historical product price rows from public DuckDB/parquet assets. Use for NZ grocery/supermarket pricing across Woolworths, New World, PAK'nSAVE, Fresh Choice, and related stores. Read-only; no login or private user data.
+description: "Query grocer.nz public NZ supermarket price data — store lookup, product search, current per-store prices, and historical product price rows from public DuckDB/parquet assets. Use for NZ grocery/supermarket pricing across Woolworths, New World, PAK'nSAVE, Fresh Choice, and related stores. Read-only; no login or private user data."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "food-and-fuel"
+  thecolab.source_owner: "Grocer.nz"
+  thecolab.source_type: "commercial"
+  thecolab.auth: "none"
+  thecolab.access_mode: "html-readonly"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "low"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "html-readonly"
+  thecolab.pack: "nz-commercial-web"
+  thecolab.source_url: "https://assets-prod.grocer.nz/public"
+  thecolab.allowed_domains: "assets-prod.grocer.nz,grocer.nz,meilisearch.grocer.nz"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "healthy"
+  thecolab.maintainer: "@adam91holt"
 ---
-
 
 # Grocer.nz Public Price Data
 

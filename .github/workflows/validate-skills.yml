@@ -13,6 +13,8 @@ jobs:
     runs-on: [self-hosted, linux, x64, skills-smoke]
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: astral-sh/setup-uv@v5
         with:
@@ -21,5 +23,24 @@ jobs:
       - name: Run deterministic foundation tests
         run: python3 -m unittest discover -s tests -p 'test_*.py' -v
 
-      - name: Validate all skills
-        run: python3 scripts/validate_skill.py --strict
+      - name: Validate Agent Skills specification
+        run: python3 scripts/validate_agent_spec.py --strict
+
+      - name: Validate TheColab repository policy
+        run: python3 scripts/validate_repo_policy.py --strict
+
+      - name: Run deterministic skill contracts and fixtures
+        run: python3 scripts/run_contract_tests.py
+
+      - name: Check generated catalogue and pack manifests
+        run: python3 scripts/generate_catalogue.py --check
+
+      - name: Run static security checks
+        run: python3 scripts/security_check.py
+
+      - name: Run bounded live probes for changed skills
+        env:
+          AT_API_KEY: ${{ secrets.AT_API_KEY }}
+          METOCEAN_API_KEY: ${{ secrets.METOCEAN_API_KEY }}
+          METLINK_API_KEY: ${{ secrets.METLINK_API_KEY }}
+        run: python3 scripts/run_smoke_tests.py --changed-from "${{ github.event.pull_request.base.sha }}" --timeout 90 --summary-json

@@ -1,6 +1,27 @@
 ---
 name: raw-essentials-nz
-description: Query Raw Essentials NZ public catalogue, product-page, and store-page HTML through a no-login read-only CLI. Use when a task needs current Raw Essentials product discovery or source-page detail; never for cart, checkout, account, payment, booking, or veterinary advice.
+description: "Query Raw Essentials NZ public catalogue, product-page, and store-page HTML through a no-login read-only CLI. Use when a task needs current Raw Essentials product discovery or source-page detail; never for cart, checkout, account, payment, booking, or veterinary advice."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "retail"
+  thecolab.source_owner: "Raw Essentials"
+  thecolab.source_type: "commercial"
+  thecolab.auth: "none"
+  thecolab.access_mode: "html-readonly"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "low"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "html-readonly"
+  thecolab.pack: "nz-commercial-web"
+  thecolab.source_url: "https://rawessentials.co.nz"
+  thecolab.allowed_domains: "rawessentials.co.nz"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "healthy"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # Raw Essentials NZ

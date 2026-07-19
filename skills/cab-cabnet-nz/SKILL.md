@@ -1,6 +1,27 @@
 ---
 name: cab-cabnet-nz
-description: Use when Codex needs to discover Citizens Advice Bureau NZ public client-enquiry evidence, CABNET source availability, advice category taxonomy, or report-backed enquiry trend caveats for New Zealand social-need analysis; wraps keyless cab.org.nz and data.govt.nz discovery and reports explicit blocked states when aggregated CABNET counts are not publicly exported.
+description: "Use when Codex needs to discover Citizens Advice Bureau NZ public client-enquiry evidence, CABNET source availability, advice category taxonomy, or report-backed enquiry trend caveats for New Zealand social-need analysis; wraps keyless cab.org.nz and data.govt.nz discovery and reports explicit blocked states when aggregated CABNET counts are not publicly exported."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "public-data"
+  thecolab.source_owner: "Citizens Advice Bureau New Zealand"
+  thecolab.source_type: "official"
+  thecolab.auth: "none"
+  thecolab.access_mode: "public-api"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "low"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "public-api"
+  thecolab.pack: "nz-public-data"
+  thecolab.source_url: "https://www.cab.org.nz"
+  thecolab.allowed_domains: "catalogue.data.govt.nz,www.cab.org.nz"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "healthy"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # CAB CABNET NZ

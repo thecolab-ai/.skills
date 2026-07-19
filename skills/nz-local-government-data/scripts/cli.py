@@ -173,7 +173,8 @@ class LinkParser(HTMLParser):
 def extract_links(page_url: str, timeout: int = TIMEOUT) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     tried = []
     last_error = "unknown error"
-    for url in ([page_url, LOCALCOUNCILS_INDEX] if page_url.startswith("https://www.localcouncils") else [page_url]):
+    page_host = (urllib.parse.urlparse(page_url).hostname or "").lower()
+    for url in ([page_url, LOCALCOUNCILS_INDEX] if page_host == "www.localcouncils.govt.nz" else [page_url]):
         tried.append(url)
         try:
             text, final_url, ctype = fetch_text(url, timeout=timeout)

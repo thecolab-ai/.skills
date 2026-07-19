@@ -1,6 +1,27 @@
 ---
 name: thecolab-brand
-description: Use when creating TheColab.ai branded outputs: decks, proposals, one-pagers, event collateral, social images, reports, or WhatsApp bot responses that need The Colab's voice, positioning, colours, and visual style.
+description: "Use when creating TheColab.ai branded outputs: decks, proposals, one-pagers, event collateral, social images, reports, or WhatsApp bot responses that need The Colab's voice, positioning, colours, and visual style."
+license: MIT
+compatibility: "Requires Python 3.10+"
+metadata:
+  thecolab.category: "artifact-and-workflow"
+  thecolab.source_owner: "TheColabAI"
+  thecolab.source_type: "internal"
+  thecolab.auth: "none"
+  thecolab.access_mode: "documentation-workflow"
+  thecolab.data_class: "internal"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "low"
+  thecolab.cache_ttl: "none"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "documentation-workflow"
+  thecolab.pack: "thecolab-internal"
+  thecolab.source_url: "https://thecolab.ai/"
+  thecolab.allowed_domains: "thecolab.ai"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "healthy"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # TheColab.ai Brand Skill

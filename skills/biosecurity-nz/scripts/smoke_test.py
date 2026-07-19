@@ -58,6 +58,8 @@ def help_check() -> None:
 def sources_check() -> None:
     data = json_command(["sources", "--json"])
     assert data["kind"] == "sources"
+    if data.get("status") == "partial" and data.get("errors"):
+        raise Skip("source catalogue blocked by Incapsula")
     assert any(pkg.get("name") == "the-official-new-zealand-pest-register" for pkg in data.get("packages", []))
 
 
@@ -119,7 +121,7 @@ def import_requirements_no_results_check() -> None:
 
 def main() -> None:
     checks = [
-        ("help", help_check),
+        ("contract help", help_check),
         ("sources", sources_check),
         ("pest search happy path", pest_search_check),
         ("pest search no results edge", pest_no_results_check),

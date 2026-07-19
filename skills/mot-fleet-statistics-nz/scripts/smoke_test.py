@@ -86,7 +86,7 @@ def make_xlsx(path: Path) -> None:
 
 
 results: list[bool] = []
-results.append(check("--help exits 0", lambda: run(["--help"]).returncode == 0))
+results.append(check("contract --help exits 0", lambda: run(["--help"]).returncode == 0))
 
 
 def with_fixture(fn) -> bool:
@@ -107,7 +107,7 @@ def test_workbook() -> bool:
     return with_fixture(inner)
 
 
-results.append(check("workbook parses a local XLSX fixture", test_workbook))
+results.append(check("fixture workbook parses a local XLSX source", test_workbook))
 
 
 def test_tables() -> bool:
@@ -121,7 +121,7 @@ def test_tables() -> bool:
     return with_fixture(inner)
 
 
-results.append(check("tables lists worksheet previews and years", test_tables))
+results.append(check("fixture tables lists worksheet previews and years", test_tables))
 
 
 def test_vkt() -> bool:
@@ -135,7 +135,7 @@ def test_vkt() -> bool:
     return with_fixture(inner)
 
 
-results.append(check("vkt returns year-specific rows", test_vkt))
+results.append(check("fixture vkt returns year-specific rows", test_vkt))
 
 
 def test_fuel_counts() -> bool:
@@ -150,7 +150,7 @@ def test_fuel_counts() -> bool:
     return with_fixture(inner)
 
 
-results.append(check("fuel-counts returns year-specific rows", test_fuel_counts))
+results.append(check("fixture fuel-counts returns year-specific rows", test_fuel_counts))
 
 
 def test_datasets_live_or_blocked() -> bool:

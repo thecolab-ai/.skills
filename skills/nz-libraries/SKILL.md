@@ -1,6 +1,27 @@
 ---
 name: nz-libraries
-description: Query selected New Zealand public library catalogues, branch locations, hours, book details, and public availability through a lightweight read-only CLI. Use when the task involves finding books in major NZ public library networks or checking which branches currently show copies.
+description: "Query selected New Zealand public library catalogues, branch locations, hours, book details, and public availability through a lightweight read-only CLI. Use when the task involves finding books in major NZ public library networks or checking which branches currently show copies."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "public-data"
+  thecolab.source_owner: "Participating New Zealand public libraries"
+  thecolab.source_type: "mixed"
+  thecolab.auth: "none"
+  thecolab.access_mode: "public-api"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "low"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "public-api"
+  thecolab.pack: "nz-public-data"
+  thecolab.source_url: "https://www.aucklandlibraries.govt.nz/"
+  thecolab.allowed_domains: "ap.iiivega.com,catalogue.wcl.govt.nz,christchurch.bibliocommons.com,christchurchcitylibraries.com,discover.aucklandlibraries.govt.nz,ent.kotui.org.nz,hamiltonlibraries.co.nz,library.tauranga.govt.nz,www.aucklandlibraries.govt.nz,www.dunedinlibraries.govt.nz,www.wcl.govt.nz"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "healthy"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # NZ Libraries

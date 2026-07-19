@@ -1,6 +1,27 @@
 ---
 name: seek-co-nz
-description: Search and inspect public SEEK.co.nz job listings through a lightweight no-login CLI. Use when the task involves New Zealand job search, SEEK listing IDs, role/company/location snapshots, salary snippets, classifications, or machine-readable public job data. Read-only; no login, saved searches, applications, account, recruiter, or job-posting actions.
+description: "Search and inspect public SEEK.co.nz job listings through a lightweight no-login CLI. Use when the task involves New Zealand job search, SEEK listing IDs, role/company/location snapshots, salary snippets, classifications, or machine-readable public job data. Read-only; no login, saved searches, applications, account, recruiter, or job-posting actions."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "public-data"
+  thecolab.source_owner: "SEEK"
+  thecolab.source_type: "commercial"
+  thecolab.auth: "none"
+  thecolab.access_mode: "html-readonly"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "low"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "html-readonly"
+  thecolab.pack: "nz-commercial-web"
+  thecolab.source_url: "https://nz.seek.com"
+  thecolab.allowed_domains: "nz.seek.com,www.seek.co.nz"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "healthy"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # SEEK.co.nz

@@ -1,6 +1,27 @@
 ---
 name: stats-nz
-description: Query official Stats NZ data: CPI, GDP, population estimates/projections, migration, and CSV catalogue. No API key or browser session required.
+description: "Query official Stats NZ data: CPI, GDP, population estimates/projections, migration, and CSV catalogue. No API key or browser session required."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "public-data"
+  thecolab.source_owner: "Stats NZ"
+  thecolab.source_type: "official"
+  thecolab.auth: "none"
+  thecolab.access_mode: "public-api"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "low"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "public-api"
+  thecolab.pack: "nz-public-data"
+  thecolab.source_url: "https://www.stats.govt.nz"
+  thecolab.allowed_domains: "tools.summaries.stats.govt.nz,www.stats.govt.nz"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "healthy"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # Stats NZ

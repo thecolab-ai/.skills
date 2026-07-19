@@ -6,11 +6,19 @@ import os
 import re
 import shutil
 import sys
+from datetime import date
 from pathlib import Path
+from urllib.parse import urlparse
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 TEMPLATES_DIR = REPO_ROOT / "templates"
-ALLOWED_VARIANTS = ("minimal", "cli-workflow", "tool-wrapper")
+ALLOWED_VARIANTS = (
+    "public-api",
+    "public-download",
+    "html-readonly",
+    "authenticated-personal",
+    "documentation-workflow",
+)
 
 
 def normalize_name(raw: str) -> str:
@@ -25,22 +33,22 @@ def title_case(name: str) -> str:
     return " ".join(part.capitalize() for part in name.split("-"))
 
 
-def default_description(variant: str) -> str:
-    if variant == "cli-workflow":
-        return (
-            "Describe what this skill does and when to use it. "
-            "Include concrete triggers, data sources, inputs, or file types."
-        )
-    elif variant == "tool-wrapper":
-        return (
-            "Describe the specific tool or API this skill wraps and when to use it. "
-            "Include concrete triggers, commands, or failure cases."
-        )
-    else:
-        return (
-            "Describe what this skill does and when to use it. "
-            "Include concrete trigger phrases, task types, or file types."
-        )
+def variant_defaults(variant: str) -> dict[str, str]:
+    values = {
+        "SKILL_TYPE": variant,
+        "ACCESS_MODE": variant,
+        "AUTH": "none",
+        "DATA_CLASS": "public",
+        "PACK": "nz-public-data",
+        "RISK": "low",
+    }
+    if variant == "html-readonly":
+        values.update(PACK="nz-commercial-web", RISK="medium")
+    elif variant == "authenticated-personal":
+        values.update(AUTH="personal-token", DATA_CLASS="personal", PACK="nz-personal-data", RISK="high")
+    elif variant == "documentation-workflow":
+        values.update(DATA_CLASS="internal", PACK="thecolab-internal", RISK="medium")
+    return values
 
 
 def render_template(content: str, values: dict) -> str:
@@ -49,6 +57,11 @@ def render_template(content: str, values: dict) -> str:
         return values.get(key, match.group(0))
 
     return re.sub(r"\{\{([A-Z_]+)\}\}", replacer, content)
+
+
+def quoted_template_value(value: str) -> str:
+    """Escape a value that will be inserted inside a double-quoted YAML scalar."""
+    return value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
 
 
 def walk(directory: Path) -> list:
@@ -69,7 +82,18 @@ def display_path(path: Path) -> str:
         return str(path)
 
 
-def scaffold_skill(name: str, variant: str, parent_path: str, force: bool) -> None:
+def scaffold_skill(
+    name: str,
+    variant: str,
+    parent_path: str,
+    force: bool,
+    description: str,
+    source_owner: str,
+    source_url: str,
+    category: str,
+    source_type: str,
+    pack: str | None,
+) -> None:
     name = normalize_name(name)
     if not name:
         raise ValueError("Skill name must include at least one letter or digit.")
@@ -77,22 +101,48 @@ def scaffold_skill(name: str, variant: str, parent_path: str, force: bool) -> No
         raise ValueError(f"Skill name is too long ({len(name)} > 64).")
 
     source_dir = TEMPLATES_DIR / f"skill-{variant}"
+    shared_dir = TEMPLATES_DIR / "_shared-executable"
     if not source_dir.exists():
         raise FileNotFoundError(f"Template not found: {source_dir}")
+    if not shared_dir.exists():
+        raise FileNotFoundError(f"Shared template not found: {shared_dir}")
+
+    parsed_source = urlparse(source_url)
+    if parsed_source.scheme not in {"http", "https"} or not parsed_source.hostname:
+        raise ValueError("--source-url must be an absolute HTTP(S) URL")
 
     target_dir = (REPO_ROOT / parent_path / name).resolve()
     if target_dir.exists():
         if not force:
             raise FileExistsError(f"Target already exists: {target_dir}")
+        canonical_skills = (REPO_ROOT / "skills").resolve()
+        if target_dir.parent != canonical_skills:
+            raise ValueError("--force may replace only a direct child of the repository skills/ directory")
+        if target_dir.is_symlink():
+            raise ValueError("refusing to replace a symbolic-link skill target")
+        if not target_dir.is_dir():
+            raise ValueError("refusing to replace a non-directory skill target")
         shutil.rmtree(target_dir)
 
     target_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(str(shared_dir), str(target_dir), dirs_exist_ok=True)
     shutil.copytree(str(source_dir), str(target_dir), dirs_exist_ok=True)
+
+    defaults = variant_defaults(variant)
+    if pack:
+        defaults["PACK"] = pack
 
     values = {
         "SKILL_NAME": name,
         "SKILL_TITLE": title_case(name),
-        "DESCRIPTION": default_description(variant),
+        "DESCRIPTION": quoted_template_value(description),
+        "SOURCE_OWNER": quoted_template_value(source_owner),
+        "SOURCE_URL": quoted_template_value(source_url),
+        "ALLOWED_DOMAINS": parsed_source.hostname.lower(),
+        "CATEGORY": category,
+        "SOURCE_TYPE": source_type,
+        "LAST_VERIFIED": date.today().isoformat(),
+        **defaults,
     }
 
     for file_path in walk(target_dir):
@@ -101,14 +151,15 @@ def scaffold_skill(name: str, variant: str, parent_path: str, force: bool) -> No
             file_path.write_text(render_template(content, values), encoding="utf-8")
         except (UnicodeDecodeError, PermissionError):
             pass
-        if file_path.suffix == ".sh":
+        if file_path.suffix in {".py", ".sh"}:
             current_mode = file_path.stat().st_mode
             file_path.chmod(current_mode | 0o755)
 
     print(f"[OK] Created {variant} skill scaffold at {target_dir}")
     print(
-        f"[NEXT] Fill in the description, remove placeholders, "
-        f"then run: python3 scripts/validate_skill.py {display_path(target_dir)}"
+        "[NEXT] Validation intentionally remains gated: replace the unimplemented source fixture, "
+        "record verified source health, then run: "
+        f"python3 scripts/validate_skill.py {display_path(target_dir)}"
     )
 
 
@@ -120,8 +171,8 @@ def main():
     parser.add_argument("name", help="skill name, normalized to hyphen-case")
     parser.add_argument(
         "--variant",
-        default="minimal",
-        help=f"template variant (default: minimal, choices: {', '.join(ALLOWED_VARIANTS)})",
+        default="public-api",
+        help=f"template variant (default: public-api, choices: {', '.join(ALLOWED_VARIANTS)})",
     )
     parser.add_argument(
         "--path",
@@ -133,6 +184,20 @@ def main():
         action="store_true",
         default=False,
         help="overwrite an existing target directory",
+    )
+    parser.add_argument("--description", required=True, help="Agent Skills trigger description")
+    parser.add_argument("--source-owner", required=True, help="agency, operator, project, or internal owner")
+    parser.add_argument("--source-url", required=True, help="canonical absolute primary-source URL")
+    parser.add_argument("--category", default="public-data", help="catalogue category")
+    parser.add_argument(
+        "--source-type",
+        choices=("official", "commercial", "community", "internal", "mixed"),
+        default="official",
+    )
+    parser.add_argument(
+        "--pack",
+        choices=("nz-public-data", "nz-commercial-web", "nz-personal-data", "thecolab-internal", "artifact-tools", "paid-data-connectors"),
+        help="override the variant's default trust pack",
     )
     args = parser.parse_args()
 
@@ -147,6 +212,12 @@ def main():
             variant=args.variant,
             parent_path=args.path,
             force=args.force,
+            description=args.description,
+            source_owner=args.source_owner,
+            source_url=args.source_url,
+            category=args.category,
+            source_type=args.source_type,
+            pack=args.pack,
         )
     except Exception as exc:
         print(f"[ERROR] {exc}", file=sys.stderr)

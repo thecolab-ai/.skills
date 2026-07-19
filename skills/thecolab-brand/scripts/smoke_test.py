@@ -7,4 +7,4 @@ text = skill.read_text(encoding="utf-8")
 for needle in ("TheColab.ai Brand Skill", "#1688C7", "Discover → Build → Operate", "Clawd", "scripts/cli.py"):
     if needle not in text:
         raise SystemExit(f"missing expected brand guidance: {needle}")
-print("[PASS] thecolab-brand guidance present")
+print("[PASS] contract thecolab-brand guidance present")

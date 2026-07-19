@@ -16,6 +16,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
 import nzfetch  # noqa: E402
 
 DEFAULT_BASE_URL = "https://api.akahu.io/v1"
+ALLOWED_API_HOSTS = {"api.akahu.io"}
 ACCOUNT_RE = re.compile(r"\b(?:\d{2}|x{4})-(?:\d{4}|x{4})-(?:\d{6,7}|x{4})-(?:\d{2,4})\b", re.I)
 SAFE_METHODS = {"GET"}
 MUTATING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
@@ -73,9 +74,19 @@ def parse_params(params):
     return parsed
 
 
+def validate_api_url(url):
+    try:
+        parsed = urllib.parse.urlparse(url)
+    except ValueError:
+        die("--base-url must be the official Akahu HTTPS API URL")
+    if parsed.scheme != "https" or (parsed.hostname or "").lower() not in ALLOWED_API_HOSTS:
+        die("--base-url must use the declared Akahu API host api.akahu.io")
+    return url.rstrip("/")
+
+
 class AkahuClient:
     def __init__(self, base_url, app_token, user_token):
-        self.base_url = base_url.rstrip("/")
+        self.base_url = validate_api_url(base_url)
         self.app_token = app_token
         self.user_token = user_token
 
@@ -97,7 +108,8 @@ class AkahuClient:
             headers["Content-Type"] = "application/json"
         response_body = ""
         try:
-            raw, _ct, _final = nzfetch.fetch_bytes(url, data=body, method=method, headers=headers, timeout=30)
+            raw, _ct, final_url = nzfetch.fetch_bytes(url, data=body, method=method, headers=headers, timeout=30)
+            validate_api_url(final_url)
             response_body = raw.decode("utf-8", "replace")
         except nzfetch.Blocked as exc:
             die(f"Akahu request failed for {method} {path}: network error: {exc}")
@@ -115,8 +127,9 @@ class AkahuClient:
 
 
 def get_client(args):
+    base_url = validate_api_url(args.base_url)
     return AkahuClient(
-        base_url=args.base_url,
+        base_url=base_url,
         app_token=env_required(args.app_token_env),
         user_token=env_required(args.user_token_env),
     )
@@ -298,6 +311,7 @@ def main(argv=None):
     p.add_argument("--out-dir", required=True)
     p.add_argument("--limit", type=int, default=100)
     p.add_argument("--raw-account-numbers", action="store_true", help="do not redact account numbers")
+    p.add_argument("--json", action="store_true", help="accepted for consistency; export summary is always JSON")
     p.set_defaults(func=cmd_export)
 
     args = parser.parse_args(argv)

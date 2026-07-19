@@ -1,6 +1,27 @@
 ---
 name: justice-data-nz
-description: Query New Zealand Ministry of Justice data tables for finalised charges, convictions, sentencing outcomes, family-violence offences, and youth justice statistics. Use when Codex needs official MoJ justice statistics, workbook URLs, or JSON rows from public no-key justice data tables.
+description: "Query New Zealand Ministry of Justice data tables for finalised charges, convictions, sentencing outcomes, family-violence offences, and youth justice statistics. Use when Codex needs official MoJ justice statistics, workbook URLs, or JSON rows from public no-key justice data tables."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "public-data"
+  thecolab.source_owner: "Ministry of Justice"
+  thecolab.source_type: "official"
+  thecolab.auth: "none"
+  thecolab.access_mode: "public-download"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "low"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "public-download"
+  thecolab.pack: "nz-public-data"
+  thecolab.source_url: "https://www.justice.govt.nz/justice-sector-policy/research-data/justice-statistics/data-tables/"
+  thecolab.allowed_domains: "catalogue.data.govt.nz,www.justice.govt.nz"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "gated"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # Justice Data NZ

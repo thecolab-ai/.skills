@@ -1,6 +1,27 @@
 ---
 name: mot-fleet-statistics-nz
-description: Query New Zealand Ministry of Transport annual fleet statistics workbooks for VKT, fleet composition, and light-fleet fuel or powertrain counts. Use when the task involves NZ vehicle kilometres travelled, annual fleet statistics, Ministry fleet workbook tables, EV-transition research, fuel counts, or source caveats for bot-protected transport data.
+description: "Query New Zealand Ministry of Transport annual fleet statistics workbooks for VKT, fleet composition, and light-fleet fuel or powertrain counts. Use when the task involves NZ vehicle kilometres travelled, annual fleet statistics, Ministry fleet workbook tables, EV-transition research, fuel counts, or source caveats for bot-protected transport data."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "transport"
+  thecolab.source_owner: "Ministry of Transport"
+  thecolab.source_type: "official"
+  thecolab.auth: "none"
+  thecolab.access_mode: "public-download"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "low"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "public-download"
+  thecolab.pack: "nz-public-data"
+  thecolab.source_url: "https://www.transport.govt.nz/statistics-and-insights/fleet-statistics/sheet/annual-fleet-statistics"
+  thecolab.allowed_domains: "www.mot-dev.link,www.transport.govt.nz"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "healthy"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # MoT Fleet Statistics NZ

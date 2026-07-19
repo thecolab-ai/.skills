@@ -1,6 +1,27 @@
 ---
 name: metservice-nz
-description: Query New Zealand weather data from the MetOcean API (MetService's data arm). Use when the task involves NZ weather forecasts, current conditions, marine/wave data, wind, rain, or atmospheric conditions for New Zealand locations. Requires METOCEAN_API_KEY.
+description: "Query New Zealand weather data from the MetOcean API (MetService's data arm). Use when the task involves NZ weather forecasts, current conditions, marine/wave data, wind, rain, or atmospheric conditions for New Zealand locations. Requires METOCEAN_API_KEY."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "environment"
+  thecolab.source_owner: "MetOcean Solutions"
+  thecolab.source_type: "official"
+  thecolab.auth: "api-key"
+  thecolab.access_mode: "public-api"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "medium"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "public-api"
+  thecolab.pack: "nz-public-data"
+  thecolab.source_url: "https://forecast-v2.metoceanapi.com/point/time"
+  thecolab.allowed_domains: "forecast-v2.metoceanapi.com,www.metservice.com"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "gated"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # MetService NZ (MetOcean API)
@@ -39,7 +60,7 @@ Requires a MetOcean API key (free tier available).
    ```
    METOCEAN_API_KEY=your_key_here
    ```
-3. The skill reads `process.env.METOCEAN_API_KEY` — no fallback, key is required.
+3. The Python CLI reads `os.environ["METOCEAN_API_KEY"]` lazily — no fallback, key is required.
 
 ## CLI
 

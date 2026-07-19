@@ -112,11 +112,11 @@ def test_invalid_year() -> bool:
 
 def main() -> int:
     checks = [
-        ("--help includes command names", test_help),
+        ("contract --help includes command names", test_help),
         ("categories returns filtered public taxonomy", test_categories),
         ("sources discovers public CAB material and blocked CABNET reporting", test_sources),
-        ("enquiries returns explicit structured-export blocked state", test_enquiries_blocked),
-        ("invalid year is rejected", test_invalid_year),
+        ("contract enquiries returns explicit structured-export blocked state", test_enquiries_blocked),
+        ("contract invalid year is rejected", test_invalid_year),
     ]
     results = [test(name, fn) for name, fn in checks]
     if all(results):

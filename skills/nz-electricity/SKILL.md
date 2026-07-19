@@ -1,6 +1,27 @@
 ---
 name: nz-electricity
-description: Query NZ electricity market data: EM6 wholesale spot prices, grid demand, carbon intensity, historical nodal prices, monthly generation by fuel type, distributed-generation solar uptake, gentailer energy-margin source status, and NZ lines-company outage records. No login or API key.
+description: "Query NZ electricity market data: EM6 wholesale spot prices, grid demand, carbon intensity, historical nodal prices, monthly generation by fuel type, distributed-generation solar uptake, gentailer energy-margin source status, and NZ lines-company outage records. No login or API key."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "environment"
+  thecolab.source_owner: "Electricity Authority and participating market operators"
+  thecolab.source_type: "mixed"
+  thecolab.auth: "none"
+  thecolab.access_mode: "public-api"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "low"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "public-api"
+  thecolab.pack: "nz-public-data"
+  thecolab.source_url: "https://api.em6.co.nz/ords/em6/data_api"
+  thecolab.allowed_domains: "api.em6.co.nz,api.integration.countiesenergy.co.nz,contact.co.nz,media.genesisenergy.co.nz,outage-centre.api.vector.co.nz,outagereporter.api.vector.co.nz,outages.powerco.co.nz,outages.topenergy.co.nz,public.tableau.com,server.ourpower.co.nz,www.auroraenergy.co.nz,www.ea.govt.nz,www.emi.ea.govt.nz,www.mercury.co.nz,www.meridianenergy.co.nz,www.nzier.org.nz,www.oriongroup.co.nz,www.unison.co.nz,www.welectricity.co.nz"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "healthy"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # NZ Electricity

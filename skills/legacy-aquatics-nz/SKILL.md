@@ -1,6 +1,27 @@
 ---
 name: legacy-aquatics-nz
-description: Query Legacy Aquatics NZ public WooCommerce category, product-search, and product-page HTML through a no-login read-only CLI. Use when a task needs current aquarium or reptile product discovery and source detail; never for cart, checkout, account, payment, hire, or husbandry advice.
+description: "Query Legacy Aquatics NZ public WooCommerce category, product-search, and product-page HTML through a no-login read-only CLI. Use when a task needs current aquarium or reptile product discovery and source detail; never for cart, checkout, account, payment, hire, or husbandry advice."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "public-data"
+  thecolab.source_owner: "Legacy Aquatics"
+  thecolab.source_type: "commercial"
+  thecolab.auth: "none"
+  thecolab.access_mode: "html-readonly"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "low"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "html-readonly"
+  thecolab.pack: "nz-commercial-web"
+  thecolab.source_url: "https://legacyaquatics.co.nz"
+  thecolab.allowed_domains: "legacyaquatics.co.nz"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "healthy"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # Legacy Aquatics NZ

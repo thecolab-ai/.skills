@@ -131,7 +131,7 @@ def test_dg_parser_handles_metadata_and_numbers():
     return True
 
 
-results.append(test("DG parser skips metadata and normalises numbers", test_dg_parser_handles_metadata_and_numbers))
+results.append(test("fixture DG parser skips metadata and normalises numbers", test_dg_parser_handles_metadata_and_numbers))
 
 
 def test_dg_latest_command():

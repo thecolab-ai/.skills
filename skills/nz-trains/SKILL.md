@@ -1,6 +1,27 @@
 ---
 name: nz-trains
-description: Query Wellington Metlink train lines through a lightweight read-only CLI using GTFS and GTFS-RT data. Use when the task involves Johnsonville, Kapiti, Hutt Valley, Melling, or Wairarapa Line stations, arrivals, delays, alerts, or live train positions. Requires METLINK_API_KEY.
+description: "Query Wellington Metlink train lines through a lightweight read-only CLI using GTFS and GTFS-RT data. Use when the task involves Johnsonville, Kapiti, Hutt Valley, Melling, or Wairarapa Line stations, arrivals, delays, alerts, or live train positions. Requires METLINK_API_KEY."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "transport"
+  thecolab.source_owner: "Metlink"
+  thecolab.source_type: "official"
+  thecolab.auth: "api-key"
+  thecolab.access_mode: "public-api"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "medium"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "public-api"
+  thecolab.pack: "nz-public-data"
+  thecolab.source_url: "https://api.opendata.metlink.org.nz/v1"
+  thecolab.allowed_domains: "api.opendata.metlink.org.nz"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "gated"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # NZ Trains

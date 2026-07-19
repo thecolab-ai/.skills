@@ -1,0 +1,26 @@
+name: Privacy exposure (non-sensitive)
+description: Report a privacy boundary concern without reproducing personal information.
+title: "[Privacy] "
+labels: [privacy]
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        If personal information is already exposed, stop and use a private
+        Security Advisory. Do not paste the affected data into this form.
+  - type: input
+    attributes:
+      label: Affected skill or component
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Privacy boundary at risk
+      description: Describe the class of data and exposure path without including a real record.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Expected safe behaviour
+    validations:
+      required: true

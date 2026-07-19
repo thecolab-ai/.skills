@@ -1,6 +1,29 @@
 ---
 name: pptx
-description: Use this skill any time a .pptx file is involved in any way — creating, reading, editing, combining, splitting, or updating decks, slides, presentations, templates, layouts, speaker notes, or comments.
+description: "Use this skill any time a .pptx file is involved in any way — creating, reading, editing, combining, splitting, or updating decks, slides, presentations, templates, layouts, speaker notes, or comments."
+license: MIT
+compatibility: "Requires Python 3.10+"
+metadata:
+  thecolab.category: "artifact-and-workflow"
+  thecolab.source_owner: "Anthropic"
+  thecolab.source_type: "mixed"
+  thecolab.auth: "none"
+  thecolab.access_mode: "documentation-workflow"
+  thecolab.data_class: "public"
+  thecolab.writes: "true"
+  thecolab.browser: "false"
+  thecolab.risk: "high"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "documentation-workflow"
+  thecolab.pack: "artifact-tools"
+  thecolab.source_url: "https://github.com/anthropics/skills/tree/main/skills/pptx"
+  thecolab.allowed_domains: "github.com"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "healthy"
+  thecolab.maintainer: "@adam91holt"
+  thecolab.mutations: "local-files"
+  thecolab.local_output: "presentation-files"
 ---
 
 # PPTX Skill

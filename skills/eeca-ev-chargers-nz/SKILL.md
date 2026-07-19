@@ -1,6 +1,27 @@
 ---
 name: eeca-ev-chargers-nz
-description: Query EECA New Zealand public EV charger dashboard CSVs and data.govt.nz metadata, including public charger units, co-funded charger pipeline rows, EV metrics by district or region, BEVs per charger, charging kW, site counts, and source caveats. Use for NZ EV infrastructure, EVRoam-derived charger coverage, charging equity, public co-funding, and For Good transport research.
+description: "Query EECA New Zealand public EV charger dashboard CSVs and data.govt.nz metadata, including public charger units, co-funded charger pipeline rows, EV metrics by district or region, BEVs per charger, charging kW, site counts, and source caveats. Use for NZ EV infrastructure, EVRoam-derived charger coverage, charging equity, public co-funding, and For Good transport research."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "transport"
+  thecolab.source_owner: "Energy Efficiency and Conservation Authority"
+  thecolab.source_type: "official"
+  thecolab.auth: "none"
+  thecolab.access_mode: "public-download"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "low"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "public-download"
+  thecolab.pack: "nz-public-data"
+  thecolab.source_url: "https://www.eeca.govt.nz/insights/data-tools/public-ev-charger-dashboard/"
+  thecolab.allowed_domains: "catalogue.data.govt.nz,www.eeca.govt.nz"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "healthy"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # EECA EV Chargers NZ

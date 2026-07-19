@@ -1,5 +1,10 @@
 # ComCom Connectivity Map Source Notes
 
+- Primary source: https://www.comcom.govt.nz
+- Declared outbound hosts: comcom.emtel.co.nz, www.comcom.govt.nz
+- Authentication: none
+- Last verified: 2026-07-19
+
 ## Public Sources
 
 - Telecommunications Connectivity Map page:

@@ -77,10 +77,15 @@ CHC_API = "https://www.christchurchairport.nz/api/flights"
 ZQN_API = "https://www.queenstownairport.co.nz/api/flights"
 WLG_FLIGHTS = "https://www.wellingtonairport.co.nz/flights/"
 AKL_FIDS_API = "https://h2g.aucklandairport.co.nz/api"
-AKL_FIDS_USERNAME = os.environ.get("AKL_API_USERNAME", "app-v5")
-AKL_FIDS_PASSWORD = os.environ.get("AKL_API_PASSWORD", "AWLyxd6{zxGsVg?coY")
 AKL_FIDS_APP_VERSION = "android|8.2.2"
 AKL_ADSB_SOURCE = "adsb.lol"
+ALLOWED_HOSTS = {
+    "api.adsb.lol",
+    "h2g.aucklandairport.co.nz",
+    "www.christchurchairport.nz",
+    "www.queenstownairport.co.nz",
+    "www.wellingtonairport.co.nz",
+}
 
 
 def die(message: str, code: int = 1) -> None:
@@ -94,7 +99,9 @@ def request_text(url: str, timeout: int = 25) -> str:
         "Accept": accept,
     }
     try:
-        return nzfetch.fetch_text(url, timeout=timeout, headers=headers, accept=accept)
+        return nzfetch.fetch_text(
+            url, timeout=timeout, headers=headers, accept=accept, allowed_hosts=ALLOWED_HOSTS
+        )
     except nzfetch.Blocked as e:
         die(f"network error: {e}")
     except nzfetch.FetchError as e:
@@ -108,7 +115,13 @@ def request_json(url: str, timeout: int = 25) -> Any:
         "Referer": url.rsplit("/", 1)[0] + "/",
     }
     try:
-        body, _ct, _final = nzfetch.fetch_bytes(url, timeout=timeout, headers=headers, accept=accept)
+        body, _ct, _final = nzfetch.fetch_bytes(
+            url,
+            timeout=timeout,
+            headers=headers,
+            accept=accept,
+            allowed_hosts=ALLOWED_HOSTS,
+        )
     except nzfetch.Blocked as e:
         die(f"network error: {e}")
     except nzfetch.FetchError as e:
@@ -121,9 +134,11 @@ def request_json(url: str, timeout: int = 25) -> Any:
 
 
 def akl_fids_auth_header() -> str:
-    if not AKL_FIDS_USERNAME or not AKL_FIDS_PASSWORD:
-        die("AKL FIDS requires AKL_API_USERNAME and AKL_API_PASSWORD")
-    token = base64.b64encode(f"{AKL_FIDS_USERNAME}:{AKL_FIDS_PASSWORD}".encode("utf-8")).decode("ascii")
+    username = os.environ.get("AKL_API_USERNAME")
+    password = os.environ.get("AKL_API_PASSWORD")
+    if not username or not password:
+        die("AKL FIDS requires AKL_API_USERNAME and AKL_API_PASSWORD", 3)
+    token = base64.b64encode(f"{username}:{password}".encode("utf-8")).decode("ascii")
     return f"Basic {token}"
 
 
@@ -137,7 +152,13 @@ def request_akl_fids_json(endpoint: str, params: dict[str, str], timeout: int = 
         "Content-Type": "application/vnd.api+json",
     }
     try:
-        body, _ct, _final = nzfetch.fetch_bytes(url, timeout=timeout, headers=headers, accept=accept)
+        body, _ct, _final = nzfetch.fetch_bytes(
+            url,
+            timeout=timeout,
+            headers=headers,
+            accept=accept,
+            allowed_hosts={"h2g.aucklandairport.co.nz"},
+        )
     except nzfetch.Blocked as e:
         die(f"network error: {e}")
     except nzfetch.FetchError as e:
@@ -145,7 +166,7 @@ def request_akl_fids_json(endpoint: str, params: dict[str, str], timeout: int = 
         if "HTTP 401" in msg or "HTTP 403" in msg:
             die(
                 "HTTP 401/403 from Auckland Airport FIDS API; "
-                "set AKL_API_USERNAME/AKL_API_PASSWORD if the public app credentials have rotated"
+                "check the operator-supplied AKL_API_USERNAME/AKL_API_PASSWORD"
             )
         die(msg)
     raw = body.decode("utf-8", "replace")
@@ -162,7 +183,11 @@ def request_adsb_aircraft(code: str) -> tuple[list[dict[str, Any]], str]:
     }
     try:
         body, _ct, _final = nzfetch.fetch_bytes(
-            url, timeout=ADSB_TIMEOUT_SECONDS, headers=headers, accept="application/json"
+            url,
+            timeout=ADSB_TIMEOUT_SECONDS,
+            headers=headers,
+            accept="application/json",
+            allowed_hosts=ALLOWED_HOSTS,
         )
     except nzfetch.Blocked as e:
         return [], f"network error calling adsb.lol: {e}"

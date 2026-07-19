@@ -1,6 +1,27 @@
 ---
 name: msd-benefits-nz
-description: Query official New Zealand MSD benefit statistics - Jobseeker Support, Sole Parent Support, Supported Living Payment, Youth Payment, NZ Superannuation and Veteran's Pension recipient numbers by quarter, gender, ethnicity, age group, and Work and Income region. Use for working-age benefit numbers, main benefit counts, welfare/superannuation recipient breakdowns, and benefit trends. No API key or browser session required.
+description: "Query official New Zealand MSD benefit statistics - Jobseeker Support, Sole Parent Support, Supported Living Payment, Youth Payment, NZ Superannuation and Veteran's Pension recipient numbers by quarter, gender, ethnicity, age group, and Work and Income region. Use for working-age benefit numbers, main benefit counts, welfare/superannuation recipient breakdowns, and benefit trends. No API key or browser session required."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "social-policy"
+  thecolab.source_owner: "Ministry of Social Development"
+  thecolab.source_type: "official"
+  thecolab.auth: "none"
+  thecolab.access_mode: "public-download"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "low"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "public-download"
+  thecolab.pack: "nz-public-data"
+  thecolab.source_url: "https://www.msd.govt.nz/documents/about-msd-and-our-work/"
+  thecolab.allowed_domains: "www.msd.govt.nz"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "healthy"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # MSD Benefits NZ

@@ -7,14 +7,14 @@ The standard is simple: narrow skills, strong trigger descriptions, lean `SKILL.
 ## Quick start
 
 ```bash
-# No install step required — this repo has zero Node.js dependencies.
-# Everything is Python stdlib.
-
-python3 scripts/new_skill.py my-skill --variant minimal
+python3 scripts/new_skill.py my-skill \
+  --variant public-api \
+  --description "Query the official example API. Use for example records and status checks." \
+  --source-owner "Example Agency" \
+  --source-url "https://example.govt.nz/api"
 python3 scripts/validate_skill.py skills/my-skill
-
-# Run skill smoke tests (Python, stdlib only — no extra deps)
-python3 skills/<name>/scripts/smoke_test.py
+python3 skills/my-skill/scripts/test_contract.py
+python3 scripts/run_smoke_tests.py my-skill
 ```
 
 ## Core stance
@@ -25,8 +25,12 @@ python3 skills/<name>/scripts/smoke_test.py
 - Move deep reference material into `references/`
 - Put deterministic operations into `scripts/cli.py` as Python standard-library CLIs
 - Keep helper CLI dependencies minimal: prefer Python stdlib; declare third-party deps in `requirements.txt` or PEP 723 `# /// script` inline metadata
-- TypeScript/Node skill helpers are **not accepted** — all scripts must be Python
+- TypeScript/Node skill helpers are **not accepted**. The one declared legacy Jetstar exception must not be copied.
 - Avoid per-skill doc clutter
+
+The public Agent Skills format and TheColab repository policy are validated
+separately. Every skill declares the metadata, trust pack, outbound hosts, and
+runtime schema described in [`docs/contracts.md`](docs/contracts.md).
 
 ## Shared public HTTP access — the `nzfetch` helper
 
@@ -224,15 +228,17 @@ Bad:
 A script with no invocation guidance is dead weight.
 Reference the script from `SKILL.md` or a linked reference doc.
 
-Python standard-library CLIs are the only accepted format for skill helpers. Do not add TypeScript or Node-based scripts. This repo has zero Node.js dependencies — no `npm install`, no `package.json`, no TypeScript toolchain. Document any required runtime, environment variable, or auth assumption in `SKILL.md`.
+Python is the canonical format for skill helpers. Do not add TypeScript or Node-based scripts. Document any required runtime, environment variable, or auth assumption in `SKILL.md` metadata and source notes.
 
 ## Template variants
 
 Use the scaffold that matches the job:
 
-- `minimal` for narrow one-file skills
-- `cli-workflow` for multi-step skills with references and scripts
-- `tool-wrapper` for skills centered around a specific external CLI or API client
+- `public-api` for documented public APIs
+- `public-download` for CSV, workbook, ZIP, or other published exports
+- `html-readonly` for bounded public website retrieval
+- `authenticated-personal` for user-authorised personal data
+- `documentation-workflow` for internal or artifact-oriented procedures
 
 ## Review checklist
 
@@ -241,9 +247,14 @@ Use the scaffold that matches the job:
 - [ ] `SKILL.md` is operational, not bloated
 - [ ] References are linked directly from `SKILL.md`
 - [ ] Script usage is documented
+- [ ] The Agent Skills spec validator and repository-policy validator pass
+- [ ] `scripts/test_contract.py` passes with representative parser fixtures
+- [ ] Every data command supports `--json` and the common runner envelope
+- [ ] Outbound hosts, auth, writes, browser use, risk, and trust pack are declared
+- [ ] Smoke output records fixture assertions, live assertions, skips, and source health
 - [ ] No placeholder text remains
 - [ ] No forbidden clutter files exist
-- [ ] Validator passes cleanly
+- [ ] Generated catalogue and pack manifests have no drift
 
 ## Bottom line
 

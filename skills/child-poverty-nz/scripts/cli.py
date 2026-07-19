@@ -546,7 +546,7 @@ def build_parser() -> argparse.ArgumentParser:
     m.set_defaults(func=cmd_measures)
 
     n = sub.add_parser("national", help="National proportion, number, change and population for a measure")
-    n.add_argument("--measure", default="MEASA", help="Measure code (default MEASA / BHC<50%)")
+    n.add_argument("--measure", default="MEASA", help="Measure code (default MEASA / BHC<50%%)")
     n.add_argument("--year", help="Single year ended June (e.g. 2025)")
     n.add_argument("--from", dest="from_year", help="Start year")
     n.add_argument("--to", dest="to_year", help="End year")

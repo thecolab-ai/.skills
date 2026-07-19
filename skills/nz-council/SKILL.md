@@ -1,6 +1,27 @@
 ---
 name: nz-council
-description: Query NZ council events and public recreation facilities (pools, leisure centres) for Auckland, Wellington, Christchurch, Rotorua, Hamilton, Dunedin, and 10 other NZ council areas. Optional --browser mode uses CloakBrowser for public pages that direct HTTP cannot fetch. Not for rates, consents, payments, or bookings.
+description: "Query NZ council events and public recreation facilities (pools, leisure centres) for Auckland, Wellington, Christchurch, Rotorua, Hamilton, Dunedin, and 10 other NZ council areas. Optional --browser mode uses CloakBrowser for public pages that direct HTTP cannot fetch. Not for rates, consents, payments, or bookings."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "government"
+  thecolab.source_owner: "Participating councils and public venue operators"
+  thecolab.source_type: "mixed"
+  thecolab.auth: "none"
+  thecolab.access_mode: "public-api"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "true"
+  thecolab.risk: "medium"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "public-api"
+  thecolab.pack: "nz-public-data"
+  thecolab.source_url: "https://www.eventfinda.co.nz"
+  thecolab.allowed_domains: "127.0.0.1,clm.perfectgym.com.au,pools.huttcity.govt.nz,portal.hastingsdc.govt.nz,recandsport.ccc.govt.nz,terauparaha-arena.co.nz,wellington.govt.nz,www.aquaticshastings.co.nz,www.aucklandleisure.co.nz,www.bellblockaquaticcentre.co.nz,www.clmnz.co.nz,www.dunedin.govt.nz,www.eventfinda.co.nz,www.h2oxtream.com,www.hamiltonpools.co.nz,www.hastingsdc.govt.nz,www.hbaquatic.co.nz,www.hepunataimoana.co.nz,www.kapiticoastaquatics.co.nz,www.mounthotpools.co.nz,www.napier.govt.nz,www.napieraquatic.co.nz,www.nelson.govt.nz,www.npdc.govt.nz,www.pncc.govt.nz,www.qldc.govt.nz,www.rotorualakescouncil.nz,www.splashplanet.co.nz,www.tasman.govt.nz,www.tauranga.govt.nz,www.taurangapools.co.nz,www.wdc.govt.nz,www.wharenuisportscentre.co.nz"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "healthy"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # NZ Council

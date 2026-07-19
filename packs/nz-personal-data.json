@@ -1,0 +1,10 @@
+{
+  "schema_version": "1",
+  "name": "nz-personal-data",
+  "description": "User-authorised personal data with runtime credentials and no live personal CI fixtures.",
+  "default": false,
+  "skill_count": 1,
+  "skills": [
+    "akahu-personal"
+  ]
+}

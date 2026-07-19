@@ -31,7 +31,7 @@ def test(name: str, fn) -> bool:
 
 def upstream_skip(result: subprocess.CompletedProcess[str]) -> bool:
     if result.returncode == 2 and "upstream_unavailable" in result.stderr:
-        print("  upstream unavailable; skipping network assertion")
+        print("  [SKIP] live upstream unavailable")
         return True
     return False
 

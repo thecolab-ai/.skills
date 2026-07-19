@@ -1,6 +1,27 @@
 ---
 name: nz-news
-description: Aggregate RSS feeds from major New Zealand news websites. Use when the task involves NZ news, current events in New Zealand, what's happening in NZ, NZ headlines, or searching NZ stories by topic, timeframe, or source. No authentication required.
+description: "Aggregate RSS feeds from major New Zealand news websites. Use when the task involves NZ news, current events in New Zealand, what's happening in NZ, NZ headlines, or searching NZ stories by topic, timeframe, or source. No authentication required."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "events-and-media"
+  thecolab.source_owner: "Participating New Zealand news publishers"
+  thecolab.source_type: "commercial"
+  thecolab.auth: "none"
+  thecolab.access_mode: "html-readonly"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "low"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "html-readonly"
+  thecolab.pack: "nz-commercial-web"
+  thecolab.source_url: "https://rss.nzherald.co.nz/rss/xml/nzhrsscid_000000001.xml"
+  thecolab.allowed_domains: "rss.nzherald.co.nz,thespinoff.co.nz,www.interest.co.nz,www.newsroom.co.nz,www.rnz.co.nz,www.stuff.co.nz"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "healthy"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # NZ News
@@ -186,3 +207,7 @@ No API key required — runs on the Python 3 standard library only.
 - Default output is human-readable, `--json` output is for chaining into other tools or agent steps
 - Headlines are deduplicated by normalised title across sources
 - RNZ category feeds may overlap with the main RNZ feed
+
+## Source notes
+
+Read `references/source-notes.md` for source ownership, access, and freshness boundaries.

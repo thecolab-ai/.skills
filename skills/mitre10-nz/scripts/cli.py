@@ -21,6 +21,7 @@ import nzfetch  # noqa: E402
 BASE_WEB = "https://www.mitre10.co.nz"
 BASE_OCC = "https://ccapi.mitre10.co.nz/occ/v2/mitre10"
 ALGOLIA_APP_ID = "CQ00O09OXX"
+# Public read-only Algolia search key delivered to every Mitre 10 browser.
 ALGOLIA_SEARCH_KEY = "edc61cb5be5216c9cc02459f13e33729"
 ALGOLIA_INDEX = "retail_products_relevance"
 ALGOLIA_HOST = "https://cq00o09oxx-dsn.algolia.net"
@@ -74,6 +75,11 @@ def request_json(
             headers=req_headers,
             data=data,
             method=method,
+            allowed_hosts={
+                "ccapi.mitre10.co.nz",
+                "cq00o09oxx-dsn.algolia.net",
+                "www.mitre10.co.nz",
+            },
         )
     except nzfetch.Blocked as e:
         die(f"network error calling {url}: {e}")

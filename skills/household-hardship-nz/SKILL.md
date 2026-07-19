@@ -1,6 +1,27 @@
 ---
 name: household-hardship-nz
-description: Query New Zealand household material hardship, child and family poverty, income adequacy, housing affordability and rent burden, low-income household counts, and the Gini coefficient of income inequality from the Stats NZ Household Economic Survey "Household Wellbeing" release on data.govt.nz. Use for questions about NZ deprivation, cost-of-living stress, who is struggling to afford housing, hardship by region or ethnicity (including Maori households), or income inequality figures with confidence intervals.
+description: "Query New Zealand household material hardship, child and family poverty, income adequacy, housing affordability and rent burden, low-income household counts, and the Gini coefficient of income inequality from the Stats NZ Household Economic Survey \"Household Wellbeing\" release on data.govt.nz. Use for questions about NZ deprivation, cost-of-living stress, who is struggling to afford housing, hardship by region or ethnicity (including Maori households), or income inequality figures with confidence intervals."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "social-policy"
+  thecolab.source_owner: "Stats NZ"
+  thecolab.source_type: "official"
+  thecolab.auth: "none"
+  thecolab.access_mode: "public-download"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "low"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "public-download"
+  thecolab.pack: "nz-public-data"
+  thecolab.source_url: "https://catalogue.data.govt.nz/api/3/action"
+  thecolab.allowed_domains: "catalogue.data.govt.nz"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "healthy"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # Household Hardship NZ

@@ -1,6 +1,27 @@
 ---
 name: biosecurity-nz
-description: Searches New Zealand biosecurity public data from the Official NZ Pest Register, PIER import requirements metadata, data.govt.nz CKAN records, and MPI active-response pages. Use when checking whether an organism is regulated, unwanted, or notifiable in NZ; finding pest synonyms/statuses; resolving import commodity requirement links; listing current biosecurity responses; or documenting source/access caveats.
+description: "Searches New Zealand biosecurity public data from the Official NZ Pest Register, PIER import requirements metadata, data.govt.nz CKAN records, and MPI active-response pages. Use when checking whether an organism is regulated, unwanted, or notifiable in NZ; finding pest synonyms/statuses; resolving import commodity requirement links; listing current biosecurity responses; or documenting source/access caveats."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "environment"
+  thecolab.source_owner: "Ministry for Primary Industries"
+  thecolab.source_type: "mixed"
+  thecolab.auth: "none"
+  thecolab.access_mode: "public-api"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "low"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "public-api"
+  thecolab.pack: "nz-public-data"
+  thecolab.source_url: "https://onzpr.mpi.govt.nz"
+  thecolab.allowed_domains: "catalogue.data.govt.nz,onzpr.mpi.govt.nz,pierpestregister.mpi.govt.nz,piersearch.mpi.govt.nz,www.mpi.govt.nz"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "healthy"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # Biosecurity NZ

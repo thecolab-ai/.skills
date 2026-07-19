@@ -112,9 +112,9 @@ def test(name: str, fn) -> bool:
 
 results: list[bool] = []
 
-results.append(test("--help exits 0", lambda: run(["--help"]).returncode == 0))
+results.append(test("contract --help exits 0", lambda: run(["--help"]).returncode == 0))
 
-results.append(test("categories lists filters", lambda: (
+results.append(test("contract categories lists filters", lambda: (
     (r := run(["categories"])).returncode == 0 and "food" in r.stdout
 )))
 
@@ -130,7 +130,7 @@ def test_categories_json() -> bool:
     )
 
 
-results.append(test("categories --json emits structured filters", test_categories_json))
+results.append(test("contract categories --json emits structured filters", test_categories_json))
 
 
 def test_nearby_json() -> bool:
@@ -151,7 +151,7 @@ def test_nearby_json() -> bool:
     return required.issubset(rows[0])
 
 
-results.append(test("nearby --json normalizes fixture results", test_nearby_json))
+results.append(test("fixture nearby --json normalizes source results", test_nearby_json))
 
 
 def test_food_filter() -> bool:
@@ -167,24 +167,24 @@ def test_food_filter() -> bool:
     return data.get("category") == "food" and isinstance(rows, list) and len(rows) == 2
 
 
-results.append(test("nearby --category food returns food fixture", test_food_filter))
+results.append(test("fixture nearby --category food returns source rows", test_food_filter))
 
-results.append(test("nearby invalid category errors cleanly", lambda: (
+results.append(test("contract nearby invalid category errors cleanly", lambda: (
     (r := run(["nearby", "-36.8485", "174.7633", "--category", "nonexistent"])).returncode != 0 and
     "unknown category" in r.stderr.lower() and "traceback" not in r.stderr.lower()
 )))
 
-results.append(test("nearby invalid coordinate errors cleanly", lambda: (
+results.append(test("contract nearby invalid coordinate errors cleanly", lambda: (
     (r := run(["nearby", "not-a-lat", "174.7633", "--json"])).returncode != 0 and
     "latitude must be a number" in r.stderr.lower() and "traceback" not in r.stderr.lower()
 )))
 
-results.append(test("nearby out-of-bounds coordinate errors cleanly", lambda: (
+results.append(test("contract nearby out-of-bounds coordinate errors cleanly", lambda: (
     (r := run(["nearby", "51.5007", "-0.1246", "--json"])).returncode != 0 and
     "within new zealand bounds" in r.stderr.lower() and "traceback" not in r.stderr.lower()
 )))
 
-results.append(test("nearby excessive radius errors cleanly", lambda: (
+results.append(test("contract nearby excessive radius errors cleanly", lambda: (
     (r := run(["nearby", "-36.8485", "174.7633", "--radius", "100000", "--json"])).returncode != 0 and
     "radius must be between" in r.stderr.lower() and "traceback" not in r.stderr.lower()
 )))

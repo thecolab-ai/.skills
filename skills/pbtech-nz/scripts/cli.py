@@ -16,7 +16,13 @@ def die(m,c=1): print(f'pbtech-nz: {m}',file=sys.stderr); raise SystemExit(c)
 def fetch(url):
  if url.startswith('/'): url=BASE+url
  try:
+  parsed=urllib.parse.urlparse(url); port=parsed.port
+ except ValueError: die('URL must use the declared PB Tech NZ HTTPS host')
+ if parsed.scheme!='https' or parsed.hostname not in {'pbtech.co.nz','www.pbtech.co.nz'} or parsed.username is not None or parsed.password is not None or port not in (None,443): die('URL must use the declared PB Tech NZ HTTPS host')
+ try:
   body,_ct,final=nzfetch.fetch_bytes(url,headers=HEADERS,timeout=40)
+  final_parsed=urllib.parse.urlparse(final)
+  if final_parsed.scheme!='https' or final_parsed.hostname not in {'pbtech.co.nz','www.pbtech.co.nz'}: die('PB Tech redirected to an undeclared host')
   return body.decode('utf-8','replace'), final
  except nzfetch.Blocked as e: die(f'network error fetching {url}: {e}')
  except nzfetch.FetchError as e: die(f'failed fetching {url}: {e}')

@@ -18,28 +18,34 @@ from typing import Any
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
 import nzfetch  # noqa: E402
 
-NEEDS = ("duckdb", "pytz")
-try:
-    import duckdb  # type: ignore
-    # duckdb requires pytz at runtime for timezone-aware timestamp casts (the
-    # price/history parquet `updated_at` columns). Import it here so a host that
-    # has duckdb but not pytz still triggers the uv bootstrap below instead of
-    # crashing mid-query.
-    import pytz  # type: ignore  # noqa: F401
-except Exception:
-    if os.environ.get("GROCER_NZ_BOOTSTRAPPED") != "1" and shutil.which("uv"):
-        env = os.environ.copy()
-        env["GROCER_NZ_BOOTSTRAPPED"] = "1"
-        os.execvpe(
-            "uv",
-            ["uv", "run", "--quiet", "--with", "duckdb", "--with", "pytz", "python", __file__, *sys.argv[1:]],
-            env,
-        )
-    raise
+duckdb = None
+
+
+def ensure_dependencies() -> None:
+    """Load optional data dependencies only when a data command needs them."""
+    global duckdb
+    if duckdb is not None:
+        return
+    try:
+        import duckdb as loaded_duckdb  # type: ignore
+        import pytz  # type: ignore  # noqa: F401
+    except Exception:
+        if os.environ.get("GROCER_NZ_BOOTSTRAPPED") != "1" and shutil.which("uv"):
+            env = os.environ.copy()
+            env["GROCER_NZ_BOOTSTRAPPED"] = "1"
+            os.execvpe(
+                "uv",
+                ["uv", "run", "--quiet", "--with", "duckdb", "--with", "pytz", "python", __file__, *sys.argv[1:]],
+                env,
+            )
+        raise RuntimeError("grocer-nz requires duckdb and pytz; install them or run with uv")
+    duckdb = loaded_duckdb
 
 BASE = "https://assets-prod.grocer.nz/public"
 MEILI = "https://meilisearch.grocer.nz"
+# Public read-only search key shipped to every grocer.nz browser client.
 MEILI_KEY = "7f58239330307ec585c86863f985ab83cbb9ce951a9601c66e158548fb632fd1"
+ALLOWED_HOSTS = {"assets-prod.grocer.nz", "grocer.nz", "meilisearch.grocer.nz"}
 CACHE = pathlib.Path(os.environ.get("GROCER_NZ_CACHE", "~/.cache/grocer-nz")).expanduser()
 HEADERS = {"Referer": "https://grocer.nz/"}
 MAX_LIMIT = 100
@@ -47,7 +53,10 @@ MAX_LIMIT = 100
 
 def http_get(url: str, *, headers: dict[str, str] | None = None) -> bytes:
     body, _content_type, _final_url = nzfetch.fetch_bytes(
-        url, timeout=120, headers={**HEADERS, **(headers or {})}
+        url,
+        timeout=120,
+        headers={**HEADERS, **(headers or {})},
+        allowed_hosts=ALLOWED_HOSTS,
     )
     return body
 
@@ -60,6 +69,7 @@ def http_json(url: str, payload: dict[str, Any], *, headers: dict[str, str] | No
         data=data,
         method="POST",
         headers={"Content-Type": "application/json", **HEADERS, **(headers or {})},
+        allowed_hosts={"meilisearch.grocer.nz"},
     )
 
 
@@ -105,6 +115,7 @@ def history_file(product_id: int, force: bool = False) -> pathlib.Path | None:
 
 
 def con(force: bool = False):
+    ensure_dependencies()
     db = base_db(force=force)
     c = duckdb.connect(":memory:")
     sql = "attach " + sql_quote_path(db) + " as base (READ_ONLY)"

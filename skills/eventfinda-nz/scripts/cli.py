@@ -28,11 +28,29 @@ def die(message: str, code: int = 1) -> None:
     raise SystemExit(code)
 
 
+def validate_eventfinda_url(url: str) -> str:
+    try:
+        parsed = urllib.parse.urlparse(url)
+        port = parsed.port
+    except ValueError:
+        die("event URL must use the declared Eventfinda NZ host")
+    if (
+        parsed.scheme != "https"
+        or (parsed.hostname or "").lower() not in {"eventfinda.co.nz", "www.eventfinda.co.nz"}
+        or parsed.username is not None
+        or parsed.password is not None
+        or port not in (None, 443)
+    ):
+        die("event URL must use the declared Eventfinda NZ host")
+    return url
+
+
 def get(url_or_path: str, timeout: int = 30) -> tuple[str, str, int]:
     if url_or_path.startswith("http://") or url_or_path.startswith("https://"):
         url = url_or_path
     else:
         url = BASE + (url_or_path if url_or_path.startswith("/") else "/" + url_or_path)
+    validate_eventfinda_url(url)
     try:
         body, _ct, final_url = nzfetch.fetch_bytes(
             url, timeout=timeout, accept="text/html,application/xhtml+xml", expect_json=False
@@ -41,6 +59,7 @@ def get(url_or_path: str, timeout: int = 30) -> tuple[str, str, int]:
         die(f"network error: {e}")
     except nzfetch.FetchError as e:
         die(str(e))
+    validate_eventfinda_url(final_url)
     return body.decode("utf-8", "replace"), final_url, 200
 
 

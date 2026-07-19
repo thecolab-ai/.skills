@@ -106,6 +106,7 @@ def main() -> int:
     title_parser = module.PageMetadataParser()
     title_parser.feed("<html><head><title>Store locations</title></head><body><svg><title>Visa</title></svg></body></html>")
     require(title_parser.title == "Store locations", "store-page title must ignore SVG titles")
+    print("[PASS] fixture storefront normalization, schema rejection, and access guards")
 
     help_result = run("--help")
     require(help_result.returncode == 0, help_result.stderr)

@@ -1,6 +1,27 @@
 ---
 name: fyi-oia-nz
-description: Query FYI.org.nz OIA/LGOIMA public authorities and request records through a read-only Alaveteli API surface, including request metadata, authority lookups, request timelines, and request search.
+description: "Query FYI.org.nz OIA/LGOIMA public authorities and request records through a read-only Alaveteli API surface, including request metadata, authority lookups, request timelines, and request search."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "government"
+  thecolab.source_owner: "FYI and mySociety"
+  thecolab.source_type: "community"
+  thecolab.auth: "none"
+  thecolab.access_mode: "public-api"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "low"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "public-api"
+  thecolab.pack: "nz-public-data"
+  thecolab.source_url: "https://fyi.org.nz"
+  thecolab.allowed_domains: "fyi.org.nz"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "gated"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # FYI.org.nz OIA/LGOIMA

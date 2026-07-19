@@ -22,4 +22,4 @@ for needle in ("markitdown", "pptxgenjs", "thumbnail.py", "editing.md"):
     if needle not in skill:
         raise SystemExit(f"SKILL.md missing expected guidance: {needle}")
 
-print("[PASS] pptx skill docs and helper scripts present")
+print("[PASS] contract pptx skill docs and helper scripts present")

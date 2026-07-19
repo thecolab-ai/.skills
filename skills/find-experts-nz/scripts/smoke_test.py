@@ -232,24 +232,24 @@ def test_register_unknown():
 
 def main() -> int:
     results = [
-        test("help lists subcommands", test_help),
-        test("search requires a topic", test_search_requires_topic),
+        test("contract help lists subcommands", test_help),
+        test("contract search requires a topic", test_search_requires_topic),
         test("topics resolves ids", test_topics),
         test("search returns NZ experts", test_search),
         test("crossref source search", test_search_crossref),
         test("wikidata source search", test_search_wikidata),
         test("institutions resolve", test_institutions),
         test("search by institution", test_search_by_institution),
-        test("unis lists auckland+massey", test_unis),
+        test("contract unis lists auckland+massey", test_unis),
         test("directory auckland", test_directory_auckland),
         test("directory massey, no contact leak", test_directory_massey_no_contact),
-        test("directory todo uni refused", test_directory_todo_refused),
-        test("registers lists the four", test_registers),
+        test("contract directory todo uni refused", test_directory_todo_refused),
+        test("contract registers lists the four", test_registers),
         test("register pgdb (trades)", test_register_pgdb),
         test("register mcnz (doctors)", test_register_mcnz),
         test("register legalaid (lawyers)", test_register_legalaid),
         test("register irpnz (rural)", test_register_irpnz),
-        test("register unknown errors", test_register_unknown),
+        test("contract register unknown errors", test_register_unknown),
         test("orcid record fetch", test_orcid),
     ]
     passed = sum(1 for r in results if r is True)

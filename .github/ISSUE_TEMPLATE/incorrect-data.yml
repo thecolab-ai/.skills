@@ -1,0 +1,31 @@
+name: Incorrect data
+description: Report a value, parser result, attribution, or freshness problem.
+title: "[Data] "
+labels: [incorrect-data]
+body:
+  - type: input
+    attributes:
+      label: Skill
+      placeholder: stats-nz
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: Command and arguments
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Observed result
+      description: Redact credentials and personal information.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Primary-source evidence
+      description: Include the official URL, source version, and retrieval time where possible.
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: Retrieval time and timezone

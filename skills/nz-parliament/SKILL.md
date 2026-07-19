@@ -1,6 +1,27 @@
 ---
 name: nz-parliament
-description: Track New Zealand Parliament bills and their legislative progress from the public bills.parliament.nz API. Use when the task involves NZ bills, legislation before Parliament, a bill's status or stage (first reading, select committee, etc.), who introduced a bill, government vs member's bills, or searching bills by keyword. Keyless, read-only; no login. Covers bills only (not MP directory, votes, Hansard, or petitions).
+description: "Track New Zealand Parliament bills and their legislative progress from the public bills.parliament.nz API. Use when the task involves NZ bills, legislation before Parliament, a bill's status or stage (first reading, select committee, etc.), who introduced a bill, government vs member's bills, or searching bills by keyword. Keyless, read-only; no login. Covers bills only (not MP directory, votes, Hansard, or petitions)."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "government"
+  thecolab.source_owner: "New Zealand Parliament"
+  thecolab.source_type: "official"
+  thecolab.auth: "none"
+  thecolab.access_mode: "public-api"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "low"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "public-api"
+  thecolab.pack: "nz-public-data"
+  thecolab.source_url: "https://bills.parliament.nz"
+  thecolab.allowed_domains: "bills.parliament.nz"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "healthy"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # NZ Parliament

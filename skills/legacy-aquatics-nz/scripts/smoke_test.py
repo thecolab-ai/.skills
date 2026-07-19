@@ -36,20 +36,20 @@ def live(args):
  try:return json.loads(r.stdout)
  except json.JSONDecodeError:print("[FAIL] invalid JSON:",r.stdout[:180]);raise SystemExit(1)
 if run("--help").returncode:raise SystemExit("[FAIL] help")
-print("[PASS] help")
+print("[PASS] contract help")
 assert cli.allowed(cli.BASE+":443/test") and not cli.allowed("https://user@legacyaquatics.co.nz/test") and not cli.allowed(cli.BASE+":444/test")
 try:cli.StorefrontRedirectHandler().redirect_request(None,None,302,"",{},"https://example.org/test");raise AssertionError("foreign redirect allowed")
 except cli.CliError:pass
 assert fetch_rejected("https://example.org/test") and fetch_rejected(cli.BASE+"/test")
-print("[PASS] canonical origin, redirect, final URL and response-size boundaries")
+print("[PASS] contract canonical origin, redirect, final URL and response-size boundaries")
 assert run("category", "../../not-a-category", "--json").returncode != 0
-print("[PASS] rejects an unsafe category slug")
+print("[PASS] contract rejects an unsafe category slug")
 assert run("search", " ", "--json").returncode != 0
 assert run("product", "http://legacyaquatics.co.nz/product/nope/", "--json").returncode != 0
-print("[PASS] rejects empty search and non-HTTPS product URL")
+print("[PASS] contract rejects empty search and non-HTTPS product URL")
 fixture='<a href="/product/example/"><img alt=""></a><h4><a href="/product/example/">Example Product</a></h4>'
 assert cli.product_links(fixture,cli.BASE)==[{"title":"Example Product","url":cli.BASE+"/product/example/"}]
-print("[PASS] duplicate product anchors retain the non-empty title")
+print("[PASS] fixture duplicate product anchors retain the non-empty title")
 price_fixture='''<meta property="product:price:amount" content="5.99">
 <meta property="product:price:currency" content="NZD">
 <span class="woocommerce-Price-amount"><bdi><span>$</span></bdi></span>'''
@@ -68,19 +68,19 @@ try:
  cli.json.loads=lambda raw:(_ for _ in ()).throw(ValueError("decoder rejected structure"))
  assert cli.product_price('<script type="application/ld+json">{}</script>')==(None,None)
 finally:cli.json.loads=original_json_loads
-print("[PASS] canonical NZD metadata yields a numeric, truthful product price")
+print("[PASS] fixture canonical NZD metadata yields a numeric, truthful product price")
 availability_fixture='<meta name="twitter:data2" content="In stock"><meta name="twitter:label2" content="Availability">'
 assert cli.product_availability(availability_fixture)==("InStock",True)
-print("[PASS] evidenced product availability is normalized")
+print("[PASS] fixture evidenced product availability is normalized")
 data=live(["category","aquariums-and-equipment","--limit","2","--json"])
 if data is not None:
- assert data["source_url"] and data["retrieved_at"] and data["results"] and all(row["title"] for row in data["results"]);print("[PASS] category JSON metadata and titles")
+ assert data["source_url"] and data["retrieved_at"] and data["results"] and all(row["title"] for row in data["results"]);print("[PASS] live category JSON metadata and titles")
 detail=live(["product","https://legacyaquatics.co.nz/product/fishheatpack40hour/","--json"])
 if detail is not None:
  assert detail["product"]["url"] and detail["retrieved_at"]
  assert isinstance(detail["product"]["price_nzd"],(int,float)) and detail["product"]["price_nzd"]>0
  assert detail["product"]["price_text"] not in (None,"$","$ $ $")
- print("[PASS] detail JSON with evidenced NZD price")
+ print("[PASS] live detail JSON with evidenced NZD price")
 search=live(["search","filter","--limit","2","--json"])
-if search is not None:assert search["source_url"] and isinstance(search["results"],list);print("[PASS] search JSON")
+if search is not None:assert search["source_url"] and isinstance(search["results"],list);print("[PASS] live search JSON")
 print("Smoke test complete.")

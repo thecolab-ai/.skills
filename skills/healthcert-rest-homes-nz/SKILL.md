@@ -1,6 +1,27 @@
 ---
 name: healthcert-rest-homes-nz
-description: Query Ministry of Health certified aged-care rest-home provider data, facility pages, audit-report links, and certification caveats. Use when the task involves NZ rest-home certification, aged-care provider beds, legal entities, auditors, certificate end dates, audit report metadata, corrective-action page availability, or source caveats for bot-protected Ministry facility pages.
+description: "Query Ministry of Health certified aged-care rest-home provider data, facility pages, audit-report links, and certification caveats. Use when the task involves NZ rest-home certification, aged-care provider beds, legal entities, auditors, certificate end dates, audit report metadata, corrective-action page availability, or source caveats for bot-protected Ministry facility pages."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "property"
+  thecolab.source_owner: "Ministry of Health"
+  thecolab.source_type: "official"
+  thecolab.auth: "none"
+  thecolab.access_mode: "public-api"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "low"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "public-api"
+  thecolab.pack: "nz-public-data"
+  thecolab.source_url: "https://www.health.govt.nz/system/files/LegalEntitySummaryAgedCare.csv"
+  thecolab.allowed_domains: "www.health.govt.nz"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "healthy"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # HealthCert Rest Homes NZ

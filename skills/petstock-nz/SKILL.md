@@ -1,6 +1,27 @@
 ---
 name: petstock-nz
-description: Query Petstock NZ's public Algolia catalogue and product JSON-LD for bounded product search, current standard and Autoship prices, public offers, rewards signals, and online availability. Use when comparing Petstock NZ products or checking a known product handle, URL, or SKU. Read-only; no account, cart, checkout, payment, vet, booking, or other mutations.
+description: "Query Petstock NZ's public Algolia catalogue and product JSON-LD for bounded product search, current standard and Autoship prices, public offers, rewards signals, and online availability. Use when comparing Petstock NZ products or checking a known product handle, URL, or SKU. Read-only; no account, cart, checkout, payment, vet, booking, or other mutations."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "retail"
+  thecolab.source_owner: "Petstock"
+  thecolab.source_type: "commercial"
+  thecolab.auth: "none"
+  thecolab.access_mode: "html-readonly"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "low"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "html-readonly"
+  thecolab.pack: "nz-commercial-web"
+  thecolab.source_url: "https://www.petstock.co.nz"
+  thecolab.allowed_domains: "hx85npq0xp-dsn.algolia.net,www.petstock.co.nz"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "healthy"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # Petstock NZ

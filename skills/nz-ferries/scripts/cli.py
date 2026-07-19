@@ -65,7 +65,6 @@ FULLERS_APP_BASE = "https://pim-mobile.fullers.co.nz"
 BROWSER_MODE = False
 
 AT_API_BASE = "https://api.at.govt.nz"
-AT_API_KEY = os.environ.get("AT_API_KEY", "de42128902d24a7a86a013633f7aa832")
 AT_GTFS_ZIP = os.environ.get("NZ_FERRIES_AT_GTFS_ZIP", "https://gtfs.at.govt.nz/gtfs.zip")
 AT_GTFS_CACHE = os.environ.get("NZ_FERRIES_AT_GTFS_CACHE", os.path.join(tempfile.gettempdir(), "nz-ferries-at-gtfs.zip"))
 AT_GTFS_CACHE_TTL_SECONDS = int(os.environ.get("NZ_FERRIES_AT_GTFS_CACHE_TTL_SECONDS", str(6 * 60 * 60)))
@@ -93,6 +92,13 @@ FULLERS_ALERT_ROUTE_IDS = {
     "PINE-210",
     "WSTH-211",
 }
+
+
+def at_api_key() -> str:
+    key = os.environ.get("AT_API_KEY")
+    if not key:
+        die("AT_API_KEY is required for AT Metro/Fullers data; export it before running this command", 3)
+    return key
 
 
 OPERATORS: dict[str, dict[str, Any]] = {
@@ -843,7 +849,8 @@ def at_request_json(path: str, *, timeout: int = 25) -> Any:
             url,
             timeout=timeout,
             accept="application/json",
-            headers={"Ocp-Apim-Subscription-Key": AT_API_KEY},
+            headers={"Ocp-Apim-Subscription-Key": at_api_key()},
+            allowed_hosts={"api.at.govt.nz"},
         )
     except nzfetch.Blocked as e:
         die(f"network error calling {url}: {e}")

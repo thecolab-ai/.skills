@@ -1,6 +1,29 @@
 ---
 name: akahu-personal
-description: Query personal transactional bank-account data — account lists, balances, settled/pending transactions, account-specific transaction history, and private JSON/CSV exports — from Akahu, a New Zealand open-banking provider. Use when the task involves personal bank data exports, NZ account balances, transaction analysis, cashflow/spending categorisation, or inspecting authenticated Personal App banking data. Requires user-provided AKAHU_APP_TOKEN and AKAHU_USER_TOKEN; never smoke-test against real personal data in CI.
+description: "Query personal transactional bank-account data — account lists, balances, settled/pending transactions, account-specific transaction history, and private JSON/CSV exports — from Akahu, a New Zealand open-banking provider. Use when the task involves personal bank data exports, NZ account balances, transaction analysis, cashflow/spending categorisation, or inspecting authenticated Personal App banking data. Requires user-provided AKAHU_APP_TOKEN and AKAHU_USER_TOKEN; never smoke-test against real personal data in CI."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "finance"
+  thecolab.source_owner: "Akahu"
+  thecolab.source_type: "official"
+  thecolab.auth: "personal-token"
+  thecolab.access_mode: "authenticated-personal"
+  thecolab.data_class: "personal"
+  thecolab.writes: "true"
+  thecolab.browser: "false"
+  thecolab.risk: "high"
+  thecolab.cache_ttl: "none"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "authenticated-personal"
+  thecolab.pack: "nz-personal-data"
+  thecolab.source_url: "https://api.akahu.io/v1"
+  thecolab.allowed_domains: "api.akahu.io"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "gated"
+  thecolab.maintainer: "@adam91holt"
+  thecolab.mutations: "authenticated-api-post,authenticated-api-put,authenticated-api-patch,authenticated-api-delete,local-private-export"
+  thecolab.local_output: "private-json-csv-export"
 ---
 
 # Akahu Personal App

@@ -1,6 +1,27 @@
 ---
 name: at-transport
-description: Query live Auckland Transport (AT) public transport data — stops, departures, service alerts, vehicle positions, routes, and network status. Use when the task involves Auckland buses, trains, ferries, or real-time transit information.
+description: "Query live Auckland Transport (AT) public transport data — stops, departures, service alerts, vehicle positions, routes, and network status. Use when the task involves Auckland buses, trains, ferries, or real-time transit information."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "transport"
+  thecolab.source_owner: "Auckland Transport"
+  thecolab.source_type: "official"
+  thecolab.auth: "api-key"
+  thecolab.access_mode: "public-api"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "medium"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "public-api"
+  thecolab.pack: "nz-public-data"
+  thecolab.source_url: "https://api.at.govt.nz"
+  thecolab.allowed_domains: "api.at.govt.nz"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "gated"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # Auckland Transport
@@ -180,9 +201,13 @@ python3 skills/at-transport/scripts/cli.py status --json
 
 ## Notes
 
-- API key stored in env var `AT_API_KEY`, falls back to bundled key
+- Set the user-supplied Auckland Transport subscription key in `AT_API_KEY`; the skill does not bundle credentials
 - Uses GTFS v3 for static data (stops, routes) and GTFS-RT legacy feed for real-time data (alerts, trip updates, vehicle positions)
 - Departures show only trips with active real-time tracking — vehicles currently approaching or at the stop
 - Parent stations (location_type=1) automatically include departures from child platform stops
 - Default output is human-readable; `--json` is intended for chaining into other tools or agent steps
 - Route types: 0=Tram, 2=Train, 3=Bus, 4=Ferry
+
+## Source notes
+
+Read `references/source-notes.md` for source ownership, access, and freshness boundaries.

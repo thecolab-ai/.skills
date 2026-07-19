@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -62,6 +63,9 @@ results.append(test("airports returns airports[] containing AKL", test_airports)
 
 
 def test_arrivals_akl():
+    if not (os.environ.get("AKL_API_USERNAME") and os.environ.get("AKL_API_PASSWORD")):
+        print("  [SKIP] missing configuration: AKL_API_USERNAME/AKL_API_PASSWORD")
+        return True
     result = run(["arrivals", "--airport", "AKL", "--limit", "3", "--json"])
     if result.returncode != 0:
         print(f"  stderr: {result.stderr[:200]}")
@@ -78,6 +82,9 @@ results.append(test("arrivals AKL returns flights[]", test_arrivals_akl))
 
 
 def test_departures_akl():
+    if not (os.environ.get("AKL_API_USERNAME") and os.environ.get("AKL_API_PASSWORD")):
+        print("  [SKIP] missing configuration: AKL_API_USERNAME/AKL_API_PASSWORD")
+        return True
     result = run(["departures", "--airport", "AKL", "--limit", "3", "--json"])
     if result.returncode != 0:
         print(f"  stderr: {result.stderr[:200]}")

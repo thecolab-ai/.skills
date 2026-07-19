@@ -6,6 +6,9 @@ on:
       - 'skills/**'
       - 'README.md'
       - 'scripts/check_readme_skills.py'
+      - 'scripts/generate_catalogue.py'
+      - 'skills.json'
+      - 'packs/**'
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
@@ -17,5 +20,5 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check README skills table is in sync
-        run: python3 scripts/check_readme_skills.py
+      - name: Check generated catalogue, packs, and README table
+        run: python3 scripts/generate_catalogue.py --check

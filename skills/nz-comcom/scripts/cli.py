@@ -177,7 +177,8 @@ def cmd_news(args: argparse.Namespace) -> int:
 def cmd_page(args: argparse.Namespace) -> int:
     ref = args.url
     url = ref if ref.startswith("http") else absolute(ref if ref.startswith("/") else "/" + ref)
-    if "comcom.govt.nz" not in urllib.parse.urlparse(url).netloc:
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme != "https" or (parsed.hostname or "").lower() != "www.comcom.govt.nz":
         raise ApiError("page only fetches comcom.govt.nz URLs")
     detail = parse_detail(fetch(url), url)
     if args.json:
