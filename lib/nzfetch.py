@@ -249,6 +249,7 @@ _CHALLENGE_MARKERS = (
     "performing security verification",
     "ddos protection by",
     "unusual traffic from your",
+    "<title>radware page</title>",
     # AWS WAF challenge / CAPTCHA shell (served at HTTP 200, so status alone
     # misses it; without these an AWS-WAF-walled API reads as an empty success —
     # the ADR-0006 mirror risk. Seen on eventfinda.co.nz and some *.govt.nz).

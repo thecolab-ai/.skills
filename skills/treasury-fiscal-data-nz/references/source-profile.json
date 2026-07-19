@@ -1,0 +1,86 @@
+{
+  "description": "Official Treasury fiscal forecast and appropriation resource discovery",
+  "source_name": "New Zealand Treasury economic and fiscal forecasts",
+  "source_url": "https://www.treasury.govt.nz/publications/budgets/forecasts",
+  "allowed_hosts": [
+    "www.treasury.govt.nz",
+    "treasury.govt.nz"
+  ],
+  "freshness": "Budget and fiscal update publication-dependent",
+  "warnings": [
+    "Do not compare measures whose definitions changed between publications.",
+    "Keep actuals, forecasts, scenarios and policy assumptions distinct.",
+    "Fiscal data retrieval is not financial or investment advice."
+  ],
+  "record_fields": {
+    "publication": "linked source publication",
+    "table_or_sheet": "published workbook sheet",
+    "period": "published period with period basis",
+    "status": "actual, estimated actual, forecast or main estimates as published",
+    "unit": "published or workbook-defined unit",
+    "provenance_complete": "values retain publication, workbook, sheet, row, column, cell and period"
+  },
+  "smoke_args": [
+    "latest"
+  ],
+  "commands": {
+    "latest": {
+      "help": "discover latest fiscal publications"
+    },
+    "forecast": {
+      "help": "search forecast indicators",
+      "positionals": [
+        {
+          "name": "indicator"
+        }
+      ]
+    },
+    "appropriation": {
+      "help": "search appropriations",
+      "positionals": [
+        {
+          "name": "query"
+        }
+      ]
+    },
+    "vote": {
+      "help": "filter by Vote",
+      "positionals": [
+        {
+          "name": "name"
+        }
+      ]
+    },
+    "compare": {
+      "help": "compare exact shared key-indicator forecasts across two vintages",
+      "options": [
+        {
+          "flags": [
+            "--from"
+          ],
+          "dest": "from_publication",
+          "required": true
+        },
+        {
+          "flags": [
+            "--to"
+          ],
+          "dest": "to_publication",
+          "required": true
+        }
+      ]
+    },
+    "fiscal-model": {
+      "help": "discover fiscal model resources"
+    },
+    "sources": {
+      "help": "list official source publications and workbooks"
+    }
+  },
+  "discovery_only": false,
+  "discovery_commands": [
+    "latest",
+    "fiscal-model",
+    "sources"
+  ]
+}

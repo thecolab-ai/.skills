@@ -95,6 +95,82 @@ def emit_envelope(payload: dict[str, object]) -> None:
     print(json.dumps(payload, indent=2, ensure_ascii=False))
 
 
+def json_object(text: str) -> dict[str, object] | None:
+    """Return a JSON object from a command stream, or ``None`` for raw output."""
+    if not text:
+        return None
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError:
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def looks_like_result_envelope(payload: dict[str, object]) -> bool:
+    """Distinguish a direct result envelope from legacy JSON command data."""
+    envelope_fields = {"schema_version", "ok", "source", "query", "data", "warnings", "blocked"}
+    return "schema_version" in payload or len(envelope_fields.intersection(payload)) >= 4
+
+
+def direct_result_envelope(
+    *,
+    stdout: str,
+    stderr: str,
+    returncode: int,
+) -> tuple[dict[str, object] | None, list[str]]:
+    """Find and validate an envelope emitted directly by a skill CLI.
+
+    Successful CLIs conventionally emit JSON on stdout; failed CLIs may emit a
+    structured result on either stream. A payload that advertises itself as an
+    envelope is never silently treated as legacy data when it is malformed.
+    """
+    streams = (stdout, stderr) if returncode == 0 else (stderr, stdout)
+    for stream in streams:
+        payload = json_object(stream)
+        if payload is None or not looks_like_result_envelope(payload):
+            continue
+        errors = validate_result_envelope(payload)
+        if not errors:
+            if returncode == 0 and payload.get("ok") is not True:
+                errors.append("zero exit status must emit a successful result")
+            elif returncode != 0:
+                error = payload.get("error")
+                error_code = error.get("code") if isinstance(error, dict) else None
+                if payload.get("ok") is not False:
+                    errors.append("non-zero exit status must emit a failed result")
+                if error_code != returncode:
+                    errors.append("result error.code must match the command exit status")
+        return payload, errors
+    return None, []
+
+
+def structured_legacy_error(text: str) -> dict[str, object] | None:
+    """Extract useful fields from a pre-envelope JSON failure payload."""
+    payload = json_object(text)
+    if payload is None or looks_like_result_envelope(payload):
+        return None
+    raw_error = payload.get("error")
+    message = payload.get("message")
+    if isinstance(raw_error, dict):
+        message = message or raw_error.get("message")
+        error_type = raw_error.get("type")
+    else:
+        error_type = raw_error
+    if not isinstance(message, str) or not message.strip():
+        return None
+    extracted: dict[str, object] = {"message": message}
+    if isinstance(error_type, str) and error_type.strip():
+        extracted["type"] = error_type
+    details = {
+        key: value
+        for key, value in payload.items()
+        if key not in {"code", "error", "message"}
+    }
+    if details:
+        extracted["details"] = details
+    return extracted
+
+
 def command_for(skill_dir: Path, args: list[str]) -> list[str]:
     python_cli = skill_dir / "scripts" / "cli.py"
     node_cli = skill_dir / "scripts" / "cli.mjs"
@@ -178,6 +254,31 @@ def main() -> int:
 
     stdout = redact_command_output(completed.stdout.strip(), cli_args)
     stderr = redact_command_output(completed.stderr.strip(), cli_args)
+
+    direct_payload, direct_errors = direct_result_envelope(
+        stdout=stdout,
+        stderr=stderr,
+        returncode=completed.returncode,
+    )
+    if direct_payload is not None:
+        if direct_errors:
+            payload = result_envelope(
+                ok=False,
+                source_name=metadata["thecolab.source_owner"],
+                source_url=metadata["thecolab.source_url"],
+                query={"argv": query_args},
+                data=None,
+                warnings=[],
+                error={
+                    "code": 6,
+                    "message": "CLI emitted an invalid result envelope: " + "; ".join(direct_errors),
+                },
+            )
+            emit_envelope(payload)
+            return 6
+        emit_envelope(direct_payload)
+        return completed.returncode
+
     if completed.returncode == 0:
         if "--help" in cli_args or "-h" in cli_args:
             data = {"help": stdout}
@@ -210,6 +311,17 @@ def main() -> int:
     combined = "\n".join(part for part in (stderr, stdout) if part)
     exit_code = classify_legacy_error(completed.returncode, combined)
     blocked = exit_code == 4
+    structured_error = structured_legacy_error(stderr) or structured_legacy_error(stdout)
+    error: dict[str, object] = {
+        "code": exit_code,
+        "message": (
+            str(structured_error["message"])
+            if structured_error is not None
+            else combined or "skill command failed"
+        ),
+    }
+    if structured_error is not None:
+        error.update({key: value for key, value in structured_error.items() if key != "message"})
     payload = result_envelope(
         ok=False,
         source_name=metadata["thecolab.source_owner"],
@@ -218,7 +330,7 @@ def main() -> int:
         data=None,
         warnings=[],
         blocked=blocked,
-        error={"code": exit_code, "message": combined or "skill command failed"},
+        error=error,
     )
     emit_envelope(payload)
     return exit_code

@@ -1,0 +1,87 @@
+{
+  "description": "Official MBIE Jobs Online advertised-vacancy trend discovery",
+  "source_name": "MBIE Jobs Online",
+  "source_url": "https://www.mbie.govt.nz/business-and-employment/employment-and-skills/labour-market-reports-data-and-analysis/jobs-online",
+  "allowed_hosts": [
+    "www.mbie.govt.nz",
+    "mbie.govt.nz"
+  ],
+  "freshness": "publication-dependent",
+  "warnings": [
+    "Advertised vacancies are not employment, hiring or unique job openings.",
+    "Preserve index, seasonal-adjustment, revision and methodology context.",
+    "Do not merge with job-listing counts unless definitions and deduplication are explicit."
+  ],
+  "record_fields": {
+    "measure": "advertised-vacancy indicator resource",
+    "seasonal_adjustment": "quarterly export is unadjusted",
+    "dimension": "industry, occupation, skill_level or unknown"
+  },
+  "smoke_args": [
+    "latest"
+  ],
+  "commands": {
+    "latest": {
+      "help": "show latest headline resources"
+    },
+    "occupation": {
+      "help": "filter by occupation",
+      "positionals": [
+        {
+          "name": "query"
+        }
+      ]
+    },
+    "industry": {
+      "help": "filter by industry",
+      "positionals": [
+        {
+          "name": "name"
+        }
+      ]
+    },
+    "region": {
+      "help": "filter by region",
+      "positionals": [
+        {
+          "name": "name"
+        }
+      ]
+    },
+    "skill-level": {
+      "help": "filter by skill level",
+      "positionals": [
+        {
+          "name": "number"
+        }
+      ]
+    },
+    "trend": {
+      "help": "discover a date-range trend",
+      "options": [
+        {
+          "flags": [
+            "--from"
+          ],
+          "dest": "from_date",
+          "required": true
+        },
+        {
+          "flags": [
+            "--to"
+          ],
+          "dest": "to_date",
+          "required": true
+        }
+      ]
+    },
+    "definitions": {
+      "help": "show methodology and series definitions"
+    }
+  },
+  "discovery_only": false,
+  "discovery_commands": [
+    "latest",
+    "definitions"
+  ]
+}

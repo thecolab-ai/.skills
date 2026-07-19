@@ -1,0 +1,68 @@
+{
+  "description": "Official New Zealand MP, electorate, party and role discovery",
+  "source_name": "New Zealand Parliament members directory",
+  "source_url": "https://www3.parliament.nz/en/mps-and-electorates/members-of-parliament/",
+  "allowed_hosts": [
+    "www3.parliament.nz"
+  ],
+  "freshness": "current directory snapshot",
+  "warnings": [
+    "Return official public office contact channels only.",
+    "Do not infer voting position, ideology or availability from directory metadata.",
+    "Current roles can change; use the retrieval timestamp."
+  ],
+  "record_fields": {
+    "contact_scope": "official public office channels only",
+    "record_currency": "verify current role in linked profile"
+  },
+  "smoke_args": [
+    "list"
+  ],
+  "commands": {
+    "list": {
+      "help": "list current MP directory resources"
+    },
+    "mp": {
+      "help": "find an MP",
+      "positionals": [
+        {
+          "name": "name"
+        }
+      ]
+    },
+    "electorate": {
+      "help": "find an electorate",
+      "positionals": [
+        {
+          "name": "name"
+        }
+      ]
+    },
+    "party": {
+      "help": "filter by party",
+      "positionals": [
+        {
+          "name": "name"
+        }
+      ]
+    },
+    "portfolio": {
+      "help": "search portfolios and roles",
+      "positionals": [
+        {
+          "name": "query"
+        }
+      ]
+    },
+    "committee": {
+      "help": "search committee membership",
+      "positionals": [
+        {
+          "name": "name"
+        }
+      ]
+    }
+  },
+  "discovery_only": false,
+  "discovery_commands": []
+}

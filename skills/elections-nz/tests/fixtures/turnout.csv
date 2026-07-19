@@ -1,0 +1,4 @@
+Party Votes and Turnout by Electorate
+Electoral District,Ordinary Votes,Special Votes,Valid Total (a)+(b),Ordinary Informal,Special Informal,Informal Total,Ordinary Disallowed,Special Disallowed,Total Votes Cast,Electors on Master Roll,Electoral Population,Turnout Percentage,Informal Percentage
+,(a),(b),(c),(d),(e),(f),(g),(h),(i),(j),(k),(i/j),(f/c+f)
+Wellington Central,30000,10000,40000,40,10,50,0,100,40150,50000,65000,80.30,0.12
