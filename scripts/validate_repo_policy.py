@@ -37,6 +37,14 @@ PLACEHOLDERS = (
 )
 NETWORK_TYPES = {"public-api", "public-download", "html-readonly", "authenticated-personal"}
 LINK_PATTERN = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
+SHARED_RUNTIME_MODULES = frozenset(
+    {
+        "contract_test.py",
+        "nzfetch.py",
+        "result_contract.py",
+        "skill_metadata.py",
+    }
+)
 
 
 def valid_outbound_domain(domain: str) -> bool:
@@ -48,6 +56,15 @@ def valid_outbound_domain(domain: str) -> bool:
         and re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", label) is not None
         for label in labels
     )
+
+
+def validate_shared_lib(lib_dir: Path = REPO_ROOT / "lib") -> list[str]:
+    """Reject source-specific Python modules from the shared runtime directory."""
+    return [
+        f"top-level lib Python module is not an allowlisted shared runtime module: {path.name}"
+        for path in sorted(lib_dir.glob("*.py"))
+        if path.name not in SHARED_RUNTIME_MODULES
+    ]
 
 
 def display_path(path: Path) -> str:
@@ -211,6 +228,9 @@ def main() -> int:
     except (OSError, ValueError) as exc:
         print(f"[ERROR] {exc}", file=sys.stderr)
         return 1
+    shared_lib_errors = validate_shared_lib()
+    if shared_lib_errors:
+        results.insert(0, {"skill": "lib", "errors": shared_lib_errors, "warnings": []})
     if args.strict:
         for result in results:
             result["errors"].extend(f"strict: {warning}" for warning in result["warnings"])

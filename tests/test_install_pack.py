@@ -1,3 +1,6 @@
+import json
+import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -69,6 +72,54 @@ class InstallPackTests(unittest.TestCase):
             completed = self.run_installer("../skills", "--target", tmp)
         self.assertEqual(completed.returncode, 2)
         self.assertIn("invalid choice", completed.stderr)
+
+    def test_installed_skill_clis_do_not_require_source_specific_repository_libs(self) -> None:
+        """Installed skills may use the common runtime, but must bundle source parsers."""
+
+        with tempfile.TemporaryDirectory() as tmp:
+            temporary_root = Path(tmp)
+            target = temporary_root / "installed"
+            installed_skills = []
+            for manifest_path in sorted((ROOT / "packs").glob("*.json")):
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                installed = self.run_installer(
+                    manifest["name"], "--target", str(target)
+                )
+                self.assertEqual(installed.returncode, 0, installed.stderr)
+                installed_skills.extend(manifest["skills"])
+
+            # Current CLIs deliberately support the repository's common HTTP/result
+            # runtime. Do not copy any source-specific parser from top-level lib/:
+            # those must resolve from each independently installed skill folder.
+            common_runtime = temporary_root / "lib"
+            common_runtime.mkdir()
+            for module in ("nzfetch.py", "result_contract.py"):
+                shutil.copy2(ROOT / "lib" / module, common_runtime / module)
+
+            environment = os.environ.copy()
+            environment.pop("PYTHONPATH", None)
+            failures = []
+            for skill in installed_skills:
+                cli = target / skill / "scripts" / "cli.py"
+                completed = subprocess.run(
+                    [sys.executable, str(cli), "--help"],
+                    cwd=temporary_root,
+                    env=environment,
+                    text=True,
+                    capture_output=True,
+                    timeout=10,
+                    check=False,
+                )
+                if completed.returncode != 0:
+                    diagnostic = (completed.stderr or completed.stdout).strip().splitlines()
+                    failures.append(f"{skill}: {diagnostic[-1] if diagnostic else 'no diagnostic'}")
+
+            self.assertEqual(
+                failures,
+                [],
+                "installed skill CLIs imported source-specific top-level lib modules:\n"
+                + "\n".join(failures),
+            )
 
 
 if __name__ == "__main__":
