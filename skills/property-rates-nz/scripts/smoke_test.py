@@ -32,6 +32,25 @@ def test(name: str, fn):
 results = []
 
 
+def test_value_fixture():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("property_rates_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    assert module.parse_int("1,234.5") == 1235
+    assert module.parse_int("not-a-number") is None
+    assert module.fmt_dollar(1_500_000) == "$1.50M"
+    assert module.validate_property_id("12343300679") == "12343300679"
+    print("[PASS] fixture Auckland rates value normalisation")
+    return True
+
+
+results.append(test("fixture rates response parser", test_value_fixture))
+
+
 def live_rates_json():
     result = run(["rates", TOWN_HALL_ID, "--json"])
     if result.returncode != 0:
@@ -92,7 +111,7 @@ def test_live_json_structure():
 results.append(test(f"rates {TOWN_HALL_ID} JSON has full property structure", test_live_json_structure))
 
 if all(results):
-    print("All tests passed.")
+    print("[PASS] live smoke assertions completed")
     sys.exit(0)
 else:
     print(f"{results.count(False)} test(s) failed.")

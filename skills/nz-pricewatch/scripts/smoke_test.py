@@ -33,6 +33,40 @@ def test(name: str, fn):
 results = []
 
 
+def test_product_card_fixture():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("nz_pricewatch_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    record = module.normalize_card(
+        {
+            "data": {
+                "product": {
+                    "id": 1234,
+                    "name": "Synthetic Headphones",
+                    "brandName": "Example",
+                    "category": {"categoryId": 10, "categoryName": "Headphones"},
+                    "productLink": "/product.php?p=1234",
+                    "storeCount": 4,
+                },
+                "offer": {"price": "199.95", "storeName": "Example Store", "stockStatus": "In stock"},
+            }
+        }
+    )
+    assert record and record["product_id"] == 1234
+    assert record["current_price"] == 199.95
+    assert record["merchant"] == "Example Store"
+    assert record["product_url"].startswith("https://")
+    print("[PASS] fixture PriceSpy product-card normalisation")
+    return True
+
+
+results.append(test("fixture product card parser", test_product_card_fixture))
+
+
 def test_help():
     result = run(["--help"])
     return result.returncode == 0
@@ -89,7 +123,7 @@ def test_trending():
 results.append(test("trending returns trending[]", test_trending))
 
 if all(results):
-    print("All tests passed.")
+    print("[PASS] live smoke assertions completed")
     sys.exit(0)
 else:
     print(f"{results.count(False)} test(s) failed.")

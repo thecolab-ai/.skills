@@ -45,6 +45,35 @@ def test(name: str, fn):
 results = []
 
 
+def test_property_card_fixture():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("homes_nz_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    record = module.parse_card(
+        {
+            "property_id": 123,
+            "state": 2,
+            "price": 750000,
+            "property_details": {"display_address": "1 Example Street", "num_bedrooms": 3},
+            "point": {"lat": -36.85, "long": 174.76},
+            "url": "/address/example",
+        }
+    )
+    assert record["property_id"] == 123
+    assert record["address"] == "1 Example Street"
+    assert record["bedrooms"] == 3
+    assert record["homes_estimate"]["value"] == 750000
+    print("[PASS] fixture property-card normalisation")
+    return True
+
+
+results.append(test("fixture property card parser", test_property_card_fixture))
+
+
 def test_help():
     result = run(["--help"])
     return result.returncode == 0
@@ -159,7 +188,7 @@ for suburb_name, suburb_id in SUBURB_TESTS:
     ))
 
 if all(results):
-    print("All tests passed.")
+    print("[PASS] live smoke assertions completed")
     sys.exit(0)
 else:
     print(f"{results.count(False)} test(s) failed.")

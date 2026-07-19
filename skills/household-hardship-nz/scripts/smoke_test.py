@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import json
+import importlib.util
 import subprocess
 import sys
 from pathlib import Path
@@ -31,6 +32,20 @@ def test(name: str, fn):
 
 
 results = []
+
+
+def test_fixture_estimate():
+    spec = importlib.util.spec_from_file_location("household_hardship_cli", CLI)
+    cli = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    sys.modules[spec.name] = cli
+    spec.loader.exec_module(cli)
+    row = {"Households": "12,345", "LCI": "11,000", "UCI": "13,600", "RSE": "4.2", "Flag": ""}
+    result = cli.serialize_estimate(row, {"region": "Region"})
+    return result["households"] == 12345 and result["rse_percent"] == 4.2 and result["flag"] is None
+
+
+results.append(test("fixture Stats NZ estimate normalization", test_fixture_estimate))
 
 
 def test_help():
@@ -138,7 +153,7 @@ def test_bad_region_fails():
 results.append(test("unknown region exits non-zero", test_bad_region_fails))
 
 if all(results):
-    print("All tests passed.")
+    print("[PASS] live smoke assertions completed")
     sys.exit(0)
 else:
     print(f"{results.count(False)} test(s) failed.")

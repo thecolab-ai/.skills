@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 """Smoke test for the vendored Anthropic PPTX skill docs."""
+import importlib.util
+import sys
 from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
@@ -21,5 +23,13 @@ skill = (root / "SKILL.md").read_text(encoding="utf-8")
 for needle in ("markitdown", "pptxgenjs", "thumbnail.py", "editing.md"):
     if needle not in skill:
         raise SystemExit(f"SKILL.md missing expected guidance: {needle}")
+
+spec = importlib.util.spec_from_file_location("pptx_cli", root / "scripts" / "cli.py")
+cli = importlib.util.module_from_spec(spec)
+assert spec.loader is not None
+sys.modules[spec.name] = cli
+spec.loader.exec_module(cli)
+assert cli.read("editing.md").startswith("#")
+print("[PASS] fixture vendored PPTX guide loading")
 
 print("[PASS] contract pptx skill docs and helper scripts present")

@@ -44,6 +44,26 @@ def maybe_skip_upstream(process: subprocess.CompletedProcess[str], label: str) -
 
 
 def main() -> int:
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("fma_nz_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    record = module.parse_list_item(
+        """
+        <h3><a href="/library/warnings-and-alerts/synthetic-warning/">Synthetic warning</a></h3>
+        <p>Synthetic warning summary.</p>
+        <span class="search-results-semantic__date">19 July 2026</span>
+        """,
+        "https://www.fma.govt.nz/library/warnings-and-alerts/",
+    )
+    if not record or record["id"] != "synthetic-warning" or record["date"] != "2026-07-19":
+        print("[FAIL] fixture FMA warning-list parser")
+        return 1
+    print("[PASS] fixture FMA warning-list parser")
+
     help_proc = run(["--help"], timeout=20)
     if help_proc.returncode != 0 or "warnings" not in help_proc.stdout:
         print(help_proc.stdout)
@@ -111,7 +131,7 @@ def main() -> int:
         print("FAIL: providers list records")
         return 1
 
-    print("OK: smoke tests passed")
+    print("[PASS] live FMA search and register assertions completed")
     return 0
 
 

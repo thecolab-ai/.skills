@@ -33,6 +33,38 @@ def test(name: str, fn):
 results = []
 
 
+def test_product_fixture():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("mitre10_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    record = module.parse_algolia_product(
+        {
+            "objectID": "SKU-1",
+            "name": "Synthetic Drill",
+            "brandName": "Example",
+            "prices": {"nationalRRP": 129.0, "nationalPromo": 99.0},
+            "availableNationWide": True,
+            "clickAndCollect": ["STORE-1"],
+            "categoryPath": {"lvl0": "Tools", "lvl1": "Tools > Drills"},
+            "url": "/shop/synthetic-drill/p/SKU-1",
+        }
+    )
+    assert record["code"] == "SKU-1"
+    assert record["price"]["value"] == 99.0
+    assert record["price"]["regular"] == 129.0
+    assert record["available_nationwide"] is True
+    assert record["click_and_collect_store_count"] == 1
+    print("[PASS] fixture Algolia product normalisation")
+    return True
+
+
+results.append(test("fixture product parser", test_product_fixture))
+
+
 def test_help():
     result = run(["--help"])
     return result.returncode == 0
@@ -89,7 +121,7 @@ def test_specials():
 results.append(test("specials returns products[]", test_specials))
 
 if all(results):
-    print("All tests passed.")
+    print("[PASS] live smoke assertions completed")
     sys.exit(0)
 else:
     print(f"{results.count(False)} test(s) failed.")

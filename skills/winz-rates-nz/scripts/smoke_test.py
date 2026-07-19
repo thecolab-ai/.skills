@@ -30,7 +30,8 @@ def test(name: str, fn):
             print(f"[SKIP] {name} (upstream unavailable or blocked)")
             return "skip"
         status = "PASS" if outcome else "FAIL"
-        print(f"[{status}] {name}")
+        prefix = f"[{status}] contract" if status == "PASS" and name.startswith("--help") else f"[{status}] live" if status == "PASS" else f"[{status}]"
+        print(f"{prefix} {name}")
         return bool(outcome)
     except Exception as e:
         print(f"[FAIL] {name}")
@@ -118,6 +119,32 @@ def test_benefit_get():
 
 
 results.append(test("benefits get accommodation-supplement returns sections", test_benefit_get))
+
+
+def test_rate_table_fixture():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("winz_rates_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    section = module.parse_rate_section(
+        "Synthetic Support",
+        """
+        <h3>Weekly payment</h3>
+        <table><tr><th>Situation</th><th>Net weekly rate</th></tr><tr><td>Single</td><td>$420.00</td></tr></table>
+        <p>Rates apply from 1 April 2026.</p>
+        """,
+    )
+    assert section["slug"] == "synthetic-support"
+    assert section["tables"][0]["context"] == "Weekly payment"
+    assert section["tables"][0]["rows"] == [{"Situation": "Single", "Net weekly rate": "$420.00"}]
+    print("[PASS] fixture WINZ rate-table parser")
+    return True
+
+
+results.append(test("fixture rate table parser", test_rate_table_fixture))
 
 failures = [r for r in results if r is False]
 if failures:

@@ -34,6 +34,25 @@ def test(name: str, fn):
 results = []
 
 
+def test_distance_fixture():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("petrolmate_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    distance = module.haversine_km(-36.8485, 174.7633, -41.2866, 174.7756)
+    assert 490 < distance < 500
+    assert module.fmt_price("249.9") == "$2.499"
+    assert module.fmt_dist(1500) == "1.5km"
+    print("[PASS] fixture PetrolMate distance and price normalisation")
+    return True
+
+
+results.append(test("fixture station result normalisation", test_distance_fixture))
+
+
 def test_help():
     result = run(["--help"])
     return result.returncode == 0
@@ -105,7 +124,7 @@ results.append(test("search --geoip returns stations[]", test_search_geoip))
 
 
 if all(results):
-    print("All tests passed.")
+    print("[PASS] live smoke assertions completed")
     sys.exit(0)
 else:
     print(f"{results.count(False)} test(s) failed.")

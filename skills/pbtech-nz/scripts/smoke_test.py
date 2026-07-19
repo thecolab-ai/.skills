@@ -8,6 +8,14 @@ def check(name, fn):
  except Exception as e: print('[FAIL]',name,e); return False
 ok=[]
 ok.append(check('help', lambda: subprocess.check_call([sys.executable,str(CLI),'--help'], stdout=subprocess.DEVNULL)))
+def fixture_cards():
+ page='''<div><a data-product-code="SYN001" href="/product/SYN001"><span>Synthetic SSD</span></a><span class="full-price">$199.95</span></div>'''
+ import importlib.util
+ spec=importlib.util.spec_from_file_location('pbtech_nz_cli',CLI); assert spec and spec.loader
+ module=importlib.util.module_from_spec(spec); sys.modules[spec.name]=module; spec.loader.exec_module(module)
+ rows=module.parse_cards(page,limit=1); assert len(rows)==1; assert rows[0]['code']=='SYN001'; assert rows[0]['price_nzd']==199.95
+ print('[PASS] fixture PB Tech product-card parser')
+ok.append(check('fixture product card parser',fixture_cards))
 def search():
  d=json.loads(run(['search','ssd','--limit','3','--json'])); assert d['products']; assert any(p.get('code') and p.get('price') for p in d['products'])
 ok.append(check('search ssd returns priced products', search))
@@ -17,5 +25,5 @@ ok.append(check('product detail by code', product))
 def stores():
  d=json.loads(run(['stores','--query','auckland','--limit','5','--json'])); assert d['stores']; assert any('Auckland' in (s.get('address') or '') for s in d['stores'])
 ok.append(check('stores auckland', stores))
-if all(ok): print('All tests passed.'); sys.exit(0)
+if all(ok): print("[PASS] live smoke assertions completed"); sys.exit(0)
 sys.exit(1)

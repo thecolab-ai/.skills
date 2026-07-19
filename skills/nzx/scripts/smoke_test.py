@@ -33,6 +33,36 @@ def test(name: str, fn):
 results = []
 
 
+def test_quote_fixture():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("nzx_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    record = module.simplify_quote(
+        {
+            "code": "SYN",
+            "description": "Synthetic Issuer",
+            "currency": "NZD",
+            "priceAmount": "10.25",
+            "priceChangeAmount": "0.25",
+            "priceChangeRelative": "0.025",
+            "totalVolume": "1000",
+        }
+    )
+    assert record["code"] == "SYN"
+    assert record["price"] == 10.25
+    assert record["change_percent"] == 2.5
+    assert record["volume"] == 1000
+    print("[PASS] fixture NZX quote normalisation")
+    return True
+
+
+results.append(test("fixture quote parser", test_quote_fixture))
+
+
 def test_help():
     result = run(["--help"])
     return result.returncode == 0
@@ -92,7 +122,7 @@ def test_search():
 results.append(test("search fisher returns results[]", test_search))
 
 if all(results):
-    print("All tests passed.")
+    print("[PASS] live smoke assertions completed")
     sys.exit(0)
 else:
     print(f"{results.count(False)} test(s) failed.")

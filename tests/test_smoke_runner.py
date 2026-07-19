@@ -108,6 +108,20 @@ metadata:
             self.assertEqual(result["status"], "pass")
             self.assertEqual(result["contract_assertions"], 1)
 
+    def test_generic_live_summary_after_any_skip_is_not_live_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            skill = self.make_skill(
+                Path(tmp),
+                "print('[PASS] fixture parser retained source identifier')\n"
+                "print('[SKIP] optional live command requires EXAMPLE_API_KEY')\n"
+                "print('[PASS] live smoke assertions completed')\n",
+            )
+            result = run_one(skill, 10)
+            self.assertEqual(result["status"], "pass")
+            self.assertEqual(result["fixture_assertions"], 1)
+            self.assertEqual(result["live_assertions"], 0)
+            self.assertEqual(result["source_health"], "untested")
+
     def test_explicit_fixture_pass_is_meaningful(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             skill = self.make_skill(Path(tmp), "print('[PASS] fixture parser retained identifier')\n")

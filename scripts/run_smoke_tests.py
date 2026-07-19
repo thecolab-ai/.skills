@@ -32,6 +32,10 @@ ASSERTION_KIND = re.compile(
     re.I,
 )
 SKIP_LINE = re.compile(r"^\s*(?:\[SKIP\]|SKIP\b)", re.I)
+GENERIC_LIVE_SUMMARY = re.compile(
+    r"\blive\s+(?:smoke\s+)?(?:assertions?|checks?)\s+(?:completed|passed)\b",
+    re.I,
+)
 CREDENTIAL_MARKER = re.compile(
     r"requires?.*(?:api[_ ]?key|token|credential|username|password)|"
     r"[A-Z][A-Z0-9_]+_(?:API_?KEY|TOKEN|USERNAME|PASSWORD|CREDENTIALS?)",
@@ -138,6 +142,7 @@ def run_one(skill_dir: Path, timeout: int) -> dict[str, object]:
         exit_code = 5
 
     lines = log.splitlines()
+    skips = [line.strip() for line in lines if SKIP_LINE.search(line)]
     pass_candidates = [
         (index, line)
         for index, line in enumerate(lines)
@@ -151,8 +156,8 @@ def run_one(skill_dir: Path, timeout: int) -> dict[str, object]:
         if index == 0
         or not SKIP_LINE.search(lines[index - 1])
         or assertion_kind(line) in {"fixture", "contract"}
+        if not (skips and GENERIC_LIVE_SUMMARY.search(line))
     ]
-    skips = [line.strip() for line in lines if SKIP_LINE.search(line)]
     classified = [(kind, line) for line in passes if (kind := assertion_kind(line))]
     fixture_passes = [line for kind, line in classified if kind == "fixture"]
     live_passes = [line for kind, line in classified if kind == "live"]

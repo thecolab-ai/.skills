@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import importlib.util
 import os
 import subprocess
 import sys
@@ -88,6 +89,21 @@ def upstream_available() -> bool:
     except Exception as exc:  # noqa: BLE001
         print(f"[SKIP] legislation.govt.nz XML endpoint unavailable: {exc}")
         return False
+
+
+def test_fixture_legislation_parsers() -> bool:
+    spec = importlib.util.spec_from_file_location("legislation_cli", CLI)
+    cli = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    sys.modules[spec.name] = cli
+    spec.loader.exec_module(cli)
+    ref = cli.parse_ref("1990/109")
+    feed = cli.parse_atom_feed(b'''<feed xmlns="http://www.w3.org/2005/Atom"><entry><title>Example Act</title><link href="https://www.legislation.govt.nz/act/public/1990/109/en/latest/"/><updated>2026-01-02T00:00:00Z</updated><summary>Updated text</summary></entry></feed>''')
+    return ref["year"] == "1990" and ref["number"] == "109" and feed[0]["title"] == "Example Act"
+
+
+if not check("fixture legislation reference and Atom parsing", test_fixture_legislation_parsers):
+    raise SystemExit(1)
 
 
 if not upstream_available():

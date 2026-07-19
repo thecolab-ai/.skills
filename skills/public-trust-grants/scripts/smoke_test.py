@@ -41,6 +41,32 @@ def test_help() -> bool:
     return result.returncode == 0 and "Public Trust" in result.stdout
 
 
+def test_grant_fixture() -> bool:
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("public_trust_grants_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    record = module.normalise_hit(
+        {
+            "title": "Synthetic Community Grant",
+            "uri": "/grants/synthetic-community-grant/",
+            "grant_type": ["Organisation"],
+            "grants_regions": ["Nationwide"],
+            "sectors": ["Community"],
+            "applications_open_now": 1,
+            "objectID": "synthetic-1",
+        }
+    )
+    assert record["source_url"] == "https://www.publictrust.co.nz/grants/synthetic-community-grant/"
+    assert record["applications_open_now"] is True
+    assert record["regions"] == ["Nationwide"]
+    print("[PASS] fixture Public Trust Algolia hit normalisation")
+    return True
+
+
 def test_search_json() -> bool:
     result = run(["search", "community", "--type", "organisation", "--limit", "3", "--json"])
     if upstream_skip(result):
@@ -78,13 +104,14 @@ def test_bad_filter_edge_case() -> bool:
 
 results = [
     test("--help exits 0", test_help),
+    test("fixture grant search result parser", test_grant_fixture),
     test("search returns grants JSON", test_search_json),
     test("facets returns grant_type facet", test_facets_json),
     test("no-result search returns empty list", test_bad_filter_edge_case),
 ]
 
 if all(results):
-    print("All tests passed.")
+    print("[PASS] live smoke assertions completed")
     sys.exit(0)
 print(f"{results.count(False)} test(s) failed.")
 sys.exit(1)

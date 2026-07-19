@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Search public Jetstar fare-cache flight availability.
 // Read-only: no login, booking creation, seat holds, or checkout.
+import { pathToFileURL } from 'node:url';
 
 const API = 'https://digitalapi.jetstar.com/v1/farecache/flights/batch/availability-with-fareclasses';
 
@@ -73,7 +74,7 @@ async function fetchAvailability(opts) {
   }
 }
 
-function flatten(raw, opts) {
+export function flatten(raw, opts) {
   const flights = [];
   const routeKey = `${opts.origin}${opts.destination}`.toLowerCase();
   for (const batch of raw) {
@@ -125,4 +126,6 @@ async function main() {
   }
 }
 
-main();
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main();
+}

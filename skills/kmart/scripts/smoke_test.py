@@ -33,6 +33,39 @@ def test(name: str, fn):
 results = []
 
 
+def test_product_fixture():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("kmart_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    record = module.parse_product_result(
+        {
+            "value": "Synthetic Toy",
+            "data": {
+                "id": "P_1234",
+                "variation_id": "5678",
+                "Brand": "Example",
+                "url": "/product/synthetic-toy/",
+                "prices": [{"type": "sale", "amount": 9.5, "currency": "NZD"}],
+                "badges": ["Special"],
+            },
+        },
+        "nz",
+    )
+    assert record["sku"] == "5678"
+    assert record["price"] == 9.5
+    assert record["currency"] == "NZD"
+    assert record["is_promotional"] is True
+    print("[PASS] fixture product search-result normalisation")
+    return True
+
+
+results.append(test("fixture product parser", test_product_fixture))
+
+
 def test_help():
     result = run(["--help"])
     return result.returncode == 0
@@ -89,7 +122,7 @@ def test_stores():
 results.append(test("stores returns stores[]", test_stores))
 
 if all(results):
-    print("All tests passed.")
+    print("[PASS] live smoke assertions completed")
     sys.exit(0)
 else:
     print(f"{results.count(False)} test(s) failed.")

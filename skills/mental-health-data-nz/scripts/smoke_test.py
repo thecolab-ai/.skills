@@ -47,6 +47,26 @@ def json_cmd(args: list[str], timeout: int = 60) -> dict:
 results: list[bool] = []
 
 
+def test_link_parser_fixture() -> bool:
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("mental_health_data_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    rows = module.parse_links(
+        '<a href="/reports/annual.docx">Annual report</a><a href="mailto:test@example.invalid">Email</a>',
+        "https://www.health.govt.nz/publications/",
+    )
+    assert rows == [{"url": "https://www.health.govt.nz/reports/annual.docx", "text": "Annual report"}]
+    print("[PASS] fixture report-link HTML parser")
+    return True
+
+
+results.append(check("fixture report link parser", test_link_parser_fixture))
+
+
 def test_help() -> bool:
     result = run(["--help"])
     return result.returncode == 0 and "odmhas-reports" in result.stdout and "seclusion" in result.stdout
@@ -112,7 +132,7 @@ results.append(check("inpatient-inspections returns counts and source links", te
 
 
 if all(results):
-    print("All tests passed.")
+    print("[PASS] live smoke assertions completed")
     raise SystemExit(0)
 
 print(f"{results.count(False)} test(s) failed.")

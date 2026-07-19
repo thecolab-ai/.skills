@@ -33,6 +33,38 @@ def test(name: str, fn):
 results = []
 
 
+def test_product_fixture():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("woolworths_nz_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    record = module.parse_product(
+        {
+            "sku": "705692",
+            "name": "Synthetic Milk",
+            "brand": "Example",
+            "slug": "synthetic-milk",
+            "price": {"originalPrice": 4.5, "salePrice": 3.9, "isSpecial": True, "savePrice": 0.6},
+            "size": {"volumeSize": "2L", "cupPrice": 0.20, "cupMeasure": "100ml"},
+            "quantity": {"min": 1, "max": 12, "increment": 1},
+            "availabilityStatus": "In Stock",
+            "breadcrumb": {"department": {"name": "Fresh"}, "aisle": {"name": "Dairy"}},
+        }
+    )
+    assert record["sku"] == "705692"
+    assert record["sale_price"] == 3.9
+    assert record["is_special"] is True and record["in_stock"] is True
+    assert record["category"] == "Fresh / Dairy"
+    print("[PASS] fixture Woolworths product normalisation")
+    return True
+
+
+results.append(test("fixture product parser", test_product_fixture))
+
+
 def test_help():
     result = run(["--help"])
     return result.returncode == 0
@@ -98,7 +130,7 @@ def test_specials():
 results.append(test("specials cheese returns products[]", test_specials))
 
 if all(results):
-    print("All tests passed.")
+    print("[PASS] live smoke assertions completed")
     sys.exit(0)
 else:
     print(f"{results.count(False)} test(s) failed.")

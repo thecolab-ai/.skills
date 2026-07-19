@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import datetime as dt
+import importlib.util
 import json
 import subprocess
 import sys
@@ -33,6 +34,24 @@ def test(name: str, fn):
 
 results: list[bool] = []
 _search_id = 1142
+
+
+def test_fixture_restaurant():
+    spec = importlib.util.spec_from_file_location("first_table_cli", CLI)
+    cli = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    sys.modules[spec.name] = cli
+    spec.loader.exec_module(cli)
+    row = cli.flatten_restaurant({
+        "id": 7, "title": "Example Eatery", "slug": "/example-eatery",
+        "region": {"id": 1, "menuTitle": "Auckland"},
+        "cuisines": {"edges": [{"node": {"title": "Pacific"}}]},
+        "tags": {"nodes": [{"id": 2, "title": "Waterfront", "category": "feature"}]},
+    })
+    return row["id"] == 7 and row["cuisines"] == ["Pacific"] and row["region"] == "Auckland"
+
+
+results.append(test("fixture GraphQL restaurant normalization", test_fixture_restaurant))
 
 
 def test_help() -> bool:
@@ -108,7 +127,7 @@ def test_availability() -> bool:
 results.append(test("availability <id> returns results[]", test_availability))
 
 if all(results):
-    print("All tests passed.")
+    print("[PASS] live smoke assertions completed")
     sys.exit(0)
 else:
     print(f"{results.count(False)} test(s) failed.")

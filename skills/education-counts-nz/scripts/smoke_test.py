@@ -164,6 +164,23 @@ def test_tds_detail_fixture() -> bool:
 results.append(check("fixture tds detail parser finds regional source documents", test_tds_detail_fixture))
 
 
+def test_combined_ite_resource_fixture() -> bool:
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("education_counts_resource_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    label = "ITE Statistics (XLS, 839.2 KB)"
+    url = "https://www.educationcounts.govt.nz/ITE-tables-full-year-enrolments-2005-2025-and-completions-2005-2024.xlsx"
+    assert module.resource_key(label, url) == "ite-enrolments-completions"
+    return True
+
+
+results.append(check("fixture combined ITE workbook supports enrolments and completions", test_combined_ite_resource_fixture))
+
+
 def test_workbook() -> bool:
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "fixture.xlsx"

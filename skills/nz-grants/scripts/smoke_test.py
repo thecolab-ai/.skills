@@ -6,6 +6,7 @@ Network-dependent checks skip cleanly when upstream public sites are blocked or 
 from __future__ import annotations
 
 import json
+import importlib.util
 import subprocess
 import sys
 from pathlib import Path
@@ -24,6 +25,17 @@ def parse_json_output(proc: subprocess.CompletedProcess[str]) -> dict:
 
 
 def main() -> int:
+    spec = importlib.util.spec_from_file_location("nz_grants_cli", CLI)
+    cli = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    sys.modules[spec.name] = cli
+    spec.loader.exec_module(cli)
+    row = cli.clean_class4_row({"Amount_Granted_Final": "$1,234.50", "Date_of_Accept/Decline": "2025-08-17"})
+    if row.get("Amount_Granted_Final_Number") != 1234.5 or row.get("Period") != "2025-H2":
+        print("[FAIL] fixture Class 4 CSV normalization", file=sys.stderr)
+        return 1
+    print("[PASS] fixture Class 4 CSV normalization")
+
     help_proc = run(["--help"], timeout=20)
     if help_proc.returncode != 0 or "class4" not in help_proc.stdout or "funds" not in help_proc.stdout:
         print(help_proc.stdout)

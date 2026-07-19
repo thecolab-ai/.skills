@@ -95,7 +95,10 @@ def test_verify_first_url() -> bool:
     r = run(["verify", "--limit", "1", "--timeout", "10", "--json"], timeout=20)
     if r.returncode == 0:
         data = json.loads(r.stdout)
-        return bool(data.get("results")) and data["results"][0].get("ok") is True
+        ok = bool(data.get("results")) and data["results"][0].get("ok") is True
+        if ok:
+            print("[PASS] live official support URL verification")
+        return ok
     # Upstream/network failures are acceptable skips for smoke tests.
     try:
         data = json.loads(r.stdout)
@@ -121,7 +124,7 @@ results = [
 ]
 
 if all(results):
-    print("All tests passed.")
+    print("[PASS] fixture official support map, search, pathway and error handling")
     sys.exit(0)
 print(f"{results.count(False)} test(s) failed.")
 sys.exit(1)

@@ -52,7 +52,9 @@ def is_network_failure(result: subprocess.CompletedProcess) -> bool:
 
 
 def report(status: str, name: str, detail: str = "") -> str:
-    print(f"[{status}] {name}")
+    kind = "contract" if name.startswith("--help") else "fixture" if name.startswith("fixture") else "live"
+    prefix = f"[{status}] {kind}" if status == "PASS" else f"[{status}]"
+    print(f"{prefix} {name}")
     if detail:
         print(f"  {detail}")
     return status
@@ -83,6 +85,35 @@ def test_help() -> str:
 
 
 results.append(test_help())
+
+
+def test_charger_fixture() -> str:
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("eeca_ev_chargers_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    record = module.normalise_charger(
+        {
+            "UnitId": "UNIT-1",
+            "Points": "2",
+            "KwRated": "50.5",
+            "Current": "DC",
+            "Latitude": "-36.85",
+            "Longitude": "174.76",
+            "Connectors": '["CCS", "CHAdeMO"]',
+        }
+    )
+    assert record["unit_id"] == "UNIT-1"
+    assert record["points"] == 2
+    assert record["kw_rated"] == 50.5
+    assert record["connectors"] == ["CCS", "CHAdeMO"]
+    return report("PASS", "fixture charger CSV row normalisation")
+
+
+results.append(test_charger_fixture())
 
 results.append(
     json_command(

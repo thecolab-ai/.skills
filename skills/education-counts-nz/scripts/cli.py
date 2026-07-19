@@ -284,6 +284,8 @@ def resource_key(label: str, url: str) -> str:
         return "school"
     if "pivot" in text:
         return "pivot"
+    if "completion" in text and "enrol" in text:
+        return "ite-enrolments-completions"
     if "completion" in text:
         return "ite-completions"
     if "enrol" in text:
@@ -501,6 +503,10 @@ def choose_resource(dataset: str, desired_key: str, timeout: int) -> dict[str, A
     exact = [r for r in resources if r.get("resource_key") == desired_key]
     if exact:
         return exact[0]
+    if desired_key in {"ite-enrolments", "ite-completions"}:
+        combined = [r for r in resources if r.get("resource_key") == "ite-enrolments-completions"]
+        if combined:
+            return combined[0]
     fuzzy = [r for r in resources if desired_key in r.get("resource_key", "") or desired_key in key_text(r.get("label", ""))]
     if fuzzy:
         return fuzzy[0]

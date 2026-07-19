@@ -8,6 +8,7 @@ asserts the clean machine-readable `clearance_required` blocked state. Network /
 upstream challenges are treated as SKIP, not failures.
 """
 import json
+import importlib.util
 import os
 import subprocess
 import sys
@@ -53,6 +54,19 @@ def is_transient(stderr):
 
 results = []
 WANT_BROWSER = browser_available()
+
+
+def test_fixture_rss_parser():
+    spec = importlib.util.spec_from_file_location("nz_ministers_cli", CLI)
+    cli = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    sys.modules[spec.name] = cli
+    spec.loader.exec_module(cli)
+    rows = cli.parse_rss_items("""<rss><channel><item><title>Example release</title><link>https://www.beehive.govt.nz/release/example</link><pubDate>Sun, 19 Jul 2026 00:00:00 GMT</pubDate></item></channel></rss>""")
+    return len(rows) == 1 and rows[0]["type"] == "release" and rows[0]["slug"] == "example"
+
+
+results.append(test("fixture Beehive RSS parsing", test_fixture_rss_parser))
 
 
 def test_help():

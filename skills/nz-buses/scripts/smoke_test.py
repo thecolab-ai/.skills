@@ -34,6 +34,26 @@ def test(name: str, fn):
 results = []
 
 
+def test_stop_fixture():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("nz_buses_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    record = module.parse_stop({"stopId": 5000, "stopCode": "WELL", "stopName": "Synthetic Station", "latitude": -41.28, "longitude": 174.77, "parentStation": "WELLINGTON"})
+    assert record["stop_id"] == "5000"
+    assert record["stop_name"] == "Synthetic Station"
+    assert record["stop_lat"] == -41.28
+    assert record["parent_station"] == "WELLINGTON"
+    print("[PASS] fixture Metlink stop normalisation")
+    return True
+
+
+results.append(test("fixture bus stop parser", test_stop_fixture))
+
+
 def test_help():
     result = run(["--help"])
     return result.returncode == 0

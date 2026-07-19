@@ -46,7 +46,7 @@ def main() -> int:
     assert data["kind"] == "ycf_releases"
     assert data["count"] >= 1
     assert any(record["period"] == "2025" for record in data["records"])
-    print(f"OK: ycf list returned {data['count']} curated releases")
+    print(f"[PASS] fixture ycf list returned {data['count']} curated releases")
 
     ycf_get = run(["ycf", "get", "2025", "--json"], timeout=20)
     if ycf_get.returncode != 0:
@@ -59,7 +59,7 @@ def main() -> int:
     assert data["metrics"]["deal_count"] == 166
     assert data["metrics"]["investment_amount_nzd_millions"] == 754
     assert data["metrics"]["new_companies_funded"] == 47
-    print("OK: ycf get returned curated 2025 metrics")
+    print("[PASS] fixture ycf get returned curated 2025 metrics")
 
     sources = run(["sources", "--json"], timeout=20)
     if sources.returncode != 0:
@@ -70,7 +70,7 @@ def main() -> int:
     assert data["kind"] == "source_catalogue"
     assert any(source["name"] == "NZGCP Young Company Finance" for source in data["sources"])
     assert any(source["name"] == "Angel Association NZ members" for source in data["sources"])
-    print(f"OK: sources returned {len(data['sources'])} source notes")
+    print(f"[PASS] fixture sources returned {len(data['sources'])} source notes")
 
     bad_period = run(["ycf", "get", "not-a-period", "--json"], timeout=20)
     if bad_period.returncode == 0:
@@ -79,7 +79,7 @@ def main() -> int:
     data = require_json(bad_period)
     assert data["error"] == "not_found"
     assert "not-a-period" in data["message"]
-    print("OK: invalid YCF period returns a clear JSON error")
+    print("[PASS] contract invalid YCF period returns a clear JSON error")
 
     investors = run(["investors", "--limit", "2", "--json"], timeout=90)
     if investors.returncode == 2:
@@ -96,7 +96,7 @@ def main() -> int:
     data = json.loads(investors.stdout)
     assert data["kind"] == "angel_investors"
     assert isinstance(data["records"], list)
-    print(f"OK: investors returned {data['count']} records")
+    print(f"[PASS] live investors returned {data['count']} records")
     return 0
 
 

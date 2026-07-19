@@ -7,15 +7,18 @@ Agent Skills metadata and trust-based distribution packs.
 
 All 113 catalogue skills now carry the required metadata, trust-pack assignment,
 outbound-domain declaration, canonical Python entry point, deterministic
-contract test, and synthetic contract fixture. Passing those structural checks
-does not by itself prove source-parser fixture coverage or live source health.
+contract test, synthetic contract fixture, and representative deterministic
+smoke fixture. Skills that parse source formats exercise the production parser
+or normalizer with synthetic source data; authenticated and documentation
+workflows exercise their safety or asset-loading boundary without storing
+credentials or personal data.
 
 Use `scripts/run_smoke_tests.py --summary-json` to see explicit fixture, contract,
 live, skip, and health evidence. Skills listed under
-`without_fixture_assertions` still need a representative parser assertion when
-they parse a source format; do not relabel a live check or the generic contract
-sentinel as parser-fixture coverage. This source-specific migration continues in
-priority order while the foundations checks prevent new unclassified work.
+`without_fixture_assertions` must remain empty. Do not relabel a live check or
+the generic contract sentinel as parser-fixture coverage. Live source health is
+reported separately and may be `gated` when credentials, browser clearance, or
+an upstream source is unavailable.
 
 ## Compatibility
 

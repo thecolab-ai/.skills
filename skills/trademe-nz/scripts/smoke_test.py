@@ -33,6 +33,37 @@ def test(name: str, fn):
 results = []
 
 
+def test_listing_fixture():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("trademe_nz_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    record = module.parse_listing(
+        {
+            "ListingId": 123456,
+            "Title": "Synthetic Bicycle",
+            "Region": "Wellington",
+            "StartPrice": 100.0,
+            "BuyNowPrice": 150.0,
+            "StartDate": "/Date(1784419200000)/",
+            "Attributes": [{"DisplayName": "Condition", "DisplayValue": "Used"}],
+        },
+        detail=True,
+    )
+    assert record["listing_id"] == 123456
+    assert record["attributes"] == {"Condition": "Used"}
+    assert record["url"].endswith("/123456/synthetic-bicycle")
+    assert record["start_date"].startswith("2026-")
+    print("[PASS] fixture Trade Me listing normalisation")
+    return True
+
+
+results.append(test("fixture listing parser", test_listing_fixture))
+
+
 def test_help():
     result = run(["--help"])
     return result.returncode == 0
@@ -143,7 +174,7 @@ def test_regions():
 results.append(test("regions returns regions[]", test_regions))
 
 if all(results):
-    print("All tests passed.")
+    print("[PASS] live smoke assertions completed")
     sys.exit(0)
 else:
     print(f"{results.count(False)} test(s) failed.")

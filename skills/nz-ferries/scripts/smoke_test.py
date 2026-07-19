@@ -35,6 +35,38 @@ def test(name: str, fn):
 results = []
 
 
+def test_sealink_slot_fixture():
+    import datetime
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("nz_ferries_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    record = module.normalize_sealink_slot(
+        "auckland-waiheke",
+        {"name": "Auckland to Waiheke"},
+        datetime.date(2026, 7, 19),
+        {
+            "departureTime": "11:30 PM",
+            "arrivalTime": "12:15 AM",
+            "departureLocation": "Auckland",
+            "arrivalLocation": "Waiheke",
+            "ferryName": "Synthetic Ferry",
+            "fareTypes": [{"code": "ADULT", "price": 49.0}],
+        },
+    )
+    assert record["departure_datetime"].startswith("2026-07-19T23:30")
+    assert record["arrival_datetime"].startswith("2026-07-20T00:15")
+    assert record["fare_summary"]["adult"] == 49.0
+    print("[PASS] fixture SeaLink sailing normalisation")
+    return True
+
+
+results.append(test("fixture SeaLink slot parser", test_sealink_slot_fixture))
+
+
 def test_help():
     result = run(["--help"])
     return result.returncode == 0
@@ -113,7 +145,7 @@ def test_fullers_browser_probe():
 results.append(test("fullers browser probe returns status", test_fullers_browser_probe))
 
 if all(results):
-    print("All tests passed.")
+    print("[PASS] live smoke assertions completed")
     sys.exit(0)
 else:
     print(f"{results.count(False)} test(s) failed.")

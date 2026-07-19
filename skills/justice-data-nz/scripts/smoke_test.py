@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import importlib.util
 import subprocess
 import sys
 import urllib.request
@@ -56,6 +57,25 @@ def upstream_available() -> bool:
     except Exception as exc:  # noqa: BLE001
         print(f"[SKIP] Ministry of Justice data-tables page unavailable: {exc}")
         return False
+
+
+def test_fixture_workbook_helpers() -> bool:
+    spec = importlib.util.spec_from_file_location("justice_data_cli", CLI)
+    cli = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    sys.modules[spec.name] = cli
+    spec.loader.exec_module(cli)
+    period = cli.parse_period("https://www.justice.govt.nz/offence_dec_2025.xlsx")
+    return (
+        period == {"type": "calendar_year", "year": 2025, "month": 12, "label": "year ending 31 December 2025"}
+        and cli.column_index("AA12") == 26
+        and cli.parse_number("1,234") == 1234
+        and cli.parse_number("<3") is None
+    )
+
+
+if not check("fixture MoJ workbook period and cell normalization", test_fixture_workbook_helpers):
+    raise SystemExit(1)
 
 
 if not upstream_available():

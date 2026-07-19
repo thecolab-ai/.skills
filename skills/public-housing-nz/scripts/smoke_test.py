@@ -33,6 +33,28 @@ def test(name: str, fn):
 results = []
 
 
+def test_date_fixture():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("public_housing_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    rows = [
+        {"Period": "2026-03-31T00:00:00"},
+        {"Period": "2026-06-30T00:00:00"},
+        {"Period": "2025-12-31"},
+    ]
+    assert module.latest_date(rows, "Period") == "2026-06-30"
+    assert module.norm("  WHANGAREI   DISTRICT ") == "whangarei district"
+    print("[PASS] fixture HUD CKAN date normalisation")
+    return True
+
+
+results.append(test("fixture housing row parser", test_date_fixture))
+
+
 def test_help():
     result = run(["--help"])
     return result.returncode == 0
@@ -160,7 +182,7 @@ results.append(test("query passthrough returns records", test_query))
 
 
 if all(results):
-    print("All tests passed.")
+    print("[PASS] live smoke assertions completed")
     sys.exit(0)
 else:
     print(f"{results.count(False)} test(s) failed.")

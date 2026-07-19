@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import json
+import importlib.util
 import os
 import subprocess
 import sys
@@ -32,6 +33,19 @@ def test(name: str, fn):
 
 
 results = []
+
+
+def test_fixture_weather_helpers():
+    spec = importlib.util.spec_from_file_location("metservice_cli", CLI)
+    cli = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    sys.modules[spec.name] = cli
+    spec.loader.exec_module(cli)
+    location = cli.resolve_location("auckland")
+    return location["name"] == "Auckland CBD" and cli.deg_to_compass(225) == "SW" and cli.num(12.345, 1) == "12.3"
+
+
+results.append(test("fixture location and weather-value normalization", test_fixture_weather_helpers))
 
 
 def test_help():

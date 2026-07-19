@@ -6,6 +6,7 @@ return 403 from datacentre/VPN IPs. Per repo convention the schedule test SKIPs
 (rather than hard-fails) on that or any transient network error.
 """
 import json
+import importlib.util
 import subprocess
 import sys
 from pathlib import Path
@@ -48,6 +49,31 @@ def is_blocked(stderr: str) -> bool:
 
 
 results = []
+
+
+def test_fixture_response_parsing():
+    spec = importlib.util.spec_from_file_location("christchurch_bins_cli", CLI)
+    cli = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    sys.modules[spec.name] = cli
+    spec.loader.exec_module(cli)
+    responses = iter([
+        [{"RatingUnitID": 42, "FullStreetAddress": "53 Hereford Street", "StreetAddressID": 7}],
+        {"address": "53 Hereford Street", "bins": {
+            "routes": [{"material": "yellow", "day_of_week": "Tuesday"}],
+            "collections": [
+                {"next_planned_date": "2999-01-01", "material": "yellow", "out_of_date": "False"},
+                {"next_planned_date": "2000-01-01", "material": "red", "out_of_date": "True"},
+            ],
+        }},
+    ])
+    cli.fetch_json = lambda *_args, **_kwargs: next(responses)
+    address = cli.find_rating_unit_id("53 Hereford Street")
+    schedule = cli.get_collection(42)
+    return address["rating_unit_id"] == 42 and len(schedule["collections"]) == 1
+
+
+results.append(test("fixture CCC address and collection response parsing", test_fixture_response_parsing))
 
 
 def test_help():
@@ -103,7 +129,7 @@ def test_no_match():
 results.append(test("non-existent address fails cleanly", test_no_match))
 
 if all(results):
-    print("All tests passed.")
+    print("[PASS] live smoke assertions completed")
     sys.exit(0)
 else:
     print(f"{results.count(False)} test(s) failed.")

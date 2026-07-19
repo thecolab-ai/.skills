@@ -33,6 +33,40 @@ def test(name: str, fn):
 results = []
 
 
+def test_event_fixture():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("nz_road_closures_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    record = module.normalize_event(
+        {
+            "properties": {
+                "id": "SYN-1",
+                "type": "closures",
+                "EventType": "Road closure",
+                "Impact": "Road closed",
+                "Name": "Synthetic closure",
+                "IsPlanned": "true",
+            },
+            "geometry": {"type": "Point", "coordinates": [174.76, -36.85]},
+        },
+        {},
+    )
+    assert record["id"] == "SYN-1"
+    assert record["category"] == "closure"
+    assert record["severity"] == "severe"
+    assert record["is_planned"] is True
+    assert record["geometry"]["type"] == "Point"
+    print("[PASS] fixture NZTA event normalisation")
+    return True
+
+
+results.append(test("fixture closure event parser", test_event_fixture))
+
+
 def test_help():
     result = run(["--help"])
     return result.returncode == 0
@@ -89,7 +123,7 @@ def test_routes():
 results.append(test("routes returns routes[]", test_routes))
 
 if all(results):
-    print("All tests passed.")
+    print("[PASS] live smoke assertions completed")
     sys.exit(0)
 else:
     print(f"{results.count(False)} test(s) failed.")

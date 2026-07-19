@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import importlib.util
 import re
 import subprocess
 import sys
@@ -230,8 +231,20 @@ def test_register_unknown():
     return result.returncode == 1
 
 
+def test_fixture_expert_merge():
+    spec = importlib.util.spec_from_file_location("find_experts_cli", CLI)
+    cli = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    sys.modules[spec.name] = cli
+    spec.loader.exec_module(cli)
+    expert = cli.new_expert("Aroha Example")
+    cli.add_work(expert, "Freshwater research", 2025, "10.1/example", ["University of Example"], "openalex")
+    return expert["matching_works"] == 1 and expert["latest_year"] == 2025 and expert["institutions"] == ["University of Example"]
+
+
 def main() -> int:
     results = [
+        test("fixture expert work normalization", test_fixture_expert_merge),
         test("contract help lists subcommands", test_help),
         test("contract search requires a topic", test_search_requires_topic),
         test("topics resolves ids", test_topics),

@@ -5,6 +5,7 @@ Hits real Companies Office NZ endpoints. Requires network access.
 Exits 0 on success, 1 if any test fails.
 """
 import json
+import importlib.util
 import subprocess
 import sys
 from pathlib import Path
@@ -40,6 +41,22 @@ def ok(name: str, fn) -> bool:
 
 
 results: list[bool] = []
+
+
+def test_fixture_normalizers():
+    spec = importlib.util.spec_from_file_location("companies_office_cli", CLI)
+    cli = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    sys.modules[spec.name] = cli
+    spec.loader.exec_module(cli)
+    return (
+        cli._compact_addr(["Level 1", None, "Wellington"]) == "Level 1, Wellington"
+        and cli._status_label(50) == "REGISTERED"
+        and cli._strip_html("<b>Example</b>  Company") == "Example Company"
+    )
+
+
+results.append(ok("fixture company status, address and HTML normalization", test_fixture_normalizers))
 
 
 # --help
@@ -228,7 +245,7 @@ results.append(ok("entity 0000001 (invalid) fails gracefully", test_bad_id))
 
 
 if all(results):
-    print("\nAll tests passed.")
+    print("[PASS] live smoke assertions completed")
     sys.exit(0)
 else:
     failed = results.count(False)

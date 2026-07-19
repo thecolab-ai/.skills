@@ -33,6 +33,37 @@ def test(name: str, fn):
 results = []
 
 
+def test_event_card_fixture():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("eventfinda_nz_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    source = """
+    <div class="card h-event">
+      <h2 class="p-summary"><a href="/2026/synthetic-concert/auckland">Synthetic Concert</a></h2>
+      <script>_efC(1, 98765)</script>
+      <p class="meta-location">Example Theatre, Auckland</p>
+      <span class="value-title" title="2026-07-19T19:30:00+12:00">Sun 19 Jul</span>
+      <span class="category">Music</span>
+      <span class="badge">Free</span>
+    </div>
+    """
+    records = module.event_cards(source, 5)
+    assert len(records) == 1
+    assert records[0]["id"] == "98765"
+    assert records[0]["title"] == "Synthetic Concert"
+    assert records[0]["category"] == "Music"
+    assert records[0]["url"].startswith("https://www.eventfinda.co.nz/")
+    print("[PASS] fixture Eventfinda event-card parser")
+    return True
+
+
+results.append(test("fixture event card parser", test_event_card_fixture))
+
+
 def test_help():
     result = run(["--help"])
     return result.returncode == 0
@@ -101,7 +132,7 @@ def test_event_detail():
 results.append(test("event <url> returns title and sessions[]", test_event_detail))
 
 if all(results):
-    print("All tests passed.")
+    print("[PASS] live smoke assertions completed")
     sys.exit(0)
 else:
     print(f"{results.count(False)} test(s) failed.")

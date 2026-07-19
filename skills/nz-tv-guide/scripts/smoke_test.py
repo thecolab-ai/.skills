@@ -33,6 +33,26 @@ def test(name: str, fn):
 results = []
 
 
+def test_freeview_range_fixture():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("nz_tv_guide_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    parsed = module.parse_freeview_range("2026-07-19", "11:30 PM - 12:15 AM")
+    assert parsed is not None
+    start, end = parsed
+    assert start.isoformat().startswith("2026-07-19T23:30")
+    assert end.isoformat().startswith("2026-07-20T00:15")
+    print("[PASS] fixture Freeview overnight time-range parser")
+    return True
+
+
+results.append(test("fixture programme range parser", test_freeview_range_fixture))
+
+
 def test_help():
     result = run(["--help"])
     return result.returncode == 0
@@ -89,7 +109,7 @@ def test_now():
 results.append(test("now returns programmes[]", test_now))
 
 if all(results):
-    print("All tests passed.")
+    print("[PASS] live smoke assertions completed")
     sys.exit(0)
 else:
     print(f"{results.count(False)} test(s) failed.")

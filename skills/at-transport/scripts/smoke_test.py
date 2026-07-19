@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import json
+import importlib.util
 import os
 import subprocess
 import sys
@@ -49,6 +50,24 @@ def test(name: str, fn):
 
 
 results = []
+
+
+def test_fixture_helpers():
+    spec = importlib.util.spec_from_file_location("at_transport_cli", CLI)
+    cli = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    sys.modules[spec.name] = cli
+    spec.loader.exec_module(cli)
+    lat, lon = cli.parse_lat_lon("-36.8485,174.7633")
+    return (
+        (lat, lon) == (-36.8485, 174.7633)
+        and cli.format_delay(125) == "(+2 min late)"
+        and cli.route_type_name(2) == "Train"
+        and 0 < cli.haversine_meters(lat, lon, -36.85, 174.76) < 1000
+    )
+
+
+results.append(test("fixture transport coordinate and presentation helpers", test_fixture_helpers))
 
 
 def test_help():

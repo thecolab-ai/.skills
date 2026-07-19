@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
+import io
 import json
 import subprocess
 import sys
+import zipfile
 from pathlib import Path
 
 SKILL_DIR = Path(__file__).parent.parent
@@ -30,6 +32,30 @@ def test(name: str, fn):
 
 
 results = []
+
+
+def test_release_zip_fixture():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("child_poverty_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    stream = io.BytesIO()
+    with zipfile.ZipFile(stream, "w") as archive:
+        archive.writestr("child-poverty-national.csv", "Measure,Year,Estimate\nMEASA,2025,12.5\n")
+        archive.writestr("child-poverty-reg-eth-dis.csv", "Measure,Group,Estimate\nMEASA,Auckland,11.0\n")
+    with zipfile.ZipFile(io.BytesIO(stream.getvalue())) as archive:
+        national = module.national_rows(archive)
+        breakdown = module.dem_rows(archive)
+    assert national == [{"Measure": "MEASA", "Year": "2025", "Estimate": "12.5"}]
+    assert breakdown[0]["Group"] == "Auckland"
+    print("[PASS] fixture Stats NZ child-poverty release ZIP parser")
+    return True
+
+
+results.append(test("fixture release ZIP parser", test_release_zip_fixture))
 
 
 def test_help():
@@ -119,7 +145,7 @@ def test_releases():
 results.append(test("releases discovers a CSV release", test_releases))
 
 if all(results):
-    print("All tests passed.")
+    print("[PASS] live smoke assertions completed")
     sys.exit(0)
 else:
     print(f"{results.count(False)} test(s) failed.")

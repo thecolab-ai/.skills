@@ -47,6 +47,34 @@ results = []
 captured = {}
 
 
+def test_card_parser_fixture():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("nz_comcom_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    source = """
+    <article class="card card--has-link">
+      <a class="card__link" href="/case-register/synthetic-case"><strong>Synthetic case</strong></a>
+      <div class="card__status">Open</div>
+      <div class="card__summary">A synthetic &amp; deterministic summary.</div>
+      <div class="card__info">Updated July 2026</div>
+    </article>
+    """
+    records = module.parse_cards(source, 5)
+    assert len(records) == 1
+    assert records[0]["title"] == "Synthetic case"
+    assert records[0]["status"] == "Open"
+    assert records[0]["url"] == "https://www.comcom.govt.nz/case-register/synthetic-case"
+    print("[PASS] fixture Commerce Commission card parser")
+    return True
+
+
+results.append(test("fixture listing card parser", test_card_parser_fixture))
+
+
 def test_help():
     return run(["--help"]).returncode == 0
 
@@ -131,7 +159,7 @@ def test_page():
 results.append(test("page returns detail + documents", test_page))
 
 if all(results):
-    print("All tests passed.")
+    print("[PASS] live smoke assertions completed")
     sys.exit(0)
 print(f"{results.count(False)} test(s) failed.")
 sys.exit(1)

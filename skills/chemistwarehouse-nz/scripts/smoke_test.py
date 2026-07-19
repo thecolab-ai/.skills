@@ -2,6 +2,7 @@
 """Live read-only smoke tests for the Chemist Warehouse NZ skill."""
 from __future__ import annotations
 
+import importlib.util
 import json
 import subprocess
 import sys
@@ -9,6 +10,11 @@ from pathlib import Path
 
 SKILL_DIR = Path(__file__).parent.parent
 CLI = SKILL_DIR / "scripts" / "cli.py"
+spec = importlib.util.spec_from_file_location("chemistwarehouse_fixture_cli", CLI)
+assert spec and spec.loader
+fixture_cli = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = fixture_cli
+spec.loader.exec_module(fixture_cli)
 
 
 def run(args: list[str]) -> subprocess.CompletedProcess[str]:
@@ -98,6 +104,30 @@ def test_product(product_id: str) -> bool:
 
 
 results: list[bool] = []
+
+
+def test_fixture_product_normalisation() -> bool:
+    product = fixture_cli.normalize_product(
+        {
+            "secondid": "FIX-1",
+            "name": "Fixture Vitamin",
+            "brand": "Fixture Brand",
+            "price_cw_nz": "12.49",
+            "rrp_cw_nz": "15.99",
+            "is_prescription": "false",
+            "producturl": "https://www.chemistwarehouse.co.nz/buy/FIX-1",
+        }
+    )
+    return bool(
+        product["product_id"] == "FIX-1"
+        and product["price"] == 12.49
+        and product["rrp"] == 15.99
+        and product["currency"] == "NZD"
+        and product["is_prescription"] is False
+    )
+
+
+results.append(test("fixture search product normalisation", test_fixture_product_normalisation))
 results.append(test("--help exits 0", test_help))
 results.append(test("suggest panadol returns keyword and product suggestions", test_suggest))
 
@@ -121,7 +151,7 @@ else:
     print("  error: skipped because search did not produce a product ID")
 
 if all(results):
-    print("All tests passed.")
+    print("[PASS] live smoke assertions completed")
     raise SystemExit(0)
 
 print(f"{results.count(False)} test(s) failed.")

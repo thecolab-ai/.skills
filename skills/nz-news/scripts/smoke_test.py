@@ -33,6 +33,35 @@ def test(name: str, fn):
 results = []
 
 
+def test_rss_fixture():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("nz_news_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    feed = {"id": "synthetic", "name": "Synthetic News"}
+    xml = """
+    <rss><channel><item>
+      <title><![CDATA[<b>Synthetic headline</b>]]></title>
+      <link>https://www.rnz.co.nz/news/1</link>
+      <pubDate>Sun, 19 Jul 2026 09:30:00 +1200</pubDate>
+      <description><![CDATA[<p>Synthetic summary.</p>]]></description>
+    </item></channel></rss>
+    """
+    records = module.parse_rss_items(xml, feed)
+    assert len(records) == 1
+    assert records[0]["title"] == "Synthetic headline"
+    assert records[0]["sourceId"] == "synthetic"
+    assert records[0]["published"].isoformat() == "2026-07-19T09:30:00+12:00"
+    print("[PASS] fixture RSS item parser")
+    return True
+
+
+results.append(test("fixture RSS parser", test_rss_fixture))
+
+
 def test_help():
     result = run(["--help"])
     return result.returncode == 0
@@ -98,7 +127,7 @@ def test_search():
 results.append(test("search cyclone returns items[]", test_search))
 
 if all(results):
-    print("All tests passed.")
+    print("[PASS] live smoke assertions completed")
     sys.exit(0)
 else:
     print(f"{results.count(False)} test(s) failed.")

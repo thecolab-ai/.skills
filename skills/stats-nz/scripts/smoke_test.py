@@ -33,6 +33,37 @@ def test(name: str, fn):
 results = []
 
 
+def test_series_row_fixture():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("stats_nz_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    record = module.serialize_series_row(
+        {
+            "Period": "2026Q2",
+            "Data_value": "123.45",
+            "STATUS": "F",
+            "UNITS": "Index",
+            "MAGNITUDE": "0",
+            "Series_title_1": "Synthetic series",
+            "Series_title_2": "All groups",
+        }
+    )
+    assert record["period"] == "2026Q2"
+    assert record["value"] == 123.45
+    assert record["magnitude"] == 0
+    assert record["series_title"] == "Synthetic series - All groups"
+    assert module.normalize_region("Wellington Region") == "wellington-region"
+    print("[PASS] fixture Stats NZ CSV series-row normalisation")
+    return True
+
+
+results.append(test("fixture Stats NZ series parser", test_series_row_fixture))
+
+
 def test_help():
     result = run(["--help"])
     return result.returncode == 0
@@ -111,7 +142,7 @@ def test_migration():
 results.append(test("migration returns dict", test_migration))
 
 if all(results):
-    print("All tests passed.")
+    print("[PASS] live smoke assertions completed")
     sys.exit(0)
 else:
     print(f"{results.count(False)} test(s) failed.")

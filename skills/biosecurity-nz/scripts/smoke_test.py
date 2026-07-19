@@ -93,6 +93,34 @@ def responses_blocked_or_ok_check() -> None:
         assert data.get("responses")
 
 
+def pest_record_fixture_check() -> None:
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("biosecurity_nz_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    record = module.normalise_pest_record(
+        {
+            "pestId": 42,
+            "pestName": "Synthetic fruit fly",
+            "nzPreferredScientificName": "Bactrocera exemplaris",
+            "organismNames": [
+                {"organismName": "Example fly", "organismNameTypeID": "common"},
+                {"organismName": "Bactrocera exemplaris", "organismNameTypeID": "scientific"},
+            ],
+            "unwanted": "true",
+            "notifiable": 1,
+        }
+    )
+    assert record["pest_id"] == 42
+    assert record["common_names"] == ["Example fly"]
+    assert record["scientific_names"] == ["Bactrocera exemplaris"]
+    assert record["unwanted"] is True and record["notifiable"] is True
+    print("[PASS] fixture ONZPR pest-record normalisation")
+
+
 def import_requirements_check() -> None:
     data = json_command(["import-requirements", "--commodity", "Apple", "--limit", "1", "--json"])
     if data.get("status") == "blocked":
@@ -121,6 +149,7 @@ def import_requirements_no_results_check() -> None:
 
 def main() -> None:
     checks = [
+        ("fixture pest record parser", pest_record_fixture_check),
         ("contract help", help_check),
         ("sources", sources_check),
         ("pest search happy path", pest_search_check),

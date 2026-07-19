@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import importlib.util
 import json
 import subprocess
 import sys
@@ -8,6 +9,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 CLI = ROOT / "scripts" / "cli.py"
+spec = importlib.util.spec_from_file_location("class4_fixture_cli", CLI)
+assert spec and spec.loader
+fixture_cli = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = fixture_cli
+spec.loader.exec_module(fixture_cli)
 
 NETWORK_SKIP_MARKERS = (
     "network error",
@@ -36,6 +42,19 @@ def run(args: list[str], *, allow_network_skip: bool = False) -> subprocess.Comp
 
 
 def main() -> None:
+    cleaned = fixture_cli.clean_row(
+        {
+            "Society_Name": "Fixture Trust",
+            "Amount_Requested_Final": "$1,234.50",
+            "Amount_Granted_Final": "1000",
+            "Amount_Refunded_Clean": "",
+        }
+    )
+    assert cleaned["Amount_Requested_Final_Number"] == 1234.5
+    assert cleaned["Amount_Granted_Final_Number"] == 1000.0
+    assert cleaned["Amount_Refunded_Clean_Number"] == 0.0
+    print("[PASS] fixture grant CSV money normalisation")
+
     help_proc = run(["--help"])
     assert "datasets" in help_proc.stdout
     assert "grants" in help_proc.stdout
@@ -63,7 +82,7 @@ def main() -> None:
     assert edge_payload["matched"] == 0
     assert edge_payload["records"] == []
 
-    print("class4-grants-nz smoke test passed")
+    print("[PASS] live class 4 datasets, preview, filtering and empty-result assertions")
 
 
 if __name__ == "__main__":
