@@ -1,6 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 import sys
@@ -8,7 +9,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from run_smoke_tests import run_one  # noqa: E402
+from run_smoke_tests import run_one, smoke_command  # noqa: E402
 
 
 class SmokeRunnerTests(unittest.TestCase):
@@ -149,6 +150,27 @@ metadata:
             )
             result = run_one(skill, 10)
             self.assertEqual(result["status"], "pass")
+
+    def test_declared_skill_requirements_are_installed_with_uv(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            skill = self.make_skill(Path(tmp), "print('[PASS] fixture dependency loaded')\n")
+            requirements = skill / "requirements.txt"
+            requirements.write_text("example-package==1.0\n", encoding="utf-8")
+            smoke = skill / "scripts" / "smoke_test.py"
+            with mock.patch("run_smoke_tests.shutil.which", return_value="/usr/bin/uv"):
+                command = smoke_command(smoke)
+            self.assertEqual(
+                command,
+                [
+                    "uv",
+                    "run",
+                    "--no-project",
+                    "--with-requirements",
+                    str(requirements),
+                    "python",
+                    str(smoke),
+                ],
+            )
 
 
 if __name__ == "__main__":

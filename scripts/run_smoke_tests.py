@@ -97,9 +97,14 @@ def static_assertions(path: Path) -> int:
 
 
 def smoke_command(path: Path) -> list[str]:
-    if os.environ.get("COLAB_SMOKE_WITH_CLOAKBROWSER") == "1" and shutil.which("uv"):
+    requirements = path.parents[1] / "requirements.txt"
+    use_cloakbrowser = os.environ.get("COLAB_SMOKE_WITH_CLOAKBROWSER") == "1"
+    if shutil.which("uv") and (requirements.is_file() or use_cloakbrowser):
         command = ["uv", "run", "--no-project"]
-        command.extend(("--with", "cloakbrowser"))
+        if requirements.is_file():
+            command.extend(("--with-requirements", str(requirements)))
+        if use_cloakbrowser:
+            command.extend(("--with", "cloakbrowser"))
         command.extend(("python", str(path)))
         return command
     return [sys.executable, str(path)]

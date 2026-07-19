@@ -2,7 +2,7 @@
 name: treasury-fiscal-data-nz
 description: "Query official New Zealand Treasury fiscal forecast, appropriation, Crown revenue, expenditure and debt resources with publication provenance."
 license: MIT
-compatibility: "Requires Python 3.10+ and network access for live data"
+compatibility: "Requires Python 3.10+, openpyxl, and network access for live data"
 metadata:
   thecolab.category: "economics"
   thecolab.source_owner: "New Zealand Treasury"
