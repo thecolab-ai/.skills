@@ -1,0 +1,92 @@
+{
+  "description": "Official Ministry of Education school directory and zone resource discovery",
+  "source_name": "Education Counts school directory",
+  "source_url": "https://www.educationcounts.govt.nz/directories/list-of-nz-schools",
+  "allowed_hosts": [
+    "www.educationcounts.govt.nz",
+    "catalogue.data.govt.nz"
+  ],
+  "freshness": "directory release-dependent",
+  "warnings": [
+    "Directory fields are not school rankings or quality claims.",
+    "Enrolment-zone boundaries can change and require official school confirmation.",
+    "No student-level or small-cell information is returned."
+  ],
+  "record_fields": {
+    "ranking": "not provided",
+    "zone_confirmation_required": true
+  },
+  "smoke_args": [
+    "search",
+    "Auckland"
+  ],
+  "commands": {
+    "search": {
+      "help": "search schools and directory resources",
+      "positionals": [
+        {
+          "name": "query"
+        }
+      ]
+    },
+    "school": {
+      "help": "find a school by Ministry number",
+      "positionals": [
+        {
+          "name": "id"
+        }
+      ]
+    },
+    "near": {
+      "help": "discover schools near coordinates",
+      "options": [
+        {
+          "flags": [
+            "--lat"
+          ],
+          "type": "float",
+          "required": true
+        },
+        {
+          "flags": [
+            "--lon"
+          ],
+          "type": "float",
+          "required": true
+        }
+      ]
+    },
+    "zone": {
+      "help": "discover official enrolment-zone resources",
+      "options": [
+        {
+          "flags": [
+            "--address"
+          ],
+          "required": true
+        }
+      ]
+    },
+    "region": {
+      "help": "filter by region",
+      "positionals": [
+        {
+          "name": "name"
+        }
+      ]
+    },
+    "changes": {
+      "help": "discover school changes since a date",
+      "options": [
+        {
+          "flags": [
+            "--since"
+          ],
+          "required": true
+        }
+      ]
+    }
+  },
+  "discovery_only": false,
+  "discovery_commands": []
+}

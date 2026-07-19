@@ -1,0 +1,68 @@
+{
+  "description": "Official Education Review Office school report discovery",
+  "source_name": "Education Review Office reports",
+  "source_url": "https://www.ero.govt.nz/review-reports",
+  "allowed_hosts": [
+    "ero.govt.nz",
+    "www.ero.govt.nz"
+  ],
+  "freshness": "report publication-dependent",
+  "warnings": [
+    "Do not create numeric ratings or cross-school rankings unless ERO publishes the measure.",
+    "Historical review frameworks and dates must remain explicit.",
+    "Extracted findings require linked section or page provenance."
+  ],
+  "record_fields": {
+    "rating": "not generated",
+    "section_or_page_provenance": "verify in linked HTML or PDF report",
+    "extraction_limitations": "institution-page report sections only; navigation is excluded"
+  },
+  "smoke_args": [
+    "search",
+    "school"
+  ],
+  "commands": {
+    "search": {
+      "help": "search reports by school",
+      "positionals": [
+        {
+          "name": "school"
+        }
+      ]
+    },
+    "latest": {
+      "help": "find a school's latest report",
+      "positionals": [
+        {
+          "name": "school_id"
+        }
+      ]
+    },
+    "report": {
+      "help": "find a report identifier",
+      "positionals": [
+        {
+          "name": "id"
+        }
+      ]
+    },
+    "actions": {
+      "help": "discover action and next-step sections",
+      "positionals": [
+        {
+          "name": "id"
+        }
+      ]
+    },
+    "history": {
+      "help": "discover report history",
+      "positionals": [
+        {
+          "name": "school_id"
+        }
+      ]
+    }
+  },
+  "discovery_only": false,
+  "discovery_commands": []
+}

@@ -1,0 +1,83 @@
+{
+  "description": "Official FENZ operational and annual incident data retrieval",
+  "source_name": "Fire and Emergency New Zealand incident reports",
+  "source_url": "https://www.fireandemergency.nz/incidents-and-news/incident-reports/",
+  "allowed_hosts": [
+    "www.fireandemergency.nz"
+  ],
+  "freshness": "seven-day operational feed and annual incident downloads",
+  "warnings": [
+    "Do not expose details beyond those FENZ publishes.",
+    "Preliminary operational labels are not final classifications.",
+    "Absence from the public feed does not prove no incident occurred.",
+    "No notification or dispatch function is provided."
+  ],
+  "record_fields": {
+    "classification_status": "operational rows are preliminary; annual rows follow metadata definitions",
+    "coverage_exhaustive": false
+  },
+  "smoke_args": [
+    "recent"
+  ],
+  "commands": {
+    "recent": {
+      "help": "list recent incident resources"
+    },
+    "search": {
+      "help": "search incident resources",
+      "positionals": [
+        {
+          "name": "query"
+        }
+      ]
+    },
+    "region": {
+      "help": "filter by region",
+      "positionals": [
+        {
+          "name": "name"
+        }
+      ]
+    },
+    "type": {
+      "help": "filter by incident type",
+      "positionals": [
+        {
+          "name": "name"
+        }
+      ]
+    },
+    "incident": {
+      "help": "find an incident identifier",
+      "positionals": [
+        {
+          "name": "id"
+        }
+      ]
+    },
+    "annual": {
+      "help": "aggregate an official annual incident dataset",
+      "options": [
+        {
+          "flags": [
+            "--year"
+          ],
+          "required": true
+        }
+      ]
+    },
+    "trend": {
+      "help": "aggregate official annual datasets for a region",
+      "options": [
+        {
+          "flags": [
+            "--region"
+          ],
+          "required": true
+        }
+      ]
+    }
+  },
+  "discovery_only": false,
+  "discovery_commands": []
+}

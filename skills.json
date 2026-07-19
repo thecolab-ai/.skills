@@ -2,7 +2,7 @@
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
   "last_verified": "2026-07-19",
-  "skill_count": 113,
+  "skill_count": 133,
   "skills": [
     {
       "name": "airnz-flights",
@@ -753,6 +753,31 @@
       "maintainer": "@adam91holt"
     },
     {
+      "name": "drinking-water-register-nz",
+      "description": "Query public Hinekōrako drinking-water supplier, supply, service-area and document records. Use for registration discovery; registration is not proof of current water safety.",
+      "path": "skills/drinking-water-register-nz",
+      "category": "environment",
+      "source_owner": "Taumata Arowai",
+      "source_type": "official",
+      "source_url": "https://hinekorako.taumataarowai.govt.nz/publicregister/supplies/",
+      "auth": "none",
+      "access_mode": "html-readonly",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "medium",
+      "cache_ttl": "24h",
+      "schema_version": "1",
+      "skill_type": "html-readonly",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "hinekorako.taumataarowai.govt.nz"
+      ],
+      "last_verified": "2026-07-19",
+      "health": "degraded",
+      "maintainer": "@adam91holt"
+    },
+    {
       "name": "education-counts-nz",
       "description": "Query Education Counts teacher workforce and initial teacher education public sources for New Zealand teacher supply research. Use when the task involves ITE enrolments/completions, teacher numbers, teacher entry/leaving, teacher turnover, teacher demand and supply projections, workbook URLs, or source caveats for Ministry of Education teacher workforce data.",
       "path": "skills/education-counts-nz",
@@ -804,6 +829,34 @@
       "maintainer": "@adam91holt"
     },
     {
+      "name": "elections-nz",
+      "description": "Query official New Zealand election results, electorate voting, turnout and published finance resources from the Electoral Commission.",
+      "path": "skills/elections-nz",
+      "category": "government",
+      "source_owner": "Electoral Commission",
+      "source_type": "official",
+      "source_url": "https://elections.nz/stats-and-research/",
+      "auth": "none",
+      "access_mode": "public-download",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "24h",
+      "schema_version": "1",
+      "skill_type": "public-download",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "elections.nz",
+        "www.elections.nz",
+        "electionresults.govt.nz",
+        "www.electionresults.govt.nz"
+      ],
+      "last_verified": "2026-07-19",
+      "health": "degraded",
+      "maintainer": "@adam91holt"
+    },
+    {
       "name": "energy-hardship-nz",
       "description": "Query New Zealand energy-hardship evidence from MBIE energy-hardship measure reports, Stats NZ Household Expenditure Statistics household energy and electricity expenditure tables, and Electricity Authority disconnection dashboard/source metadata. Use for NZ energy poverty, electricity affordability, domestic-energy burden, 2M or 10 percent hardship proxy research, HES energy expenditure, MBIE five hardship measures, and disconnections for non-payment caveats.",
       "path": "skills/energy-hardship-nz",
@@ -832,6 +885,32 @@
       "maintainer": "@adam91holt"
     },
     {
+      "name": "ero-school-reports-nz",
+      "description": "Find and retrieve official Education Review Office school reports with section or page provenance. Use for report evidence, not rankings.",
+      "path": "skills/ero-school-reports-nz",
+      "category": "education",
+      "source_owner": "Education Review Office",
+      "source_type": "official",
+      "source_url": "https://www.ero.govt.nz/review-reports",
+      "auth": "none",
+      "access_mode": "html-readonly",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "medium",
+      "cache_ttl": "24h",
+      "schema_version": "1",
+      "skill_type": "html-readonly",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "ero.govt.nz",
+        " www.ero.govt.nz"
+      ],
+      "last_verified": "2026-07-19",
+      "health": "degraded",
+      "maintainer": "@adam91holt"
+    },
+    {
       "name": "eventfinda-nz",
       "description": "Search and inspect public Eventfinda New Zealand event listings from the no-login website pages. Use when the task involves finding NZ events by location, category, or keyword, getting Eventfinda event URLs, venues, dates, public session times, ticket badges, images, or JSON-LD detail from public event pages.",
       "path": "skills/eventfinda-nz",
@@ -854,6 +933,31 @@
       ],
       "last_verified": "2026-07-19",
       "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "fenz-incidents-nz",
+      "description": "Query official Fire and Emergency New Zealand operational reports and annual incident datasets by place, type and period.",
+      "path": "skills/fenz-incidents-nz",
+      "category": "emergency",
+      "source_owner": "Fire and Emergency New Zealand",
+      "source_type": "official",
+      "source_url": "https://www.fireandemergency.nz/incidents-and-news/incident-reports/",
+      "auth": "none",
+      "access_mode": "html-readonly",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "medium",
+      "cache_ttl": "24h",
+      "schema_version": "1",
+      "skill_type": "html-readonly",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "www.fireandemergency.nz"
+      ],
+      "last_verified": "2026-07-19",
+      "health": "degraded",
       "maintainer": "@adam91holt"
     },
     {
@@ -1441,6 +1545,57 @@
       "maintainer": "@adam91holt"
     },
     {
+      "name": "mbie-jobs-online-nz",
+      "description": "Query official MBIE Jobs Online advertised-vacancy trends by occupation, industry, region and skill level with methodology context.",
+      "path": "skills/mbie-jobs-online-nz",
+      "category": "employment",
+      "source_owner": "Ministry of Business, Innovation and Employment",
+      "source_type": "official",
+      "source_url": "https://www.mbie.govt.nz/business-and-employment/employment-and-skills/labour-market-reports-data-and-analysis/jobs-online",
+      "auth": "none",
+      "access_mode": "public-download",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "24h",
+      "schema_version": "1",
+      "skill_type": "public-download",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "www.mbie.govt.nz",
+        "mbie.govt.nz"
+      ],
+      "last_verified": "2026-07-19",
+      "health": "degraded",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "medsafe-recalls-nz",
+      "description": "Search official Medsafe medicine and medical-device recalls and safety communications. Use for product, batch, hazard and action retrieval; not medical advice.",
+      "path": "skills/medsafe-recalls-nz",
+      "category": "health",
+      "source_owner": "Medsafe",
+      "source_type": "official",
+      "source_url": "https://www.medsafe.govt.nz/hot/Recalls/RecallSearch.asp",
+      "auth": "none",
+      "access_mode": "html-readonly",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "medium",
+      "cache_ttl": "24h",
+      "schema_version": "1",
+      "skill_type": "html-readonly",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "www.medsafe.govt.nz"
+      ],
+      "last_verified": "2026-07-19",
+      "health": "degraded",
+      "maintainer": "@adam91holt"
+    },
+    {
       "name": "mental-health-data-nz",
       "description": "Use when Codex needs New Zealand mental-health regulatory data from ODMHAS reports, seclusion/restraint summaries, MH&A KPI Programme indicator metadata, inpatient inspection counts, District Inspector sources, or source caveats for public mental-health transparency work. Read-only, keyless, and stdlib-only.",
       "path": "skills/mental-health-data-nz",
@@ -1736,6 +1891,31 @@
       "maintainer": "@adam91holt"
     },
     {
+      "name": "nz-case-law",
+      "description": "Search publicly available official New Zealand judgments by citation, court, party, judge, date and subject. Retrieval only; coverage is not exhaustive and this is not legal advice.",
+      "path": "skills/nz-case-law",
+      "category": "legal",
+      "source_owner": "Courts of New Zealand",
+      "source_type": "official",
+      "source_url": "https://www.courtsofnz.govt.nz/judgments",
+      "auth": "none",
+      "access_mode": "html-readonly",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "medium",
+      "cache_ttl": "24h",
+      "schema_version": "1",
+      "skill_type": "html-readonly",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "www.courtsofnz.govt.nz"
+      ],
+      "last_verified": "2026-07-19",
+      "health": "degraded",
+      "maintainer": "@adam91holt"
+    },
+    {
       "name": "nz-cinemas",
       "description": "Query NZ cinema locations, now-playing movies, and session times across Event Cinemas, HOYTS, Reading Cinemas, Rialto, and Berkeley Mission Bay. Read-only; no booking, ticket, or payment.",
       "path": "skills/nz-cinemas",
@@ -1787,6 +1967,31 @@
       "pack": "nz-public-data",
       "allowed_domains": [
         "www.comcom.govt.nz"
+      ],
+      "last_verified": "2026-07-19",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "nz-consultations",
+      "description": "List open New Zealand central-government consultations, agencies, topics, deadlines and official submission links. Read-only; does not submit responses.",
+      "path": "skills/nz-consultations",
+      "category": "government",
+      "source_owner": "New Zealand Government",
+      "source_type": "official",
+      "source_url": "https://www.govt.nz/browse/engaging-with-government/consultations-have-your-say/consultations-listing/",
+      "auth": "none",
+      "access_mode": "html-readonly",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "medium",
+      "cache_ttl": "24h",
+      "schema_version": "1",
+      "skill_type": "html-readonly",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "www.govt.nz"
       ],
       "last_verified": "2026-07-19",
       "health": "healthy",
@@ -1893,6 +2098,32 @@
       "maintainer": "@adam91holt"
     },
     {
+      "name": "nz-emergency-alerts",
+      "description": "Query official New Zealand CAP emergency alerts by location, region, agency and severity. Use for current official alert retrieval; absence is not proof of safety.",
+      "path": "skills/nz-emergency-alerts",
+      "category": "emergency",
+      "source_owner": "National Emergency Management Agency",
+      "source_type": "official",
+      "source_url": "https://www.civildefence.govt.nz/about/news-and-events/news-and-events/cap-feed-for-emergency-mobile-alert-is-now-live",
+      "auth": "none",
+      "access_mode": "public-api",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "5m",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "www.civildefence.govt.nz",
+        " alerthub.civildefence.govt.nz"
+      ],
+      "last_verified": "2026-07-19",
+      "health": "degraded",
+      "maintainer": "@adam91holt"
+    },
+    {
       "name": "nz-family-support",
       "description": "Map New Zealand family support entitlement questions to official IRD, MSD, and WINZ sources without calculating eligibility. Use when the task involves Working for Families, Best Start, FamilyBoost, childcare help, Accommodation Supplement, MSD/WINZ handoffs, or finding the right official checker or programme page. Read-only; no private data collection, applications, or entitlement decisions.",
       "path": "skills/nz-family-support",
@@ -1952,6 +2183,56 @@
       "maintainer": "@adam91holt"
     },
     {
+      "name": "nz-food-recalls",
+      "description": "Search official MPI food recalls by product, brand, allergen, hazard, batch and date. Use for source-backed current and historical food-recall checks.",
+      "path": "skills/nz-food-recalls",
+      "category": "safety",
+      "source_owner": "Ministry for Primary Industries",
+      "source_type": "official",
+      "source_url": "https://www.mpi.govt.nz/food-safety-home/food-recalls-and-complaints/",
+      "auth": "none",
+      "access_mode": "html-readonly",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "medium",
+      "cache_ttl": "24h",
+      "schema_version": "1",
+      "skill_type": "html-readonly",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "www.mpi.govt.nz"
+      ],
+      "last_verified": "2026-07-19",
+      "health": "degraded",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "nz-gazette",
+      "description": "Search and retrieve authoritative New Zealand Gazette notices by keyword, identifier, date, category and legislation. Retrieval only; not legal advice.",
+      "path": "skills/nz-gazette",
+      "category": "government",
+      "source_owner": "New Zealand Gazette",
+      "source_type": "official",
+      "source_url": "https://gazette.govt.nz/",
+      "auth": "none",
+      "access_mode": "html-readonly",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "medium",
+      "cache_ttl": "24h",
+      "schema_version": "1",
+      "skill_type": "html-readonly",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "gazette.govt.nz"
+      ],
+      "last_verified": "2026-07-19",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
       "name": "nz-grants",
       "description": "Query New Zealand grant opportunities and grant-distribution history from DIA/Granted.govt.nz Class 4 gambling grants and CommunityMatters fund pages. Use when the task involves current NZ community grant opportunities, CommunityMatters fund criteria/source pages, pokie/Class 4 grant recipient history, funders, half-year periods, recipients, or Territorial Local Authority grant totals. Read-only and no API key required; upstream bot protection may require graceful retry or skip.",
       "path": "skills/nz-grants",
@@ -1973,6 +2254,31 @@
         "catalogue.data.govt.nz",
         "www.communitymatters.govt.nz",
         "www.granted.govt.nz"
+      ],
+      "last_verified": "2026-07-19",
+      "health": "degraded",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "nz-hansard",
+      "description": "Search official New Zealand parliamentary debates, speeches and oral-question transcripts by speaker, date, topic, bill and sitting.",
+      "path": "skills/nz-hansard",
+      "category": "government",
+      "source_owner": "New Zealand Parliament",
+      "source_type": "official",
+      "source_url": "https://hansard.parliament.nz/",
+      "auth": "none",
+      "access_mode": "html-readonly",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "medium",
+      "cache_ttl": "24h",
+      "schema_version": "1",
+      "skill_type": "html-readonly",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "hansard.parliament.nz"
       ],
       "last_verified": "2026-07-19",
       "health": "degraded",
@@ -2092,6 +2398,31 @@
       "maintainer": "@adam91holt"
     },
     {
+      "name": "nz-mps-electorates",
+      "description": "Query official current New Zealand MP, electorate, party, portfolio, role, committee and public office contact records.",
+      "path": "skills/nz-mps-electorates",
+      "category": "government",
+      "source_owner": "New Zealand Parliament",
+      "source_type": "official",
+      "source_url": "https://www3.parliament.nz/en/mps-and-electorates/members-of-parliament/",
+      "auth": "none",
+      "access_mode": "html-readonly",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "medium",
+      "cache_ttl": "24h",
+      "schema_version": "1",
+      "skill_type": "html-readonly",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "www3.parliament.nz"
+      ],
+      "last_verified": "2026-07-19",
+      "health": "degraded",
+      "maintainer": "@adam91holt"
+    },
+    {
       "name": "nz-news",
       "description": "Aggregate RSS feeds from major New Zealand news websites. Use when the task involves NZ news, current events in New Zealand, what's happening in NZ, NZ headlines, or searching NZ stories by topic, timeframe, or source. No authentication required.",
       "path": "skills/nz-news",
@@ -2147,6 +2478,33 @@
       "maintainer": "@adam91holt"
     },
     {
+      "name": "nz-police-data",
+      "description": "Query official anonymised New Zealand Police victimisation, proceedings and offence statistics with suppression and interpretation context.",
+      "path": "skills/nz-police-data",
+      "category": "public-safety",
+      "source_owner": "New Zealand Police",
+      "source_type": "official",
+      "source_url": "https://www.police.govt.nz/about-us/publications-statistics/data-and-statistics/policedatanz",
+      "auth": "none",
+      "access_mode": "public-download",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "24h",
+      "schema_version": "1",
+      "skill_type": "public-download",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "www.police.govt.nz",
+        "police.govt.nz",
+        "public.tableau.com"
+      ],
+      "last_verified": "2026-07-19",
+      "health": "degraded",
+      "maintainer": "@adam91holt"
+    },
+    {
       "name": "nz-pricewatch",
       "description": "Query PriceSpy NZ for NZ electronics and appliance price comparison: cheapest prices, merchant offers, price history, and trending products. No login, cart, or account required.",
       "path": "skills/nz-pricewatch",
@@ -2169,6 +2527,31 @@
       ],
       "last_verified": "2026-07-19",
       "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "nz-product-recalls",
+      "description": "Search official Product Safety New Zealand non-food consumer-product recalls by product, supplier, category, hazard and date.",
+      "path": "skills/nz-product-recalls",
+      "category": "safety",
+      "source_owner": "Product Safety New Zealand",
+      "source_type": "official",
+      "source_url": "https://www.productsafety.govt.nz/recalls",
+      "auth": "none",
+      "access_mode": "html-readonly",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "medium",
+      "cache_ttl": "24h",
+      "schema_version": "1",
+      "skill_type": "html-readonly",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "www.productsafety.govt.nz"
+      ],
+      "last_verified": "2026-07-19",
+      "health": "degraded",
       "maintainer": "@adam91holt"
     },
     {
@@ -2195,6 +2578,58 @@
       ],
       "last_verified": "2026-07-19",
       "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "nz-schools",
+      "description": "Query official Ministry of Education school directory, roll, location and enrolment-zone resources. Use for source-backed school lookup, not rankings.",
+      "path": "skills/nz-schools",
+      "category": "education",
+      "source_owner": "Ministry of Education",
+      "source_type": "official",
+      "source_url": "https://www.educationcounts.govt.nz/directories/list-of-nz-schools",
+      "auth": "none",
+      "access_mode": "public-download",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "24h",
+      "schema_version": "1",
+      "skill_type": "public-download",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "www.educationcounts.govt.nz",
+        " catalogue.data.govt.nz"
+      ],
+      "last_verified": "2026-07-19",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "nz-select-committees",
+      "description": "Track official New Zealand select committees, open submissions, business, public evidence and reports. Read-only; does not submit on a user's behalf.",
+      "path": "skills/nz-select-committees",
+      "category": "government",
+      "source_owner": "New Zealand Parliament",
+      "source_type": "official",
+      "source_url": "https://www3.parliament.nz/en/pb/sc/",
+      "auth": "none",
+      "access_mode": "html-readonly",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "medium",
+      "cache_ttl": "24h",
+      "schema_version": "1",
+      "skill_type": "html-readonly",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "www3.parliament.nz",
+        " www.parliament.nz"
+      ],
+      "last_verified": "2026-07-19",
+      "health": "degraded",
       "maintainer": "@adam91holt"
     },
     {
@@ -2614,6 +3049,32 @@
       "maintainer": "@adam91holt"
     },
     {
+      "name": "pharmac-schedule-nz",
+      "description": "Query official Pharmac Schedule funding, subsidy, restriction and Special Authority resources. Use for source-backed medicine/device funding research; not clinical advice.",
+      "path": "skills/pharmac-schedule-nz",
+      "category": "health",
+      "source_owner": "Pharmac",
+      "source_type": "official",
+      "source_url": "https://www.pharmac.govt.nz/pharmaceutical-schedule/about-the-schedule",
+      "auth": "none",
+      "access_mode": "html-readonly",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "medium",
+      "cache_ttl": "24h",
+      "schema_version": "1",
+      "skill_type": "html-readonly",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "www.pharmac.govt.nz",
+        " schedule.pharmac.govt.nz"
+      ],
+      "last_verified": "2026-07-19",
+      "health": "degraded",
+      "maintainer": "@adam91holt"
+    },
+    {
       "name": "pptx",
       "description": "Use this skill any time a .pptx file is involved in any way — creating, reading, editing, combining, splitting, or updating decks, slides, presentations, templates, layouts, speaker notes, or comments.",
       "path": "skills/pptx",
@@ -2879,6 +3340,33 @@
       "maintainer": "@adam91holt"
     },
     {
+      "name": "statsnz-building-consents",
+      "description": "Query official Stats NZ building-consent counts, values and floor area by region, building type and period with revision context.",
+      "path": "skills/statsnz-building-consents",
+      "category": "housing",
+      "source_owner": "Stats NZ",
+      "source_type": "official",
+      "source_url": "https://datainfoplus.stats.govt.nz/item/nz.govt.stats/ee083b32-8c10-4ccf-b1ee-a4990b27273c",
+      "auth": "none",
+      "access_mode": "public-download",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "24h",
+      "schema_version": "1",
+      "skill_type": "public-download",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "datainfoplus.stats.govt.nz",
+        "stats.govt.nz",
+        "www.stats.govt.nz"
+      ],
+      "last_verified": "2026-07-19",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
       "name": "statsnz-classifications-nz",
       "description": "Query Stats NZ DataInfo+ / Aria classifications, concepts, concordances, and quality standards with lookup IDs, code lists, version history, and category metadata.",
       "path": "skills/statsnz-classifications-nz",
@@ -2977,6 +3465,32 @@
       ],
       "last_verified": "2026-07-19",
       "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "treasury-fiscal-data-nz",
+      "description": "Query official New Zealand Treasury fiscal forecast, appropriation, Crown revenue, expenditure and debt resources with publication provenance.",
+      "path": "skills/treasury-fiscal-data-nz",
+      "category": "economics",
+      "source_owner": "New Zealand Treasury",
+      "source_type": "official",
+      "source_url": "https://www.treasury.govt.nz/publications/budgets/forecasts",
+      "auth": "none",
+      "access_mode": "public-download",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "24h",
+      "schema_version": "1",
+      "skill_type": "public-download",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "www.treasury.govt.nz",
+        "treasury.govt.nz"
+      ],
+      "last_verified": "2026-07-19",
+      "health": "degraded",
       "maintainer": "@adam91holt"
     },
     {

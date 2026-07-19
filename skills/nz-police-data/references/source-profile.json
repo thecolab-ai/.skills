@@ -1,0 +1,75 @@
+{
+  "description": "Official anonymised New Zealand Police statistics and definition discovery",
+  "source_name": "New Zealand Police Data NZ",
+  "source_url": "https://www.police.govt.nz/about-us/publications-statistics/data-and-statistics/policedatanz",
+  "allowed_hosts": [
+    "www.police.govt.nz",
+    "police.govt.nz",
+    "public.tableau.com"
+  ],
+  "freshness": "dataset release-dependent",
+  "warnings": [
+    "All suppression, rounding and small-cell rules must be preserved.",
+    "Recorded crime is not a direct measure of total underlying crime prevalence.",
+    "Do not produce person-level, address-level, profiling or predictive-policing output.",
+    "Geographic comparisons require population, base-rate and boundary context."
+  ],
+  "record_fields": {
+    "suppression": "preserve markers in linked dataset",
+    "interpretation": "recorded or reported measures only; not total prevalence"
+  },
+  "smoke_args": [
+    "definitions"
+  ],
+  "commands": {
+    "victimisations": {
+      "help": "discover victimisation statistics"
+    },
+    "proceedings": {
+      "help": "discover offender proceeding statistics"
+    },
+    "trend": {
+      "help": "report unsupported row-level offence filtering",
+      "options": [
+        {
+          "flags": [
+            "--offence"
+          ],
+          "required": true
+        }
+      ]
+    },
+    "area": {
+      "help": "report unsupported row-level area filtering",
+      "positionals": [
+        {
+          "name": "name"
+        }
+      ]
+    },
+    "demographics": {
+      "help": "report unsupported row-level demographic filtering",
+      "options": [
+        {
+          "flags": [
+            "--measure"
+          ],
+          "required": true
+        }
+      ]
+    },
+    "definitions": {
+      "help": "show source definitions and interpretation resources"
+    },
+    "datasets": {
+      "help": "list official datasets and workbooks"
+    }
+  },
+  "discovery_only": true,
+  "discovery_commands": [
+    "victimisations",
+    "proceedings",
+    "definitions",
+    "datasets"
+  ]
+}

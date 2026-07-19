@@ -1,0 +1,13 @@
+{
+  "Records": [
+    {
+      "Id": "f23f031d-dc5d-ec11-8f8f-002248122144",
+      "Attributes": [
+        {"Name": "ta_supplyid", "DisplayValue": "AKA001"},
+        {"Name": "ta_supplyname", "DisplayValue": "Akaroa"},
+        {"Name": "ta_supplytype", "DisplayValue": "Networked supply"},
+        {"Name": "ta_community", "DisplayValue": "Akaroa, Takamatua"}
+      ]
+    }
+  ]
+}

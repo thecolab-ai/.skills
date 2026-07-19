@@ -1,0 +1,77 @@
+{
+  "description": "Official Stats NZ building-consent release and workbook series",
+  "source_name": "Stats NZ Building Consents Issued DataInfo+",
+  "source_url": "https://datainfoplus.stats.govt.nz/item/nz.govt.stats/ee083b32-8c10-4ccf-b1ee-a4990b27273c",
+  "allowed_hosts": ["datainfoplus.stats.govt.nz", "stats.govt.nz", "www.stats.govt.nz"],
+  "freshness": "monthly release-dependent",
+  "warnings": [
+    "Consents are intentions or authorisations, not completed buildings.",
+    "Keep residential units, buildings, alterations and non-residential measures distinct.",
+    "Preserve revised series and geography-boundary context."
+  ],
+  "record_fields": {
+    "measure_scope": "verify count, value or floor area in linked series",
+    "revision_status": "verify linked release",
+    "completion_status": "not evidence of completion"
+  },
+  "smoke_args": [
+    "latest"
+  ],
+  "commands": {
+    "latest": {
+      "help": "show latest release resources"
+    },
+    "region": {
+      "help": "filter by geography",
+      "positionals": [
+        {
+          "name": "name"
+        }
+      ]
+    },
+    "type": {
+      "help": "filter by building type",
+      "positionals": [
+        {
+          "name": "name"
+        }
+      ]
+    },
+    "timeseries": {
+      "help": "retrieve a date-range time series",
+      "options": [
+        {
+          "flags": [
+            "--from"
+          ],
+          "dest": "from_date",
+          "required": true
+        },
+        {
+          "flags": [
+            "--to"
+          ],
+          "dest": "to_date",
+          "required": true
+        }
+      ]
+    },
+    "value": {
+      "help": "retrieve published value measures by supported region",
+      "options": [
+        {
+          "flags": [
+            "--region"
+          ],
+          "required": true
+        }
+      ]
+    },
+    "compare-regions": {
+      "help": "compare latest published regional dwelling counts"
+    },
+    "definitions": {
+      "help": "show measure, classification and revision definitions"
+    }
+  }
+}
