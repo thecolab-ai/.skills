@@ -33,6 +33,32 @@ def test(name: str, fn):
 results = []
 
 
+def test_search_item_fixture():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("nz_healthpoint_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    block = """
+      <h4><a href="/pharmacy/pharmacy/synthetic-pharmacy/">Synthetic Pharmacy</a></h4>
+      <div class="search-result-locations">1 Example Street, Wellington</div>
+      <a href="tel:%2B64-4-555-0100">Call</a>
+      <p class="opening-hours">Open today 8:00 AM to 10:00 PM</p>
+    """
+    record = module.normalize_item(block, "https://www.healthpoint.co.nz/search/")
+    assert record and record["name"] == "Synthetic Pharmacy"
+    assert record["phone"] == "+64-4-555-0100"
+    assert record["address"] == "1 Example Street, Wellington"
+    assert record["open_late_today_after_9pm"] is True
+    print("[PASS] fixture Healthpoint search-result parser")
+    return True
+
+
+results.append(test("fixture search result parser", test_search_item_fixture))
+
+
 def test_help():
     result = run(["--help"])
     return result.returncode == 0
@@ -93,7 +119,7 @@ def test_hospitals():
 results.append(test("hospitals returns results[]", test_hospitals))
 
 if all(results):
-    print("All tests passed.")
+    print("[PASS] live smoke assertions completed")
     sys.exit(0)
 else:
     print(f"{results.count(False)} test(s) failed.")

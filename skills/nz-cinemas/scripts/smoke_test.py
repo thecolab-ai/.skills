@@ -36,6 +36,40 @@ def test(name: str, fn):
 results = []
 
 
+def test_movie_fixture():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("nz_cinemas_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    movies = module.parse_event_movies(
+        "event",
+        {
+            "Movies": [{
+                "Id": 42,
+                "Name": "Synthetic Film",
+                "Rating": "PG",
+                "RunningTime": 105,
+                "MovieGenres": [{"Name": "Drama"}],
+                "CinemaModels": [{"Name": "Example Cinema", "Sessions": [{"Id": 1}, {"Id": 2}]}],
+                "CinemaIds": [10],
+                "MovieUrl": "/Movies/Synthetic-Film",
+            }]
+        },
+    )
+    assert len(movies) == 1
+    assert movies[0]["title"] == "Synthetic Film"
+    assert movies[0]["genres"] == ["Drama"]
+    assert movies[0]["sessions_count"] == 2
+    print("[PASS] fixture cinema movie-bundle parser")
+    return True
+
+
+results.append(test("fixture cinema bundle parser", test_movie_fixture))
+
+
 def test_help():
     result = run(["--help"])
     return result.returncode == 0
@@ -92,7 +126,7 @@ def test_nowplaying():
 results.append(test("nowplaying returns sessions[]", test_nowplaying))
 
 if all(results):
-    print("All tests passed.")
+    print("[PASS] live smoke assertions completed")
     sys.exit(0)
 else:
     print(f"{results.count(False)} test(s) failed.")

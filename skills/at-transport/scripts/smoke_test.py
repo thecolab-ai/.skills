@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 import json
+import importlib.util
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -7,9 +9,8 @@ from pathlib import Path
 SKILL_DIR = Path(__file__).parent.parent
 CLI = SKILL_DIR / "scripts" / "cli.py"
 
-# The CLI ships a working public fallback key, so the smoke test exercises the
-# real network path. Only genuine upstream trouble (rate-limit, auth, 5xx,
-# network) degrades to a graceful SKIP — a shape/parse problem is a real FAIL.
+# Live data checks run only when the operator supplies AT_API_KEY. Genuine
+# upstream trouble degrades to a graceful SKIP; a shape/parse problem is a FAIL.
 NETWORK_SKIP_MARKERS = (
     "network error",
     "timed out",
@@ -51,6 +52,24 @@ def test(name: str, fn):
 results = []
 
 
+def test_fixture_helpers():
+    spec = importlib.util.spec_from_file_location("at_transport_cli", CLI)
+    cli = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    sys.modules[spec.name] = cli
+    spec.loader.exec_module(cli)
+    lat, lon = cli.parse_lat_lon("-36.8485,174.7633")
+    return (
+        (lat, lon) == (-36.8485, 174.7633)
+        and cli.format_delay(125) == "(+2 min late)"
+        and cli.route_type_name(2) == "Train"
+        and 0 < cli.haversine_meters(lat, lon, -36.85, 174.76) < 1000
+    )
+
+
+results.append(test("fixture transport coordinate and presentation helpers", test_fixture_helpers))
+
+
 def test_help():
     result = run(["--help"])
     return result.returncode == 0
@@ -60,6 +79,9 @@ results.append(test("--help exits 0", test_help))
 
 
 def test_alerts():
+    if not os.environ.get("AT_API_KEY"):
+        print("  [SKIP] missing configuration: AT_API_KEY")
+        return True
     result = run(["alerts", "--json"])
     if result.returncode != 0:
         if is_skip(result.stderr):
@@ -79,6 +101,9 @@ results.append(test("alerts returns alerts[]", test_alerts))
 
 
 def test_stops():
+    if not os.environ.get("AT_API_KEY"):
+        print("  [SKIP] missing configuration: AT_API_KEY")
+        return True
     result = run(["stops", "britomart", "--json"])
     if result.returncode != 0:
         if is_skip(result.stderr):
@@ -98,6 +123,9 @@ results.append(test("stops britomart returns stops[]", test_stops))
 
 
 def test_status():
+    if not os.environ.get("AT_API_KEY"):
+        print("  [SKIP] missing configuration: AT_API_KEY")
+        return True
     result = run(["status", "--json"])
     if result.returncode != 0:
         if is_skip(result.stderr):

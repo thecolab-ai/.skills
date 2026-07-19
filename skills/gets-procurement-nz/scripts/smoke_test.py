@@ -92,15 +92,38 @@ def check_argparse_edge() -> None:
     assert "usage:" in result.stderr
 
 
+def check_list_parser_fixture() -> None:
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("gets_procurement_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    document = """
+    <table><tr>
+      <td>123456</td><td>SYN-1</td><td><a href="/ExternalTenderDetails.htm?id=123456">Synthetic tender</a></td>
+      <td>Request for proposals</td><td>31 July 2026</td><td>Example Agency</td>
+    </tr></table>
+    """
+    records = module.parse_gets_list(document, "https://www.gets.govt.nz/", "open")
+    assert len(records) == 1
+    assert records[0]["rfx_id"] == "123456"
+    assert records[0]["close_date"] == "31 July 2026"
+    assert records[0]["url"].startswith("https://www.gets.govt.nz/")
+    print("[PASS] fixture GETS tender table parser")
+
+
 def main() -> int:
     checks = [
         check("help", check_help),
         check("open tenders JSON", check_open_tenders),
         check("sources JSON", check_sources),
         check("missing argument edge case", check_argparse_edge),
+        check("fixture tender table parser", check_list_parser_fixture),
     ]
     if all(checks):
-        print("All tests passed.")
+        print("[PASS] live smoke assertions completed")
         return 0
     return 1
 

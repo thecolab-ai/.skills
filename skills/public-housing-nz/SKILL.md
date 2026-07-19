@@ -1,6 +1,27 @@
 ---
 name: public-housing-nz
-description: Query New Zealand public and social housing open data from the Ministry of Housing and Urban Development (HUD) on data.govt.nz — public housing stock (Kainga Ora and community housing providers), social housing IRRS and market-rent tenancies, accommodation supplement recipients and weekly spend, and the Local Housing Statistics dashboard (housing affordability, rent burden, bonds, building consents, MSD benefit numbers, and the year-on-year change in the public/social housing register). Use when the task involves NZ public housing, the social housing register or wait-list, Kainga Ora, housing deprivation, accommodation supplement, housing affordability, or HUD housing statistics. No API key, login, or browser session required.
+description: "Query New Zealand public and social housing open data from the Ministry of Housing and Urban Development (HUD) on data.govt.nz — public housing stock (Kainga Ora and community housing providers), social housing IRRS and market-rent tenancies, accommodation supplement recipients and weekly spend, and the Local Housing Statistics dashboard (housing affordability, rent burden, bonds, building consents, MSD benefit numbers, and the year-on-year change in the public/social housing register). Use when the task involves NZ public housing, the social housing register or wait-list, Kainga Ora, housing deprivation, accommodation supplement, housing affordability, or HUD housing statistics. No API key, login, or browser session required."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "social-policy"
+  thecolab.source_owner: "Ministry of Housing and Urban Development and Stats NZ"
+  thecolab.source_type: "official"
+  thecolab.auth: "none"
+  thecolab.access_mode: "public-download"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "low"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "public-download"
+  thecolab.pack: "nz-public-data"
+  thecolab.source_url: "https://catalogue.data.govt.nz"
+  thecolab.allowed_domains: "catalogue.data.govt.nz"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "healthy"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # Public Housing NZ

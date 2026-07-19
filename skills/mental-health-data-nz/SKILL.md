@@ -1,6 +1,27 @@
 ---
 name: mental-health-data-nz
-description: Use when Codex needs New Zealand mental-health regulatory data from ODMHAS reports, seclusion/restraint summaries, MH&A KPI Programme indicator metadata, inpatient inspection counts, District Inspector sources, or source caveats for public mental-health transparency work. Read-only, keyless, and stdlib-only.
+description: "Use when Codex needs New Zealand mental-health regulatory data from ODMHAS reports, seclusion/restraint summaries, MH&A KPI Programme indicator metadata, inpatient inspection counts, District Inspector sources, or source caveats for public mental-health transparency work. Read-only, keyless, and stdlib-only."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "social-policy"
+  thecolab.source_owner: "Ministry of Health"
+  thecolab.source_type: "official"
+  thecolab.auth: "none"
+  thecolab.access_mode: "public-download"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "low"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "public-download"
+  thecolab.pack: "nz-public-data"
+  thecolab.source_url: "https://www.health.govt.nz/about-us/corporate-publications/mental-health-annual-reports"
+  thecolab.allowed_domains: "www.health.govt.nz,www.mhakpi.health.nz"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "healthy"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # Mental Health Data NZ

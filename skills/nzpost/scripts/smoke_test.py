@@ -37,6 +37,29 @@ def test(name: str, fn):
 results = []
 
 
+def test_api_error_fixture():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("nzpost_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    message = module.extract_api_error(
+        [
+            {"errors": [{"code": "NOT_FOUND", "details": "No parcel found"}]},
+            {"errors": [{"message": "Reference expired"}]},
+        ]
+    )
+    assert message == "No parcel found; Reference expired"
+    assert module.clean_text("<b>Safe &amp; clean</b>\x1b") == "Safe & clean"
+    print("[PASS] fixture NZ Post API error normalisation")
+    return True
+
+
+results.append(test("fixture tracking response parser", test_api_error_fixture))
+
+
 def test_help():
     result = run(["--help"])
     return result.returncode == 0
@@ -578,7 +601,7 @@ results.append(test("locations human output: at least one location shows real ho
 
 
 if all(results):
-    print("All tests passed.")
+    print("[PASS] live smoke assertions completed")
     sys.exit(0)
 else:
     failed = results.count(False)

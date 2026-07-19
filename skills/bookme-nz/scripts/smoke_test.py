@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import importlib.util
 import json
 import subprocess
 import sys
@@ -6,6 +7,11 @@ from pathlib import Path
 
 SKILL_DIR = Path(__file__).parent.parent
 CLI = SKILL_DIR / "scripts" / "cli.py"
+spec = importlib.util.spec_from_file_location("bookme_fixture_cli", CLI)
+assert spec and spec.loader
+fixture_cli = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = fixture_cli
+spec.loader.exec_module(fixture_cli)
 
 
 def run(args: list) -> subprocess.CompletedProcess:
@@ -31,6 +37,29 @@ def test(name: str, fn):
 
 
 results = []
+
+
+def test_fixture_deal_normalisation():
+    deal = fixture_cli.normalize_deal(
+        {
+            "deal_id": "fixture-1",
+            "deal_name": "Kayak &amp; Cruise",
+            "price_raw": "49",
+            "deal_saving": "Save $20",
+            "reduction_raw": "29%",
+            "activity_ref": "/things-to-do/auckland/activity/fixture",
+        }
+    )
+    return bool(
+        deal["title"] == "Kayak & Cruise"
+        and deal["price"] == 49.0
+        and deal["normal_price"] == 69.0
+        and deal["discount_percent"] == 29.0
+        and deal["region"] == "auckland"
+    )
+
+
+results.append(test("fixture deal normalisation", test_fixture_deal_normalisation))
 
 
 def test_help():
@@ -89,7 +118,7 @@ def test_categories():
 results.append(test("categories returns categories[]", test_categories))
 
 if all(results):
-    print("All tests passed.")
+    print("[PASS] live smoke assertions completed")
     sys.exit(0)
 else:
     print(f"{results.count(False)} test(s) failed.")

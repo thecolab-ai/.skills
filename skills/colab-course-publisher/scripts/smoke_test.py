@@ -196,7 +196,7 @@ def main() -> int:
         shutil.rmtree(temp_root, ignore_errors=True)
         shutil.rmtree(bad_root, ignore_errors=True)
 
-    print("colab-course-publisher smoke test passed")
+    print("[PASS] fixture publisher validator accepts a valid bundle and rejects an invalid bundle")
     return 0
 
 

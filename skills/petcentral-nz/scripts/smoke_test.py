@@ -36,17 +36,17 @@ def live(args):
  try:return json.loads(r.stdout)
  except json.JSONDecodeError: print("[FAIL] invalid JSON:",r.stdout[:180]);raise SystemExit(1)
 if run("--help").returncode: raise SystemExit("[FAIL] help")
-print("[PASS] help")
+print("[PASS] contract help")
 assert cli.allowed(cli.BASE+":443/test") and not cli.allowed("https://user@petcentral.co.nz/test") and not cli.allowed(cli.BASE+":444/test")
 try:cli.StorefrontRedirectHandler().redirect_request(None,None,302,"",{},"https://example.org/test");raise AssertionError("foreign redirect allowed")
 except cli.CliError:pass
 assert fetch_rejected("https://example.org/test") and fetch_rejected(cli.BASE+"/test")
-print("[PASS] canonical origin, redirect, final URL and response-size boundaries")
+print("[PASS] contract canonical origin, redirect, final URL and response-size boundaries")
 assert run("search", "dog", "--limit", "51", "--json").returncode != 0
-print("[PASS] rejects an over-limit request")
+print("[PASS] contract rejects an over-limit request")
 assert run("search", " ", "--json").returncode != 0
 assert run("product", "https://example.org/products/nope", "--json").returncode != 0
-print("[PASS] rejects empty search and cross-site product URL")
+print("[PASS] contract rejects empty search and cross-site product URL")
 priced=cli.product({"id":1,"title":"Priced","handle":"priced","variants":[{"id":11,"price":649},{"id":12,"price":7799}]})
 assert priced["price_min_nzd"]==6.49 and priced["price_max_nzd"]==77.99
 assert [variant["price_nzd"] for variant in priced["variants"]]==[6.49,77.99]
@@ -56,12 +56,12 @@ try:cli.product({});raise AssertionError("malformed product accepted")
 except cli.CliError:pass
 try:cli.product({"id":3,"title":"Overflow","handle":"overflow","variants":[{"id":31,"price":10**10000}]});raise AssertionError("overflowing product price accepted")
 except cli.CliError:pass
-print("[PASS] Shopify price units and malformed or overflowing product fail-closed behavior")
+print("[PASS] fixture Shopify price units and malformed or overflowing product fail-closed behavior")
 data=live(["search","dog","--limit","2","--json"])
 if data is not None:
  assert data["source_url"] and data["retrieved_at"] and isinstance(data["results"],list)
- print("[PASS] search JSON metadata")
+ print("[PASS] live search JSON metadata")
  if data["results"]:
   item=live(["product",data["results"][0]["handle"],"--json"])
-  if item is not None: assert item["product"]["url"] and item["retrieved_at"];print("[PASS] product JSON")
+  if item is not None: assert item["product"]["url"] and item["retrieved_at"];print("[PASS] live product JSON")
 print("Smoke test complete.")

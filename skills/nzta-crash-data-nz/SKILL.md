@@ -1,6 +1,27 @@
 ---
 name: nzta-crash-data-nz
-description: Query NZTA/Waka Kotahi Crash Analysis System public crash statistics from the no-key ArcGIS FeatureServer and data.govt.nz CKAN mirror. Use when the task involves New Zealand road deaths, serious injuries, crash severity by region or TLA, yearly road-toll counts, or public CAS crash indicator fields such as weather, light, road surface, vehicle type, roadside objects, and roadworks.
+description: "Query NZTA/Waka Kotahi Crash Analysis System public crash statistics from the no-key ArcGIS FeatureServer and data.govt.nz CKAN mirror. Use when the task involves New Zealand road deaths, serious injuries, crash severity by region or TLA, yearly road-toll counts, or public CAS crash indicator fields such as weather, light, road surface, vehicle type, roadside objects, and roadworks."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "transport"
+  thecolab.source_owner: "NZ Transport Agency Waka Kotahi"
+  thecolab.source_type: "official"
+  thecolab.auth: "none"
+  thecolab.access_mode: "public-api"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "low"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "public-api"
+  thecolab.pack: "nz-public-data"
+  thecolab.source_url: "https://services.arcgis.com/CXBb7LAjgIIdcsPt/arcgis/rest/services/"
+  thecolab.allowed_domains: "catalogue.data.govt.nz,opendata-nzta.opendata.arcgis.com,services.arcgis.com"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "healthy"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # NZTA Crash Data NZ

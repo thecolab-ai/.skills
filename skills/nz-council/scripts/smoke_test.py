@@ -39,6 +39,28 @@ def test(name: str, fn):
 results = []
 
 
+def test_hours_fixture():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("nz_council_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    hours = module.parse_ham_hours_table(
+        """
+        <table><tr><th>Facility</th><th>Monday</th><th>Tuesday</th></tr>
+        <tr><td>Main pool</td><td>6am - 8pm</td><td>6am - 8pm</td></tr></table>
+        """
+    )
+    assert hours == [{"label": "Main pool", "text": "Monday: 6am - 8pm; Tuesday: 6am - 8pm"}]
+    print("[PASS] fixture council facility-hours parser")
+    return True
+
+
+results.append(test("fixture facility hours parser", test_hours_fixture))
+
+
 def test_help():
     result = run(["--help"])
     return result.returncode == 0
@@ -96,7 +118,7 @@ def test_facilities():
 results.append(test("facilities akl returns facilities[]", test_facilities))
 
 if all(results):
-    print("All tests passed.")
+    print("[PASS] live smoke assertions completed")
     sys.exit(0)
 else:
     print(f"{results.count(False)} test(s) failed.")

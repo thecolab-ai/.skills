@@ -1,6 +1,27 @@
 ---
 name: nz-local-government-data
-description: Discover and preview official New Zealand local government finance, performance, and statistics datasets from Stats NZ/data.govt.nz, DIA local council downloads, DIA council performance metrics, and OAG local-government insight sources. Use when the task involves council profiles, rates revenue, local authority statistics, comparing councils, finding machine-readable local-government datasets, or identifying official source gaps. Read-only, no login or API key required.
+description: "Discover and preview official New Zealand local government finance, performance, and statistics datasets from Stats NZ/data.govt.nz, DIA local council downloads, DIA council performance metrics, and OAG local-government insight sources. Use when the task involves council profiles, rates revenue, local authority statistics, comparing councils, finding machine-readable local-government datasets, or identifying official source gaps. Read-only, no login or API key required."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "public-data"
+  thecolab.source_owner: "Stats NZ, Department of Internal Affairs, and Office of the Auditor-General"
+  thecolab.source_type: "mixed"
+  thecolab.auth: "none"
+  thecolab.access_mode: "public-download"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "low"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "public-download"
+  thecolab.pack: "nz-public-data"
+  thecolab.source_url: "https://catalogue.data.govt.nz/api/3/action/"
+  thecolab.allowed_domains: "catalogue.data.govt.nz,oag.parliament.nz,www.localcouncils.govt.nz,www.mcert.govt.nz"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "healthy"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # NZ Local Government Data

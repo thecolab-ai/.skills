@@ -1,0 +1,34 @@
+name: Source or operator request
+description: Request removal, attribution, rate, cache, or integration changes for a source you operate.
+title: "[Operator] "
+labels: [source-operator]
+body:
+  - type: input
+    attributes:
+      label: Organisation and role
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: Affected skill or source URL
+    validations:
+      required: true
+  - type: dropdown
+    attributes:
+      label: Request type
+      options:
+        - Removal or disablement
+        - Attribution correction
+        - Request rate or caching change
+        - Supported API or feed migration
+        - Other operator concern
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Requested change and reason
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: Preferred private contact

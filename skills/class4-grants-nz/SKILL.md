@@ -1,6 +1,27 @@
 ---
 name: class4-grants-nz
-description: Query New Zealand Class 4 gambling grants and Granted.govt.nz public data from DIA/data.govt.nz. Use when the task involves pokie-machine grant funding, gaming-machine profits, grant recipients, Class 4 societies/funders, grant categories, regional/TLA grant totals, accepted or declined grant applications, or discovering the related venues and gaming-machine quarterly datasets. Read-only and no API key required.
+description: "Query New Zealand Class 4 gambling grants and Granted.govt.nz public data from DIA/data.govt.nz. Use when the task involves pokie-machine grant funding, gaming-machine profits, grant recipients, Class 4 societies/funders, grant categories, regional/TLA grant totals, accepted or declined grant applications, or discovering the related venues and gaming-machine quarterly datasets. Read-only and no API key required."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "public-data"
+  thecolab.source_owner: "Department of Internal Affairs"
+  thecolab.source_type: "official"
+  thecolab.auth: "none"
+  thecolab.access_mode: "public-api"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "low"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "public-api"
+  thecolab.pack: "nz-public-data"
+  thecolab.source_url: "https://www.granted.govt.nz/"
+  thecolab.allowed_domains: "catalogue.data.govt.nz,www.dia.govt.nz,www.granted.govt.nz"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "healthy"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # Class 4 Grants NZ

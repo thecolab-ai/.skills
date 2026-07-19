@@ -1,6 +1,27 @@
 ---
 name: linz-title-memorials
-description: Use when researching NZ Records of Title memorials, Building Act 2004 s73/s74 natural-hazard title entries, or LINZ/Landonline title memorial aggregate counts. Inspects public LINZ/LDS metadata safely, explains public-data and privacy limits, and generates aggregate-only OIA request templates; does not expose title, owner, address, or small-cell data.
+description: "Use when researching NZ Records of Title memorials, Building Act 2004 s73/s74 natural-hazard title entries, or LINZ/Landonline title memorial aggregate counts. Inspects public LINZ/LDS metadata safely, explains public-data and privacy limits, and generates aggregate-only OIA request templates; does not expose title, owner, address, or small-cell data."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "property"
+  thecolab.source_owner: "Toitū Te Whenua LINZ"
+  thecolab.source_type: "official"
+  thecolab.auth: "none"
+  thecolab.access_mode: "public-api"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "low"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "public-api"
+  thecolab.pack: "nz-public-data"
+  thecolab.source_url: "https://data.linz.govt.nz/services/api/v1/"
+  thecolab.allowed_domains: "data.linz.govt.nz"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "healthy"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # LINZ Title Memorials

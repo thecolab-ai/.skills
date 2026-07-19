@@ -1,0 +1,11 @@
+{
+  "schema_version": "1",
+  "name": "thecolab-internal",
+  "description": "TheColab-specific documentation and operational workflows.",
+  "default": false,
+  "skill_count": 2,
+  "skills": [
+    "colab-course-publisher",
+    "thecolab-brand"
+  ]
+}

@@ -123,6 +123,7 @@ def query_point_time(request: dict) -> dict:
             headers={"x-api-key": api_key, "Content-Type": "application/json"},
             data=body,
             method="POST",
+            allowed_hosts={"forecast-v2.metoceanapi.com"},
         )
     except nzfetch.Blocked as e:
         die(f"network error calling MetOcean API: {e}")

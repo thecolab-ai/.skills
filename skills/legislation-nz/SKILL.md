@@ -1,6 +1,27 @@
 ---
 name: legislation-nz
-description: Resolves, searches, and checks New Zealand Acts, Bills, secondary legislation, sections, point-in-time versions, and update feeds from official legislation.govt.nz and PCO sources. Use when a task needs NZ legislation text, exact section citations, current in-force status, amendments since a date, current Bills, or source caveats.
+description: "Resolves, searches, and checks New Zealand Acts, Bills, secondary legislation, sections, point-in-time versions, and update feeds from official legislation.govt.nz and PCO sources. Use when a task needs NZ legislation text, exact section citations, current in-force status, amendments since a date, current Bills, or source caveats."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "government"
+  thecolab.source_owner: "New Zealand Parliamentary Counsel Office"
+  thecolab.source_type: "official"
+  thecolab.auth: "mixed"
+  thecolab.access_mode: "public-api"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "medium"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "public-api"
+  thecolab.pack: "nz-public-data"
+  thecolab.source_url: "https://www.legislation.govt.nz"
+  thecolab.allowed_domains: "api.legislation.govt.nz,catalogue.data.govt.nz,www.legislation.govt.nz"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "gated"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # New Zealand Legislation

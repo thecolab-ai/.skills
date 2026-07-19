@@ -1,6 +1,27 @@
 ---
 name: petrolmate-nz-au
-description: Query live AU & NZ fuel prices from petrolmate.com.au's public API. Search stations near any AU or NZ location, filter by supported fuel type, sort by price or distance. Covers AU state FuelCheck data and NZ Gaspy data. No API key or authentication required.
+description: "Query live AU & NZ fuel prices from petrolmate.com.au's public API. Search stations near any AU or NZ location, filter by supported fuel type, sort by price or distance. Covers AU state FuelCheck data and NZ Gaspy data. No API key or authentication required."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "retail"
+  thecolab.source_owner: "PetrolMate"
+  thecolab.source_type: "commercial"
+  thecolab.auth: "none"
+  thecolab.access_mode: "html-readonly"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "low"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "html-readonly"
+  thecolab.pack: "nz-commercial-web"
+  thecolab.source_url: "https://petrolmate.com.au"
+  thecolab.allowed_domains: "petrolmate.com.au"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "healthy"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # PetrolMate (AU + NZ)

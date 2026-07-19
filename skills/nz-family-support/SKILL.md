@@ -1,6 +1,27 @@
 ---
 name: nz-family-support
-description: Map New Zealand family support entitlement questions to official IRD, MSD, and WINZ sources without calculating eligibility. Use when the task involves Working for Families, Best Start, FamilyBoost, childcare help, Accommodation Supplement, MSD/WINZ handoffs, or finding the right official checker or programme page. Read-only; no private data collection, applications, or entitlement decisions.
+description: "Map New Zealand family support entitlement questions to official IRD, MSD, and WINZ sources without calculating eligibility. Use when the task involves Working for Families, Best Start, FamilyBoost, childcare help, Accommodation Supplement, MSD/WINZ handoffs, or finding the right official checker or programme page. Read-only; no private data collection, applications, or entitlement decisions."
+license: MIT
+compatibility: "Requires Python 3.10+"
+metadata:
+  thecolab.category: "social-policy"
+  thecolab.source_owner: "Inland Revenue"
+  thecolab.source_type: "mixed"
+  thecolab.auth: "none"
+  thecolab.access_mode: "documentation-workflow"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "low"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "documentation-workflow"
+  thecolab.pack: "nz-public-data"
+  thecolab.source_url: "https://www.ird.govt.nz/support-for-families"
+  thecolab.allowed_domains: "check.msd.govt.nz,www.ird.govt.nz,www.workandincome.govt.nz"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "healthy"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # NZ Family Support

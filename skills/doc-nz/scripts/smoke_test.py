@@ -41,6 +41,37 @@ def test_help():
 results.append(test("--help exits 0", test_help))
 
 
+def test_great_walk_fixture():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("doc_nz_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    record = module.normalize_great_walk(
+        {
+            "PlaceId": 42,
+            "Name": "Synthetic Track",
+            "AllowWebBooking": "true",
+            "IsWebViewable": 1,
+            "IsAvailableForGreatwalk": True,
+            "FixedGWMinNight": "2",
+            "FixedGWMaxNight": "4",
+            "Description": '<a href="https://www.doc.govt.nz/synthetic-track">DOC page</a>',
+        }
+    )
+    assert record["place_id"] == 42
+    assert record["status"] == "open"
+    assert record["fixed_min_nights"] == 2
+    assert record["doc_url"] == "https://www.doc.govt.nz/synthetic-track"
+    print("[PASS] fixture Great Walk API record normalisation")
+    return True
+
+
+results.append(test("fixture Great Walk parser", test_great_walk_fixture))
+
+
 def test_great_walks():
     result = run(["great-walks", "--json"])
     if result.returncode != 0:
@@ -89,7 +120,7 @@ def test_huts():
 results.append(test("huts returns places[]", test_huts))
 
 if all(results):
-    print("All tests passed.")
+    print("[PASS] live smoke assertions completed")
     sys.exit(0)
 else:
     print(f"{results.count(False)} test(s) failed.")

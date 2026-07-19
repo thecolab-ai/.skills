@@ -1,6 +1,27 @@
 ---
 name: gets-procurement-nz
-description: Discover New Zealand public procurement opportunities and award notices from GETS, MBIE open-data metadata, and procurement.govt.nz significant-service-contract sources. Use when Codex needs keyless NZ government tender searches, current GETS notices, RFx detail by ID, recent completed/award notices, procurement source URLs, or significant service contract dashboard summaries.
+description: "Discover New Zealand public procurement opportunities and award notices from GETS, MBIE open-data metadata, and procurement.govt.nz significant-service-contract sources. Use when Codex needs keyless NZ government tender searches, current GETS notices, RFx detail by ID, recent completed/award notices, procurement source URLs, or significant service contract dashboard summaries."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "government"
+  thecolab.source_owner: "New Zealand Government Electronic Tenders Service"
+  thecolab.source_type: "official"
+  thecolab.auth: "none"
+  thecolab.access_mode: "public-api"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "low"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "public-api"
+  thecolab.pack: "nz-public-data"
+  thecolab.source_url: "https://www.gets.govt.nz"
+  thecolab.allowed_domains: "catalogue.data.govt.nz,www.gets.govt.nz,www.mbie.govt.nz,www.procurement.govt.nz"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "healthy"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # GETS Procurement NZ

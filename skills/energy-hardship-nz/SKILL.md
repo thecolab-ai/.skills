@@ -1,6 +1,27 @@
 ---
 name: energy-hardship-nz
-description: Query New Zealand energy-hardship evidence from MBIE energy-hardship measure reports, Stats NZ Household Expenditure Statistics household energy and electricity expenditure tables, and Electricity Authority disconnection dashboard/source metadata. Use for NZ energy poverty, electricity affordability, domestic-energy burden, 2M or 10 percent hardship proxy research, HES energy expenditure, MBIE five hardship measures, and disconnections for non-payment caveats.
+description: "Query New Zealand energy-hardship evidence from MBIE energy-hardship measure reports, Stats NZ Household Expenditure Statistics household energy and electricity expenditure tables, and Electricity Authority disconnection dashboard/source metadata. Use for NZ energy poverty, electricity affordability, domestic-energy burden, 2M or 10 percent hardship proxy research, HES energy expenditure, MBIE five hardship measures, and disconnections for non-payment caveats."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "social-policy"
+  thecolab.source_owner: "MBIE, Stats NZ, and Electricity Authority"
+  thecolab.source_type: "mixed"
+  thecolab.auth: "none"
+  thecolab.access_mode: "public-download"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "low"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "public-download"
+  thecolab.pack: "nz-public-data"
+  thecolab.source_url: "https://www.mbie.govt.nz/building-and-energy/energy-and-natural-resources/"
+  thecolab.allowed_domains: "emidatasets.blob.core.windows.net,www.ea.govt.nz,www.mbie.govt.nz,www.stats.govt.nz"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "healthy"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # Energy Hardship NZ

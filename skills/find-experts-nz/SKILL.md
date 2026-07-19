@@ -1,6 +1,27 @@
 ---
 name: find-experts-nz
-description: Discover New Zealand experts by topic across public sources — the OpenAlex and Crossref scholarly graphs, Wikidata, ORCID, and university "Find an Expert" directories (University of Auckland, Massey). Use when you need a citable candidate shortlist of who could speak to a research question — expert matching, "find an expert", verifying a finding, or building an SME/advisory candidate list. Returns ephemeral shortlists from public data only — discovery is not consent and output is never a contact list.
+description: "Discover New Zealand experts by topic across public sources — the OpenAlex and Crossref scholarly graphs, Wikidata, ORCID, and university \"Find an Expert\" directories (University of Auckland, Massey). Use when you need a citable candidate shortlist of who could speak to a research question — expert matching, \"find an expert\", verifying a finding, or building an SME/advisory candidate list. Returns ephemeral shortlists from public data only — discovery is not consent and output is never a contact list."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "education"
+  thecolab.source_owner: "OpenAlex and contributing directories"
+  thecolab.source_type: "mixed"
+  thecolab.auth: "none"
+  thecolab.access_mode: "public-api"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "low"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "public-api"
+  thecolab.pack: "nz-public-data"
+  thecolab.source_url: "https://api.openalex.org"
+  thecolab.allowed_domains: "academics.aut.ac.nz,api.crossref.org,api.openalex.org,en.wikipedia.org,people.wgtn.ac.nz,pgdb-api.pgdb.co.nz,profiles.auckland.ac.nz,pub.orcid.org,query.wikidata.org,researchers.lincoln.ac.nz,researchprofiles.canterbury.ac.nz,www.irpnz.co.nz,www.justice.govt.nz,www.massey.ac.nz,www.mcnz.org.nz,www.otago.ac.nz,www.waikato.ac.nz,www2.pgdb.co.nz"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "healthy"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # Find Experts (NZ)

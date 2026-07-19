@@ -33,6 +33,28 @@ def test(name: str, fn):
 results = []
 
 
+def test_search_payload_fixture():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("paknsave_nz_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    payload = module.search_payload("bread", "PAK-001", 8, 3, False)
+    params = payload["algoliaQuery"]
+    assert params["query"] == "bread"
+    assert params["hitsPerPage"] == 8
+    assert params["page"] == 2
+    assert "onPromotion:true" not in params["filters"]
+    assert module.normalize_product_id("12345") == "12345-EA-000"
+    print("[PASS] fixture PAK'nSAVE search payload normalisation")
+    return True
+
+
+results.append(test("fixture search payload builder", test_search_payload_fixture))
+
+
 def test_help():
     result = run(["--help"])
     return result.returncode == 0
@@ -73,7 +95,7 @@ def test_search():
 results.append(test("search milk returns products[]", test_search))
 
 if all(results):
-    print("All tests passed.")
+    print("[PASS] live smoke assertions completed")
     sys.exit(0)
 else:
     print(f"{results.count(False)} test(s) failed.")

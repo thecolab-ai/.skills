@@ -1,6 +1,27 @@
 ---
 name: nz-angel-investment
-description: Queries New Zealand angel and seed investment publication sources from NZGCP Young Company Finance, NZGCP annual/ecosystem reports, and Angel Association NZ member and investment-publication pages. Use when the task involves NZ early-stage capital, angel investment, seed funding, Young Company Finance deal or investment counts, Aspire/Elevate reporting, investor directories, Angel Market reports, or source-backed publication discovery; read-only and no API key required.
+description: "Queries New Zealand angel and seed investment publication sources from NZGCP Young Company Finance, NZGCP annual/ecosystem reports, and Angel Association NZ member and investment-publication pages. Use when the task involves NZ early-stage capital, angel investment, seed funding, Young Company Finance deal or investment counts, Aspire/Elevate reporting, investor directories, Angel Market reports, or source-backed publication discovery; read-only and no API key required."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "finance"
+  thecolab.source_owner: "New Zealand Growth Capital Partners and Angel Association NZ"
+  thecolab.source_type: "mixed"
+  thecolab.auth: "none"
+  thecolab.access_mode: "public-api"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "low"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "public-api"
+  thecolab.pack: "nz-public-data"
+  thecolab.source_url: "https://www.nzgcp.co.nz"
+  thecolab.allowed_domains: "nz.dealroom.co,www.angelassociation.co.nz,www.nzgcp.co.nz"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "healthy"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # NZ Angel Investment

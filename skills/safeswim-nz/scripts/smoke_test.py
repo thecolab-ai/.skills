@@ -38,6 +38,26 @@ def parse_json(args: list[str]) -> dict:
 
 results = []
 
+
+def test_locations_fixture():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("safeswim_nz_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    locations = module.get_locations({"locations": [{"id": "one"}, None, "bad", {"id": "two"}]})
+    assert locations == [{"id": "one"}, {"id": "two"}]
+    assert module.quality_status("red") == "RED"
+    assert module.status_at_or_above_risk("BLACK", "RED") is True
+    assert 490 < module.haversine_km(-36.8485, 174.7633, -41.2866, 174.7756) < 500
+    print("[PASS] fixture SafeSwim location response normalisation")
+    return True
+
+
+results.append(test("fixture location parser", test_locations_fixture))
+
 results.append(test("--help exits 0", lambda: run(["--help"]).returncode == 0))
 
 results.append(test("list returns locations", lambda: (
@@ -82,7 +102,7 @@ results.append(test("invalid coordinates fail before fetching", lambda: (
 )))
 
 if all(results):
-    print("All tests passed.")
+    print("[PASS] live smoke assertions completed")
     sys.exit(0)
 else:
     print(f"{results.count(False)} test(s) failed.")

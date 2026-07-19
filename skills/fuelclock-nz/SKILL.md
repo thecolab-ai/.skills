@@ -1,6 +1,27 @@
 ---
 name: fuelclock-nz
-description: Query NZ fuel prices, supply, inbound tankers, MSO status, geopolitical shipping risk markets, and NZ fuel headlines from fuelclock.nz. No authentication required.
+description: "Query NZ fuel prices, supply, inbound tankers, MSO status, geopolitical shipping risk markets, and NZ fuel headlines from fuelclock.nz. No authentication required."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "food-and-fuel"
+  thecolab.source_owner: "FuelClock"
+  thecolab.source_type: "community"
+  thecolab.auth: "none"
+  thecolab.access_mode: "public-api"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "low"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "public-api"
+  thecolab.pack: "nz-public-data"
+  thecolab.source_url: "https://fuelclock.nz"
+  thecolab.allowed_domains: "fuelclock.nz"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "healthy"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # FuelClock NZ
@@ -198,3 +219,7 @@ python3 skills/fuelclock-nz/scripts/cli.py news --limit 5 --json
 - `--json` output is intended for chaining into other tools or agent steps
 - FuelClock supply data and MBIE stock data are related but not identical, FuelClock applies its own live supply model on top of source data
 - Geopolitical risk probabilities are market yes-prices from Polymarket-style data, not direct NZ fuel risk scores
+
+## Source notes
+
+Read `references/source-notes.md` for source ownership, access, and freshness boundaries.

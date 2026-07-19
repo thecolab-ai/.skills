@@ -25,7 +25,9 @@ import nzfetch  # noqa: E402
 BASE_WEB = "https://www.briscoes.co.nz"
 GRAPHQL_URL = BASE_WEB + "/graphql"
 DEFAULT_KLEVU_HOST = "aucs34.ksearchnet.com"
+# Public read-only storefront search key delivered to every Briscoes browser.
 DEFAULT_KLEVU_API_KEY = "klevu-173190000117617559"
+ALLOWED_HOSTS = {"www.briscoes.co.nz", DEFAULT_KLEVU_HOST}
 
 KLEVU_FIELDS = [
     "isDiscountPrice",
@@ -175,7 +177,15 @@ def request_json(url: str, payload: dict[str, Any], timeout: int = 25) -> Any:
         "Referer": BASE_WEB + "/",
     }
     try:
-        raw_bytes, _ct, _final = nzfetch.fetch_bytes(url, data=data, method="POST", headers=headers, timeout=timeout, accept="application/json, text/plain, */*")
+        raw_bytes, _ct, _final = nzfetch.fetch_bytes(
+            url,
+            data=data,
+            method="POST",
+            headers=headers,
+            timeout=timeout,
+            accept="application/json, text/plain, */*",
+            allowed_hosts=ALLOWED_HOSTS,
+        )
         raw = raw_bytes.decode("utf-8", "replace")
         return json.loads(raw) if raw else None
     except nzfetch.Blocked as e:
@@ -206,6 +216,15 @@ def klevu_config() -> dict[str, str]:
     store = (graphql(KLEVU_CONFIG_QUERY).get("storeConfig") or {})
     host = str(store.get("klevu_search_url") or DEFAULT_KLEVU_HOST)
     api_key = str(store.get("klevu_search_js_api_key") or DEFAULT_KLEVU_API_KEY)
+    parsed_host = urllib.parse.urlsplit(host if "://" in host else "https://" + host)
+    if (
+        parsed_host.scheme != "https"
+        or (parsed_host.hostname or "").lower().rstrip(".") != DEFAULT_KLEVU_HOST
+        or parsed_host.username is not None
+        or parsed_host.password is not None
+        or parsed_host.port not in (None, 443)
+    ):
+        die("Briscoes returned an undeclared Klevu search host")
     if not host.startswith("http://") and not host.startswith("https://"):
         url = "https://" + host.strip("/") + "/cs/v2/search"
     else:

@@ -104,7 +104,13 @@ def request_json(path: str, params: dict[str, Any] | None = None, timeout: int =
         "x-api-key": require_api_key(),
     }
     try:
-        body, _ct, _final = nzfetch.fetch_bytes(url, timeout=timeout, accept="application/json", headers=headers)
+        body, _ct, _final = nzfetch.fetch_bytes(
+            url,
+            timeout=timeout,
+            accept="application/json",
+            headers=headers,
+            allowed_hosts={"api.opendata.metlink.org.nz"},
+        )
     except nzfetch.Blocked as e:
         raise CliError(f"network error: {e}")
     except nzfetch.FetchError as e:

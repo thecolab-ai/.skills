@@ -117,6 +117,6 @@ checks = [
 
 ok = [check(name, func) for name, func in checks]
 if all(ok):
-    print("All tests passed.")
+    print("[PASS] fixture aggregate-only metadata and safety guards")
     sys.exit(0)
 sys.exit(1)

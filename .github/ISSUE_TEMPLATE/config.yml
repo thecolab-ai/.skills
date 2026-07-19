@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Private security report
+    url: https://github.com/thecolab-ai/.skills/security/advisories/new
+    about: Report exploitable vulnerabilities, credentials, or sensitive personal data privately.
+  - name: Source operator contact
+    url: mailto:adam@thecolab.ai
+    about: Contact the maintainers privately about urgent source or privacy concerns.

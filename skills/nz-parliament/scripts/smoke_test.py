@@ -38,6 +38,34 @@ results = []
 captured = {}
 
 
+def test_bill_summary_fixture():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("nz_parliament_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    record = module.normalise_summary(
+        {
+            "id": "synthetic-bill",
+            "title": "Synthetic Amendment Bill",
+            "billNumber": "123-1",
+            "itemType": "Government",
+            "billCurrentStageName": "First reading",
+            "lastStageDate": "2026-07-19T01:02:03Z",
+        }
+    )
+    assert record["id"] == "synthetic-bill"
+    assert record["status"] == "First reading"
+    assert record["url"].endswith("/synthetic-bill")
+    print("[PASS] fixture Parliament bill-summary normalisation")
+    return True
+
+
+results.append(test("fixture bill summary parser", test_bill_summary_fixture))
+
+
 def test_help():
     return run(["--help"]).returncode == 0
 
@@ -111,7 +139,7 @@ def test_bill_detail():
 results.append(test("bill <number> returns detail + stages", test_bill_detail))
 
 if all(results):
-    print("All tests passed.")
+    print("[PASS] live smoke assertions completed")
     sys.exit(0)
 print(f"{results.count(False)} test(s) failed.")
 sys.exit(1)

@@ -6,6 +6,7 @@ DATAFORSEO_LOGIN and DATAFORSEO_PASSWORD are set — each spends a small amount
 of DataForSEO credit.
 """
 import json
+import importlib.util
 import os
 import subprocess
 import sys
@@ -41,6 +42,22 @@ def test(name, fn):
 
 
 results = []
+
+
+def t_fixture_helpers():
+    spec = importlib.util.spec_from_file_location("dataforseo_cli", CLI)
+    cli = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    sys.modules[spec.name] = cli
+    spec.loader.exec_module(cli)
+    return (
+        cli.strip_www("www.example.co.nz") == "example.co.nz"
+        and cli.resolve_location("nz") == 2554
+        and cli.truncate("abcdefgh", 5) == "abcd…"
+    )
+
+
+results.append(test("fixture domain, location and display normalization", t_fixture_helpers))
 
 
 def t_help():

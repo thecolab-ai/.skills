@@ -1,6 +1,27 @@
 ---
 name: fma-nz
-description: Query FMA warnings/alerts and licensed provider pages for NZ crowdfunding, peer-to-peer lending, and financial-advice sources. Search alerts, list/register providers by type, and return source-backed JSON payloads for machine-readable workflows.
+description: "Query FMA warnings/alerts and licensed provider pages for NZ crowdfunding, peer-to-peer lending, and financial-advice sources. Search alerts, list/register providers by type, and return source-backed JSON payloads for machine-readable workflows."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "public-data"
+  thecolab.source_owner: "Financial Markets Authority"
+  thecolab.source_type: "official"
+  thecolab.auth: "none"
+  thecolab.access_mode: "public-api"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "low"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "public-api"
+  thecolab.pack: "nz-public-data"
+  thecolab.source_url: "https://www.fma.govt.nz"
+  thecolab.allowed_domains: "fsp-register.companiesoffice.govt.nz,www.fma.govt.nz"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "healthy"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # FMA NZ

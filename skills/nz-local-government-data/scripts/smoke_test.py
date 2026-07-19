@@ -47,6 +47,25 @@ def json_cmd(args: list[str]) -> dict:
 results: list[bool] = []
 
 
+def test_link_fixture() -> bool:
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("nz_local_government_data_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    parser = module.LinkParser()
+    parser.feed('<a href="reports/performance.xlsx">  Council <strong>performance</strong> workbook </a>')
+    assert parser.links == [{"href": "reports/performance.xlsx", "label": "Council performance workbook"}]
+    assert module.normalise_url("reports/performance.xlsx", "https://www.localcouncils.govt.nz/local-government/") == "https://www.localcouncils.govt.nz/local-government/reports/performance.xlsx"
+    print("[PASS] fixture local-government source-link parser")
+    return True
+
+
+results.append(test("fixture source link parser", test_link_fixture))
+
+
 def test_help() -> bool:
     result = run(["--help"])
     return result.returncode == 0 and "datasets" in result.stdout and "councils" in result.stdout
@@ -95,7 +114,7 @@ def test_compare_edge_case() -> bool:
 results.append(test("compare rejects unknown metric", test_compare_edge_case))
 
 if all(results):
-    print("All tests passed.")
+    print("[PASS] live smoke assertions completed")
     sys.exit(0)
 
 print(f"{results.count(False)} test(s) failed.")

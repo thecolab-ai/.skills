@@ -59,13 +59,14 @@ def main() -> int:
     else:
         assert fetch["url"].startswith("https://www.privacy.org.nz/")
         assert fetch.get("preview") or fetch.get("metadata_only")
+        print("[PASS] live official privacy AI source retrieval")
 
     # Edge case: unknown source must fail clearly, not stack trace.
     bad = run_cmd("fetch", "not-a-source", "--json")
     assert bad.returncode != 0
     assert "unknown source id" in bad.stderr
 
-    print("nz-ai-policy smoke tests passed")
+    print("[PASS] fixture policy source map, briefing, search, checklist and error handling")
     return 0
 
 

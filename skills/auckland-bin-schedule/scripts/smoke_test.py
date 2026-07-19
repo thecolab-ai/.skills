@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import importlib.util
 import json
 import subprocess
 import sys
@@ -6,6 +7,11 @@ from pathlib import Path
 
 SKILL_DIR = Path(__file__).parent.parent
 CLI = SKILL_DIR / "scripts" / "cli.py"
+spec = importlib.util.spec_from_file_location("auckland_bin_fixture_cli", CLI)
+assert spec and spec.loader
+fixture_cli = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = fixture_cli
+spec.loader.exec_module(fixture_cli)
 
 
 def run(args: list) -> subprocess.CompletedProcess:
@@ -31,6 +37,30 @@ def test(name: str, fn):
 
 
 results = []
+
+
+def test_fixture_section_parser():
+    lines = [
+        "Household collection",
+        "Rubbish:",
+        "Friday, 1 August",
+        "Rubbish",
+        "Collection day:",
+        "Every week",
+        ".",
+        "Put bins out before 7am",
+        "Where you can put your rubbish, food scraps and recycling for collection",
+    ]
+    parsed = fixture_cli.parse_section(lines, "Household collection")
+    return bool(
+        parsed
+        and parsed["next_dates"]["rubbish"] == "Friday, 1 August"
+        and parsed["frequency"]["rubbish"] == "Every week"
+        and parsed["put_out"] == "Put bins out before 7am"
+    )
+
+
+results.append(test("fixture household collection section parses", test_fixture_section_parser))
 
 
 def test_help():
@@ -73,7 +103,7 @@ def test_schedule():
 results.append(test("'12 Tawa Road Onehunga' returns property_id and household", test_schedule))
 
 if all(results):
-    print("All tests passed.")
+    print("[PASS] live smoke assertions completed")
     sys.exit(0)
 else:
     print(f"{results.count(False)} test(s) failed.")

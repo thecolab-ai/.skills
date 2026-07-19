@@ -381,6 +381,9 @@ def command_fund_get(args: argparse.Namespace) -> dict[str, Any]:
         else:
             path = "funds/" + slug
         url = urllib.parse.urljoin(COMMUNITY_BASE + "/", path + "/")
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme != "https" or (parsed.hostname or "").lower() != "www.communitymatters.govt.nz":
+        raise ValueError("fund URL must use the declared Community Matters HTTPS host")
     page = fetch_text(url, timeout=args.timeout)
     parser = LinkTextParser()
     parser.feed(page)

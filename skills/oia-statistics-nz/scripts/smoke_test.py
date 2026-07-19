@@ -37,6 +37,29 @@ def is_upstream_skip(proc: subprocess.CompletedProcess[str]) -> tuple[bool, str]
 
 
 def main() -> int:
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("oia_statistics_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    record = module.row_enriched(
+        {
+            "OrgID": "42",
+            "Agency": "Synthetic Agency",
+            "Agency_Type": "Department",
+            "SurveyPeriodEndDate": "2025-12-31T00:00:00",
+            "OIA_RequestsHandled": "200",
+            "OIAs_CompletedWithinTimeframe": "180",
+            "OIA_refused": "10",
+        }
+    )
+    if record["org_id"] != 42 or record["timeliness_pct"] != 90.0 or record["refusals_pct"] != 5.0:
+        print("[FAIL] fixture OIA CSV row normalisation", file=sys.stderr)
+        return 1
+    print("[PASS] fixture OIA CSV row normalisation")
+
     help_proc = run(["--help"], timeout=20)
     if help_proc.returncode != 0 or "list-agencies" not in (help_proc.stdout or ""):
         print("FAIL: --help should list available commands", file=sys.stderr)
@@ -62,7 +85,7 @@ def main() -> int:
         print(periods.stdout, file=sys.stderr)
         return 1
     latest_period = periods_data.get("latest_period")
-    print(f"OK: periods returned {periods_data.get('count')} period(s)")
+    print(f"[PASS] live periods returned {periods_data.get('count')} period(s)")
 
     agencies = run(["list-agencies", "--limit", "3", "--json"])
     if agencies.returncode == 2:
@@ -100,7 +123,7 @@ def main() -> int:
             print("FAIL: agency command did not return expected records", file=sys.stderr)
             print(agency.stdout, file=sys.stderr)
             return 1
-        print(f"OK: agency lookup by OrgID {org_id} returned {len(agency_data['records'])} rows")
+        print(f"[PASS] live agency lookup by OrgID {org_id} returned {len(agency_data['records'])} rows")
 
     totals = run(["totals", "--period", latest_period or "latest", "--json"], timeout=120)
     if totals.returncode == 2:
@@ -121,7 +144,7 @@ def main() -> int:
     if totals_data['totals'].get('requests_handled', 0) <= 0:
         print("FAIL: totals command returned no handled requests", file=sys.stderr)
         return 1
-    print(f"OK: totals returned requests_handled={totals_data['totals'].get('requests_handled')}")
+    print(f"[PASS] live totals returned requests_handled={totals_data['totals'].get('requests_handled')}")
 
     complaints = run(["complaints", "--period", latest_period or "latest", "--sort", "complaints", "--limit", "5", "--json"], timeout=120)
     if complaints.returncode != 0:
@@ -136,7 +159,7 @@ def main() -> int:
     if counts != sorted(counts, reverse=True):
         print("FAIL: complaints sort is not descending", file=sys.stderr)
         return 1
-    print("OK: complaints excludes aggregate rows and sorts descending")
+    print("[PASS] live complaints excludes aggregate rows and sorts descending")
 
     return 0
 

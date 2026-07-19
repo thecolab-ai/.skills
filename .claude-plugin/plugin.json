@@ -1,10 +1,10 @@
 {
   "name": "nz-skills",
-  "version": "0.1.0",
-  "description": "Community-contributed AI skills for New Zealand public data — LINZ, Stats NZ, Auckland Transport, GeoNet, weather, fuel prices, electricity, retail pricing, transport, and more. Drop-in read-only connectors to real NZ infrastructure and datasets.",
+  "version": "0.2.0",
+  "description": "Legacy aggregate of TheColab New Zealand skills. New installations should choose a trust-based pack from packs/.",
   "author": {
     "name": "thecolab.ai"
   },
   "homepage": "https://github.com/thecolab-ai/.skills",
-  "license": "see repository"
+  "license": "MIT"
 }

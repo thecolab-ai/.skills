@@ -1,6 +1,27 @@
 ---
 name: bookme-nz
-description: Query Bookme NZ discounted activities, experiences, tours, restaurants, and last-minute deals. Supports hot deals, cheapest offers, regional/category search, and deal detail. No login, booking, or payment.
+description: "Query Bookme NZ discounted activities, experiences, tours, restaurants, and last-minute deals. Supports hot deals, cheapest offers, regional/category search, and deal detail. No login, booking, or payment."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "events-and-media"
+  thecolab.source_owner: "Bookme"
+  thecolab.source_type: "commercial"
+  thecolab.auth: "none"
+  thecolab.access_mode: "html-readonly"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "low"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "html-readonly"
+  thecolab.pack: "nz-commercial-web"
+  thecolab.source_url: "https://www.bookme.co.nz"
+  thecolab.allowed_domains: "www.bookme.co.nz"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "healthy"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # Bookme NZ

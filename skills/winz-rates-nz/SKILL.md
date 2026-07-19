@@ -1,6 +1,27 @@
 ---
 name: winz-rates-nz
-description: Query current and historical public Work and Income New Zealand benefit/payment rate tables and A-Z benefit entitlement pages. Use when the task involves WINZ benefit rates, NZ Super rates, Jobseeker/Sole Parent/Supported Living payment amounts, Accommodation Supplement thresholds, or official Work and Income eligibility/criteria page summaries.
+description: "Query current and historical public Work and Income New Zealand benefit/payment rate tables and A-Z benefit entitlement pages. Use when the task involves WINZ benefit rates, NZ Super rates, Jobseeker/Sole Parent/Supported Living payment amounts, Accommodation Supplement thresholds, or official Work and Income eligibility/criteria page summaries."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "social-policy"
+  thecolab.source_owner: "Work and Income"
+  thecolab.source_type: "official"
+  thecolab.auth: "none"
+  thecolab.access_mode: "public-api"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "low"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "public-api"
+  thecolab.pack: "nz-public-data"
+  thecolab.source_url: "https://www.workandincome.govt.nz"
+  thecolab.allowed_domains: "www.workandincome.govt.nz"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "healthy"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # WINZ rates NZ

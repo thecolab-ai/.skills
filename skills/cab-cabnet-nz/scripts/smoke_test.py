@@ -8,6 +8,7 @@ expected behaviour this smoke test verifies.
 from __future__ import annotations
 
 import json
+import importlib.util
 import subprocess
 import sys
 from pathlib import Path
@@ -57,6 +58,20 @@ def test(name: str, fn) -> bool:
 def test_help() -> bool:
     proc = run(["--help"], timeout=20)
     return proc.returncode == 0 and "enquiries" in proc.stdout and "sources" in proc.stdout
+
+
+def test_fixture_categories() -> bool:
+    spec = importlib.util.spec_from_file_location("cab_cabnet_cli", CLI)
+    cli = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    sys.modules[spec.name] = cli
+    spec.loader.exec_module(cli)
+    rows = cli.flatten_categories([
+        {"id": 1, "name": "Housing", "slug": "housing", "url": "/article/KB1", "children": [
+            {"id": 2, "name": "Tenancy", "slug": "tenancy", "count": 4}
+        ]}
+    ])
+    return len(rows) == 2 and rows[1]["path"] == "Housing > Tenancy" and rows[1]["level"] == 2
 
 
 def test_categories() -> bool | str:
@@ -112,11 +127,12 @@ def test_invalid_year() -> bool:
 
 def main() -> int:
     checks = [
-        ("--help includes command names", test_help),
+        ("fixture category taxonomy flattening", test_fixture_categories),
+        ("contract --help includes command names", test_help),
         ("categories returns filtered public taxonomy", test_categories),
         ("sources discovers public CAB material and blocked CABNET reporting", test_sources),
-        ("enquiries returns explicit structured-export blocked state", test_enquiries_blocked),
-        ("invalid year is rejected", test_invalid_year),
+        ("contract enquiries returns explicit structured-export blocked state", test_enquiries_blocked),
+        ("contract invalid year is rejected", test_invalid_year),
     ]
     results = [test(name, fn) for name, fn in checks]
     if all(results):

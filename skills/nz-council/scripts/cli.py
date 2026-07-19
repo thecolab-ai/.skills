@@ -2038,8 +2038,16 @@ def cmd_event(args: argparse.Namespace) -> None:
     if re.fullmatch(r"\d+", args.id_or_url):
         die("event id must be a URL or path from `events --json`; numeric Eventfinda ids are not stable enough by themselves")
 
+    event_url = resolve_url(args.id_or_url, EVENTFINDA_BASE)
+    parsed_event_url = urllib.parse.urlparse(event_url)
+    if parsed_event_url.scheme != "https" or (parsed_event_url.hostname or "").lower() not in {"eventfinda.co.nz", "www.eventfinda.co.nz"}:
+        die("event URL must use the declared Eventfinda NZ HTTPS host")
+
     started = time.perf_counter()
-    body, final_url, status = fetch_text(args.id_or_url, EVENTFINDA_BASE)
+    body, final_url, status = fetch_text(event_url, EVENTFINDA_BASE)
+    final_event_url = urllib.parse.urlparse(final_url)
+    if final_event_url.scheme != "https" or (final_event_url.hostname or "").lower() not in {"eventfinda.co.nz", "www.eventfinda.co.nz"}:
+        die("Eventfinda redirected to an undeclared host")
     objs = json_ld_objects(body)
     places = {o.get("@id"): o for o in objs if o.get("@type") == "Place" and o.get("@id")}
     offers = {o.get("@id"): o for o in objs if o.get("@type") == "Offer" and o.get("@id")}

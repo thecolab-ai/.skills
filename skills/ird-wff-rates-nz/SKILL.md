@@ -1,6 +1,27 @@
 ---
 name: ird-wff-rates-nz
-description: Query Inland Revenue Working for Families, Best Start, Minimum Family Tax Credit, In-Work Tax Credit, and FamilyBoost public rate/threshold parameters. Use when the task involves NZ family entitlement pre-check inputs, WFF tax-credit rates, abatement thresholds/rates, Best Start rules, FamilyBoost income caps, or official IRD eligibility source links. Read-only, no login or API key; optional source probes handle IRD availability gracefully.
+description: "Query Inland Revenue Working for Families, Best Start, Minimum Family Tax Credit, In-Work Tax Credit, and FamilyBoost public rate/threshold parameters. Use when the task involves NZ family entitlement pre-check inputs, WFF tax-credit rates, abatement thresholds/rates, Best Start rules, FamilyBoost income caps, or official IRD eligibility source links. Read-only, no login or API key; optional source probes handle IRD availability gracefully."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "social-policy"
+  thecolab.source_owner: "Inland Revenue"
+  thecolab.source_type: "official"
+  thecolab.auth: "none"
+  thecolab.access_mode: "public-api"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "low"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "public-api"
+  thecolab.pack: "nz-public-data"
+  thecolab.source_url: "https://www.ird.govt.nz"
+  thecolab.allowed_domains: "www.ird.govt.nz"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "healthy"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # IRD WFF Rates NZ

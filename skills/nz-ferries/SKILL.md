@@ -1,6 +1,27 @@
 ---
 name: nz-ferries
-description: Query NZ ferry schedules, fare snapshots, and service alerts: Cook Strait Interislander/Bluebridge, SeaLink Waiheke/Great Barrier, Fullers360/AT Metro Auckland ferries. Optional --browser mode probes Fullers public timetable pages with CloakBrowser while keeping AT GTFS fallback. Read-only; no booking or payment. Use at-transport for AT Metro real-time positions.
+description: "Query NZ ferry schedules, fare snapshots, and service alerts: Cook Strait Interislander/Bluebridge, SeaLink Waiheke/Great Barrier, Fullers360/AT Metro Auckland ferries. Optional --browser mode probes Fullers public timetable pages with CloakBrowser while keeping AT GTFS fallback. Read-only; no booking or payment. Use at-transport for AT Metro real-time positions."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "transport"
+  thecolab.source_owner: "Participating New Zealand ferry operators"
+  thecolab.source_type: "mixed"
+  thecolab.auth: "mixed"
+  thecolab.access_mode: "public-api"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "true"
+  thecolab.risk: "medium"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "public-api"
+  thecolab.pack: "nz-public-data"
+  thecolab.source_url: "https://www.sealink.co.nz"
+  thecolab.allowed_domains: "api.at.govt.nz,at.govt.nz,gtfs.at.govt.nz,pim-mobile.fullers.co.nz,www.bluebridge.co.nz,www.fullers.co.nz,www.interislander.co.nz,www.sealink.co.nz"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "healthy"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # NZ Ferries
@@ -85,7 +106,7 @@ python3 skills/nz-ferries/scripts/cli.py alerts --json
 - Bluebridge uses the public timetable and service-alert pages. The CLI filters known day restrictions such as "not available on weekends" from the published timetable notes.
 - Fullers360 app and website timetable endpoints were reverse-engineered, but direct stdlib requests hit Radware/hCaptcha validation. The shipped Fullers implementation uses AT's public static GTFS zip for scheduled sailings and AT GTFS-RT service alerts for cancellations and disruptions. Optional `--browser` on `sailings`/`next` probes the public Fullers timetable page with CloakBrowser and records `browser_probe.status` as `loaded` or `blocked`; it never solves CAPTCHA/PerfDrive/hCaptcha and AT GTFS remains the structured source.
 - Fullers fare snapshots are not implemented because the Fullers website/app fare/timetable fragments are browser-gated from direct CLI fetches.
-- No operator account cookie, browser session, booking mutation, or payment action is required. The AT alert feed uses a public AT API subscription key with an `AT_API_KEY` environment override.
+- No operator account cookie, browser session, booking mutation, or payment action is required. AT Metro/Fullers data commands require a user-supplied `AT_API_KEY`; the repository does not bundle the subscription key.
 - Endpoint shapes can change without notice because these are public website surfaces rather than official stable APIs.
 - API and stability notes: `references/api-notes.md`
 - CLI entrypoint: `scripts/cli.py`

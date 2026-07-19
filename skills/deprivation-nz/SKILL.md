@@ -1,6 +1,27 @@
 ---
 name: deprivation-nz
-description: Look up New Zealand small-area socioeconomic deprivation (NZDep2023) by SA1/SA2 code, place name, decile, or SA3 region - the standard index of relative poverty, material hardship, and disadvantage used for health, housing, school decile, child poverty, and funding analysis. No API key or login required.
+description: "Look up New Zealand small-area socioeconomic deprivation (NZDep2023) by SA1/SA2 code, place name, decile, or SA3 region - the standard index of relative poverty, material hardship, and disadvantage used for health, housing, school decile, child poverty, and funding analysis. No API key or login required."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "property"
+  thecolab.source_owner: "University of Otago"
+  thecolab.source_type: "official"
+  thecolab.auth: "none"
+  thecolab.access_mode: "public-api"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "low"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "public-api"
+  thecolab.pack: "nz-public-data"
+  thecolab.source_url: "https://services6.arcgis.com/ZVM1rEuVZjtC1Wwk/arcgis/rest/services/"
+  thecolab.allowed_domains: "services6.arcgis.com,www.arcgis.com"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "healthy"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # Deprivation NZ (NZDep2023)

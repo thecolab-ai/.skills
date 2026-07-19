@@ -34,6 +34,34 @@ def test(name: str, fn):
 results = []
 
 
+def test_arrival_fixture():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("nz_trains_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    record = module.parse_arrival(
+        {
+            "service_id": "KPL",
+            "stop_id": "WELLINGTON",
+            "departure": {"aimed": "2026-07-19T08:00:00+12:00", "expected": "2026-07-19T08:05:00+12:00"},
+            "delay": "PT5M",
+            "monitored": True,
+        }
+    )
+    assert record["line"] == "KPL"
+    assert record["delay_seconds"] == 300
+    assert record["status"] == "delayed"
+    assert record["monitored"] is True
+    print("[PASS] fixture Metlink train-arrival normalisation")
+    return True
+
+
+results.append(test("fixture train arrival parser", test_arrival_fixture))
+
+
 def test_help():
     result = run(["--help"])
     return result.returncode == 0

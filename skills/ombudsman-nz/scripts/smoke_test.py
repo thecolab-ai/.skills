@@ -57,6 +57,35 @@ def upstream_available() -> bool:
         return False
 
 
+def test_resource_card_fixture() -> bool:
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("ombudsman_nz_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    source = """
+    <li class="slat">
+      <h3><a href="/resources/synthetic-case-note">Synthetic case note</a></h3>
+      <span class="slat__term">Case note</span>
+      <span class="slat__term slat__date"><time datetime="2026-07-19">19 July 2026</time></span>
+      <div class="slat__body"><p>Synthetic summary.</p></div>
+    </li>
+    """
+    records = module.parse_resource_cards(source)
+    assert len(records) == 1
+    assert records[0]["slug"] == "synthetic-case-note"
+    assert records[0]["published_at"] == "2026-07-19"
+    assert records[0]["category"] == ["Case note"]
+    print("[PASS] fixture Ombudsman resource-card parser")
+    return True
+
+
+if not test_resource_card_fixture():
+    sys.exit(1)
+
+
 if not upstream_available():
     sys.exit(0)
 
@@ -118,7 +147,7 @@ results.append(check("reports --category OPCAT returns publication rows", test_r
 
 
 if all(results):
-    print("All tests passed.")
+    print("[PASS] live smoke assertions completed")
     raise SystemExit(0)
 
 print(f"{results.count(False)} test(s) failed.")

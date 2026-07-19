@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import importlib.util
 import json
 import subprocess
 import sys
@@ -6,6 +7,11 @@ from pathlib import Path
 
 SKILL_DIR = Path(__file__).parent.parent
 CLI = SKILL_DIR / "scripts" / "cli.py"
+spec = importlib.util.spec_from_file_location("bunnings_fixture_cli", CLI)
+assert spec and spec.loader
+fixture_cli = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = fixture_cli
+spec.loader.exec_module(fixture_cli)
 
 
 def run(args: list) -> subprocess.CompletedProcess:
@@ -31,6 +37,31 @@ def test(name: str, fn):
 
 
 results = []
+
+
+def test_fixture_product_parser():
+    product = fixture_cli.parse_raw_product(
+        {
+            "code": "FIX-1",
+            "name": "Fixture Drill",
+            "price": 99.0,
+            "currency": "NZD",
+            "productroutingurl": "/fixture-drill_p0001",
+            "supercategories": ["Tools--tools", "Power Tools--power-tools"],
+            "newarrival": "true",
+        },
+        fixture_cli.country_cfg("nz"),
+    )
+    return bool(
+        product["sku"] == "FIX-1"
+        and product["price"] == 99.0
+        and product["currency"] == "NZD"
+        and product["category"] == "Tools / Power Tools"
+        and product["source_url"].startswith("https://www.bunnings.co.nz/")
+    )
+
+
+results.append(test("fixture search product parser", test_fixture_product_parser))
 
 
 def test_help():
@@ -89,7 +120,7 @@ def test_browse():
 results.append(test("browse tools/power-tools/drills returns products[]", test_browse))
 
 if all(results):
-    print("All tests passed.")
+    print("[PASS] live smoke assertions completed")
     sys.exit(0)
 else:
     print(f"{results.count(False)} test(s) failed.")

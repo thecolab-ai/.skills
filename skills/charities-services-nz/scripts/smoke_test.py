@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import importlib.util
 import json
 import subprocess
 import sys
@@ -9,6 +10,11 @@ from pathlib import Path
 
 SKILL_DIR = Path(__file__).parent.parent
 CLI = SKILL_DIR / "scripts" / "cli.py"
+spec = importlib.util.spec_from_file_location("charities_fixture_cli", CLI)
+assert spec and spec.loader
+fixture_cli = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = fixture_cli
+spec.loader.exec_module(fixture_cli)
 
 
 def run(args: list[str]) -> subprocess.CompletedProcess:
@@ -33,6 +39,19 @@ def test(name: str, fn) -> bool:
 
 
 results: list[bool] = []
+
+
+def test_fixture_row_safety() -> bool:
+    cleaned = fixture_cli.clean_row(
+        {"RegistrationNumber": "CC123", "__metadata": {"uri": "fixture"}, "Deferred": {"__deferred": {}}}
+    )
+    public = fixture_cli.strip_officer_private(
+        {"FullName": "Fixture Officer", "Email": "fixture@example.invalid", "MailAddress": "Private"}
+    )
+    return cleaned == {"RegistrationNumber": "CC123"} and public == {"FullName": "Fixture Officer"}
+
+
+results.append(test("fixture OData row cleanup and officer privacy filter", test_fixture_row_safety))
 
 
 def upstream_available() -> bool:
@@ -157,7 +176,7 @@ results.append(test("grants-paid spot query returns positive GrantsPaidWithinNZ"
 
 
 if all(results):
-    print("All tests passed.")
+    print("[PASS] live smoke assertions completed")
     sys.exit(0)
 
 print(f"{results.count(False)} test(s) failed.")

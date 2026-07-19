@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import json
+import importlib.util
 import subprocess
 import sys
 from pathlib import Path
@@ -31,6 +32,20 @@ def test(name: str, fn):
 
 
 results = []
+
+
+def test_fixture_arcgis_helpers():
+    spec = importlib.util.spec_from_file_location("deprivation_cli", CLI)
+    cli = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    sys.modules[spec.name] = cli
+    spec.loader.exec_module(cli)
+    data = {"features": [{"attributes": {"SA12023_V1_00": "7000000", "NZDep2023": "10"}}]}
+    rows = cli.features(data)
+    return len(rows) == 1 and cli.as_int(rows[0]["NZDep2023"]) == 10 and cli.decile_band(10).startswith("most deprived")
+
+
+results.append(test("fixture ArcGIS feature and deprivation normalization", test_fixture_arcgis_helpers))
 
 
 def test_help():
@@ -157,7 +172,7 @@ def test_bad_code():
 results.append(test("invalid SA1 code exits non-zero", test_bad_code))
 
 if all(results):
-    print("All tests passed.")
+    print("[PASS] live smoke assertions completed")
     sys.exit(0)
 else:
     print(f"{results.count(False)} test(s) failed.")

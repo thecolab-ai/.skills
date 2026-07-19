@@ -43,7 +43,9 @@ def is_upstream_failure(result: subprocess.CompletedProcess[str]) -> bool:
 
 
 def report(name: str, status: str, detail: str = "") -> bool | None:
-    print(f"[{status}] {name}")
+    kind = "contract" if name.startswith(("--help", "invalid date")) else "fixture" if name.startswith("fixture") else "live"
+    prefix = f"[{status}] {kind}" if status == "PASS" else f"[{status}]"
+    print(f"{prefix} {name}")
     if detail:
         print(f"  {detail}")
     if status == "PASS":
@@ -93,11 +95,38 @@ def test_invalid_date_edge_case() -> bool | None:
     return report("invalid date fails cleanly", "FAIL", combined[:300])
 
 
+def test_crash_record_fixture() -> bool | None:
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("nzta_crash_data_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    record = module.clean_crash_record(
+        {
+            "OBJECTID": "42",
+            "crashYear": "2025",
+            "crashSeverity": "Serious Crash",
+            "crashLocation1": "Example Road",
+            "crashLocation2": "Sample Street",
+            "fatalCount": "0",
+            "seriousInjuryCount": "1",
+            "speedLimit": "50.0",
+            "bicycle": "1",
+        }
+    )
+    if record["object_id"] == 42 and record["location"] == "Example Road / Sample Street" and record["speed_limit"] == 50 and record["road_user_indicators"]["bicycle"] == 1:
+        return report("fixture crash feature normalisation", "PASS")
+    return report("fixture crash feature normalisation", "FAIL", str(record))
+
+
 tests = [
     test_help,
     test_datasets_json,
     test_road_toll_json,
     test_invalid_date_edge_case,
+    test_crash_record_fixture,
 ]
 
 results = [test() for test in tests]

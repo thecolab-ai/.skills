@@ -24,7 +24,6 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
 import nzfetch  # noqa: E402
 
 BASE_URL = "https://api.at.govt.nz"
-API_KEY = os.environ.get("AT_API_KEY", "de42128902d24a7a86a013633f7aa832")
 DEFAULT_TIMEOUT = 15
 
 try:
@@ -39,14 +38,27 @@ def die(message: str, code: int = 1) -> None:
     raise SystemExit(code)
 
 
+def api_key() -> str:
+    key = os.environ.get("AT_API_KEY")
+    if not key:
+        die("AT_API_KEY is required; obtain one from the Auckland Transport developer portal and export it", 3)
+    return key
+
+
 def request_json(path: str, timeout: int = DEFAULT_TIMEOUT) -> Any:
     url = f"{BASE_URL}{path}"
     headers = {
         "Accept": "application/json",
-        "Ocp-Apim-Subscription-Key": API_KEY,
+        "Ocp-Apim-Subscription-Key": api_key(),
     }
     try:
-        body, _ct, _final = nzfetch.fetch_bytes(url, headers=headers, timeout=timeout, accept="application/json")
+        body, _ct, _final = nzfetch.fetch_bytes(
+            url,
+            headers=headers,
+            timeout=timeout,
+            accept="application/json",
+            allowed_hosts={"api.at.govt.nz"},
+        )
         raw = body.decode("utf-8", "replace")
         return json.loads(raw) if raw else None
     except nzfetch.Blocked as e:

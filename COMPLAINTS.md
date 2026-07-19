@@ -36,10 +36,12 @@ If the request is more nuanced (e.g. you'd prefer rate-limiting, attribution, or
 
 ## Our position
 
-We build skills against endpoints that respond to unauthenticated public requests. We don't bypass authentication or circumvent technical access controls. Users of these skills are responsible for complying with the terms of service of the underlying provider.
+We build skills against endpoints that respond to public, unauthenticated requests. Skills prefer official APIs, feeds, and downloads. Requests may use an optional user-configured proxy with a bounded number of retries; proxy credentials are not stored in this repository or emitted by the tooling. When access remains blocked or rate-limited, the skill should report that state explicitly rather than fabricate an empty result.
+
+We don't bypass authentication, solve CAPTCHAs, forge protected tokens, operate accounts, or automate bookings, payments, checkouts, or transactions. Users of these skills are responsible for complying with the terms of service of the underlying provider.
 
 We'd rather work with businesses than around them. If you'd prefer a more controlled way for AI agents to access your data, see the "For businesses whose APIs we touch" section in the [README](README.md). Email **adam@thecolab.ai** or open an issue.
 
 ---
 
-*Last updated: 2026-05-25*
+*Last updated: 2026-07-19*

@@ -1,6 +1,27 @@
 ---
 name: nz-ai-policy
-description: Map and brief official New Zealand AI policy guidance — public-service AI framework, responsible GenAI guidance, procurement, privacy, algorithm governance, AI strategy, and source-backed agency checklists. Use when the task involves NZ public-sector AI policy citations, compliance review, proposal evidence, AI governance questions, or agency GenAI policy drafting.
+description: "Map and brief official New Zealand AI policy guidance — public-service AI framework, responsible GenAI guidance, procurement, privacy, algorithm governance, AI strategy, and source-backed agency checklists. Use when the task involves NZ public-sector AI policy citations, compliance review, proposal evidence, AI governance questions, or agency GenAI policy drafting."
+license: MIT
+compatibility: "Requires Python 3.10+"
+metadata:
+  thecolab.category: "public-data"
+  thecolab.source_owner: "Department of Internal Affairs"
+  thecolab.source_type: "official"
+  thecolab.auth: "none"
+  thecolab.access_mode: "documentation-workflow"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "low"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "documentation-workflow"
+  thecolab.pack: "nz-public-data"
+  thecolab.source_url: "https://www.digital.govt.nz/standards-and-guidance/technology-and-architecture/artificial-intelligence/public-service-artificial-intelligence-framework"
+  thecolab.allowed_domains: "data.govt.nz,www.digital.govt.nz,www.mbie.govt.nz,www.privacy.org.nz,www.publicservice.govt.nz"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "healthy"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # NZ AI Policy

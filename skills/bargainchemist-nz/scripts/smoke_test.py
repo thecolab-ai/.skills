@@ -2,6 +2,7 @@
 """Live read-only smoke tests for the Bargain Chemist NZ skill."""
 from __future__ import annotations
 
+import importlib.util
 import json
 import subprocess
 import sys
@@ -9,6 +10,11 @@ from pathlib import Path
 
 SKILL_DIR = Path(__file__).parent.parent
 CLI = SKILL_DIR / "scripts" / "cli.py"
+spec = importlib.util.spec_from_file_location("bargainchemist_fixture_cli", CLI)
+assert spec and spec.loader
+fixture_cli = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = fixture_cli
+spec.loader.exec_module(fixture_cli)
 
 
 def run(args: list[str]) -> subprocess.CompletedProcess[str]:
@@ -35,6 +41,29 @@ def test(name: str, fn) -> bool:
 
 results: list[bool] = []
 search_handle = ""
+
+
+def test_fixture_product_normalisation() -> bool:
+    product = fixture_cli.normalize_product(
+        {
+            "id": 1,
+            "title": "Fixture Tablets",
+            "handle": "fixture-tablets",
+            "available": True,
+            "variants": [{"id": 2, "sku": "FIX-1", "price": 1299, "compare_at_price": 1499}],
+            "images": ["//www.bargainchemist.co.nz/fixture.jpg"],
+        },
+        source="shopify-product-json",
+    )
+    return bool(
+        product["price_min"] == 12.99
+        and product["price_max"] == 12.99
+        and product["variants"][0]["compare_at_price"] == 14.99
+        and product["images"] == ["https://www.bargainchemist.co.nz/fixture.jpg"]
+    )
+
+
+results.append(test("fixture Shopify product normalisation", test_fixture_product_normalisation))
 
 
 def test_help() -> bool:
@@ -128,7 +157,7 @@ def test_product() -> bool:
 results.append(test("product <handle> returns Shopify product JSON", test_product))
 
 if all(results):
-    print("All tests passed.")
+    print("[PASS] live smoke assertions completed")
     sys.exit(0)
 
 print(f"{results.count(False)} test(s) failed.")

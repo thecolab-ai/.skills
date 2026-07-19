@@ -33,6 +33,30 @@ def test(name: str, fn):
 results = []
 
 
+def test_price_rows_fixture():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("fuelclock_nz_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    rows = module.select_price_rows(
+        [
+            {"type": "Diesel", "price": 1.99, "stationCount": 20},
+            {"type": "91 Unleaded", "price": 2.49, "stationCount": 30},
+        ]
+    )
+    assert [row["fuel"] for row in rows] == ["91", "diesel"]
+    assert rows[0]["price"] == 2.49
+    assert rows[1]["stationCount"] == 20
+    print("[PASS] fixture FuelClock price-row normalisation")
+    return True
+
+
+results.append(test("fixture price row parser", test_price_rows_fixture))
+
+
 def test_help():
     result = run(["--help"])
     return result.returncode == 0
@@ -89,7 +113,7 @@ def test_supply():
 results.append(test("supply returns dict", test_supply))
 
 if all(results):
-    print("All tests passed.")
+    print("[PASS] live smoke assertions completed")
     sys.exit(0)
 else:
     print(f"{results.count(False)} test(s) failed.")

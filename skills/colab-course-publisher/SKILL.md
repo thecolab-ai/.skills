@@ -1,6 +1,29 @@
 ---
 name: colab-course-publisher
-description: Use when Codex needs to create, edit, publish, package, or validate The Colab CourseViewerPlatform course content, including tenant course repos, course.json, blueprint.json, module manifests, markdown lessons, quizzes, generated educational images, HTML widgets, and live CourseViewerPlatform content checks.
+description: "Use when Codex needs to create, edit, publish, package, or validate The Colab CourseViewerPlatform course content, including tenant course repos, course.json, blueprint.json, module manifests, markdown lessons, quizzes, generated educational images, HTML widgets, and live CourseViewerPlatform content checks."
+license: MIT
+compatibility: "Requires Python 3.10+"
+metadata:
+  thecolab.category: "education"
+  thecolab.source_owner: "TheColabAI"
+  thecolab.source_type: "internal"
+  thecolab.auth: "none"
+  thecolab.access_mode: "documentation-workflow"
+  thecolab.data_class: "internal"
+  thecolab.writes: "true"
+  thecolab.browser: "false"
+  thecolab.risk: "high"
+  thecolab.cache_ttl: "none"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "documentation-workflow"
+  thecolab.pack: "thecolab-internal"
+  thecolab.source_url: "https://github.com/thecolab-ai/.skills"
+  thecolab.allowed_domains: "github.com"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "healthy"
+  thecolab.maintainer: "@adam91holt"
+  thecolab.mutations: "local-files,git-publish,remote-content-publish"
+  thecolab.local_output: "course-content-files"
 ---
 
 # Colab Course Publisher

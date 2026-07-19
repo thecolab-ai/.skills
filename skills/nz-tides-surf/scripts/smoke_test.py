@@ -33,6 +33,28 @@ def test(name: str, fn):
 results = []
 
 
+def test_linz_csv_fixture():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("nz_tides_surf_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    csv_text = "Day,Weekday,Month,Year,Time,Height,Time,Height\n19,Sun,7,2026,03:15,0.4,09:30,1.8\n"
+    records = module.parse_linz_csv(csv_text, "Synthetic Port", "https://www.linz.govt.nz/tides.csv")
+    assert len(records) == 2
+    assert records[0]["time_local"] == "03:15"
+    assert records[0]["type"] == "low"
+    assert records[1]["type"] == "high"
+    assert records[1]["height_m"] == 1.8
+    print("[PASS] fixture LINZ tide CSV parser")
+    return True
+
+
+results.append(test("fixture tide CSV parser", test_linz_csv_fixture))
+
+
 def test_help():
     result = run(["--help"])
     return result.returncode == 0
@@ -89,7 +111,7 @@ def test_breaks():
 results.append(test("breaks returns breaks[]", test_breaks))
 
 if all(results):
-    print("All tests passed.")
+    print("[PASS] live smoke assertions completed")
     sys.exit(0)
 else:
     print(f"{results.count(False)} test(s) failed.")

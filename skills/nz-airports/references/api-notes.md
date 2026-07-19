@@ -4,9 +4,7 @@ This skill is an unofficial lightweight wrapper around public airport flight-boa
 
 ## Source and auth
 
-No personal username, password, API key, private token, cookie, or browser session is required for the implemented commands.
-
-AKL FIDS uses Auckland Airport mobile app v5 Basic auth. The default credentials are the public app credentials embedded in the Auckland Airport Android APK v8.2.2, not a user credential. They can be overridden with:
+CHC, ZQN, WLG, the local airport directory, and AKL ADS-B require no credentials. AKL scheduled FIDS uses Basic authentication and requires both operator-supplied environment variables:
 
 - `AKL_API_USERNAME`
 - `AKL_API_PASSWORD`
@@ -42,8 +40,9 @@ The CLI calls all four combinations for today's `Pacific/Auckland` date:
 
 Auth and headers:
 
-- HTTP Basic auth with public mobile-app credentials embedded in the APK.
-- Defaults can be overridden with `AKL_API_USERNAME` and `AKL_API_PASSWORD`.
+- HTTP Basic auth using `AKL_API_USERNAME` and `AKL_API_PASSWORD` supplied by the operator.
+- The repository does not bundle or fall back to Auckland Airport application credentials.
+- Authenticated requests and redirects are pinned to `h2g.aucklandairport.co.nz`.
 - `Content-Type: application/vnd.api+json`
 - `App-Version: android|8.2.2`
 

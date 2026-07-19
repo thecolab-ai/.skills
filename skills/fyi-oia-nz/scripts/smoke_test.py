@@ -137,8 +137,15 @@ def import_cli_module():
     spec = importlib.util.spec_from_file_location("fyi_oia_cli", CLI)
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
+    sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
+
+
+def test_search_parser_fixture():
+    cli = import_cli_module()
+    rows = cli.parse_search_html('<a href="/request/1234/example_request"><strong>Example OIA request</strong></a>')
+    return rows == [{"id": 1234, "title": "Example OIA request", "url": "https://fyi.org.nz/request/1234/example_request"}]
 
 
 def test_search_failure_not_ok():
@@ -173,6 +180,7 @@ def test_search():
 
 def main() -> None:
     checks = [
+        test("fixture FYI search HTML parsing", test_search_parser_fixture),
         test("--help exits 0", test_help),
         test("authorities --tag returns authorities[]", test_authorities),
         test("authorities --query handles Botany CSV text", test_authorities_query_ministry),

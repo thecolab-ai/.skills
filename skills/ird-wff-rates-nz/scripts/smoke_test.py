@@ -66,7 +66,8 @@ def main() -> int:
     for test in tests:
         try:
             test()
-            print(f"ok - {test.__name__}")
+            kind = "fixture" if test is test_rates_json else "contract"
+            print(f"[PASS] {kind} {test.__name__}")
         except Exception as exc:
             print(f"not ok - {test.__name__}: {exc}", file=sys.stderr)
             return 1

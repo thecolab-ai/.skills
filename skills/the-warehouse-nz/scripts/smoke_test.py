@@ -39,6 +39,40 @@ def test(name: str, fn):
 results = []
 
 
+def test_product_fixture():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("the_warehouse_nz_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    record = module.normalize_tile_product(
+        {
+            "_gtm": {
+                "id": "SYN-1",
+                "name": "Synthetic Toy",
+                "brand": "Example",
+                "price": "19.99",
+                "productThenPrice": "29.99",
+                "productSecondaryNavigationCategory": "specials/toys",
+                "promotionCallOutMessage": "Save $10",
+            },
+            "availability": "In stock",
+            "source_url": "https://www.thewarehouse.co.nz/p/synthetic",
+        }
+    )
+    assert record["sku"] == "SYN-1"
+    assert record["price"] == 19.99 and record["then_price"] == 29.99
+    assert record["is_special"] is True
+    assert record["promotion"] == "Save $10"
+    print("[PASS] fixture The Warehouse tile-product normalisation")
+    return True
+
+
+results.append(test("fixture product tile parser", test_product_fixture))
+
+
 def test_help():
     result = run(["--help"])
     return result.returncode == 0
@@ -95,7 +129,7 @@ def test_specials():
 results.append(test("specials returns products[]", test_specials))
 
 if all(results):
-    print("All tests passed.")
+    print("[PASS] live smoke assertions completed")
     sys.exit(0)
 else:
     print(f"{results.count(False)} test(s) failed.")

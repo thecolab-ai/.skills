@@ -33,7 +33,8 @@ def test(name: str, fn):
             print(f"[SKIP] {name}")
             return "skip"
         status = "PASS" if outcome else "FAIL"
-        print(f"[{status}] {name}")
+        prefix = f"[{status}] contract" if status == "PASS" and name == "--help" else f"[{status}] live" if status == "PASS" else f"[{status}]"
+        print(f"{prefix} {name}")
         return bool(outcome)
     except Exception as e:
         print(f"[FAIL] {name}")
@@ -111,6 +112,31 @@ def test_concordance():
     return data.get("kind") == "concordance" and "from" in data and "to" in data
 
 
+def test_search_card_fixture():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("statsnz_classifications_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    card = """
+    <div class="card mb-3 search-result-classification">
+      <div class="search-link-text-wrapper"><a href="/item/nz.govt.stats/synthetic-id">Synthetic classification</a></div>
+      <dl><dt class="search-result-label-label">Label</dt><dd class="search-result-label-value">Synthetic label</dd></dl>
+      <p class="search-result-description-value">Synthetic description.</p>
+      <img title="Classification" />
+    </div>
+    """
+    record = module.parse_search_card(card)
+    assert record and record["agency"] == "nz.govt.stats"
+    assert record["identifier"] == "synthetic-id"
+    assert record["label"] == "Synthetic label"
+    assert record["item_type"] == "Classification"
+    print("[PASS] fixture DataInfo search-card parser")
+    return True
+
+
 results = [
     test("--help", test_help),
     test("search region --scope codelists --json", test_search),
@@ -118,6 +144,7 @@ results = [
     test("classification versions --json", test_classification_versions),
     test("standards --json", test_standards),
     test("concordance industry census --json", test_concordance),
+    test("fixture search card parser", test_search_card_fixture),
 ]
 
 if __name__ == "__main__":

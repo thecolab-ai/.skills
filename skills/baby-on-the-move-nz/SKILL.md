@@ -1,6 +1,27 @@
 ---
 name: baby-on-the-move-nz
-description: Query Baby On The Move NZ's public Shopify product search, product details, current online price snapshots, variant availability, and verified store-locations page. Use when comparing Baby On The Move products, looking up a product handle or URL, or finding official store information. Read-only; no cart, checkout, account, payment, fitting booking, hire, or other mutations.
+description: "Query Baby On The Move NZ's public Shopify product search, product details, current online price snapshots, variant availability, and verified store-locations page. Use when comparing Baby On The Move products, looking up a product handle or URL, or finding official store information. Read-only; no cart, checkout, account, payment, fitting booking, hire, or other mutations."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "retail"
+  thecolab.source_owner: "Baby On The Move"
+  thecolab.source_type: "commercial"
+  thecolab.auth: "none"
+  thecolab.access_mode: "html-readonly"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "low"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "html-readonly"
+  thecolab.pack: "nz-commercial-web"
+  thecolab.source_url: "https://babyonthemove.co.nz/"
+  thecolab.allowed_domains: "babyonthemove.co.nz,www.babycity.co.nz,www.dimples.co.nz,www.naturebaby.co.nz"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "healthy"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # Baby On The Move NZ

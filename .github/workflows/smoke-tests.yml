@@ -40,4 +40,4 @@ jobs:
           METLINK_API_KEY: ${{ secrets.METLINK_API_KEY }}
           COLAB_SMOKE_WITH_CLOAKBROWSER: "1"
           COLAB_SMOKE_USE_BROWSER: "1"
-        run: bash scripts/run_all_smoke.sh
+        run: bash scripts/run_all_smoke.sh --summary-json

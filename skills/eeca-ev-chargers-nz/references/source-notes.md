@@ -1,5 +1,10 @@
 # EECA Public EV Charger Sources
 
+- Primary source: https://www.eeca.govt.nz/insights/data-tools/public-ev-charger-dashboard/
+- Declared outbound hosts: catalogue.data.govt.nz, www.eeca.govt.nz
+- Authentication: none
+- Last verified: 2026-07-19
+
 ## Official Sources
 
 - EECA Public EV Charger Dashboard:

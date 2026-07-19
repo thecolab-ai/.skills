@@ -1,6 +1,27 @@
 ---
 name: child-poverty-nz
-description: Query official New Zealand child poverty statistics from Stats NZ — the nine Child Poverty Reduction Act measures (BHC/AHC low-income lines, material hardship, severe material hardship, DEP-17 deprivation), national rates and child numbers 2007-2025 with confidence intervals, and breakdowns by region, ethnicity (Māori, Pacific, European, Asian) and disability. Use for tasks about NZ child poverty rates, kids in hardship or deprivation, poverty by region or ethnic group, annual change, or finding the latest Stats NZ child-poverty release.
+description: "Query official New Zealand child poverty statistics from Stats NZ — the nine Child Poverty Reduction Act measures (BHC/AHC low-income lines, material hardship, severe material hardship, DEP-17 deprivation), national rates and child numbers 2007-2025 with confidence intervals, and breakdowns by region, ethnicity (Māori, Pacific, European, Asian) and disability. Use for tasks about NZ child poverty rates, kids in hardship or deprivation, poverty by region or ethnic group, annual change, or finding the latest Stats NZ child-poverty release."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "social-policy"
+  thecolab.source_owner: "Stats NZ"
+  thecolab.source_type: "official"
+  thecolab.auth: "none"
+  thecolab.access_mode: "public-download"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "low"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "public-download"
+  thecolab.pack: "nz-public-data"
+  thecolab.source_url: "https://www.stats.govt.nz"
+  thecolab.allowed_domains: "www.stats.govt.nz"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "healthy"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # Child Poverty NZ

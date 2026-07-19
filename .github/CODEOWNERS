@@ -1,0 +1,11 @@
+# Repository-wide foundations and default review ownership.
+* @adam91holt
+
+# Changes to trust, distribution, security, and CI always require ownership review.
+/.github/ @adam91holt
+/.claude-plugin/ @adam91holt
+/lib/ @adam91holt
+/scripts/ @adam91holt
+/spec/ @adam91holt
+/SECURITY.md @adam91holt
+/LICENSE @adam91holt

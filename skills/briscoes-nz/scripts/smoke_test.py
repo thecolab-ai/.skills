@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import importlib.util
 import json
 import subprocess
 import sys
@@ -6,6 +7,11 @@ from pathlib import Path
 
 SKILL_DIR = Path(__file__).parent.parent
 CLI = SKILL_DIR / "scripts" / "cli.py"
+spec = importlib.util.spec_from_file_location("briscoes_fixture_cli", CLI)
+assert spec and spec.loader
+fixture_cli = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = fixture_cli
+spec.loader.exec_module(fixture_cli)
 
 
 def run(args: list) -> subprocess.CompletedProcess:
@@ -31,6 +37,31 @@ def test(name: str, fn):
 
 
 results = []
+
+
+def test_fixture_klevu_product_parser():
+    product = fixture_cli.parse_klevu_product(
+        {
+            "sku": "FIX-1",
+            "name": "Fixture Towel",
+            "salePrice": "19.99",
+            "basePrice": "29.99",
+            "isDiscountPrice": "yes",
+            "inStock": "true",
+            "currency": "NZD",
+            "url": "https://www.briscoes.co.nz/product/fixture/",
+        }
+    )
+    return bool(
+        product["sku"] == "FIX-1"
+        and product["sale_price"] == 19.99
+        and product["save_price"] == 10.0
+        and product["is_special"] is True
+        and product["in_stock"] is True
+    )
+
+
+results.append(test("fixture Klevu product parser", test_fixture_klevu_product_parser))
 
 
 def test_help():
@@ -148,7 +179,7 @@ def test_specials():
 results.append(test("specials towel returns discounted towel products", test_specials))
 
 if all(results):
-    print("All tests passed.")
+    print("[PASS] live smoke assertions completed")
     sys.exit(0)
 else:
     print(f"{results.count(False)} test(s) failed.")

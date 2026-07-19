@@ -23,12 +23,14 @@ import os
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from collections import Counter
 
 BASE_URL = "https://api.dataforseo.com"
 USER_AGENT = "thecolab-skills-dataforseo/1.0"
 DEFAULT_TIMEOUT = 60  # Labs/backlinks live calls can be slow
+API_HOST = "api.dataforseo.com"
 
 # Friendly location aliases -> DataForSEO location_code.
 # Full list: https://api.dataforseo.com/v3/serp/google/locations
@@ -103,14 +105,39 @@ def resolve_location(value):
     die(f"unknown --location '{value}'; use a numeric location_code or one of: {known}")
 
 
+def validate_api_url(url):
+    """Keep Basic credentials on the one declared DataForSEO API origin."""
+    try:
+        parsed = urllib.parse.urlsplit(url)
+        port = parsed.port
+    except ValueError as exc:
+        raise ValueError("invalid DataForSEO API URL") from exc
+    if (
+        parsed.scheme != "https"
+        or (parsed.hostname or "").lower().rstrip(".") != API_HOST
+        or parsed.username is not None
+        or parsed.password is not None
+        or port not in (None, 443)
+    ):
+        raise ValueError("DataForSEO credentials may only be sent to the declared API host")
+
+
+class ExactApiRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        validate_api_url(newurl)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
 class DataForSEOClient:
     def __init__(self, login, password):
         token = base64.b64encode(f"{login}:{password}".encode("utf-8")).decode("ascii")
         self.auth_header = f"Basic {token}"
+        self.opener = urllib.request.build_opener(ExactApiRedirectHandler())
 
     def _send(self, method, path, payload=None):
         """Core HTTP call. Returns the parsed JSON envelope (unvalidated)."""
         url = f"{BASE_URL}/{path.lstrip('/')}"
+        validate_api_url(url)
         body = json.dumps(payload).encode("utf-8") if payload is not None else None
         headers = {
             "Authorization": self.auth_header,
@@ -121,7 +148,8 @@ class DataForSEOClient:
             headers["Content-Type"] = "application/json"
         req = urllib.request.Request(url, data=body, headers=headers, method=method)
         try:
-            with urllib.request.urlopen(req, timeout=DEFAULT_TIMEOUT) as resp:
+            with self.opener.open(req, timeout=DEFAULT_TIMEOUT) as resp:
+                validate_api_url(resp.geturl())
                 raw = resp.read().decode("utf-8")
         except urllib.error.HTTPError as exc:
             detail = exc.read().decode("utf-8", "replace")[:500]

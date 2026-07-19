@@ -33,6 +33,35 @@ def test(name: str, fn):
 results = []
 
 
+def test_entity_fixture():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("nzbn_register_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    record = module.simplify_entity(
+        {
+            "nzbn": "9429000000000",
+            "entityName": "Synthetic Limited",
+            "entityStatusDescription": "Registered",
+            "tradingNames": [{"name": "Synthetic Trading"}, {"name": "No trading name"}],
+            "addresses": {"addressList": [{"addressType": "REGISTERED", "address1": "1 Example Street", "postCode": "6011", "countryCode": "NZ"}]},
+        },
+        detail=True,
+    )
+    assert record["nzbn"] == "9429000000000"
+    assert record["trading_names"] == ["Synthetic Trading"]
+    assert record["addresses"][0]["address"] == "1 Example Street, 6011, NZ"
+    assert record["url"].endswith("/9429000000000/")
+    print("[PASS] fixture NZBN entity normalisation")
+    return True
+
+
+results.append(test("fixture entity parser", test_entity_fixture))
+
+
 def test_help():
     result = run(["--help"])
     return result.returncode == 0
@@ -87,7 +116,7 @@ def test_lookup():
 results.append(test("lookup <nzbn> returns matching entity", test_lookup))
 
 if all(results):
-    print("All tests passed.")
+    print("[PASS] live smoke assertions completed")
     sys.exit(0)
 else:
     print(f"{results.count(False)} test(s) failed.")

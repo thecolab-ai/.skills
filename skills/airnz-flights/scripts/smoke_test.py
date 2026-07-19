@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 import subprocess
@@ -10,10 +11,23 @@ from importlib.util import find_spec
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
+CLI = ROOT / "skills/airnz-flights/scripts/cli.py"
+spec = importlib.util.spec_from_file_location("airnz_fixture_cli", CLI)
+assert spec and spec.loader
+fixture_cli = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = fixture_cli
+spec.loader.exec_module(fixture_cli)
+
+fixture_rows = fixture_cli.extract_json_array('prefix fareRows [{"id":"fixture"}] suffix', "fareRows")
+fixture_fare = fixture_cli.normalise_fare({"code": "seat", "adultPrice": "$123", "reveal": True})
+assert fixture_rows == [{"id": "fixture"}]
+assert fixture_fare["price"] == 123 and fixture_fare["available"] is True
+print("[PASS] fixture fare array extraction and fare normalisation")
+
 DATE = (date.today() + timedelta(days=7)).isoformat()
 browser_required = os.getenv("COLAB_SMOKE_USE_BROWSER") == "1"
 use_browser = browser_required or find_spec("cloakbrowser") is not None
-cmd = [sys.executable, str(ROOT / "skills/airnz-flights/scripts/cli.py"), "AKL", "WLG", DATE, "--limit", "3", "--json"]
+cmd = [sys.executable, str(CLI), "AKL", "WLG", DATE, "--limit", "3", "--json"]
 if use_browser:
     cmd.append("--browser")
 proc = subprocess.run(cmd, text=True, capture_output=True, timeout=180)
@@ -26,7 +40,7 @@ if proc.returncode != 0:
         if error_payload.get("error") == "cloakbrowser_not_installed":
             fallback_cmd = [
                 sys.executable,
-                str(ROOT / "skills/airnz-flights/scripts/cli.py"),
+                str(CLI),
                 "AKL",
                 "WLG",
                 DATE,
@@ -51,6 +65,6 @@ else:
 assert "booking_search_url" in payload, payload
 price = first.get("lowest_fare", {}).get("adult_price") if first.get("lowest_fare") else "fare-blocked"
 print(
-    f"OK airnz-flights smoke ({payload.get('source')}): {len(flights)} flights, "
+    f"[PASS] live airnz-flights ({payload.get('source')}): {len(flights)} flights, "
     f"first={segments[0].get('flight_number')} {first.get('departure')}->{first.get('arrival')} price={price}"
 )

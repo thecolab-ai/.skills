@@ -1,10 +1,9 @@
 """nzfetch — shared HTTP helper for For Good skills (Python stdlib only).
 
-Gets past the IP-reputation bot walls (Incapsula / Cloudflare) that guard a lot
-of official NZ sources — data.govt.nz (CKAN), councils, some government portals.
-It sends a browser-shaped User-Agent and, on a block, RETRIES through a rotating
-proxy when one is configured: a fresh IP per attempt clears IP-reputation walls
-probabilistically (some rotated IPs are clean).
+Fetches public, unauthenticated NZ sources through one consistent HTTP policy.
+It sends a browser-shaped User-Agent and, on a block, retries through a proxy
+when one is configured. A rotating pool may provide a different route for each
+bounded attempt; a single-IP proxy re-attempts through the same route.
 
 Import it from a skill's `scripts/cli.py` (it lives at the repo's `lib/`, three
 parents up from the skill's scripts dir):
@@ -15,10 +14,12 @@ parents up from the skill's scripts dir):
 
     data = nzfetch.fetch_json("https://catalogue.data.govt.nz/api/3/action/...")
 
-Handle the two typed errors so a transient block SKIPS rather than hard-fails:
+Handle the typed errors so an exhausted block SKIPS rather than hard-fails:
 
     try:
         data = nzfetch.fetch_json(url)
+    except nzfetch.RateLimited as e:
+        die(f"network error: rate_limited: retry_after={e.retry_after}: {e}")
     except nzfetch.Blocked as e:
         die(f"network error: {e}")        # smoke tests treat 'network error' as SKIP
     except nzfetch.FetchError as e:
@@ -39,11 +40,10 @@ Environment (all optional):
     FETCH_PROXY / HTTPS_PROXY   rotating proxy URL, e.g. http://user:pass@host:port
                                — a SECRET. Never hard-code it, never print it, never
                                commit it. nzfetch reads it from the env only.
-    PROXY_RETRIES              retries through the proxy on a block or a truncated
-                               read (default 3). A rotating pool gets a fresh IP each
-                               retry; a single-IP proxy just re-attempts (which still
-                               clears transient truncations). Raise it for a stubborn
-                               wall or a proxy that often truncates large responses.
+    PROXY_RETRIES              bounded retries through the proxy on a block or a
+                               truncated read (default 3, minimum 1). Must be an
+                               integer. A rotating pool may provide a different route
+                               per retry; a single-IP proxy uses the same route.
     NZFETCH_UA                 override the User-Agent if a source needs a specific one.
 
 No proxy set → nzfetch just does the single direct request (same as before), so a
@@ -59,6 +59,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import zlib
+from collections.abc import Iterable
 
 # Keep the UA version and the sec-ch-ua brand list in sync — a real Chrome sends a
 # UA and Client-Hints that agree, and a mismatch is itself a bot signal. Bump this
@@ -83,7 +84,7 @@ def _browser_headers(url: str, accept: str) -> dict:
 
     NOTE: this cannot change urllib's TLS ClientHello fingerprint (a Python
     signature some advanced WAFs still detect) — for those, the stealth browser
-    (fetch.mjs's cloak rung) remains the strongest bypass. Browser-shaped headers
+    (fetch.mjs's cloak rung) remains the strongest public-page fallback. Browser-shaped headers
     plus a rotating IP clear the common cases."""
     ua = os.environ.get("NZFETCH_UA") or DEFAULT_UA
     try:
@@ -155,9 +156,59 @@ class FetchError(Exception):
 
 
 class Blocked(FetchError):
-    """Every attempt hit a bot wall (HTTP 403/429 or an HTML challenge). This is a
-    TRANSIENT block (tooling / IP reputation), NOT a dead source — callers should
-    skip / soft-fail, never treat it as a citation defect."""
+    """Bounded attempts ended at a block or challenge, not a dead source.
+
+    Callers should return an explicit blocked state or soft-fail rather than
+    treating it as a citation defect. ``RateLimited`` is the compatible subtype
+    for a terminal HTTP 429.
+    """
+
+
+class RateLimited(Blocked):
+    """Bounded attempts ended with HTTP 429.
+
+    ``retry_after`` preserves the raw upstream header because it may be either
+    delta-seconds or an HTTP date.
+    """
+
+    def __init__(self, message: str, *, retry_after: str | None = None):
+        super().__init__(message)
+        self.retry_after = retry_after
+
+
+def _normalise_allowed_hosts(allowed_hosts: Iterable[str] | None) -> frozenset[str] | None:
+    if allowed_hosts is None:
+        return None
+    return frozenset(str(host).strip().lower().rstrip(".") for host in allowed_hosts if str(host).strip())
+
+
+def _validate_outbound_url(url: str, allowed_hosts: frozenset[str]) -> None:
+    try:
+        parsed = urllib.parse.urlparse(url)
+        port = parsed.port
+    except ValueError as exc:
+        raise FetchError(f"invalid outbound URL: {url!r}") from exc
+    hostname = (parsed.hostname or "").lower().rstrip(".")
+    default_port = 443 if parsed.scheme == "https" else 80 if parsed.scheme == "http" else None
+    if (
+        parsed.scheme not in {"http", "https"}
+        or not hostname
+        or hostname not in allowed_hosts
+        or parsed.username is not None
+        or parsed.password is not None
+        or port not in {None, default_port}
+    ):
+        raise FetchError(f"outbound URL host is not in the declared allowlist: {hostname or url!r}")
+
+
+class _AllowlistRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def __init__(self, allowed_hosts: frozenset[str]):
+        super().__init__()
+        self.allowed_hosts = allowed_hosts
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        _validate_outbound_url(newurl, self.allowed_hosts)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
 def proxy_url() -> str:
@@ -169,6 +220,15 @@ def proxy_url() -> str:
         or os.environ.get("https_proxy")
         or ""
     )
+
+
+def _proxy_retries() -> int:
+    """Return the configured retry count with the existing minimum of one."""
+    raw = os.environ.get("PROXY_RETRIES", "3")
+    try:
+        return max(1, int(raw))
+    except ValueError as exc:
+        raise FetchError("PROXY_RETRIES must be an integer") from exc
 
 
 # Reliable bot-wall fingerprints — a real page NEVER contains these, so they flag
@@ -232,6 +292,7 @@ def fetch_bytes(
     context=None,
     expect_json: bool | None = None,
     browser_headers: bool = True,
+    allowed_hosts: Iterable[str] | None = None,
 ) -> tuple[bytes, str, str]:
     """Fetch *url* → (body, content_type, final_url). GET by default; pass
     ``data`` (bytes) for a POST. A full drop-in for a skill's own
@@ -254,11 +315,17 @@ def fetch_bytes(
       for the few hosts that 200 on a bare request but bot-wall the full
       Client-Hint / Sec-Fetch-* set — the fetch still gets the rotating-proxy
       fallback without the headers that make it worse than plain urllib.
+    - ``allowed_hosts`` — optional exact host allowlist. The initial URL and
+      every redirect are rejected before a request can leave the declared host
+      set. Credential-bearing callers must provide this.
 
-    Tries a DIRECT request first; on a bot-block (HTTP 403/429 or an HTML
-    challenge) retries through the rotating proxy when one is configured, a fresh
-    IP per attempt. Raises ``Blocked`` if every attempt is blocked, ``FetchError``
-    for other HTTP/URL failures."""
+    Tries a DIRECT request first; on HTTP 403/406/429/451 or a recognised HTML
+    challenge, runs the configured bounded proxy attempts. Raises ``RateLimited``
+    if the final attempt is HTTP 429, ``Blocked`` for other exhausted block or
+    challenge outcomes, and ``FetchError`` for other HTTP/URL failures."""
+    allowed = _normalise_allowed_hosts(allowed_hosts)
+    if allowed is not None:
+        _validate_outbound_url(url, allowed)
     hdrs = _browser_headers(url, accept) if browser_headers else _minimal_headers(accept)
     if headers:
         hdrs.update(headers)  # caller headers (API key, auth, custom UA/Accept) win
@@ -266,41 +333,67 @@ def fetch_bytes(
     # (fetch_text=False, fetch_json=True) when given; else inferred from accept.
     expects_json = expect_json if expect_json is not None else ("json" in (accept or "").lower())
     proxy = proxy_url()
-    openers: list = [None]  # attempt 1 = direct (urlopen, which accepts context=)
+    if allowed is None:
+        openers: list = [None]  # attempt 1 = direct urlopen for backwards compatibility
+    else:
+        direct_handlers: list = [_AllowlistRedirectHandler(allowed)]
+        if context is not None:
+            direct_handlers.append(urllib.request.HTTPSHandler(context=context))
+        openers = [urllib.request.build_opener(*direct_handlers)]
     if proxy:
         handler = urllib.request.ProxyHandler({"http": proxy, "https": proxy})
         # A custom SSL context must be baked into an HTTPSHandler on the opener —
         # OpenerDirector.open() does NOT accept a context= kwarg (passing it raises
         # TypeError), so it can't be forwarded per-call like urlopen's.
-        extra = [urllib.request.HTTPSHandler(context=context)] if context is not None else []
-        retries = max(1, int(os.environ.get("PROXY_RETRIES", "3")))
+        extra = [_AllowlistRedirectHandler(allowed)] if allowed is not None else []
+        if context is not None:
+            extra.append(urllib.request.HTTPSHandler(context=context))
+        retries = _proxy_retries()
         openers += [urllib.request.build_opener(handler, *extra)] * retries
     # context= only goes to the direct urlopen; the proxy openers carry it in their handler.
     direct_kw = {"timeout": timeout}
     if context is not None:
         direct_kw["context"] = context
     last = "no attempt made"
+    last_status = None
+    last_retry_after = None
     for opener in openers:
         req = urllib.request.Request(url, data=data, headers=hdrs, method=method)
         try:
             resp = opener.open(req, timeout=timeout) if opener else urllib.request.urlopen(req, **direct_kw)
+            final_url = resp.geturl()
+            if allowed is not None:
+                _validate_outbound_url(final_url, allowed)
             body = _decompress(resp.read(), resp.headers.get("Content-Encoding"))
             content_type = (resp.headers.get("Content-Type") or "").lower()
-            final_url = resp.geturl()
         except urllib.error.HTTPError as e:
             # WAF bot-walls: 403/429 classic, 406 is Akamai's "Not Acceptable"
             # bot block (seen on aucklandcouncil.govt.nz — a bare curl gets it
             # too), 451 some edge WAFs. Rotate to a fresh IP and retry; if every
-            # attempt hits it, it surfaces as Blocked (SKIP-able / not a defect).
+            # attempt hits it, it surfaces as a typed blocked/rate-limited state.
             if e.code in (403, 406, 429, 451):
                 last = f"HTTP {e.code}"
+                last_status = e.code
+                retry_after = (
+                    e.headers.get("Retry-After")
+                    if e.code == 429 and e.headers is not None
+                    else None
+                )
+                if e.code != 429:
+                    last_retry_after = None
+                elif retry_after is not None:
+                    last_retry_after = retry_after
                 continue
             raise FetchError(f"HTTP {e.code} from {url}") from e
         except urllib.error.URLError as e:
             last = f"network error: {e.reason}"
+            last_status = None
+            last_retry_after = None
             continue
         except (TimeoutError, OSError) as e:  # bare socket timeout / connection reset
             last = f"network error: {e}"
+            last_status = None
+            last_retry_after = None
             continue
         except http.client.HTTPException as e:
             # A truncated / malformed response body — most often
@@ -308,14 +401,24 @@ def fetch_bytes(
             # mid-stream (common through a proxy on a large body). Transient:
             # retry (a fresh connection / IP usually completes it).
             last = f"network error: incomplete read ({type(e).__name__})"
+            last_status = None
+            last_retry_after = None
             continue
         if _looks_like_challenge(body.decode("utf-8", "replace"), content_type, expected_json=expects_json):
             last = "bot-challenge interstitial"
+            last_status = None
+            last_retry_after = None
             continue  # rotate and retry
         return body, content_type, final_url
+    if last_status == 429:
+        raise RateLimited(
+            f"{url} rate-limited after {len(openers)} attempt(s); retry later.",
+            retry_after=last_retry_after,
+        )
     raise Blocked(
         f"{url} blocked after {len(openers)} attempt(s) ({last}). The public source is "
-        f"bot-blocking this network; set a rotating FETCH_PROXY to clear it."
+        f"blocking this network; use an official fallback or configure FETCH_PROXY "
+        f"for bounded proxy retries."
     )
 
 

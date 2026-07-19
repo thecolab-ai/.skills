@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -33,6 +34,38 @@ def test(name: str, fn):
 results = []
 
 
+def test_akl_fixture():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("nz_airports_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    record = module.normalize_akl_fids(
+        {
+            "id": "flight-1",
+            "attributes": {
+                "iataCode": ["NZ 123"],
+                "codeshares": [["UA 999"]],
+                "range": "domestic",
+                "destination": {"city": "Wellington", "airportCode": "WLG"},
+                "time": {"scheduled": "2026-07-19T08:00:00Z", "status": "On time"},
+            },
+        },
+        "departures",
+    )
+    assert record["primary_flight"] == "NZ123"
+    assert record["flight_numbers"] == ["NZ123", "UA999"]
+    assert record["destination_airport_code"] == "WLG"
+    assert record["is_domestic"] is True
+    print("[PASS] fixture Auckland Airport FIDS normalisation")
+    return True
+
+
+results.append(test("fixture airport flight parser", test_akl_fixture))
+
+
 def test_help():
     result = run(["--help"])
     return result.returncode == 0
@@ -62,6 +95,9 @@ results.append(test("airports returns airports[] containing AKL", test_airports)
 
 
 def test_arrivals_akl():
+    if not (os.environ.get("AKL_API_USERNAME") and os.environ.get("AKL_API_PASSWORD")):
+        print("  [SKIP] missing configuration: AKL_API_USERNAME/AKL_API_PASSWORD")
+        return True
     result = run(["arrivals", "--airport", "AKL", "--limit", "3", "--json"])
     if result.returncode != 0:
         print(f"  stderr: {result.stderr[:200]}")
@@ -78,6 +114,9 @@ results.append(test("arrivals AKL returns flights[]", test_arrivals_akl))
 
 
 def test_departures_akl():
+    if not (os.environ.get("AKL_API_USERNAME") and os.environ.get("AKL_API_PASSWORD")):
+        print("  [SKIP] missing configuration: AKL_API_USERNAME/AKL_API_PASSWORD")
+        return True
     result = run(["departures", "--airport", "AKL", "--limit", "3", "--json"])
     if result.returncode != 0:
         print(f"  stderr: {result.stderr[:200]}")

@@ -116,6 +116,26 @@ def test_market_rent() -> bool:
 
 
 def main() -> int:
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("rental_bond_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    rows, metadata, period_start = module.parse_market_rent_table(
+        """
+        <h5>Auckland - Avondale <span class="search_details">01 Oct 2025 - 31 Mar 2026</span></h5>
+        <table><tr><td class="head_type"><h5>House</h5></td></tr>
+        <tr><th>Size</th><th>Active bonds</th><th>Lower</th><th>Median</th><th>Upper</th></tr>
+        <tr><td>3 bedrooms</td><td>120</td><td>$600</td><td>$680</td><td>$750</td></tr></table>
+        """
+    )
+    if len(rows) != 1 or rows[0]["median_rent"] != 680 or metadata["area"] != "Auckland - Avondale" or period_start != "2025-10":
+        print("[FAIL] fixture Tenancy market-rent table parser")
+        return 1
+    print("[PASS] fixture Tenancy market-rent table parser")
+
     tests = [
         ("--help includes market-rent", test_help),
         ("datasets returns tenancy/CKAN data", test_datasets),

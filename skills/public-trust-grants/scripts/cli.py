@@ -22,6 +22,8 @@ GRANTS_URL = f"{BASE_URL}/grants/"
 USER_AGENT = "thecolab-ai-public-trust-grants/1.0 (+https://github.com/thecolab-ai/.skills)"
 DEFAULT_TIMEOUT = 10
 MAX_HITS = 50
+ALGOLIA_APP_ID = "00GCMOPT4B"
+ALGOLIA_HOST = f"{ALGOLIA_APP_ID.lower()}-dsn.algolia.net"
 
 
 class UpstreamError(RuntimeError):
@@ -68,18 +70,23 @@ def load_config(timeout: int = DEFAULT_TIMEOUT) -> dict[str, str]:
     """
 
     page = fetch_text(GRANTS_URL, timeout=timeout)
-    return {
+    config = {
         "app_id": _extract_config_value(page, "algoliaAppId"),
         "api_key": _extract_config_value(page, "algoliaApiKey"),
         "index": _extract_config_value(page, "algoliaGrantsIndex"),
         "alphabetical_index": _extract_config_value(page, "algoliaGrantsAlphabeticalReplica"),
     }
+    if config["app_id"].upper() != ALGOLIA_APP_ID:
+        raise UpstreamError(
+            "Public Trust Algolia application ID changed; review the outbound allowlist before querying it"
+        )
+    return config
 
 
 def algolia_query(payload: dict[str, Any], timeout: int = DEFAULT_TIMEOUT) -> dict[str, Any]:
     config = load_config(timeout=timeout)
     index = urllib.parse.quote(payload.pop("_index", config["index"]), safe="")
-    url = f"https://{config['app_id']}-dsn.algolia.net/1/indexes/{index}/query"
+    url = f"https://{ALGOLIA_HOST}/1/indexes/{index}/query"
     return fetch_json(url, payload, config["app_id"], config["api_key"], timeout=timeout)
 
 
@@ -220,6 +227,9 @@ def command_detail(args: argparse.Namespace) -> dict[str, Any]:
         if slug.startswith("grants/"):
             slug = slug.split("/", 1)[1]
         url = f"{BASE_URL}/grants/{urllib.parse.quote(slug)}/"
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme != "https" or (parsed.hostname or "").lower() not in {"publictrust.co.nz", "www.publictrust.co.nz"}:
+        raise ValueError("grant URL must use the declared Public Trust HTTPS host")
     page = fetch_text(url, timeout=args.timeout)
     title = None
     title_match = re.search(r"<h1[^>]*>(.*?)</h1>", page, flags=re.I | re.S)
@@ -310,6 +320,12 @@ def main(argv: list[str] | None = None) -> int:
     except UpstreamError as exc:
         if getattr(args, "json", False):
             print(json.dumps({"error": "upstream_unavailable", "message": str(exc)}, ensure_ascii=False), file=sys.stderr)
+        else:
+            print(f"Error: {exc}", file=sys.stderr)
+        return 2
+    except ValueError as exc:
+        if getattr(args, "json", False):
+            print(json.dumps({"error": "invalid_input", "message": str(exc)}, ensure_ascii=False), file=sys.stderr)
         else:
             print(f"Error: {exc}", file=sys.stderr)
         return 2

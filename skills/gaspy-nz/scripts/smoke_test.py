@@ -33,6 +33,31 @@ def test(name: str, fn):
 results = []
 
 
+def test_price_rows_fixture():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("gaspy_nz_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    rows = module.price_rows(
+        {
+            "gaspy": {"national": {"1": {"average": 249.9, "minimum": 229.9, "maximum": 269.9, "count": 100}}},
+            "datamine": {"Averages": {"91": {"28DayChange": -3.2, "28DayPercent": -1.25}}},
+        }
+    )
+    assert len(rows) == 1
+    assert rows[0]["fuel"] == "91"
+    assert rows[0]["average"] == 249.9
+    assert rows[0]["change_28d_cents"] == -3.2
+    print("[PASS] fixture Gaspy national-price normalisation")
+    return True
+
+
+results.append(test("fixture national price parser", test_price_rows_fixture))
+
+
 def test_help():
     result = run(["--help"])
     return result.returncode == 0
@@ -89,7 +114,7 @@ def test_prices():
 results.append(test("prices returns prices[]", test_prices))
 
 if all(results):
-    print("All tests passed.")
+    print("[PASS] live smoke assertions completed")
     sys.exit(0)
 else:
     print(f"{results.count(False)} test(s) failed.")

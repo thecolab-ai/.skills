@@ -52,6 +52,34 @@ results: list[bool] = []
 results.append(check("--help exits 0", lambda: run(["--help"]).returncode == 0))
 
 
+def test_csv_row_fixture() -> bool:
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("healthcert_rest_homes_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    record = module.normalise_row(
+        {
+            "Premises Name": "Synthetic Rest Home",
+            "Service Types": "Rest home care, Hospital care",
+            "Total Beds": "24",
+            "Certification Period (Months)": "36",
+            "Legal Name": "Synthetic Provider Limited",
+        }
+    )
+    assert record["slug"] == "synthetic-rest-home"
+    assert record["service_types"] == ["Rest home care", "Hospital care"]
+    assert record["total_beds"] == 24
+    assert record["certification_period_months"] == 36
+    print("[PASS] fixture certified-provider CSV row normalisation")
+    return True
+
+
+results.append(check("fixture CSV parser", test_csv_row_fixture))
+
+
 def test_list() -> bool:
     result, data = parse_result(["list", "--limit", "1", "--json"])
     if is_upstream_skip(result, data):
@@ -127,7 +155,7 @@ def test_reports_live_or_blocked() -> bool:
 results.append(check("reports returns links or explicit blocked state", test_reports_live_or_blocked))
 
 if all(results):
-    print("All tests passed.")
+    print("[PASS] live smoke assertions completed")
     raise SystemExit(0)
 
 print(f"{results.count(False)} test(s) failed.")

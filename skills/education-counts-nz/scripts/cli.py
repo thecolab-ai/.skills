@@ -86,6 +86,25 @@ def fetched_at() -> str:
     return dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat()
 
 
+ALLOWED_SOURCE_HOSTS = {"www.educationcounts.govt.nz"}
+
+
+def validate_source_url(url: str) -> urllib.parse.ParseResult:
+    try:
+        parsed = urllib.parse.urlparse(url)
+    except ValueError as exc:
+        raise SkillError("invalid workbook URL", code="invalid_input", source_url=url) from exc
+    if parsed.scheme == "file":
+        return parsed
+    if parsed.scheme != "https" or (parsed.hostname or "").lower() not in ALLOWED_SOURCE_HOSTS:
+        raise SkillError(
+            "workbook URL must use a declared Education Counts HTTPS host or file:// fixture",
+            code="unsupported_source",
+            source_url=url,
+        )
+    return parsed
+
+
 def request_headers(url: str) -> dict[str, str]:
     parsed = urllib.parse.urlparse(url)
     is_asset = bool(re.search(r"\.(xlsx|xls|csv|pdf)$", parsed.path, re.I))
@@ -104,8 +123,9 @@ def request_headers(url: str) -> dict[str, str]:
 
 
 def fetch_bytes(url: str, timeout: int = DEFAULT_TIMEOUT) -> tuple[bytes, str, str]:
-    if url.startswith("file://"):
-        path = Path(urllib.parse.urlparse(url).path)
+    parsed = validate_source_url(url)
+    if parsed.scheme == "file":
+        path = Path(parsed.path)
         return path.read_bytes(), url, "application/octet-stream"
     try:
         body, content_type, final_url = nzfetch.fetch_bytes(
@@ -122,6 +142,7 @@ def fetch_bytes(url: str, timeout: int = DEFAULT_TIMEOUT) -> tuple[bytes, str, s
         ) from exc
     except nzfetch.FetchError as exc:
         raise SkillError(f"{exc}", code="upstream_http", source_url=url) from exc
+    validate_source_url(final_url)
     return body, final_url, content_type
 
 
@@ -263,6 +284,8 @@ def resource_key(label: str, url: str) -> str:
         return "school"
     if "pivot" in text:
         return "pivot"
+    if "completion" in text and "enrol" in text:
+        return "ite-enrolments-completions"
     if "completion" in text:
         return "ite-completions"
     if "enrol" in text:
@@ -480,6 +503,10 @@ def choose_resource(dataset: str, desired_key: str, timeout: int) -> dict[str, A
     exact = [r for r in resources if r.get("resource_key") == desired_key]
     if exact:
         return exact[0]
+    if desired_key in {"ite-enrolments", "ite-completions"}:
+        combined = [r for r in resources if r.get("resource_key") == "ite-enrolments-completions"]
+        if combined:
+            return combined[0]
     fuzzy = [r for r in resources if desired_key in r.get("resource_key", "") or desired_key in key_text(r.get("label", ""))]
     if fuzzy:
         return fuzzy[0]

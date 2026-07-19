@@ -43,7 +43,14 @@ def is_network_failure(result: subprocess.CompletedProcess) -> bool:
 
 
 def report(status: str, name: str, detail: str = "") -> str:
-    print(f"[{status}] {name}")
+    if name.startswith("--help") or name.startswith("invalid month"):
+        kind = "contract"
+    elif name.startswith("measures 2024"):
+        kind = "fixture"
+    else:
+        kind = "live"
+    prefix = f"[{status}] {kind}" if status == "PASS" else f"[{status}]"
+    print(f"{prefix} {name}")
     if detail:
         print(f"  {detail}")
     return status

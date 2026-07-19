@@ -1,6 +1,27 @@
 ---
 name: nz-airports
-description: Query live public New Zealand airport arrivals and departures data for supported airports through a lightweight read-only CLI. Use when the task involves current flight board data for Auckland, Christchurch, Queenstown, or Wellington airports, or live ADS-B aircraft positions near Auckland Airport.
+description: "Query live public New Zealand airport arrivals and departures data for supported airports through a lightweight read-only CLI. Use when the task involves current flight board data for Auckland, Christchurch, Queenstown, or Wellington airports, or live ADS-B aircraft positions near Auckland Airport."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "transport"
+  thecolab.source_owner: "Participating New Zealand airport operators"
+  thecolab.source_type: "commercial"
+  thecolab.auth: "mixed"
+  thecolab.access_mode: "html-readonly"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "true"
+  thecolab.risk: "medium"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "html-readonly"
+  thecolab.pack: "nz-commercial-web"
+  thecolab.source_url: "https://h2g.aucklandairport.co.nz/api/"
+  thecolab.allowed_domains: "api.adsb.lol,h2g.aucklandairport.co.nz,www.christchurchairport.nz,www.queenstownairport.co.nz,www.wellingtonairport.co.nz"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "gated"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # NZ Airports
@@ -71,8 +92,8 @@ python3 skills/nz-airports/scripts/cli.py airports
 - Queenstown uses public JSON endpoints for arrivals and departures; the CLI filters to today's NZ board when possible
 - Wellington embeds the current flight-board JSON in the public flight page; departures can be empty late in the local operating day
 - Auckland Airport's public website flight-board surface was investigated, but direct fetches and CloakBrowser/CDP attempts returned Cloudflare challenge/block pages from this environment. The mobile app v5 FIDS API is reachable directly.
-- AKL FIDS uses public app Basic auth embedded in the Auckland Airport Android APK. The CLI ships those public app defaults and allows override with `AKL_API_USERNAME` / `AKL_API_PASSWORD` if they rotate.
-- No personal API key, account cookie, browser session, or write action is required
+- AKL FIDS requires operator-supplied `AKL_API_USERNAME` and `AKL_API_PASSWORD`; the repository does not bundle the mobile application's Basic credentials.
+- CHC, ZQN, WLG, the local airport directory, and the AKL ADS-B source do not require credentials. No account cookie, browser session, or write action is used.
 - Endpoint shapes can change without notice because these are unofficial public website surfaces
 - API and stability notes: `references/api-notes.md`
 - CLI entrypoint: `scripts/cli.py`

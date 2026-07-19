@@ -7,14 +7,14 @@ The standard is simple: narrow skills, strong trigger descriptions, lean `SKILL.
 ## Quick start
 
 ```bash
-# No install step required — this repo has zero Node.js dependencies.
-# Everything is Python stdlib.
-
-python3 scripts/new_skill.py my-skill --variant minimal
+python3 scripts/new_skill.py my-skill \
+  --variant public-api \
+  --description "Query the official example API. Use for example records and status checks." \
+  --source-owner "Example Agency" \
+  --source-url "https://example.govt.nz/api"
 python3 scripts/validate_skill.py skills/my-skill
-
-# Run skill smoke tests (Python, stdlib only — no extra deps)
-python3 skills/<name>/scripts/smoke_test.py
+python3 skills/my-skill/scripts/test_contract.py
+python3 scripts/run_smoke_tests.py my-skill
 ```
 
 ## Core stance
@@ -25,18 +25,22 @@ python3 skills/<name>/scripts/smoke_test.py
 - Move deep reference material into `references/`
 - Put deterministic operations into `scripts/cli.py` as Python standard-library CLIs
 - Keep helper CLI dependencies minimal: prefer Python stdlib; declare third-party deps in `requirements.txt` or PEP 723 `# /// script` inline metadata
-- TypeScript/Node skill helpers are **not accepted** — all scripts must be Python
+- TypeScript/Node skill helpers are **not accepted**. The one declared legacy Jetstar exception must not be copied.
 - Avoid per-skill doc clutter
 
-## Getting past bot walls — the shared `nzfetch` helper
+The public Agent Skills format and TheColab repository policy are validated
+separately. Every skill declares the metadata, trust pack, outbound hosts, and
+runtime schema described in [`docs/contracts.md`](docs/contracts.md).
+
+## Shared public HTTP access — the `nzfetch` helper
 
 A lot of official NZ sources (data.govt.nz CKAN, councils, some government portals) sit behind
 **Incapsula / Cloudflare** that block by **IP reputation** — a bare HTTP client gets an HTML
 "checking your browser" challenge instead of the data. Don't hand-roll a fix per skill: use the
 shared **`lib/nzfetch.py`** helper (stdlib only). It sends a browser-shaped User-Agent and, on a
-block, **retries through a rotating proxy** when one is configured — a fresh IP per attempt clears
-IP-reputation walls. With no proxy set it just does the single direct request, so nothing changes
-on a clean network.
+block, **retries through a proxy** when one is configured. A rotating pool may provide a different
+route for each bounded attempt; a single-IP proxy re-attempts through the same route. With no proxy
+set it makes only the direct request, so nothing changes on a clean network.
 
 Import it from a skill's `scripts/cli.py` (it lives at the repo `lib/`, three parents up):
 
@@ -48,18 +52,25 @@ import nzfetch  # noqa: E402
 def get(url):
     try:
         return nzfetch.fetch_json(url)          # also: fetch_bytes, fetch_text
+    except nzfetch.RateLimited as e:
+        die(f"network error: rate_limited: retry_after={e.retry_after}: {e}")
     except nzfetch.Blocked as e:
         die(f"network error: {e}")              # transient block → smoke tests SKIP, not FAIL
     except nzfetch.FetchError as e:
         die(str(e))
 ```
 
-`nzfetch.Blocked` is a subclass of `FetchError` — a transient bot-wall, **not** a dead source; a
+`nzfetch.Blocked` is a subclass of `FetchError` — an exhausted bot-wall, **not** a dead source; a
 skill should report it as a `network error` (so smoke tests skip) rather than crash. Keep your
-smoke test's `is_network_failure()` markers including `blocked` / `network error`. A block includes
-HTTP 403/429/451 **and 406** (Akamai's bot "Not Acceptable", seen on `aucklandcouncil.govt.nz`),
+smoke test's `is_network_failure()` markers including `blocked` / `network error`. Block retries
+include HTTP 403/429/451 **and 406** (Akamai's bot "Not Acceptable", seen on `aucklandcouncil.govt.nz`),
 plus Incapsula/Cloudflare **and AWS-WAF (`goku`) challenge shells served at HTTP 200** — nzfetch
 detects those by body fingerprint so they never slip through as an empty "success".
+
+`nzfetch.RateLimited` subclasses `Blocked`, so existing callers remain compatible. It is raised
+when the final bounded attempt ends in HTTP 429 and exposes the raw upstream `Retry-After` value as
+`retry_after` (`None` when absent). Preserve that value in structured output so a caller can decide
+when to schedule a later request; do not turn rate limiting into an empty result.
 
 **Pick the right entry point — it decides challenge handling for you:**
 
@@ -83,12 +94,12 @@ POST `data`/`method`, and a custom SSL `context=` are preserved through the prox
 | Env | Meaning |
 |---|---|
 | `FETCH_PROXY` / `HTTPS_PROXY` | Rotating proxy URL, e.g. `http://user:pass@host:port`. **A SECRET** — never hard-code, print, or commit it; `nzfetch` reads it from the env only. |
-| `PROXY_RETRIES` | Retries through the proxy on a block **or a truncated read** (default 3). A rotating pool gets a fresh IP each retry; a single-IP proxy re-attempts (still clears transient truncations). Raise it for a stubborn wall or a proxy that often truncates large responses. |
+| `PROXY_RETRIES` | Bounded retries through the proxy on a block **or a truncated read** (default 3, minimum 1). A rotating pool may provide a different route each retry; a single-IP proxy re-attempts through the same route. Set an integer and increase it only deliberately. |
 | `NZFETCH_UA` | Override the User-Agent for a source that needs a specific one. |
 
 Even without adopting `nzfetch`, any skill that uses `urllib` already **honours `HTTPS_PROXY`
 natively**, so setting it routes that skill through the proxy — but only `nzfetch` adds the
-retry-rotation + challenge-detection that makes the bypass *reliable*. Migrate a blocked skill by
+bounded retry + challenge-detection contract used across this repository. Migrate a blocked skill by
 swapping its `urllib.request.urlopen(...)` fetch for an `nzfetch` call as above (see
 `skills/data-govt-nz` and `skills/eeca-ev-chargers-nz` for worked examples).
 
@@ -217,15 +228,17 @@ Bad:
 A script with no invocation guidance is dead weight.
 Reference the script from `SKILL.md` or a linked reference doc.
 
-Python standard-library CLIs are the only accepted format for skill helpers. Do not add TypeScript or Node-based scripts. This repo has zero Node.js dependencies — no `npm install`, no `package.json`, no TypeScript toolchain. Document any required runtime, environment variable, or auth assumption in `SKILL.md`.
+Python is the canonical format for skill helpers. Do not add TypeScript or Node-based scripts. Document any required runtime, environment variable, or auth assumption in `SKILL.md` metadata and source notes.
 
 ## Template variants
 
 Use the scaffold that matches the job:
 
-- `minimal` for narrow one-file skills
-- `cli-workflow` for multi-step skills with references and scripts
-- `tool-wrapper` for skills centered around a specific external CLI or API client
+- `public-api` for documented public APIs
+- `public-download` for CSV, workbook, ZIP, or other published exports
+- `html-readonly` for bounded public website retrieval
+- `authenticated-personal` for user-authorised personal data
+- `documentation-workflow` for internal or artifact-oriented procedures
 
 ## Review checklist
 
@@ -234,9 +247,14 @@ Use the scaffold that matches the job:
 - [ ] `SKILL.md` is operational, not bloated
 - [ ] References are linked directly from `SKILL.md`
 - [ ] Script usage is documented
+- [ ] The Agent Skills spec validator and repository-policy validator pass
+- [ ] `scripts/test_contract.py` passes with representative parser fixtures
+- [ ] Every data command supports `--json` and the common runner envelope
+- [ ] Outbound hosts, auth, writes, browser use, risk, and trust pack are declared
+- [ ] Smoke output records fixture assertions, live assertions, skips, and source health
 - [ ] No placeholder text remains
 - [ ] No forbidden clutter files exist
-- [ ] Validator passes cleanly
+- [ ] Generated catalogue and pack manifests have no drift
 
 ## Bottom line
 

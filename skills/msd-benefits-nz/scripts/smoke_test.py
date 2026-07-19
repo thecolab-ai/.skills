@@ -33,6 +33,29 @@ def test(name: str, fn):
 results = []
 
 
+def test_aggregate_fixture():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("msd_benefits_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    rows = [
+        {"Benefit_Group": "Jobseeker Support", "Gender": "Female", "Count": "100"},
+        {"Benefit_Group": "Jobseeker Support", "Gender": "Female", "Count": "25"},
+        {"Benefit_Group": "Jobseeker Support", "Gender": "Male", "Count": "90"},
+    ]
+    aggregated = module.aggregate(rows, ["Gender"])
+    assert aggregated == [{"Gender": "Female", "count": 125}, {"Gender": "Male", "count": 90}]
+    assert module.resolve_group(rows, "jobseeker support") == "Jobseeker Support"
+    print("[PASS] fixture MSD benefit CSV aggregation")
+    return True
+
+
+results.append(test("fixture benefit row parser", test_aggregate_fixture))
+
+
 def test_help():
     return run(["--help"]).returncode == 0
 
@@ -139,7 +162,7 @@ def test_bad_quarter():
 results.append(test("unknown quarter exits non-zero", test_bad_quarter))
 
 if all(results):
-    print("All tests passed.")
+    print("[PASS] live smoke assertions completed")
     sys.exit(0)
 else:
     print(f"{results.count(False)} test(s) failed.")

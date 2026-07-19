@@ -28,6 +28,11 @@ UA = "thecolab-ai/legislation-nz-skill (+https://github.com/thecolab-ai/.skills)
 DEFAULT_TIMEOUT = 10
 DEFAULT_LIMIT = 10
 MAX_LIMIT = 100
+ALLOWED_HOSTS = {
+    "api.legislation.govt.nz",
+    "catalogue.data.govt.nz",
+    "www.legislation.govt.nz",
+}
 
 TYPE_ALIASES = {
     "act": "act",
@@ -116,7 +121,12 @@ def fetch_bytes(
         headers.update(extra_headers)
     try:
         body, content_type, final_url = nzfetch.fetch_bytes(
-            url, timeout=timeout, accept=accept, headers=headers, method=method
+            url,
+            timeout=timeout,
+            accept=accept,
+            headers=headers,
+            method=method,
+            allowed_hosts=ALLOWED_HOSTS,
         )
         return body, final_url, content_type
     except nzfetch.Blocked as exc:

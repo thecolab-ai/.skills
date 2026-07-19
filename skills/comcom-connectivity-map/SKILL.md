@@ -1,6 +1,27 @@
 ---
 name: comcom-connectivity-map
-description: Inspect Commerce Commission Telecommunications Connectivity Map public metadata, provider-list workbooks, annual monitoring report links, and source caveats for rural broadband coverage research. Use when the task involves ComCom connectivity map data, rural broadband coverage, provider supplied coverage, annual telecommunications monitoring reports, or distinguishing coverage from address-level orderability.
+description: "Inspect Commerce Commission Telecommunications Connectivity Map public metadata, provider-list workbooks, annual monitoring report links, and source caveats for rural broadband coverage research. Use when the task involves ComCom connectivity map data, rural broadband coverage, provider supplied coverage, annual telecommunications monitoring reports, or distinguishing coverage from address-level orderability."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "public-data"
+  thecolab.source_owner: "Commerce Commission"
+  thecolab.source_type: "official"
+  thecolab.auth: "none"
+  thecolab.access_mode: "public-download"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "low"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "public-download"
+  thecolab.pack: "nz-public-data"
+  thecolab.source_url: "https://www.comcom.govt.nz"
+  thecolab.allowed_domains: "comcom.emtel.co.nz,www.comcom.govt.nz"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "healthy"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # ComCom Connectivity Map

@@ -70,7 +70,11 @@ def request_json(path: str, params: dict[str, Any] | None = None, timeout: int =
     }
     try:
         body, _ct, _final = nzfetch.fetch_bytes(
-            url, timeout=timeout, accept="application/json", headers=headers
+            url,
+            timeout=timeout,
+            accept="application/json",
+            headers=headers,
+            allowed_hosts={"api.opendata.metlink.org.nz"},
         )
     except nzfetch.Blocked as e:
         die(f"network error calling Metlink: {e}")

@@ -16,6 +16,7 @@ from typing import Any
 
 BASE = "https://www.petstock.co.nz"
 ALGOLIA_APP_ID = "HX85NPQ0XP"
+# Public read-only Algolia search key delivered to every Petstock browser.
 ALGOLIA_API_KEY = "c545abd23934d9a1a200961d8d189708"
 PRODUCT_INDEX = "product_prod"
 VARIANT_INDEX = "product_prod_all_variants"

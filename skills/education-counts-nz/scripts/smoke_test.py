@@ -22,9 +22,13 @@ def run(args: list[str], timeout: int = 60) -> subprocess.CompletedProcess:
     )
 
 
-def check(name: str, fn) -> bool:
+def check(name: str, fn) -> bool | str:
     try:
-        ok = bool(fn())
+        outcome = fn()
+        if outcome == "skip":
+            print(f"[SKIP] {name}: upstream unavailable or blocked")
+            return "skip"
+        ok = bool(outcome)
         print(f"[{'PASS' if ok else 'FAIL'}] {name}")
         return ok
     except Exception as exc:  # noqa: BLE001
@@ -74,9 +78,9 @@ def make_xlsx(path: Path, absolute_target: bool = False) -> None:
         )
 
 
-results: list[bool] = []
+results: list[bool | str] = []
 
-results.append(check("--help exits 0", lambda: run(["--help"]).returncode == 0))
+results.append(check("contract --help exits 0", lambda: run(["--help"]).returncode == 0))
 
 
 def test_list() -> bool:
@@ -87,11 +91,14 @@ def test_list() -> bool:
     return True
 
 
-results.append(check("list returns supported dataset families", test_list))
+results.append(check("contract list returns supported dataset families", test_list))
 
 
-def test_ite_enrolments_live_or_blocked() -> bool:
-    result = run(["ite-enrolments", "--from", "2024", "--to", "2025", "--json"], timeout=30)
+def test_ite_enrolments_live_or_blocked() -> bool | str:
+    try:
+        result = run(["ite-enrolments", "--from", "2024", "--to", "2025", "--json"], timeout=30)
+    except subprocess.TimeoutExpired:
+        return "skip"
     assert result.returncode == 0
     data = json.loads(result.stdout)
     assert data["status"] in {"ok", "blocked"}
@@ -100,14 +107,18 @@ def test_ite_enrolments_live_or_blocked() -> bool:
         assert data["records"]
     else:
         assert data["code"] in {"blocked", "timeout", "unreachable"}
+        return "skip"
     return True
 
 
-results.append(check("ite-enrolments returns live rows or explicit blocked", test_ite_enrolments_live_or_blocked))
+results.append(check("live ite-enrolments returns evidenced rows", test_ite_enrolments_live_or_blocked))
 
 
-def test_tds_live_or_blocked() -> bool:
-    result = run(["tds", "--year", "2025", "--json"], timeout=30)
+def test_tds_live_or_blocked() -> bool | str:
+    try:
+        result = run(["tds", "--year", "2025", "--json"], timeout=30)
+    except subprocess.TimeoutExpired:
+        return "skip"
     assert result.returncode == 0
     data = json.loads(result.stdout)
     assert data["status"] in {"ok", "blocked"}
@@ -117,10 +128,11 @@ def test_tds_live_or_blocked() -> bool:
         assert all(item.get("year") == 2025 for item in data["publications"])
     else:
         assert data["code"] in {"blocked", "timeout", "unreachable"}
+        return "skip"
     return True
 
 
-results.append(check("tds returns live publications or explicit blocked", test_tds_live_or_blocked))
+results.append(check("live tds returns evidenced publications", test_tds_live_or_blocked))
 
 
 def test_tds_detail_fixture() -> bool:
@@ -149,7 +161,24 @@ def test_tds_detail_fixture() -> bool:
     return True
 
 
-results.append(check("tds detail parser finds regional source documents", test_tds_detail_fixture))
+results.append(check("fixture tds detail parser finds regional source documents", test_tds_detail_fixture))
+
+
+def test_combined_ite_resource_fixture() -> bool:
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("education_counts_resource_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    label = "ITE Statistics (XLS, 839.2 KB)"
+    url = "https://www.educationcounts.govt.nz/ITE-tables-full-year-enrolments-2005-2025-and-completions-2005-2024.xlsx"
+    assert module.resource_key(label, url) == "ite-enrolments-completions"
+    return True
+
+
+results.append(check("fixture combined ITE workbook supports enrolments and completions", test_combined_ite_resource_fixture))
 
 
 def test_workbook() -> bool:
@@ -163,7 +192,7 @@ def test_workbook() -> bool:
     return True
 
 
-results.append(check("workbook parses local XLSX fixture", test_workbook))
+results.append(check("fixture workbook parses local XLSX source", test_workbook))
 
 
 def test_workbook_absolute_target() -> bool:
@@ -176,11 +205,14 @@ def test_workbook_absolute_target() -> bool:
     return True
 
 
-results.append(check("workbook handles absolute relationship targets", test_workbook_absolute_target))
+results.append(check("fixture workbook handles absolute relationship targets", test_workbook_absolute_target))
 
 
-def test_resources_block_or_ok() -> bool:
-    result = run(["resources", "--dataset", "teacher-numbers", "--json"], timeout=30)
+def test_resources_block_or_ok() -> bool | str:
+    try:
+        result = run(["resources", "--dataset", "teacher-numbers", "--json"], timeout=30)
+    except subprocess.TimeoutExpired:
+        return "skip"
     assert result.returncode == 0
     data = json.loads(result.stdout)
     assert data["status"] in {"ok", "blocked"}
@@ -189,10 +221,11 @@ def test_resources_block_or_ok() -> bool:
         assert data["resources"]
     else:
         assert data["code"] in {"blocked", "timeout", "unreachable"}
+        return "skip"
     return True
 
 
-results.append(check("resources returns ok or explicit blocked", test_resources_block_or_ok))
+results.append(check("live resources returns evidenced records", test_resources_block_or_ok))
 
 if all(results):
     print("All tests passed.")

@@ -1,6 +1,27 @@
 ---
 name: charities-services-nz
-description: Query Charities Services New Zealand public OData for registered charities, organisation metadata, public officer roles, sectors/activity taxonomy, annual-return financials, and grant-making signals. Use when the task involves NZ charity lookup, charity registration numbers, grant-making charities, GrantsPaidWithinNZ, annual returns, Charities Register summaries, officers, or schema discovery from odata.charities.govt.nz. Read-only and no API key required.
+description: "Query Charities Services New Zealand public OData for registered charities, organisation metadata, public officer roles, sectors/activity taxonomy, annual-return financials, and grant-making signals. Use when the task involves NZ charity lookup, charity registration numbers, grant-making charities, GrantsPaidWithinNZ, annual returns, Charities Register summaries, officers, or schema discovery from odata.charities.govt.nz. Read-only and no API key required."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "government"
+  thecolab.source_owner: "Charities Services"
+  thecolab.source_type: "official"
+  thecolab.auth: "none"
+  thecolab.access_mode: "public-api"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "low"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "public-api"
+  thecolab.pack: "nz-public-data"
+  thecolab.source_url: "https://www.odata.charities.govt.nz/"
+  thecolab.allowed_domains: "www.odata.charities.govt.nz"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "healthy"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # Charities Services NZ

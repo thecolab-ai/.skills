@@ -1,6 +1,27 @@
 ---
 name: christchurch-bin-schedule
-description: Query Christchurch City Council kerbside collection schedules (rubbish, recycling, organics). Use when the task involves Christchurch bin days, kerbside collection for a Christchurch address, or CCC three-bin schedules. Supports address search (name → RatingUnitID) or direct RatingUnitID lookup. No account required.
+description: "Query Christchurch City Council kerbside collection schedules (rubbish, recycling, organics). Use when the task involves Christchurch bin days, kerbside collection for a Christchurch address, or CCC three-bin schedules. Supports address search (name → RatingUnitID) or direct RatingUnitID lookup. No account required."
+license: MIT
+compatibility: "Requires Python 3.10+ and network access for live data"
+metadata:
+  thecolab.category: "public-data"
+  thecolab.source_owner: "Christchurch City Council"
+  thecolab.source_type: "official"
+  thecolab.auth: "none"
+  thecolab.access_mode: "public-api"
+  thecolab.data_class: "public"
+  thecolab.writes: "false"
+  thecolab.browser: "false"
+  thecolab.risk: "low"
+  thecolab.cache_ttl: "24h"
+  thecolab.schema_version: "1"
+  thecolab.skill_type: "public-api"
+  thecolab.pack: "nz-public-data"
+  thecolab.source_url: "https://opendata.ccc.govt.nz/CCCSearch/rest/address/suggest"
+  thecolab.allowed_domains: "ccc.govt.nz,opendata.ccc.govt.nz"
+  thecolab.last_verified: "2026-07-19"
+  thecolab.health: "healthy"
+  thecolab.maintainer: "@adam91holt"
 ---
 
 # Christchurch Bin Schedule
