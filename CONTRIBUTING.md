@@ -24,6 +24,9 @@ python3 scripts/run_smoke_tests.py my-skill
 - Keep `SKILL.md` operational, not essay-like
 - Move deep reference material into `references/`
 - Put deterministic operations into `scripts/cli.py` as Python standard-library CLIs
+- Keep source-specific parsers and helpers inside the owning skill's `scripts/`
+  directory. Top-level `lib/` is reserved for the explicitly allowlisted shared
+  runtime modules.
 - Keep helper CLI dependencies minimal: prefer Python stdlib; declare third-party deps in `requirements.txt` or PEP 723 `# /// script` inline metadata
 - TypeScript/Node skill helpers are **not accepted**. The one declared legacy Jetstar exception must not be copied.
 - Avoid per-skill doc clutter
