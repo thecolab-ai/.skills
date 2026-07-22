@@ -1,0 +1,13 @@
+<?xml version="1.0" ?>
+<HilltopServer>
+<Agency>GWRC</Agency>
+<Version>0.0.0.0</Version>
+<Site Name="Synthetic River at Example Gorge">
+<Latitude>-41.10000000</Latitude>
+<Longitude>175.10000000</Longitude>
+</Site>
+<Site Name="Synthetic Creek at No Coordinates">
+</Site>
+<Site Name="">
+</Site>
+</HilltopServer>

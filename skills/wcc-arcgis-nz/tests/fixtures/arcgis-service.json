@@ -1,0 +1,9 @@
+{
+  "serviceDescription": "Synthetic service fixture",
+  "layers": [
+    {"id": 51, "name": "synthetic_overlays", "geometryType": "esriGeometryPolygon"}
+  ],
+  "tables": [
+    {"id": 60, "name": "synthetic_lookup"}
+  ]
+}

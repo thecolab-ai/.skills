@@ -194,7 +194,10 @@ def split_csv(value: str) -> list[str]:
 
 
 def iter_skill_dirs(root: Path) -> Iterable[Path]:
-    skills_dir = root if root.name == "skills" else root / "skills"
+    # Accept either the repo root or the skills/ directory itself; checking for
+    # the child directory (rather than the root's name) keeps a checkout that is
+    # itself named "skills" from being mistaken for the skills directory.
+    skills_dir = root / "skills" if (root / "skills").is_dir() else root
     for skill_dir in sorted(skills_dir.iterdir()):
         if skill_dir.is_dir() and (skill_dir / "SKILL.md").is_file():
             yield skill_dir

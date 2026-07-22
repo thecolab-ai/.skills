@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
-  "last_verified": "2026-07-19",
-  "skill_count": 133,
+  "last_verified": "2026-07-22",
+  "skill_count": 135,
   "skills": [
     {
       "name": "airnz-flights",
@@ -1132,7 +1132,7 @@
     },
     {
       "name": "geonet-nz",
-      "description": "Query GeoNet New Zealand public earthquake, volcano alert, and GeoNet news endpoints through a lightweight no-login CLI. Use when the task involves recent NZ earthquakes, felt/MMI-filtered quakes, earthquake detail by publicID, volcanic alert levels, volcanic activity bulletins, or GeoNet public geohazard updates. Read-only; no authentication required.",
+      "description": "Query GeoNet New Zealand public earthquake, volcano alert, GeoNet news, and Tilde sensor endpoints through a lightweight no-login CLI. Use when the task involves recent NZ earthquakes, felt/MMI-filtered quakes, earthquake detail by publicID, volcanic alert levels, volcanic activity bulletins, GeoNet public geohazard updates, coastal tsunami gauge water heights, or DART deep-ocean buoy readings. Read-only; no authentication required.",
       "path": "skills/geonet-nz",
       "category": "environment",
       "source_owner": "GeoNet",
@@ -1149,9 +1149,10 @@
       "skill_type": "public-api",
       "pack": "nz-public-data",
       "allowed_domains": [
-        "api.geonet.org.nz"
+        "api.geonet.org.nz",
+        "tilde.geonet.org.nz"
       ],
-      "last_verified": "2026-07-19",
+      "last_verified": "2026-07-22",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
@@ -1207,6 +1208,31 @@
         "meilisearch.grocer.nz"
       ],
       "last_verified": "2026-07-19",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "gwrc-hilltop-nz",
+      "description": "Query Greater Wellington Regional Council Hilltop environmental monitoring time series through a lightweight no-login CLI: rainfall gauges, river and stream levels and flows, monitoring site lists with coordinates, and per-site measurement catalogues. Use when the task involves Wellington-region rainfall totals, current river levels, flood-watch context, or Hilltop time-series data. Read-only; no authentication required.",
+      "path": "skills/gwrc-hilltop-nz",
+      "category": "environment",
+      "source_owner": "Greater Wellington Regional Council",
+      "source_type": "official",
+      "source_url": "https://hilltop.gw.govt.nz/data.hts",
+      "auth": "none",
+      "access_mode": "public-api",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "24h",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "hilltop.gw.govt.nz"
+      ],
+      "last_verified": "2026-07-22",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
@@ -3491,6 +3517,39 @@
       ],
       "last_verified": "2026-07-19",
       "health": "degraded",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "wcc-arcgis-nz",
+      "description": "Search and query Wellington City Council and Greater Wellington Regional Council ArcGIS open data through a lightweight no-login CLI: org-scoped dataset search, FeatureServer/MapServer layer listing and GeoJSON queries with attribute and bounding-box filters, and Pōneke Travel Insights transport sensor countline locations and counts. Use when the task involves Wellington open geospatial data such as flood or coastal hazard layers, road network, community facilities, or pedestrian/vehicle movement counts. Read-only; no authentication required.",
+      "path": "skills/wcc-arcgis-nz",
+      "category": "environment",
+      "source_owner": "Wellington City Council",
+      "source_type": "official",
+      "source_url": "https://data-wcc.opendata.arcgis.com/",
+      "auth": "none",
+      "access_mode": "public-api",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "24h",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "data-wcc.opendata.arcgis.com",
+        "data-gwrc.opendata.arcgis.com",
+        "www.arcgis.com",
+        "hub.arcgis.com",
+        "services1.arcgis.com",
+        "services2.arcgis.com",
+        "gis.wcc.govt.nz",
+        "mapping.gw.govt.nz",
+        "gis-snowflake-opendata-public-wcc-arcgis-prod.s3.ap-southeast-2.amazonaws.com"
+      ],
+      "last_verified": "2026-07-22",
+      "health": "healthy",
       "maintainer": "@adam91holt"
     },
     {

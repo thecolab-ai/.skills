@@ -1,0 +1,22 @@
+<?xml version="1.0" ?>
+<HilltopServer>
+<Agency>GWRC</Agency>
+<DataSource Name="Water Level" Site="Synthetic River at Example Gorge" >
+<NumItems>1</NumItems>
+<TSType>StdSeries</TSType>
+<DataType>SimpleTimeSeries</DataType>
+<Interpolation>Instant</Interpolation>
+<From>1979-03-16T12:15:00</From>
+<To>2026-07-22T14:15:00</To>
+<Measurement Name="Stage">
+<Item>1</Item>
+<RequestAs>Stage</RequestAs>
+<Units>mm</Units>
+</Measurement>
+<Measurement Name="Flow">
+<Item>1</Item>
+<RequestAs>Flow</RequestAs>
+<Units>m&#179;/sec</Units>
+</Measurement>
+</DataSource>
+</HilltopServer>
