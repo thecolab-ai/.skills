@@ -51,8 +51,9 @@ Verified live 22 July 2026 (server version 2606.0.2.92, `<Agency>GWRC</Agency>`)
 - Measurement labels are not unique per site. `MeasurementList` can expose several
   `Stage` rows under different data sources, each with a distinct `RequestAs` value.
   The `measurements` command prints that copy-pastable value. For a plain label,
-  `latest` selects the matching row with the newest advertised `To` timestamp; an
-  explicit `RequestAs` value selects that exact series.
+  `latest` selects the matching row with the newest advertised `To` timestamp.
+  `--exact-request-as` forces literal `RequestAs` selection when that value also
+  collides with a display label. JSON records whether exact mode was used.
 
 ## Generalisation
 

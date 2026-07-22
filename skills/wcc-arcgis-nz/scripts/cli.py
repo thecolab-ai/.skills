@@ -13,6 +13,7 @@ import argparse
 import csv
 import io
 import json
+import math
 import pathlib
 import sys
 import urllib.parse
@@ -320,9 +321,10 @@ def parse_sensor_meta(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
 
 def parse_optional_float(raw: str | None) -> float | None:
     try:
-        return float(raw) if raw else None
+        value = float(raw) if raw else None
     except (TypeError, ValueError):
         return None
+    return value if value is not None and math.isfinite(value) else None
 
 
 def summarise_mobility(rows: list[dict[str, str]]) -> dict[str, Any]:

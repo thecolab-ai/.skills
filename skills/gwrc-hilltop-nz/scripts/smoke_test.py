@@ -62,6 +62,13 @@ def main() -> int:
             "to": "2026-07-23T14:15:00",
         }
         assert cli.select_measurement_request([rows[0], duplicate], "Stage") == "Stage [Gauging Results]"
+        assert cli.select_measurement_request([rows[0], duplicate], "Stage", exact=True) == "Stage"
+        try:
+            cli.select_measurement_request([rows[0], duplicate], "NotARequestAs", exact=True)
+        except SystemExit as exc:
+            assert exc.code == 2
+        else:
+            raise AssertionError("unknown exact RequestAs must fail before GetData")
         assert cli.select_measurement_request([rows[0], duplicate], "Stage [Gauging Results]") == "Stage [Gauging Results]"
 
         original = cli.fetch_root

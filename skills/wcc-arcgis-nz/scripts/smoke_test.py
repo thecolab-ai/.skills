@@ -77,6 +77,9 @@ def main() -> int:
         assert sensors[0]["countline_id"] == "90001" and sensors[0]["latitude"] == -41.3
         assert sensors[0]["latest"] == "2026-07-21"
         assert sensors[-1]["latitude"] is None and sensors[-1]["longitude"] == 174.8
+        assert cli.parse_optional_float("NaN") is None
+        assert cli.parse_optional_float("inf") is None
+        assert cli.parse_optional_float("-inf") is None
 
     def fixture_mobility():
         rows = list(csv.DictReader(io.StringIO((FIXTURES / "countline-mobility-sample.csv").read_text(encoding="utf-8"))))
