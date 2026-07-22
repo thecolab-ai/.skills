@@ -18,7 +18,7 @@ metadata:
   thecolab.skill_type: "public-api"
   thecolab.pack: "nz-public-data"
   thecolab.source_url: "https://data-wcc.opendata.arcgis.com/"
-  thecolab.allowed_domains: "data-wcc.opendata.arcgis.com,data-gwrc.opendata.arcgis.com,www.arcgis.com,hub.arcgis.com,services1.arcgis.com,services2.arcgis.com,gis.wcc.govt.nz,mapping.gw.govt.nz,gis-snowflake-opendata-public-wcc-arcgis-prod.s3.ap-southeast-2.amazonaws.com"
+  thecolab.allowed_domains: "data-wcc.opendata.arcgis.com,data-gwrc.opendata.arcgis.com,www.arcgis.com,hub.arcgis.com,services.arcgis.com,services1.arcgis.com,services2.arcgis.com,gis.wcc.govt.nz,giswebprd.gw.govt.nz,mapping.gw.govt.nz,maps.gw.govt.nz,gis-snowflake-opendata-public-wcc-arcgis-prod.s3.ap-southeast-2.amazonaws.com"
   thecolab.last_verified: "2026-07-22"
   thecolab.health: "healthy"
   thecolab.maintainer: "@adam91holt"
@@ -60,19 +60,23 @@ python3 skills/wcc-arcgis-nz/scripts/cli.py sensors-latest --limit 20 --json
 ```
 
 - `search KEYWORD [--portal wcc|gwrc] [--type TYPE] [--limit N] [--json]` — org-scoped catalogue search, newest first
-- `layers ITEM_OR_URL [--json]` — layers/tables of a Feature/Map service
-- `query LAYER [--layer-id N] [--where SQL] [--bbox minLon,minLat,maxLon,maxLat] [--fields F1,F2] [--limit N] [--json]` — GeoJSON features; LAYER is an item id, service URL, or layer URL
+- `layers ITEM_OR_URL [--json]` — layers/tables of a verified WCC/GWRC Feature/Map service
+- `query LAYER [--layer-id N] [--where SQL] [--bbox minLon,minLat,maxLon,maxLat] [--fields F1,F2] [--limit N] [--json]` — GeoJSON features; LAYER is a verified council item id, HTTPS service URL, or HTTPS layer URL
 - `sensors [--search TEXT] [--limit N] [--json]` — transport sensor countlines with coordinates and data spans
-- `sensors-latest [--month YYYY-MM] [--search TEXT] [--limit N] [--json]` — counts per countline and transport class for the newest published day, with a monthly daily average for baseline comparison
+- `sensors-latest [--month YYYY-MM] [--search TEXT] [--limit N] [--json]` — counts per countline and transport class for the newest published day, with a monthly daily average and explicit stale/missing observations
 
 ## Notes
 
 - Licence: CC BY 4.0 — attribute "Wellington City Council" (or GWRC for `--portal gwrc` data)
 - Searches are scoped to each council's ArcGIS organisation; hub-wide search APIs
   return a global catalogue and are deliberately not used
-- Layer queries only go to council/Esri hosts; other hosts are refused explicitly
+- Layer queries require HTTPS, exact declared hosts, and a verified WCC/GWRC ArcGIS
+  organisation id; unrelated global ArcGIS items and tenant paths are refused
 - `sensors-latest` downloads the month's count file (~12 MB) — WCC refreshes it at
   least monthly and in practice daily; expect the newest day to be about one day old
+- A missing countline/class row is not assumed to mean zero traffic:
+  `latest_date_count` is `null`, `stale` is true, and `latest_observed_date` plus the
+  metadata's `LATEST` date are returned for auditability
 - Query responses cap at the server's transfer limit (2000); a `truncated` flag says
   when to narrow with `--where`/`--bbox`
 
