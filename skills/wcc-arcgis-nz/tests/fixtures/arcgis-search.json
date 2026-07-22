@@ -1,0 +1,25 @@
+{
+  "total": 2,
+  "results": [
+    {
+      "id": "synthetic0000000000000000000001",
+      "title": "Synthetic Flood Overlay",
+      "type": "Feature Service",
+      "orgId": "CPYspmTk3abe6d7i",
+      "url": "https://services1.arcgis.com/CPYspmTk3abe6d7i/arcgis/rest/services/synthetic/FeatureServer",
+      "snippet": "Synthetic fixture item",
+      "tags": ["flood", "synthetic"],
+      "modified": 1770000000000
+    },
+    {
+      "id": "synthetic0000000000000000000002",
+      "title": "Synthetic Web Map",
+      "type": "Web Map",
+      "orgId": "CPYspmTk3abe6d7i",
+      "url": null,
+      "snippet": null,
+      "tags": [],
+      "modified": 1770000000001
+    }
+  ]
+}
