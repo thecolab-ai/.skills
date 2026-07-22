@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
-  "last_verified": "2026-07-19",
-  "skill_count": 133,
+  "last_verified": "2026-07-22",
+  "skill_count": 134,
   "skills": [
     {
       "name": "airnz-flights",
@@ -1207,6 +1207,31 @@
         "meilisearch.grocer.nz"
       ],
       "last_verified": "2026-07-19",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "gwrc-hilltop-nz",
+      "description": "Query Greater Wellington Regional Council Hilltop environmental monitoring time series through a lightweight no-login CLI: rainfall gauges, river and stream levels and flows, monitoring site lists with coordinates, and per-site measurement catalogues. Use when the task involves Wellington-region rainfall totals, current river levels, flood-watch context, or Hilltop time-series data. Read-only; no authentication required.",
+      "path": "skills/gwrc-hilltop-nz",
+      "category": "environment",
+      "source_owner": "Greater Wellington Regional Council",
+      "source_type": "official",
+      "source_url": "https://hilltop.gw.govt.nz/data.hts",
+      "auth": "none",
+      "access_mode": "public-api",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "24h",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "hilltop.gw.govt.nz"
+      ],
+      "last_verified": "2026-07-22",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },

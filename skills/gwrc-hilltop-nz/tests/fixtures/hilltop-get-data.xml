@@ -1,0 +1,58 @@
+<?xml version="1.0" ?>
+<Hilltop>
+<Agency>GWRC</Agency>
+<Measurement SiteName="Synthetic River at Example Gorge">
+<DataSource Name="Water Level" NumItems="1">
+<TSType>StdSeries</TSType>
+<DataType>SimpleTimeSeries</DataType>
+<Interpolation>Instant</Interpolation>
+<ItemInfo ItemNumber="1">
+<ItemName>Stage</ItemName><ItemFormat>F</ItemFormat><Units>mm</Units><Format>####</Format>
+</ItemInfo>
+</DataSource>
+<Data DateFormat="Calendar" NumItems="1">
+<E><T>2026-07-22T10:00:00</T><I1>900</I1></E>
+<E><T>2026-07-22T11:00:00</T><I1>910</I1></E>
+<E><T>2026-07-22T12:00:00</T><I1>930</I1></E>
+<E><T>2026-07-22T13:00:00</T><I1>955</I1></E>
+<E><T>2026-07-22T14:00:00</T><I1>980</I1></E>
+</Data>
+</Measurement>
+<Measurement SiteName="Synthetic River at Example Gorge (Backup Logger)">
+<DataSource Name="Water Level" NumItems="1">
+<TSType>StdSeries</TSType>
+<DataType>SimpleTimeSeries</DataType>
+<Interpolation>Instant</Interpolation>
+<ItemInfo ItemNumber="1">
+<ItemName>Stage</ItemName><ItemFormat>F</ItemFormat><Units>mm</Units><Format>####</Format>
+</ItemInfo>
+</DataSource>
+<Data DateFormat="Calendar" NumItems="1">
+<E><T>2026-07-22T14:00:00</T><I1>981</I1></E>
+</Data>
+</Measurement>
+<Measurement SiteName="Synthetic Rain Gauge at Example Hill">
+<DataSource Name="Rainfall" NumItems="1">
+<TSType>StdSeries</TSType>
+<DataType>SimpleTimeSeries</DataType>
+<Interpolation>Incremental</Interpolation>
+<ItemInfo ItemNumber="1">
+<ItemName>Rainfall</ItemName><ItemFormat>F</ItemFormat><Units>mm</Units><Format>#.#</Format>
+</ItemInfo>
+</DataSource>
+<Data DateFormat="Calendar" NumItems="1">
+<E><T>2026-07-21T14:00:00</T><I1>0</I1></E>
+<E><T>2026-07-22T14:00:00</T><I1>12.5</I1></E>
+</Data>
+</Measurement>
+<Measurement SiteName="Synthetic Gauge with Gap">
+<DataSource Name="Water Level" NumItems="1">
+<ItemInfo ItemNumber="1">
+<ItemName>Stage</ItemName><Units>mm</Units>
+</ItemInfo>
+</DataSource>
+<Data DateFormat="Calendar" NumItems="1">
+<E><T>2026-07-22T14:00:00</T><I1>not-a-number</I1></E>
+</Data>
+</Measurement>
+</Hilltop>
