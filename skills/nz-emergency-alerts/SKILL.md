@@ -1,11 +1,11 @@
 ---
 name: nz-emergency-alerts
-description: "Query official New Zealand CAP emergency alerts by location, region, agency and severity. Use for current official alert retrieval; absence is not proof of safety."
+description: "Query official New Zealand CAP emergency alerts by location, region, agency and severity, aggregating NEMA Emergency Mobile Alerts and MetService severe weather watches/warnings. Use for current official alert retrieval; absence is not proof of safety."
 license: MIT
 compatibility: "Requires Python 3.10+ and network access for live data"
 metadata:
   thecolab.category: "emergency"
-  thecolab.source_owner: "National Emergency Management Agency"
+  thecolab.source_owner: "National Emergency Management Agency and MetService"
   thecolab.source_type: "official"
   thecolab.auth: "none"
   thecolab.access_mode: "public-api"
@@ -18,9 +18,9 @@ metadata:
   thecolab.skill_type: "public-api"
   thecolab.pack: "nz-public-data"
   thecolab.source_url: "https://www.civildefence.govt.nz/about/news-and-events/news-and-events/cap-feed-for-emergency-mobile-alert-is-now-live"
-  thecolab.allowed_domains: "www.civildefence.govt.nz, alerthub.civildefence.govt.nz"
-  thecolab.last_verified: "2026-07-19"
-  thecolab.health: "degraded"
+  thecolab.allowed_domains: "www.civildefence.govt.nz, alerthub.civildefence.govt.nz, alerts.metservice.com"
+  thecolab.last_verified: "2026-07-22"
+  thecolab.health: "healthy"
   thecolab.maintainer: "@adam91holt"
 ---
 
@@ -52,15 +52,20 @@ Add `--limit N` (1–100) to bound any command. Human output is the default.
 
 ## Coverage and interpretation
 
+- Aggregates two official CAP publishers: NEMA's Emergency Mobile Alert feed (NEMA,
+  CDEM Groups, Health, Police, MPI, FENZ) and MetService's severe weather
+  watches/warnings/advisories. Each alert row carries a `feed` field.
 - Only issuing-agency feeds are treated as alerts.
 - No alert in this result does not prove absence of danger.
 - Preserve the issuing agency's instructions and timestamps.
 
-The CLI reads NEMA's official public CAP Atom feed, follows the complete bounded set of allowlisted
-linked CAP entries before applying the result `--limit`, and parses identifiers, update/cancel
-relationships, agency, status, event, effective/expiry times, instructions and geometry. `near`
-validates latitude/longitude ranges before network access, then uses published polygons and circles.
-Feed health reports age and staleness; an empty current feed is not presented as proof of safety.
+The CLI reads both official public CAP index feeds (NEMA Atom, MetService RSS), follows the
+complete bounded set of allowlisted linked CAP entries per feed before applying the result
+`--limit`, and parses identifiers, update/cancel relationships, agency, status, event,
+effective/expiry times, instructions and geometry. `near` validates latitude/longitude ranges
+before network access, then uses published polygons and circles. Feed health reports age and
+staleness per feed; if one feed is unavailable the other still answers with an explicit warning.
+An empty current feed is not presented as proof of safety.
 
 ## Resources
 

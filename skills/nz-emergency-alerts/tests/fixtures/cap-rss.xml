@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<rss version="2.0">
+  <channel>
+    <title>Metservice Public CAP Alerts</title>
+    <link>https://www.metservice.com</link>
+    <description>Synthetic fixture: current watches, warnings and advisories</description>
+    <copyright>Synthetic fixture. CC BY 4.0.</copyright>
+    <pubDate>Sun, 19 Jul 2026 12:00:00 +1200</pubDate>
+    <item>
+      <title>Heavy Rain Warning for Synthetic Ranges</title>
+      <link>https://alerts.metservice.com/cap/synthetic-warning.xml</link>
+      <pubDate>Sun, 19 Jul 2026 11:45:00 +1200</pubDate>
+    </item>
+  </channel>
+</rss>

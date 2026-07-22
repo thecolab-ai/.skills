@@ -3,11 +3,12 @@
   "name": "nz-public-data",
   "description": "Public, read-only New Zealand data and public-interest sources.",
   "default": true,
-  "skill_count": 88,
+  "skill_count": 91,
   "skills": [
     "at-transport",
     "auckland-bin-schedule",
     "biosecurity-nz",
+    "bluesky-nz",
     "cab-cabnet-nz",
     "charities-services-nz",
     "child-poverty-nz",
@@ -89,9 +90,11 @@
     "stats-nz",
     "statsnz-building-consents",
     "statsnz-classifications-nz",
+    "tiakiwai-water-nz",
     "treasury-fiscal-data-nz",
     "wcc-arcgis-nz",
     "wellington-bin-schedule",
-    "winz-rates-nz"
+    "winz-rates-nz",
+    "wremo-nz"
   ]
 }

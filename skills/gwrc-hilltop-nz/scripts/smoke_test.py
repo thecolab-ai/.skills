@@ -75,10 +75,37 @@ def main() -> int:
         cutoff = cli.freshness_cutoff(["2016-05-29T18:15:00", "2026-07-22T14:00:00"], 24)
         assert cutoff is not None and "2016-05-29T18:15:00" < cutoff < "2026-07-22T14:00:00"
 
+    def fixture_registry_only():
+        original = cli.nzfetch.fetch_text
+        called = False
+
+        def unexpected_network(*_args, **_kwargs):
+            nonlocal called
+            called = True
+            raise AssertionError("unregistered Hilltop host reached the network layer")
+
+        probe_host = ".".join(("127", "0", "0", "1"))
+        probe_base = f"http://{probe_host}:18765/data.hts"
+        cli.nzfetch.fetch_text = unexpected_network
+        try:
+            try:
+                cli.fetch_root(
+                    f"{probe_base}?Service=Hilltop&Request=CollectionList",
+                    probe_base,
+                )
+            except SystemExit as exc:
+                assert exc.code == 2
+            else:
+                raise AssertionError("unregistered Hilltop base URL must be rejected")
+        finally:
+            cli.nzfetch.fetch_text = original
+        assert not called, "unregistered Hilltop host must fail before network access"
+
     results.append(check("fixture Hilltop site-list parser", fixture_sites))
     results.append(check("fixture Hilltop measurement-list parser", fixture_measurements))
     results.append(check("fixture Hilltop GetData time-series parser", fixture_time_series))
     results.append(check("fixture trend summary and staleness cutoff", fixture_summary))
+    results.append(check("fixture registry-only host enforcement", fixture_registry_only))
 
     def live(name: str, args: list[str], assertion) -> None:
         completed = subprocess.run(

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Query NEMA's official Emergency Mobile Alert CAP Atom feed."""
+"""Query official NZ CAP alert feeds: NEMA Emergency Mobile Alerts and MetService severe weather."""
 from __future__ import annotations
 
 import argparse
@@ -8,6 +8,7 @@ import math
 import sys
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 from urllib.parse import urljoin, urlparse
 
@@ -18,6 +19,20 @@ from result_contract import result_envelope, utc_now  # noqa: E402
 
 FEED = "https://alerthub.civildefence.govt.nz/atom/pwp"
 HOSTS = {"alerthub.civildefence.govt.nz"}
+FEEDS = (
+    {
+        "key": "nema",
+        "name": "NEMA Emergency Mobile Alert CAP feed",
+        "url": FEED,
+        "hosts": frozenset(HOSTS),
+    },
+    {
+        "key": "metservice",
+        "name": "MetService severe weather CAP feed",
+        "url": "https://alerts.metservice.com/cap/rss",
+        "hosts": frozenset({"alerts.metservice.com"}),
+    },
+)
 ATOM_NS = "http://www.w3.org/2005/Atom"
 CAP_NS = "urn:oasis:names:tc:emergency:cap:1.2"
 STALE_AFTER_SECONDS = 900
@@ -95,14 +110,23 @@ def parse_cap(node: ET.Element, source_url: str, retrieved_at: str) -> dict[str,
     return record
 
 
-def parse_feed(body: bytes, source_url: str, retrieved_at: str) -> tuple[dict[str, object], list[dict[str, object]], list[str]]:
+def parse_feed(body: bytes, source_url: str, retrieved_at: str, hosts: frozenset[str] | set[str] | None = None) -> tuple[dict[str, object], list[dict[str, object]], list[str]]:
+    """Parse an Atom (NEMA) or RSS 2.0 (MetService) CAP index feed."""
+    if hosts is None:
+        hosts = {urlparse(source_url).hostname}
     try:
         root = ET.fromstring(body)
     except ET.ParseError as exc:
-        raise ValueError(f"CAP Atom feed was invalid XML: {exc}") from exc
+        raise ValueError(f"CAP feed was invalid XML: {exc}") from exc
     namespace, name = _qname(root)
-    if namespace != ATOM_NS or name != "feed":
-        raise ValueError("CAP feed root was not an Atom feed")
+    if (namespace, name) == (ATOM_NS, "feed"):
+        return _parse_atom(root, source_url, retrieved_at, hosts)
+    if namespace is None and name == "rss":
+        return _parse_rss(root, source_url, retrieved_at, hosts)
+    raise ValueError("CAP feed root was neither an Atom feed nor an RSS channel")
+
+
+def _parse_atom(root: ET.Element, source_url: str, retrieved_at: str, hosts) -> tuple[dict[str, object], list[dict[str, object]], list[str]]:
     updated = _direct_text(root, ATOM_NS, "updated")
     if not updated:
         raise ValueError("CAP Atom feed is missing its updated timestamp")
@@ -124,8 +148,47 @@ def parse_feed(body: bytes, source_url: str, retrieved_at: str) -> tuple[dict[st
         if not link:
             raise ValueError("Atom alert entry contained neither embedded CAP nor a detail link")
         detail_url = urljoin(source_url, link)
-        if urlparse(detail_url).hostname not in HOSTS:
+        if urlparse(detail_url).hostname not in hosts:
             raise ValueError("Atom alert detail link left the declared source allowlist")
+        linked.append(detail_url)
+    return status, alerts, linked
+
+
+def _parse_rss(root: ET.Element, source_url: str, retrieved_at: str, hosts) -> tuple[dict[str, object], list[dict[str, object]], list[str]]:
+    channel = root.find("channel")
+    if channel is None:
+        raise ValueError("CAP RSS feed had no channel element")
+    pub_date = (channel.findtext("pubDate") or "").strip()
+    if not pub_date:
+        raise ValueError("CAP RSS channel is missing its pubDate timestamp")
+    try:
+        parsed = parsedate_to_datetime(pub_date)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"CAP RSS pubDate was not a valid RFC 2822 date: {pub_date!r}") from exc
+    if parsed.tzinfo is None:
+        # RFC 2822 "-0000" (or a missing zone) parses naive; treat it as UTC
+        # deterministically rather than letting astimezone() assume machine-local.
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    updated = parsed.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    status = {
+        "title": (channel.findtext("title") or "").strip() or None,
+        "updated": updated,
+        "source_url": source_url,
+        "retrieved_at": retrieved_at,
+    }
+    alerts: list[dict[str, object]] = []
+    linked: list[str] = []
+    for item in channel.findall("item"):
+        cap = next((node for node in item.iter() if _qname(node) == (CAP_NS, "alert")), None)
+        if cap is not None:
+            alerts.append(parse_cap(cap, source_url, retrieved_at))
+            continue
+        link = (item.findtext("link") or "").strip()
+        if not link:
+            raise ValueError("RSS alert item contained neither embedded CAP nor a detail link")
+        detail_url = urljoin(source_url, link)
+        if urlparse(detail_url).hostname not in hosts:
+            raise ValueError("RSS alert detail link left the declared source allowlist")
         linked.append(detail_url)
     return status, alerts, linked
 
@@ -146,6 +209,7 @@ def fetch_linked_alerts(
     retrieved_at: str,
     *,
     fetcher=None,
+    hosts: frozenset[str] | set[str] | None = None,
 ) -> list[dict[str, object]]:
     """Fetch the complete bounded linked-entry set before result filtering."""
 
@@ -160,7 +224,7 @@ def fetch_linked_alerts(
             detail_url,
             timeout=15,
             accept="application/xml",
-            allowed_hosts=HOSTS,
+            allowed_hosts=hosts if hosts is not None else HOSTS,
         )
         output.append(parse_linked_alert(detail, detail_final, retrieved_at))
     return output
@@ -223,11 +287,14 @@ def _referenced_ids(value: object) -> set[str]:
 
 
 def active_alerts(alerts: list[dict[str, object]], now: datetime) -> list[dict[str, object]]:
-    selected: dict[str, dict[str, object]] = {}
+    # Keyed per feed so an identifier collision across publishers cannot dedupe
+    # silently, and one feed's references cannot cancel another feed's alert.
+    selected: dict[tuple[str, str], dict[str, object]] = {}
     for alert in sorted(alerts, key=lambda row: str(row.get("sent") or "")):
+        feed = str(alert.get("feed") or "")
         message_type = str(alert.get("message_type") or "")
         for referenced in _referenced_ids(alert.get("references")):
-            selected.pop(referenced, None)
+            selected.pop((feed, referenced), None)
         if message_type.casefold() == "cancel":
             continue
         if str(alert.get("status") or "").casefold() != "actual":
@@ -236,7 +303,7 @@ def active_alerts(alerts: list[dict[str, object]], now: datetime) -> list[dict[s
         expires = _parse_time(str(alert.get("expires") or ""))
         if effective and effective > now or expires and expires <= now:
             continue
-        selected[str(alert["id"])] = alert
+        selected[(feed, str(alert["id"]))] = alert
     return list(selected.values())
 
 
@@ -264,16 +331,42 @@ def main() -> int:
             raise LookupError("--limit must be between 1 and 100")
         if args.command == "near":
             validate_coordinates(args.lat, args.lon)
-        body, _content_type, final = nzfetch.fetch_bytes(
-            FEED, timeout=20, accept="application/atom+xml,application/xml", headers={"Cache-Control": "no-cache", "Pragma": "no-cache"}, allowed_hosts=HOSTS
-        )
         retrieved = utc_now()
-        status, alerts, linked = parse_feed(body, final, retrieved)
         now = datetime.now(timezone.utc)
+        statuses: list[dict[str, object]] = []
+        alerts: list[dict[str, object]] = []
+        feed_warnings: list[str] = []
+        failures: list[Exception] = []
+        final = None
+        for feed in FEEDS:
+            try:
+                body, _content_type, feed_final = nzfetch.fetch_bytes(
+                    feed["url"], timeout=20, accept="application/atom+xml,application/rss+xml,application/xml", headers={"Cache-Control": "no-cache", "Pragma": "no-cache"}, allowed_hosts=feed["hosts"]
+                )
+                status, feed_alerts, linked = parse_feed(body, feed_final, retrieved, hosts=feed["hosts"])
+                if args.command != "feed-status":
+                    feed_alerts.extend(fetch_linked_alerts(linked, retrieved, hosts=feed["hosts"]))
+                statuses.append({"feed": feed["key"], "name": feed["name"], **feed_health(status, now), "entry_count": len(feed_alerts) + (len(linked) if args.command == "feed-status" else 0), "linked_entry_count": len(linked)})
+                for row in feed_alerts:
+                    row["feed"] = feed["key"]
+                alerts.extend(feed_alerts)
+                if final is None or feed["key"] == "nema":
+                    final = feed_final
+            except (nzfetch.FetchError, ET.ParseError, ValueError) as exc:
+                failures.append(exc)
+                feed_warnings.append(f"{feed['name']} unavailable: {exc}")
+        if len(failures) == len(FEEDS):
+            # Surface the most actionable failure class: a rate-limit (with its
+            # retry_after) beats a generic block, which beats schema noise.
+            for kind in (nzfetch.RateLimited, nzfetch.Blocked, nzfetch.FetchError):
+                for failure in failures:
+                    if isinstance(failure, kind):
+                        raise failure
+            raise failures[0]
+        assert final is not None
         if args.command == "feed-status":
-            data = [{**feed_health(status, now), "entry_count": len(alerts) + len(linked), "linked_entry_count": len(linked)}]
+            data = statuses
         else:
-            alerts.extend(fetch_linked_alerts(linked, retrieved))
             data = active_alerts(alerts, now) if args.command != "alert" else alerts
             if args.command == "near":
                 data = [row for row in data if any(area_contains(area, args.lat, args.lon) for area in row.get("areas", []))]
@@ -281,7 +374,7 @@ def main() -> int:
             elif args.command == "agency": data = [row for row in data if args.name.casefold() in str(row.get("sender") or "").casefold()]
             elif args.command == "severity": data = [row for row in data if args.level.casefold() == str(row.get("severity") or "").casefold()]
             elif args.command == "alert": data = [row for row in data if args.id == row.get("id")]
-        payload = result_envelope(ok=True, source_name="NEMA Emergency Mobile Alert CAP feed", source_url=final, retrieved_at=retrieved, freshness="live; feed status reports staleness", query=vars(args), data=data[:args.limit], warnings=WARNINGS, blocked=False)
+        payload = result_envelope(ok=True, source_name="NZ official CAP alert feeds (NEMA Emergency Mobile Alerts + MetService severe weather)", source_url=final, retrieved_at=retrieved, freshness="live; feed status reports staleness", query=vars(args), data=data[:args.limit], warnings=WARNINGS + feed_warnings, blocked=False)
         print(json.dumps(payload if args.json else data[:args.limit], indent=2, ensure_ascii=False))
         return 0
     except LookupError as exc:

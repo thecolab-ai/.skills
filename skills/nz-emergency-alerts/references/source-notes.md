@@ -1,13 +1,25 @@
 # Source notes
 
-- Primary owner: NEMA official emergency alert feed information
+- Primary owner: NEMA official emergency alert feed information; MetService severe weather CAP
 - Primary source: https://www.civildefence.govt.nz/about/news-and-events/news-and-events/cap-feed-for-emergency-mobile-alert-is-now-live
-- Declared outbound hosts: www.civildefence.govt.nz, alerthub.civildefence.govt.nz
-- Access mode: official CAP 1.2 Atom feed
+- Declared outbound hosts: www.civildefence.govt.nz, alerthub.civildefence.govt.nz, alerts.metservice.com
+- Access mode: official CAP 1.2 feeds (NEMA Atom index; MetService RSS 2.0 index)
 - Authentication: none
-- Last verified: 2026-07-19
-- Update cadence: live feed; landing page freshness source-managed
-- Reuse: retain primary-source links, published context and Crown/source terms; no republishing claim is made
+- Last verified: 2026-07-22
+- Update cadence: live feeds; landing page freshness source-managed
+- Reuse: retain primary-source links, published context and Crown/source terms; MetService CAP is Creative Commons BY 4.0 (per feed copyright); no republishing claim is made
+
+## MetService feed
+
+`https://alerts.metservice.com/cap/rss` is MetService's public CAP index for current
+watches, warnings and advisories (verified live 2026-07-22; the channel is empty when
+nothing is in force). Items link to CAP 1.2 XML documents on the same host; the same
+allowlist rule applies as for NEMA linked entries. The channel `pubDate` is RFC 2822
+and is normalised to UTC ISO for the shared staleness check; a naive date (missing
+zone or RFC 2822 `-0000`) is treated as UTC deterministically, never machine-local. Each returned alert row
+carries a `feed` field (`nema` or `metservice`). When one feed is unavailable the other
+still answers, with an explicit per-feed warning in the envelope; only both failing is
+a command failure.
 
 ## Feasibility decision
 

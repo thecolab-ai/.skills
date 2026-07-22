@@ -22,7 +22,25 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
 import nzfetch  # noqa: E402
 
 DEFAULT_BASE = "https://hilltop.gw.govt.nz/data.hts"
-SOURCE_NAME = "Greater Wellington Regional Council Hilltop server"
+
+
+def source_name(base: str) -> str:
+    for title, council_url in COUNCILS.values():
+        if council_url == base:
+            return f"{title} Hilltop server"
+    host = urllib.parse.urlparse(base).hostname or base
+    return f"Hilltop server at {host}"
+# Councils whose Hilltop servers answered the standard query surface when last
+# verified (2026-07-22). Collection names differ per council — the rainfall and
+# rivers defaults are GWRC's; use `collections` to discover another council's
+# names and pass --collection.
+COUNCILS = {
+    "gwrc": ("Greater Wellington Regional Council", DEFAULT_BASE),
+    "hbrc": ("Hawke's Bay Regional Council", "https://data.hbrc.govt.nz/Envirodata/data.hts"),
+    "marlborough": ("Marlborough District Council", "https://hydro.marlborough.govt.nz/data.hts"),
+    "northland": ("Northland Regional Council", "https://hilltop.nrc.govt.nz/data.hts"),
+    "tasman": ("Tasman District Council", "https://envdata.tasman.govt.nz/data.hts"),
+}
 RAINFALL_COLLECTION = "Rainfall"
 RIVER_COLLECTION = "River and Stream Levels"
 # Known Hilltop error templates for bad site/measurement input. Matched as
@@ -32,6 +50,7 @@ INVALID_INPUT_PREFIXES = (
     "no data for site",
     "no measurements available",
     "no data source for",
+    "no collection",
     "unknown",
     "invalid",
 )
@@ -50,15 +69,14 @@ def hilltop_url(base: str, request: str, **params: str | None) -> str:
 
 
 def fetch_root(url: str, base: str) -> ET.Element:
+    registry_urls = {council_url for _, council_url in COUNCILS.values()}
+    if base not in registry_urls:
+        die("unsupported Hilltop server: choose a verified server with --council", 2)
     parsed = urllib.parse.urlparse(base)
-    if parsed.scheme not in ("http", "https") or not parsed.hostname:
-        die(f"invalid base URL: {base!r}", 2)
-    # The host allowlist only applies to the shipped default; a user-supplied
-    # --base-url is an explicit direction to another council's server (and may
-    # carry a non-default port, which the allowlist would reject).
-    allowed = [parsed.hostname] if base == DEFAULT_BASE else None
+    if parsed.scheme != "https" or not parsed.hostname or parsed.port is not None or parsed.username or parsed.password:
+        die(f"invalid registered base URL: {base!r}", 2)
     try:
-        text = nzfetch.fetch_text(url, timeout=45, accept="application/xml,text/xml,*/*", allowed_hosts=allowed)
+        text = nzfetch.fetch_text(url, timeout=45, accept="application/xml,text/xml,*/*", allowed_hosts=[parsed.hostname])
     except nzfetch.RateLimited as exc:
         die(f"network error: rate_limited: retry_after={exc.retry_after}: {exc}", 4)
     except nzfetch.Blocked as exc:
@@ -211,10 +229,26 @@ def emit(payload: dict[str, Any], as_json: bool, lines: list[str]) -> None:
             print(line)
 
 
+def cmd_councils(args: argparse.Namespace) -> None:
+    rows = [
+        {"key": key, "council": title, "base_url": url, "is_default": key == "gwrc"}
+        for key, (title, url) in sorted(COUNCILS.items())
+    ]
+    payload = {
+        "kind": "councils",
+        "note": "servers verified 2026-07-22; rainfall/rivers collection defaults are GWRC's — discover another council's names with the collections command",
+        "councils": rows,
+    }
+    lines = ["Verified council Hilltop servers:"]
+    for r in rows:
+        lines.append(f"- {r['key']}{' (default)' if r['is_default'] else ''}: {r['council']} — {r['base_url']}")
+    emit(payload, args.json, lines)
+
+
 def cmd_collections(args: argparse.Namespace) -> None:
     url = hilltop_url(args.base_url, "CollectionList")
     names = parse_collections(fetch_root(url, args.base_url))
-    payload = {"kind": "collections", "source": SOURCE_NAME, "source_url": url, "collections": names}
+    payload = {"kind": "collections", "source": source_name(args.base_url), "source_url": url, "collections": names}
     emit(payload, args.json, [f"Hilltop collections: {len(names)}", *[f"- {n}" for n in names]])
 
 
@@ -229,7 +263,7 @@ def cmd_sites(args: argparse.Namespace) -> None:
         sites = sites[: args.limit]
     payload = {
         "kind": "sites",
-        "source": SOURCE_NAME,
+        "source": source_name(args.base_url),
         "source_url": url,
         "measurement_filter": args.measurement,
         "search": args.search,
@@ -248,7 +282,7 @@ def cmd_measurements(args: argparse.Namespace) -> None:
     rows = parse_measurement_list(fetch_root(url, args.base_url))
     if not rows:
         die(f"no measurements found for site {args.site!r}; check the exact name with the sites command", 2)
-    payload = {"kind": "measurements", "source": SOURCE_NAME, "source_url": url, "site": args.site, "measurements": rows}
+    payload = {"kind": "measurements", "source": source_name(args.base_url), "source_url": url, "site": args.site, "measurements": rows}
     lines = [f"Measurements at {args.site}: {len(rows)}"]
     for r in rows:
         units = f" [{r['units']}]" if r["units"] else ""
@@ -285,7 +319,7 @@ def cmd_latest(args: argparse.Namespace) -> None:
     stale = age_hours is not None and age_hours > args.window_hours
     payload = {
         "kind": "latest",
-        "source": SOURCE_NAME,
+        "source": source_name(args.base_url),
         "source_url": url,
         "site": block["site"],
         "measurement": block["item_name"] or args.measurement,
@@ -312,7 +346,7 @@ def cmd_rainfall(args: argparse.Namespace) -> None:
     url = hilltop_url(
         args.base_url,
         "GetData",
-        Collection=RAINFALL_COLLECTION,
+        Collection=args.collection,
         Method="Total",
         Interval=f"{args.hours} hours",
         TimeInterval=f"PT{args.hours}H",
@@ -330,6 +364,12 @@ def cmd_rainfall(args: argparse.Namespace) -> None:
                 "to_time": block["points"][-1]["time"],
             }
         )
+    if blocks and not rows:
+        die(
+            f"collection {args.collection!r} contains no Rainfall series; this command expects a rainfall "
+            "collection — list this server's names with the collections command",
+            2,
+        )
     cutoff = freshness_cutoff([r["to_time"] for r in rows], args.hours)
     if args.search:
         needle = args.search.casefold()
@@ -342,7 +382,7 @@ def cmd_rainfall(args: argparse.Namespace) -> None:
         rows = rows[: args.limit]
     payload = {
         "kind": "rainfall",
-        "source": SOURCE_NAME,
+        "source": source_name(args.base_url),
         "source_url": url,
         "hours": args.hours,
         "search": args.search,
@@ -361,7 +401,7 @@ def cmd_rivers(args: argparse.Namespace) -> None:
     url = hilltop_url(
         args.base_url,
         "GetData",
-        Collection=RIVER_COLLECTION,
+        Collection=args.collection,
         Method="Average",
         Interval="1 hour",
         TimeInterval=f"PT{args.hours}H",
@@ -381,6 +421,12 @@ def cmd_rivers(args: argparse.Namespace) -> None:
         if current is None or summary["latest_time"] > current["latest_time"]:
             best[key] = summary
     rows = list(best.values())
+    if blocks and not rows:
+        die(
+            f"collection {args.collection!r} contains no Stage or Flow series; this command expects a "
+            "river-levels collection — list this server's names with the collections command",
+            2,
+        )
     cutoff = freshness_cutoff([r["latest_time"] for r in rows], args.hours)
     if args.search:
         needle = args.search.casefold()
@@ -393,7 +439,7 @@ def cmd_rivers(args: argparse.Namespace) -> None:
         rows = rows[: args.limit]
     payload = {
         "kind": "rivers",
-        "source": SOURCE_NAME,
+        "source": source_name(args.base_url),
         "source_url": url,
         "hours": args.hours,
         "search": args.search,
@@ -426,13 +472,24 @@ def positive_int(maximum: int):
 
 
 def add_common(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--base-url", default=DEFAULT_BASE, help="Hilltop server endpoint (defaults to GWRC; other councils' Hilltop servers work too)")
+    parser.add_argument("--council", choices=sorted(COUNCILS), help="verified council Hilltop server (default gwrc)")
     parser.add_argument("--json", action="store_true", help="emit machine-readable JSON")
+
+
+def resolve_base(args: argparse.Namespace) -> None:
+    collection = getattr(args, "collection", "unset")
+    if collection is not None and not str(collection).strip():
+        die("--collection must not be empty", 2)
+    args.base_url = COUNCILS[args.council or "gwrc"][1]
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Query GWRC Hilltop rainfall and river monitoring time series")
     sub = parser.add_subparsers(dest="command", required=True)
+
+    s = sub.add_parser("councils", help="list verified council Hilltop servers")
+    s.add_argument("--json", action="store_true", help="emit machine-readable JSON")
+    s.set_defaults(func=cmd_councils, needs_base=False)
 
     s = sub.add_parser("collections", help="list Hilltop collection names")
     add_common(s)
@@ -458,6 +515,7 @@ def main() -> None:
     s.set_defaults(func=cmd_latest)
 
     s = sub.add_parser("rainfall", help="rainfall totals for every gauge over a recent window")
+    s.add_argument("--collection", default=RAINFALL_COLLECTION, help=f"Hilltop collection name (default {RAINFALL_COLLECTION!r}, GWRC's; other councils differ)")
     s.add_argument("--hours", type=positive_int(168), default=24, help="totalling window in hours (default 24)")
     s.add_argument("--search", help="case-insensitive site-name filter")
     s.add_argument("--limit", type=positive_int(500), help="maximum gauges to return")
@@ -465,6 +523,7 @@ def main() -> None:
     s.set_defaults(func=cmd_rainfall)
 
     s = sub.add_parser("rivers", help="current river/stream levels with trend over a recent window")
+    s.add_argument("--collection", default=RIVER_COLLECTION, help=f"Hilltop collection name (default {RIVER_COLLECTION!r}, GWRC's; other councils differ)")
     s.add_argument("--hours", type=positive_int(168), default=24, help="trend window in hours (default 24)")
     s.add_argument("--search", help="case-insensitive site-name filter")
     s.add_argument("--limit", type=positive_int(500), help="maximum sites to return")
@@ -472,6 +531,8 @@ def main() -> None:
     s.set_defaults(func=cmd_rivers)
 
     args = parser.parse_args()
+    if getattr(args, "needs_base", True):
+        resolve_base(args)
     args.func(args)
 
 

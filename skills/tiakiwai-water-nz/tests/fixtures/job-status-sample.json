@@ -1,0 +1,41 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": 1,
+      "geometry": {"type": "Point", "coordinates": [174.78, -41.3]},
+      "properties": {
+        "wonum": "900001",
+        "externalrefid": "WCC0000001",
+        "status": "INPRG",
+        "description": "Synthetic blockage 1 Example Street, Te Aro",
+        "reportdate": 1784600000000,
+        "actstart": 1784650000000,
+        "compdate": null,
+        "wsadd_formattedaddress": "1 Example Street, Te Aro, Wellington, 6011",
+        "type": "REPAIR",
+        "wtypedesc": "Reactive Maintenance",
+        "comm_description": "Blockage - Significant",
+        "priority": "Medium",
+        "councilid": "WCC",
+        "watertype": "Storm Water",
+        "StatusDescription": "In Progress"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 2,
+      "geometry": null,
+      "properties": {
+        "wonum": "900002",
+        "councilid": "HCC",
+        "watertype": "Potable Water",
+        "StatusDescription": "New",
+        "description": "Synthetic leak with no geometry",
+        "reportdate": "not-a-number",
+        "priority": "High"
+      }
+    }
+  ]
+}
