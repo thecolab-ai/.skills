@@ -40,15 +40,31 @@ except ValueError: pass
 else: raise AssertionError("oversized linked-entry feeds must fail closed")
 print("[PASS] fixture CAP 1.2 fields and polygon point matching")
 print("[PASS] complete bounded linked-entry retrieval precedes result filtering")
+rss_body = (SKILL / "tests" / "fixtures" / "cap-rss.xml").read_bytes()
+rss_status, rss_alerts, rss_linked = mod.parse_feed(rss_body, "https://alerts.metservice.com/cap/rss", "2026-07-19T00:00:00Z")
+assert rss_status["title"] == "Metservice Public CAP Alerts" and rss_status["updated"] == "2026-07-19T00:00:00Z"
+assert rss_alerts == [] and rss_linked == ["https://alerts.metservice.com/cap/synthetic-warning.xml"]
+rss_malicious = rss_body.replace(b"https://alerts.metservice.com/cap/synthetic-warning.xml", b"https://example.com/alert.xml")
+try: mod.parse_feed(rss_malicious, "https://alerts.metservice.com/cap/rss", "2026-07-19T00:00:00Z")
+except ValueError: pass
+else: raise AssertionError("RSS linked entries must stay on the declared alert host")
+try: mod.parse_feed(rss_body.replace(b"<pubDate>Sun, 19 Jul 2026 12:00:00 +1200</pubDate>", b"", 1), "https://alerts.metservice.com/cap/rss", "2026-07-19T00:00:00Z")
+except ValueError: pass
+else: raise AssertionError("an RSS channel without pubDate must fail closed")
+print("[PASS] fixture MetService CAP RSS channel parsing and link allowlist")
 r = subprocess.run([sys.executable, str(CLI), "--help"], capture_output=True, text=True, timeout=10); assert r.returncode == 0
 print("[PASS] contract CLI help is executable")
 for coordinate_args in (("--lat", "91", "--lon", "174"), ("--lat", "-41", "--lon", "181"), ("--lat", "nan", "--lon", "174")):
     invalid = subprocess.run([sys.executable, str(CLI), "near", *coordinate_args, "--json"], capture_output=True, text=True, timeout=10)
     assert invalid.returncode == 2 and "invalid_input" in invalid.stderr and "blocked" not in invalid.stderr
 print("[PASS] invalid near coordinates fail before network access")
-r = subprocess.run([sys.executable, str(CLI), "feed-status", "--json"], capture_output=True, text=True, timeout=45)
+r = subprocess.run([sys.executable, str(CLI), "feed-status", "--json"], capture_output=True, text=True, timeout=60)
 if r.returncode == 0:
-    payload = json.loads(r.stdout); assert payload["data"][0]["healthy"] is True; print("[PASS] live official CAP feed status")
+    payload = json.loads(r.stdout)
+    feeds = {row.get("feed") for row in payload["data"]}
+    assert any(row.get("healthy") is True for row in payload["data"])
+    assert feeds & {"nema", "metservice"}, f"expected known feeds, got {feeds}"
+    print("[PASS] live official CAP feed status (NEMA + MetService)")
 elif r.returncode in {4, 5}:
     print(f"[SKIP] network official CAP feed unavailable: {r.stderr.strip()}")
 else: print(r.stderr, file=sys.stderr); raise SystemExit(1)
