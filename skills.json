@@ -1132,7 +1132,7 @@
     },
     {
       "name": "geonet-nz",
-      "description": "Query GeoNet New Zealand public earthquake, volcano alert, and GeoNet news endpoints through a lightweight no-login CLI. Use when the task involves recent NZ earthquakes, felt/MMI-filtered quakes, earthquake detail by publicID, volcanic alert levels, volcanic activity bulletins, or GeoNet public geohazard updates. Read-only; no authentication required.",
+      "description": "Query GeoNet New Zealand public earthquake, volcano alert, GeoNet news, and Tilde sensor endpoints through a lightweight no-login CLI. Use when the task involves recent NZ earthquakes, felt/MMI-filtered quakes, earthquake detail by publicID, volcanic alert levels, volcanic activity bulletins, GeoNet public geohazard updates, coastal tsunami gauge water heights, or DART deep-ocean buoy readings. Read-only; no authentication required.",
       "path": "skills/geonet-nz",
       "category": "environment",
       "source_owner": "GeoNet",
@@ -1149,9 +1149,10 @@
       "skill_type": "public-api",
       "pack": "nz-public-data",
       "allowed_domains": [
-        "api.geonet.org.nz"
+        "api.geonet.org.nz",
+        "tilde.geonet.org.nz"
       ],
-      "last_verified": "2026-07-19",
+      "last_verified": "2026-07-22",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
