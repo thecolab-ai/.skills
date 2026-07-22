@@ -2,7 +2,7 @@
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
   "last_verified": "2026-07-22",
-  "skill_count": 135,
+  "skill_count": 138,
   "skills": [
     {
       "name": "airnz-flights",
@@ -274,6 +274,32 @@
         "www.mpi.govt.nz"
       ],
       "last_verified": "2026-07-19",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "bluesky-nz",
+      "description": "Search public Bluesky posts and read public account feeds through the no-login Bluesky AppView API, tuned for New Zealand situational awareness: keyword and phrase search with recency sort, author feeds for official NZ accounts, and machine-readable post output. Use when the task involves scanning public social media for emerging NZ events, weather or hazard impacts, community reports, or monitoring a public Bluesky account. Read-only; no authentication required.",
+      "path": "skills/bluesky-nz",
+      "category": "emergency",
+      "source_owner": "Bluesky Social (public AppView)",
+      "source_type": "community",
+      "source_url": "https://api.bsky.app/xrpc/app.bsky.feed.searchPosts",
+      "auth": "none",
+      "access_mode": "public-api",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "24h",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "api.bsky.app",
+        "bsky.app"
+      ],
+      "last_verified": "2026-07-22",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
@@ -1230,7 +1256,11 @@
       "skill_type": "public-api",
       "pack": "nz-public-data",
       "allowed_domains": [
-        "hilltop.gw.govt.nz"
+        "hilltop.gw.govt.nz",
+        "data.hbrc.govt.nz",
+        "hydro.marlborough.govt.nz",
+        "hilltop.nrc.govt.nz",
+        "envdata.tasman.govt.nz"
       ],
       "last_verified": "2026-07-22",
       "health": "healthy",
@@ -2125,10 +2155,10 @@
     },
     {
       "name": "nz-emergency-alerts",
-      "description": "Query official New Zealand CAP emergency alerts by location, region, agency and severity. Use for current official alert retrieval; absence is not proof of safety.",
+      "description": "Query official New Zealand CAP emergency alerts by location, region, agency and severity, aggregating NEMA Emergency Mobile Alerts and MetService severe weather watches/warnings. Use for current official alert retrieval; absence is not proof of safety.",
       "path": "skills/nz-emergency-alerts",
       "category": "emergency",
-      "source_owner": "National Emergency Management Agency",
+      "source_owner": "National Emergency Management Agency and MetService",
       "source_type": "official",
       "source_url": "https://www.civildefence.govt.nz/about/news-and-events/news-and-events/cap-feed-for-emergency-mobile-alert-is-now-live",
       "auth": "none",
@@ -2143,10 +2173,11 @@
       "pack": "nz-public-data",
       "allowed_domains": [
         "www.civildefence.govt.nz",
-        " alerthub.civildefence.govt.nz"
+        " alerthub.civildefence.govt.nz",
+        " alerts.metservice.com"
       ],
-      "last_verified": "2026-07-19",
-      "health": "degraded",
+      "last_verified": "2026-07-22",
+      "health": "healthy",
       "maintainer": "@adam91holt"
     },
     {
@@ -3468,6 +3499,32 @@
       "maintainer": "@adam91holt"
     },
     {
+      "name": "tiakiwai-water-nz",
+      "description": "Query Wellington Water (Tiaki Wai) public network fault and job status records through a lightweight no-login CLI: current water, wastewater, and stormwater faults and repair jobs across Wellington, Hutt, Upper Hutt, and Porirua with location, status, priority, and report times. Use when the task involves Wellington-region water outages, pipe faults, stormwater blockages, or three-waters incident monitoring. Read-only; no authentication required.",
+      "path": "skills/tiakiwai-water-nz",
+      "category": "emergency",
+      "source_owner": "Wellington Water (Tiaki Wai)",
+      "source_type": "official",
+      "source_url": "https://www.tiakiwai.co.nz/faults-and-outages/see-outages/network-status",
+      "auth": "none",
+      "access_mode": "public-api",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "24h",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "www.tiakiwai.co.nz",
+        "services7.arcgis.com"
+      ],
+      "last_verified": "2026-07-22",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
       "name": "trademe-nz",
       "description": "Query Trade Me NZ public listings: marketplace, property sale/rental, motors, jobs, flatmates, rural, retirement, regions, categories, and listing details. No login or credentials required.",
       "path": "skills/trademe-nz",
@@ -3624,6 +3681,31 @@
         "www.woolworths.co.nz"
       ],
       "last_verified": "2026-07-19",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "wremo-nz",
+      "description": "Read Wellington Region Emergency Management Office (WREMO) public news and updates through a lightweight no-login CLI: news listings with dates and snippets, and full article text by slug or URL. Use when the task involves WREMO announcements, Wellington-region emergency management updates, preparedness campaigns, or recovery information. Read-only; no authentication required.",
+      "path": "skills/wremo-nz",
+      "category": "emergency",
+      "source_owner": "Wellington Region Emergency Management Office",
+      "source_type": "official",
+      "source_url": "https://www.wremo.nz/news-and-events/wremo-news",
+      "auth": "none",
+      "access_mode": "html-readonly",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "medium",
+      "cache_ttl": "24h",
+      "schema_version": "1",
+      "skill_type": "html-readonly",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "www.wremo.nz"
+      ],
+      "last_verified": "2026-07-22",
       "health": "healthy",
       "maintainer": "@adam91holt"
     }
