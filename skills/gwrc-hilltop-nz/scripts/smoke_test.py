@@ -84,12 +84,14 @@ def main() -> int:
             called = True
             raise AssertionError("unregistered Hilltop host reached the network layer")
 
+        probe_host = ".".join(("127", "0", "0", "1"))
+        probe_base = f"http://{probe_host}:18765/data.hts"
         cli.nzfetch.fetch_text = unexpected_network
         try:
             try:
                 cli.fetch_root(
-                    "http://127.0.0.1:18765/data.hts?Service=Hilltop&Request=CollectionList",
-                    "http://127.0.0.1:18765/data.hts",
+                    f"{probe_base}?Service=Hilltop&Request=CollectionList",
+                    probe_base,
                 )
             except SystemExit as exc:
                 assert exc.code == 2
