@@ -76,7 +76,8 @@ All commands accept `--base-url` to target another council's Hilltop server.
   a few hours behind reality, and never as a substitute for official warnings.
 - Timestamps are NZ local time exactly as published by the server.
 - `rainfall` and `rivers` exclude decommissioned gauges that still answer with
-  years-old data, and report how many were excluded.
+  years-old data, and report how many were excluded; `latest` flags such readings
+  with `stale: true` and their age in hours.
 - Keep windows narrow (`--hours` defaults to 24, max 168) — collection queries fan out
   across ~100 sites server-side.
 

@@ -73,7 +73,7 @@ def normalise_item(item: dict[str, Any]) -> dict[str, Any]:
         "id": item.get("id"),
         "title": item.get("title"),
         "type": item.get("type"),
-        "owner_org": item.get("orgId"),
+        "owner": item.get("owner"),
         "url": item.get("url"),
         "snippet": item.get("snippet"),
         "tags": item.get("tags") or [],
@@ -219,6 +219,7 @@ def cmd_layers(args: argparse.Namespace) -> None:
 
 
 def cmd_query(args: argparse.Namespace) -> None:
+    bbox_params = parse_bbox(args.bbox) if args.bbox else {}
     layer_url = resolve_layer_url(args.layer, args.layer_id)
     params: dict[str, Any] = {
         "where": args.where or "1=1",
@@ -227,8 +228,7 @@ def cmd_query(args: argparse.Namespace) -> None:
         "outSR": "4326",
         "f": "geojson",
     }
-    if args.bbox:
-        params.update(parse_bbox(args.bbox))
+    params.update(bbox_params)
     data, url = fetch_json(layer_url + "/query", params)
     features = data.get("features") if isinstance(data, dict) else None
     if features is None:
@@ -375,8 +375,10 @@ def cmd_sensors_latest(args: argparse.Namespace) -> None:
             rows = fetch_csv_rows(url)
             used = (year, month, url)
             break
-        except SystemExit:
-            if (year, month) == months[-1]:
+        except SystemExit as exc:
+            # Only a missing file (upstream 404 → exit 5) falls back a month;
+            # blocked/rate-limited states must surface for the month they hit.
+            if exc.code != 5 or (year, month) == months[-1]:
                 raise
     summary = summarise_mobility(rows)
     out_rows = summary["rows"]

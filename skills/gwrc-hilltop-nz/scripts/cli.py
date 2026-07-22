@@ -13,6 +13,7 @@ import json
 import pathlib
 import sys
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 import urllib.parse
 import xml.etree.ElementTree as ET
 from typing import Any
@@ -24,7 +25,16 @@ DEFAULT_BASE = "https://hilltop.gw.govt.nz/data.hts"
 SOURCE_NAME = "Greater Wellington Regional Council Hilltop server"
 RAINFALL_COLLECTION = "Rainfall"
 RIVER_COLLECTION = "River and Stream Levels"
-INVALID_INPUT_MARKERS = ("unknown", "not found", "invalid", "no such")
+# Known Hilltop error templates for bad site/measurement input. Matched as
+# prefixes so an echoed user-supplied name at the end of the message cannot
+# influence classification.
+INVALID_INPUT_PREFIXES = (
+    "no data for site",
+    "no measurements available",
+    "no data source for",
+    "unknown",
+    "invalid",
+)
 
 
 def die(message: str, code: int = 1) -> None:
@@ -40,11 +50,15 @@ def hilltop_url(base: str, request: str, **params: str | None) -> str:
 
 
 def fetch_root(url: str, base: str) -> ET.Element:
-    host = urllib.parse.urlparse(base).hostname
-    if not host:
+    parsed = urllib.parse.urlparse(base)
+    if parsed.scheme not in ("http", "https") or not parsed.hostname:
         die(f"invalid base URL: {base!r}", 2)
+    # The host allowlist only applies to the shipped default; a user-supplied
+    # --base-url is an explicit direction to another council's server (and may
+    # carry a non-default port, which the allowlist would reject).
+    allowed = [parsed.hostname] if base == DEFAULT_BASE else None
     try:
-        text = nzfetch.fetch_text(url, timeout=45, accept="application/xml,text/xml,*/*", allowed_hosts=[host])
+        text = nzfetch.fetch_text(url, timeout=45, accept="application/xml,text/xml,*/*", allowed_hosts=allowed)
     except nzfetch.RateLimited as exc:
         die(f"network error: rate_limited: retry_after={exc.retry_after}: {exc}", 4)
     except nzfetch.Blocked as exc:
@@ -58,8 +72,7 @@ def fetch_root(url: str, base: str) -> ET.Element:
     error = root.findtext("Error")
     if error:
         message = error.strip()
-        low = message.lower()
-        code = 2 if any(marker in low for marker in INVALID_INPUT_MARKERS) else 5
+        code = 2 if message.lower().startswith(INVALID_INPUT_PREFIXES) else 5
         die(f"Hilltop error: {message}", code)
     return root
 
@@ -67,16 +80,21 @@ def fetch_root(url: str, base: str) -> ET.Element:
 def parse_site_list(root: ET.Element) -> list[dict[str, Any]]:
     sites = []
     for node in root.findall("Site"):
-        latitude = node.findtext("Latitude")
-        longitude = node.findtext("Longitude")
         sites.append(
             {
                 "name": node.get("Name"),
-                "latitude": float(latitude) if latitude else None,
-                "longitude": float(longitude) if longitude else None,
+                "latitude": parse_float(node.findtext("Latitude")),
+                "longitude": parse_float(node.findtext("Longitude")),
             }
         )
     return [s for s in sites if s["name"]]
+
+
+def parse_float(raw: str | None) -> float | None:
+    try:
+        return float(raw) if raw else None
+    except ValueError:
+        return None
 
 
 def parse_measurement_list(root: ET.Element) -> list[dict[str, Any]]:
@@ -255,6 +273,16 @@ def cmd_latest(args: argparse.Namespace) -> None:
         )
     block = blocks[0]
     latest = block["points"][-1]
+    # Hilltop resolves TimeInterval relative to the gauge's LAST record, not now,
+    # so a decommissioned gauge happily answers with years-old data. Age the
+    # reading against actual NZ time and say so explicitly.
+    age_hours = None
+    try:
+        now = datetime.now(ZoneInfo("Pacific/Auckland")).replace(tzinfo=None)
+        age_hours = round((now - datetime.fromisoformat(latest["time"])).total_seconds() / 3600, 1)
+    except (ValueError, KeyError):
+        pass
+    stale = age_hours is not None and age_hours > args.window_hours
     payload = {
         "kind": "latest",
         "source": SOURCE_NAME,
@@ -266,16 +294,18 @@ def cmd_latest(args: argparse.Namespace) -> None:
         "observations_in_window": len(block["points"]),
         "latest_value": latest["value"],
         "latest_time": latest["time"],
+        "age_hours": age_hours,
+        "stale": stale,
         "timezone": "NZ local time as published by Hilltop",
     }
-    emit(
-        payload,
-        args.json,
-        [
-            f"{block['site']} — {payload['measurement']}: {latest['value']} {block['units'] or ''}".rstrip()
-            + f" at {latest['time']} (NZ local time, {len(block['points'])} observations in {args.window_hours}h)"
-        ],
+    line = (
+        f"{block['site']} — {payload['measurement']}: {latest['value']} {block['units'] or ''}".rstrip()
+        + f" at {latest['time']} (NZ local time, {len(block['points'])} observations)"
     )
+    if stale:
+        age_text = f"{round(age_hours / 24)} days" if age_hours > 48 else f"{age_hours} hours"
+        line += f" [STALE — last reported {age_text} ago; gauge may be decommissioned]"
+    emit(payload, args.json, [line])
 
 
 def cmd_rainfall(args: argparse.Namespace) -> None:
@@ -301,11 +331,11 @@ def cmd_rainfall(args: argparse.Namespace) -> None:
             }
         )
     cutoff = freshness_cutoff([r["to_time"] for r in rows], args.hours)
-    stale = [r for r in rows if cutoff and r["to_time"] < cutoff]
-    rows = [r for r in rows if not (cutoff and r["to_time"] < cutoff)]
     if args.search:
         needle = args.search.casefold()
         rows = [r for r in rows if needle in (r["site"] or "").casefold()]
+    stale = [r for r in rows if cutoff and r["to_time"] < cutoff]
+    rows = [r for r in rows if not (cutoff and r["to_time"] < cutoff)]
     rows.sort(key=lambda r: r["total_mm"], reverse=True)
     total = len(rows)
     if args.limit:
@@ -352,11 +382,11 @@ def cmd_rivers(args: argparse.Namespace) -> None:
             best[key] = summary
     rows = list(best.values())
     cutoff = freshness_cutoff([r["latest_time"] for r in rows], args.hours)
-    stale = [r for r in rows if cutoff and r["latest_time"] < cutoff]
-    rows = [r for r in rows if not (cutoff and r["latest_time"] < cutoff)]
     if args.search:
         needle = args.search.casefold()
         rows = [r for r in rows if needle in (r["site"] or "").casefold()]
+    stale = [r for r in rows if cutoff and r["latest_time"] < cutoff]
+    rows = [r for r in rows if not (cutoff and r["latest_time"] < cutoff)]
     rows.sort(key=lambda r: (r["site"] or "", r["measurement"] or ""))
     total = len(rows)
     if args.limit:
@@ -377,7 +407,7 @@ def cmd_rivers(args: argparse.Namespace) -> None:
     for r in rows:
         lines.append(
             f"- {r['site']}: {r['latest_value']} {r['units'] or ''} at {r['latest_time']} "
-            f"[{r['trend']}; {args.hours}h range {r['window_min']}–{r['window_max']}]"
+            f"[{r['trend']} since {r['reference_time']}; {args.hours}h range {r['window_min']}–{r['window_max']}]"
         )
     emit(payload, args.json, lines)
 

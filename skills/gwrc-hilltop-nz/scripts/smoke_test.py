@@ -94,7 +94,8 @@ def main() -> int:
                 print(f"[SKIP] live {name}: {stderr}")
                 return
             raise AssertionError(f"exit {completed.returncode}: {stderr}")
-        assertion(json.loads(completed.stdout))
+        if not assertion(json.loads(completed.stdout)):
+            raise AssertionError(f"live assertion for {name} evaluated false")
         print(f"[PASS] live {name}")
 
     def run_live() -> bool:

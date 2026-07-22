@@ -30,10 +30,16 @@ Verified live 22 July 2026 (server version 2606.0.2.92, `<Agency>GWRC</Agency>`)
   and the `latest` command's guidance text.
 - Timestamps are naive NZ local time strings; the CLI passes them through unchanged and
   labels them.
-- Decommissioned gauges still answer collection queries with their last-ever data (one
-  Miramar gauge returns 2016 data). The `rainfall`/`rivers` commands drop rows older
-  than the freshest observation minus the window plus six hours of slack, and report the
-  excluded count.
+- Hilltop resolves `TimeInterval` relative to a gauge's LAST record, not now, so
+  decommissioned gauges still answer queries with their last-ever data (one Miramar
+  gauge returns 2016 data). The `rainfall`/`rivers` commands drop rows older than the
+  freshest observation minus the window plus six hours of slack and report the excluded
+  count; `latest` ages the reading against actual NZ time and sets `stale: true` (with
+  a human-readable warning) when it falls outside the requested window.
+- A primary rainfall sensor can flatline at 0 with a current timestamp while its
+  backup records real rain (seen live at Waitatapia Stream at Taungata: primary 0.0 mm,
+  backup 3.5 mm, same timestamp). The CLI reports the primary; cross-check
+  neighbouring gauges before treating an isolated zero as ground truth.
 - The `River and Stream Levels` collection carries more than levels: temperature,
   dissolved oxygen, turbidity, compliance flows, and secondary/backup sensors
   (`Stage 2`, `Water Level 2`, `... (Backup Logger)` sites). The `rivers` command keeps

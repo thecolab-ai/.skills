@@ -46,6 +46,7 @@ def main() -> int:
         items = [cli.normalise_item(r) for r in data["results"]]
         assert items[0]["title"] == "Synthetic Flood Overlay"
         assert items[0]["url"].endswith("/FeatureServer")
+        assert items[0]["owner"] == "SyntheticTeam_WCC"
         assert items[1]["url"] is None and items[1]["tags"] == []
 
     def fixture_service():
@@ -96,7 +97,8 @@ def main() -> int:
                 print(f"[SKIP] live {name}: {stderr}")
                 return
             raise AssertionError(f"exit {completed.returncode}: {stderr}")
-        assertion(json.loads(completed.stdout))
+        if not assertion(json.loads(completed.stdout)):
+            raise AssertionError(f"live assertion for {name} evaluated false")
         print(f"[PASS] live {name}")
 
     def run_live() -> bool:
@@ -104,7 +106,7 @@ def main() -> int:
             live(
                 "org-scoped search",
                 ["search", "flood", "--limit", "3", "--json"],
-                lambda d: d["items"] and all(i["owner_org"] == "CPYspmTk3abe6d7i" for i in d["items"]),
+                lambda d: bool(d["items"]) and d["total_matches"] > 0 and all(i["id"] and i["owner"] for i in d["items"]),
             )
             live(
                 "flood layer bbox query",
