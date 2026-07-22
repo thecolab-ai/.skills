@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-import argparse,json,sys,urllib.parse
+import argparse,json,re,sys,urllib.parse
 import pathlib
 from typing import Any
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
@@ -65,9 +65,12 @@ def cmd_news(a):
 def tilde_get(path):
     url=TILDE+path
     try:
-        return nzfetch.fetch_json(url,timeout=45,accept='application/json'), url
+        return nzfetch.fetch_json(url,timeout=30,accept='application/json'), url
     except nzfetch.Blocked as e: die(f'network error: {e}',4)
     except nzfetch.FetchError as e: die(f'upstream unavailable: {e}',5)
+def tilde_domain_arg(raw):
+    if not re.fullmatch(r'[a-z0-9-]+',raw or ''): die(f'invalid Tilde domain {raw!r}; list domains with tilde-domains',2)
+    return raw
 def tilde_station_rows(domain_summary):
     rows=[]
     for st in (domain_summary.get('stations') or {}).values():
@@ -90,22 +93,22 @@ def tilde_first_series(domain_summary,station,name):
         die(f'station {station!r} has no series named {name!r}; list names with tilde-stations',2)
     return best
 def tilde_series_summary(points):
-    vals=[p['val'] for p in points if isinstance(p.get('val'),(int,float))]
-    if not vals: return None
-    latest=points[-1]
-    return {'latest_value':latest.get('val'),'latest_time':latest.get('ts'),'window_min':min(vals),'window_max':max(vals),'observations':len(vals)}
+    numeric=[p for p in points if isinstance(p.get('val'),(int,float))]
+    if not numeric: return None
+    vals=[p['val'] for p in numeric]; latest=numeric[-1]
+    return {'latest_value':latest['val'],'latest_time':latest.get('ts'),'window_min':min(vals),'window_max':max(vals),'observations':len(vals)}
 def cmd_tilde_domains(a):
     data,url=tilde_get('dataSummary/')
     rows=[{'domain':d.get('domain'),'description':d.get('description'),'stations':d.get('stationCount'),'latest_record':d.get('latestRecord')} for d in (data.get('domains') or {}).values()]
     out({'kind':'tilde-domains','source':'geonet-nz','source_url':url,'domains':sorted(rows,key=lambda r:r['domain'] or '')},a.json)
 def cmd_tilde_stations(a):
-    data,url=tilde_get('dataSummary/'+a.domain)
+    data,url=tilde_get('dataSummary/'+tilde_domain_arg(a.domain))
     summary=(data.get('domain') or {}).get(a.domain)
     if not summary: die(f'unknown Tilde domain {a.domain!r}; list domains with tilde-domains',2)
     out({'kind':'tilde-stations','source':'geonet-nz','source_url':url,'domain':a.domain,'stations':tilde_station_rows(summary)},a.json)
 def cmd_tilde_latest(a):
     if a.window not in TILDE_WINDOWS: die(f'invalid --window {a.window!r}; allowed: {", ".join(TILDE_WINDOWS)}',2)
-    data,_=tilde_get('dataSummary/'+a.domain)
+    data,_=tilde_get('dataSummary/'+tilde_domain_arg(a.domain))
     summary=(data.get('domain') or {}).get(a.domain)
     if not summary: die(f'unknown Tilde domain {a.domain!r}; list domains with tilde-domains',2)
     series=tilde_first_series(summary,a.station,a.name)
@@ -113,7 +116,9 @@ def cmd_tilde_latest(a):
     rows,url=tilde_get(path)
     points=(rows[0].get('data') or []) if isinstance(rows,list) and rows else []
     stats=tilde_series_summary(points)
-    if not stats: die(f'no observations for {a.station} {series["name"]} in the last {a.window} (series last recorded {series["series_latest_record"] or "never"}); try --window 30d or another --name',5)
+    if not stats:
+        hint='another --name' if a.window=='30d' else 'a wider --window or another --name'
+        die(f'no observations for {a.station} {series["name"]} in the last {a.window} (series last recorded {series["series_latest_record"] or "never"}); try {hint}',5)
     out({'kind':'tilde-latest','source':'geonet-nz','source_url':url,'domain':a.domain,'station':a.station,**series,'window':a.window,**stats},a.json)
 def main():
     p=argparse.ArgumentParser(description='Query GeoNet public feeds')

@@ -41,5 +41,9 @@ ok.append(check('news', news))
 def tilde_stations():
  d=json.loads(run(['tilde-stations','coastal','--json'])); assert any(s['station']=='WLGT' for s in d['stations'])
 ok.append(check('tilde coastal stations', tilde_stations))
+def tilde_latest():
+ d=json.loads(run(['tilde-latest','coastal','WLGT','--window','30m','--json']))
+ assert isinstance(d['latest_value'],(int,float)) and d['observations']>0 and d['name']
+ok.append(check('tilde latest WLGT water height', tilde_latest))
 if all(ok): print("[PASS] live smoke assertions completed"); sys.exit(0)
 sys.exit(1)
