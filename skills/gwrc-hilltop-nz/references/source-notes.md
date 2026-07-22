@@ -51,9 +51,21 @@ Verified live 22 July 2026 (server version 2606.0.2.92, `<Agency>GWRC</Agency>`)
 
 ## Generalisation
 
-Most NZ regional councils run Hilltop servers with this exact query surface. Every
-command takes `--base-url` so the skill works against other councils' endpoints
-unchanged; only the GWRC default is baked in and allowlisted.
+Most NZ regional councils run Hilltop servers with this exact query surface. The
+registry (`councils` command / `--council`) ships the servers that answered the
+standard queries when verified on 2026-07-22:
+
+- gwrc — https://hilltop.gw.govt.nz/data.hts (default)
+- hbrc — https://data.hbrc.govt.nz/Envirodata/data.hts
+- marlborough — https://hydro.marlborough.govt.nz/data.hts
+- northland — https://hilltop.nrc.govt.nz/data.hts
+- tasman — https://envdata.tasman.govt.nz/data.hts
+
+Collection names are council-specific (e.g. HBRC uses `HBRC_Rainfall`), so the
+`rainfall`/`rivers` GWRC defaults need `--collection` when pointed elsewhere.
+Probed but not shipped: Horizons, Gisborne, Environment Southland (hosts did not
+resolve on the guessed patterns), Bay of Plenty (responded without an Agency
+element). `--base-url` still accepts any other endpoint explicitly.
 
 ## Stability and licence
 

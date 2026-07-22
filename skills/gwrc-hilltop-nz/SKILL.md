@@ -18,7 +18,7 @@ metadata:
   thecolab.skill_type: "public-api"
   thecolab.pack: "nz-public-data"
   thecolab.source_url: "https://hilltop.gw.govt.nz/data.hts"
-  thecolab.allowed_domains: "hilltop.gw.govt.nz"
+  thecolab.allowed_domains: "hilltop.gw.govt.nz,data.hbrc.govt.nz,hydro.marlborough.govt.nz,hilltop.nrc.govt.nz,envdata.tasman.govt.nz"
   thecolab.last_verified: "2026-07-22"
   thecolab.health: "healthy"
   thecolab.maintainer: "@adam91holt"
@@ -66,8 +66,12 @@ python3 skills/gwrc-hilltop-nz/scripts/cli.py collections
 - `rainfall [--hours N] [--search TEXT] [--limit N] [--json]` — per-gauge totals over the window, wettest first
 - `rivers [--hours N] [--search TEXT] [--limit N] [--json]` — latest level/flow per site with min/max and rising/falling/steady trend
 - `collections [--json]` — Hilltop collection names
+- `councils [--json]` — verified council Hilltop servers in the registry
 
-All commands accept `--base-url` to target another council's Hilltop server.
+All data commands accept `--council gwrc|hbrc|marlborough|northland|tasman` (verified
+servers) or `--base-url` for any other council's Hilltop endpoint. Collection names
+differ per council: `rainfall`/`rivers` default to GWRC's collections — for another
+council run `collections --council <key>` and pass `--collection NAME`.
 
 ## Notes
 

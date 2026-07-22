@@ -23,6 +23,17 @@ import nzfetch  # noqa: E402
 
 DEFAULT_BASE = "https://hilltop.gw.govt.nz/data.hts"
 SOURCE_NAME = "Greater Wellington Regional Council Hilltop server"
+# Councils whose Hilltop servers answered the standard query surface when last
+# verified (2026-07-22). Collection names differ per council — the rainfall and
+# rivers defaults are GWRC's; use `collections` to discover another council's
+# names and pass --collection.
+COUNCILS = {
+    "gwrc": ("Greater Wellington Regional Council", DEFAULT_BASE),
+    "hbrc": ("Hawke's Bay Regional Council", "https://data.hbrc.govt.nz/Envirodata/data.hts"),
+    "marlborough": ("Marlborough District Council", "https://hydro.marlborough.govt.nz/data.hts"),
+    "northland": ("Northland Regional Council", "https://hilltop.nrc.govt.nz/data.hts"),
+    "tasman": ("Tasman District Council", "https://envdata.tasman.govt.nz/data.hts"),
+}
 RAINFALL_COLLECTION = "Rainfall"
 RIVER_COLLECTION = "River and Stream Levels"
 # Known Hilltop error templates for bad site/measurement input. Matched as
@@ -53,10 +64,10 @@ def fetch_root(url: str, base: str) -> ET.Element:
     parsed = urllib.parse.urlparse(base)
     if parsed.scheme not in ("http", "https") or not parsed.hostname:
         die(f"invalid base URL: {base!r}", 2)
-    # The host allowlist only applies to the shipped default; a user-supplied
+    # The host allowlist only applies to registry servers; a user-supplied
     # --base-url is an explicit direction to another council's server (and may
     # carry a non-default port, which the allowlist would reject).
-    allowed = [parsed.hostname] if base == DEFAULT_BASE else None
+    allowed = [parsed.hostname] if base in {url for _, url in COUNCILS.values()} else None
     try:
         text = nzfetch.fetch_text(url, timeout=45, accept="application/xml,text/xml,*/*", allowed_hosts=allowed)
     except nzfetch.RateLimited as exc:
@@ -211,6 +222,22 @@ def emit(payload: dict[str, Any], as_json: bool, lines: list[str]) -> None:
             print(line)
 
 
+def cmd_councils(args: argparse.Namespace) -> None:
+    rows = [
+        {"key": key, "council": title, "base_url": url, "is_default": key == "gwrc"}
+        for key, (title, url) in sorted(COUNCILS.items())
+    ]
+    payload = {
+        "kind": "councils",
+        "note": "servers verified 2026-07-22; rainfall/rivers collection defaults are GWRC's — discover another council's names with the collections command",
+        "councils": rows,
+    }
+    lines = ["Verified council Hilltop servers:"]
+    for r in rows:
+        lines.append(f"- {r['key']}{' (default)' if r['is_default'] else ''}: {r['council']} — {r['base_url']}")
+    emit(payload, args.json, lines)
+
+
 def cmd_collections(args: argparse.Namespace) -> None:
     url = hilltop_url(args.base_url, "CollectionList")
     names = parse_collections(fetch_root(url, args.base_url))
@@ -312,7 +339,7 @@ def cmd_rainfall(args: argparse.Namespace) -> None:
     url = hilltop_url(
         args.base_url,
         "GetData",
-        Collection=RAINFALL_COLLECTION,
+        Collection=args.collection,
         Method="Total",
         Interval=f"{args.hours} hours",
         TimeInterval=f"PT{args.hours}H",
@@ -361,7 +388,7 @@ def cmd_rivers(args: argparse.Namespace) -> None:
     url = hilltop_url(
         args.base_url,
         "GetData",
-        Collection=RIVER_COLLECTION,
+        Collection=args.collection,
         Method="Average",
         Interval="1 hour",
         TimeInterval=f"PT{args.hours}H",
@@ -426,13 +453,26 @@ def positive_int(maximum: int):
 
 
 def add_common(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--base-url", default=DEFAULT_BASE, help="Hilltop server endpoint (defaults to GWRC; other councils' Hilltop servers work too)")
+    parser.add_argument("--council", choices=sorted(COUNCILS), help="verified council Hilltop server (default gwrc)")
+    parser.add_argument("--base-url", default=None, help="explicit Hilltop endpoint for a council not in the registry")
     parser.add_argument("--json", action="store_true", help="emit machine-readable JSON")
+
+
+def resolve_base(args: argparse.Namespace) -> None:
+    if args.base_url and args.council:
+        die("pass either --council or --base-url, not both", 2)
+    if args.base_url:
+        return
+    args.base_url = COUNCILS[args.council or "gwrc"][1]
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Query GWRC Hilltop rainfall and river monitoring time series")
     sub = parser.add_subparsers(dest="command", required=True)
+
+    s = sub.add_parser("councils", help="list verified council Hilltop servers")
+    s.add_argument("--json", action="store_true", help="emit machine-readable JSON")
+    s.set_defaults(func=cmd_councils, needs_base=False)
 
     s = sub.add_parser("collections", help="list Hilltop collection names")
     add_common(s)
@@ -458,6 +498,7 @@ def main() -> None:
     s.set_defaults(func=cmd_latest)
 
     s = sub.add_parser("rainfall", help="rainfall totals for every gauge over a recent window")
+    s.add_argument("--collection", default=RAINFALL_COLLECTION, help=f"Hilltop collection name (default {RAINFALL_COLLECTION!r}, GWRC's; other councils differ)")
     s.add_argument("--hours", type=positive_int(168), default=24, help="totalling window in hours (default 24)")
     s.add_argument("--search", help="case-insensitive site-name filter")
     s.add_argument("--limit", type=positive_int(500), help="maximum gauges to return")
@@ -465,6 +506,7 @@ def main() -> None:
     s.set_defaults(func=cmd_rainfall)
 
     s = sub.add_parser("rivers", help="current river/stream levels with trend over a recent window")
+    s.add_argument("--collection", default=RIVER_COLLECTION, help=f"Hilltop collection name (default {RIVER_COLLECTION!r}, GWRC's; other councils differ)")
     s.add_argument("--hours", type=positive_int(168), default=24, help="trend window in hours (default 24)")
     s.add_argument("--search", help="case-insensitive site-name filter")
     s.add_argument("--limit", type=positive_int(500), help="maximum sites to return")
@@ -472,6 +514,8 @@ def main() -> None:
     s.set_defaults(func=cmd_rivers)
 
     args = parser.parse_args()
+    if getattr(args, "needs_base", True):
+        resolve_base(args)
     args.func(args)
 
 
