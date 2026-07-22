@@ -1,0 +1,27 @@
+{
+  "posts": [
+    {
+      "uri": "at://did:plc:synthetic0000000000000001/app.bsky.feed.post/3synthetic01",
+      "cid": "bafysynthetic01",
+      "author": {
+        "did": "did:plc:synthetic0000000000000001",
+        "handle": "example.bsky.social",
+        "displayName": "Synthetic Example"
+      },
+      "record": {
+        "$type": "app.bsky.feed.post",
+        "createdAt": "2026-07-21T09:00:00.000Z",
+        "langs": ["en"],
+        "text": "Surface flooding on Synthetic Parade, water over the road near the shops."
+      },
+      "replyCount": 2,
+      "repostCount": 5,
+      "likeCount": 9
+    },
+    {
+      "uri": "at://did:plc:synthetic0000000000000002/app.bsky.feed.post/3synthetic02",
+      "author": {"did": "did:plc:synthetic0000000000000002", "handle": "second.example.nz"},
+      "record": {"createdAt": "2026-07-21T09:05:00.000Z", "text": "No langs field on this one."}
+    }
+  ]
+}
