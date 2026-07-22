@@ -53,12 +53,25 @@ def main() -> int:
         assert article["paragraphs"][0].startswith("Heavy rain is forecast")
         assert "emergency plans" in article["paragraphs"][1], "inline tags must be flattened"
 
+    def fixture_degraded_card():
+        page = (FIXTURES / "news-listing-sample.html").read_text(encoding="utf-8")
+        # Remove the FIRST card's date div: its date must become None and the
+        # second card must keep its own date — no cross-card stealing.
+        broken = page.replace('<div class="article-date">21 July 2026</div>', "", 1)
+        items = cli.parse_news_listing(broken)
+        assert len(items) == 2, "both cards must survive a missing date"
+        assert items[0]["date"] is None and items[0]["date_text"] is None
+        assert items[1]["date"] == "2024-09-06", "second card must keep its own date"
+
     def fixture_dates():
         assert cli.parse_date("6 Sept 2024") == "2024-09-06"
         assert cli.parse_date("21 July 2026") == "2026-07-21"
+        assert cli.parse_date("6 September 2024") == "2024-09-06", "full month names must parse"
+        assert cli.parse_date("99 Jan 2024") is None, "impossible days must not emit pseudo-ISO"
         assert cli.parse_date("") is None and cli.parse_date("yesterday") is None
 
     results.append(check("fixture news listing parser", fixture_listing))
+    results.append(check("fixture degraded card isolation", fixture_degraded_card))
     results.append(check("fixture article extraction and boilerplate filter", fixture_article))
     results.append(check("fixture NZ date parsing", fixture_dates))
 

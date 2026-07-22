@@ -15,7 +15,8 @@
 watches, warnings and advisories (verified live 2026-07-22; the channel is empty when
 nothing is in force). Items link to CAP 1.2 XML documents on the same host; the same
 allowlist rule applies as for NEMA linked entries. The channel `pubDate` is RFC 2822
-and is normalised to UTC ISO for the shared staleness check. Each returned alert row
+and is normalised to UTC ISO for the shared staleness check; a naive date (missing
+zone or RFC 2822 `-0000`) is treated as UTC deterministically, never machine-local. Each returned alert row
 carries a `feed` field (`nema` or `metservice`). When one feed is unavailable the other
 still answers, with an explicit per-feed warning in the envelope; only both failing is
 a command failure.

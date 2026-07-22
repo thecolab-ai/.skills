@@ -162,9 +162,14 @@ def _parse_rss(root: ET.Element, source_url: str, retrieved_at: str, hosts) -> t
     if not pub_date:
         raise ValueError("CAP RSS channel is missing its pubDate timestamp")
     try:
-        updated = parsedate_to_datetime(pub_date).astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+        parsed = parsedate_to_datetime(pub_date)
     except (TypeError, ValueError) as exc:
         raise ValueError(f"CAP RSS pubDate was not a valid RFC 2822 date: {pub_date!r}") from exc
+    if parsed.tzinfo is None:
+        # RFC 2822 "-0000" (or a missing zone) parses naive; treat it as UTC
+        # deterministically rather than letting astimezone() assume machine-local.
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    updated = parsed.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
     status = {
         "title": (channel.findtext("title") or "").strip() or None,
         "updated": updated,
@@ -219,7 +224,7 @@ def fetch_linked_alerts(
             detail_url,
             timeout=15,
             accept="application/xml",
-            allowed_hosts=hosts or HOSTS,
+            allowed_hosts=hosts if hosts is not None else HOSTS,
         )
         output.append(parse_linked_alert(detail, detail_final, retrieved_at))
     return output
@@ -282,11 +287,14 @@ def _referenced_ids(value: object) -> set[str]:
 
 
 def active_alerts(alerts: list[dict[str, object]], now: datetime) -> list[dict[str, object]]:
-    selected: dict[str, dict[str, object]] = {}
+    # Keyed per feed so an identifier collision across publishers cannot dedupe
+    # silently, and one feed's references cannot cancel another feed's alert.
+    selected: dict[tuple[str, str], dict[str, object]] = {}
     for alert in sorted(alerts, key=lambda row: str(row.get("sent") or "")):
+        feed = str(alert.get("feed") or "")
         message_type = str(alert.get("message_type") or "")
         for referenced in _referenced_ids(alert.get("references")):
-            selected.pop(referenced, None)
+            selected.pop((feed, referenced), None)
         if message_type.casefold() == "cancel":
             continue
         if str(alert.get("status") or "").casefold() != "actual":
@@ -295,7 +303,7 @@ def active_alerts(alerts: list[dict[str, object]], now: datetime) -> list[dict[s
         expires = _parse_time(str(alert.get("expires") or ""))
         if effective and effective > now or expires and expires <= now:
             continue
-        selected[str(alert["id"])] = alert
+        selected[(feed, str(alert["id"]))] = alert
     return list(selected.values())
 
 
@@ -329,7 +337,7 @@ def main() -> int:
         alerts: list[dict[str, object]] = []
         feed_warnings: list[str] = []
         failures: list[Exception] = []
-        final = FEED
+        final = None
         for feed in FEEDS:
             try:
                 body, _content_type, feed_final = nzfetch.fetch_bytes(
@@ -342,13 +350,20 @@ def main() -> int:
                 for row in feed_alerts:
                     row["feed"] = feed["key"]
                 alerts.extend(feed_alerts)
-                if feed["key"] == "nema":
+                if final is None or feed["key"] == "nema":
                     final = feed_final
             except (nzfetch.FetchError, ET.ParseError, ValueError) as exc:
                 failures.append(exc)
                 feed_warnings.append(f"{feed['name']} unavailable: {exc}")
         if len(failures) == len(FEEDS):
+            # Surface the most actionable failure class: a rate-limit (with its
+            # retry_after) beats a generic block, which beats schema noise.
+            for kind in (nzfetch.RateLimited, nzfetch.Blocked, nzfetch.FetchError):
+                for failure in failures:
+                    if isinstance(failure, kind):
+                        raise failure
             raise failures[0]
+        assert final is not None
         if args.command == "feed-status":
             data = statuses
         else:

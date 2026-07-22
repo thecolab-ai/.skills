@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import pathlib
+import re
 import sys
 import urllib.parse
 from datetime import datetime, timezone
@@ -64,6 +65,11 @@ def sql_quote(value: str) -> str:
     return "'" + value.replace("'", "''") + "'"
 
 
+def like_literal(value: str) -> str:
+    """Escape LIKE wildcards so user text matches literally ('$' as escape char)."""
+    return value.replace("$", "$$").replace("%", "$%").replace("_", "$_")
+
+
 def build_where(args: argparse.Namespace) -> str:
     clauses = [f"StatusDescription <> {sql_quote(HIDDEN_STATUS)}"]
     if not getattr(args, "include_resolved", False):
@@ -72,14 +78,21 @@ def build_where(args: argparse.Namespace) -> str:
         clauses.append(f"councilid = {sql_quote(COUNCILS[args.council])}")
     if getattr(args, "water_type", None):
         clauses.append(f"watertype = {sql_quote(WATER_TYPES[args.water_type])}")
-    if getattr(args, "search", None):
-        needle = sql_quote("%" + args.search.upper() + "%")
-        clauses.append(f"(UPPER(description) LIKE {needle} OR UPPER(wsadd_formattedaddress) LIKE {needle})")
+    search = getattr(args, "search", None)
+    if search is not None:
+        if not search.strip():
+            die("--search must not be empty", 2)
+        if len(search) > 200:
+            die("--search is limited to 200 characters", 2)
+        needle = sql_quote("%" + like_literal(search.upper()) + "%")
+        clauses.append(
+            f"(UPPER(description) LIKE {needle} ESCAPE '$' OR UPPER(wsadd_formattedaddress) LIKE {needle} ESCAPE '$')"
+        )
     return " AND ".join(clauses)
 
 
 def epoch_to_nz(value: Any) -> str | None:
-    if not isinstance(value, (int, float)):
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or value <= 0:
         return None
     try:
         return datetime.fromtimestamp(value / 1000, tz=timezone.utc).astimezone(NZ_TZ).isoformat()
@@ -147,7 +160,8 @@ def cmd_faults(args: argparse.Namespace) -> None:
         "note": "open jobs only unless --include-resolved; rows the source marks Do Not Display are always excluded",
         "faults": jobs,
     }
-    lines = [f"Tiaki Wai open jobs: {len(jobs)} shown" + (" (truncated; add filters)" if truncated else "")]
+    label = "open and recently resolved jobs" if args.include_resolved else "open jobs"
+    lines = [f"Tiaki Wai {label}: {len(jobs)} shown" + (" (truncated; add filters)" if truncated else "")]
     for j in jobs:
         lines.append(
             f"- [{j['council']}/{j['water_type']}] {j['description']} — {j['status']}, priority {j['priority']}, reported {j['reported_at']} ({j['job_number']})"
@@ -156,11 +170,12 @@ def cmd_faults(args: argparse.Namespace) -> None:
 
 
 def cmd_fault(args: argparse.Namespace) -> None:
-    if not args.job_number.isdigit():
-        die(f"invalid job number {args.job_number!r}: expected digits (the wonum from faults output)", 2)
+    if not re.fullmatch(r"[0-9]+", args.job_number):
+        die(f"invalid job number {args.job_number!r}: expected ASCII digits (the wonum from faults output)", 2)
     data, url = query_layer(
         {
-            "where": f"wonum = {sql_quote(args.job_number)}",
+            # Match the source's own publication contract even on direct lookup.
+            "where": f"wonum = {sql_quote(args.job_number)} AND StatusDescription <> {sql_quote(HIDDEN_STATUS)}",
             "outFields": "*",
             "outSR": "4326",
             "f": "geojson",
@@ -212,23 +227,25 @@ def cmd_summary(args: argparse.Namespace) -> None:
             {
                 "council": f.get("attributes", {}).get("councilid"),
                 "water_type": f.get("attributes", {}).get("watertype"),
-                "open_jobs": f.get("attributes", {}).get("job_count"),
+                "job_count": f.get("attributes", {}).get("job_count"),
             }
             for f in features
         ),
-        key=lambda r: -(r["open_jobs"] or 0),
+        key=lambda r: -(r["job_count"] or 0),
     )
     payload = {
         "kind": "summary",
         "source": SOURCE_NAME,
         "source_url": url,
         "where": where,
-        "total_open_jobs": sum(r["open_jobs"] or 0 for r in rows),
+        "includes_resolved": bool(args.include_resolved),
+        "total_jobs": sum(r["job_count"] or 0 for r in rows),
         "by_council_and_type": rows,
     }
-    lines = [f"Tiaki Wai open jobs by council and water type (total {payload['total_open_jobs']}):"]
+    label = "open and recently resolved jobs" if args.include_resolved else "open jobs"
+    lines = [f"Tiaki Wai {label} by council and water type (total {payload['total_jobs']}):"]
     for r in rows:
-        lines.append(f"- {r['council']} {r['water_type']}: {r['open_jobs']}")
+        lines.append(f"- {r['council']} {r['water_type']}: {r['job_count']}")
     emit(payload, args.json, lines)
 
 

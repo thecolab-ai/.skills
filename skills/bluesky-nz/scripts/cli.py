@@ -13,6 +13,7 @@ import pathlib
 import re
 import sys
 import urllib.parse
+from datetime import datetime
 from typing import Any
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
@@ -20,8 +21,8 @@ import nzfetch  # noqa: E402
 
 BASE = "https://api.bsky.app/xrpc/"
 SOURCE_NAME = "Bluesky public AppView"
-HANDLE_RE = re.compile(r"^@?[a-z0-9][a-z0-9.-]{2,252}$", re.IGNORECASE)
-ISO_RE = re.compile(r"^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2})?(\.\d+)?(Z|[+-]\d{2}:?\d{2})?)?$")
+HANDLE_RE = re.compile(r"^[a-z0-9][a-z0-9.-]{2,252}$")
+DID_RE = re.compile(r"^did:[a-z0-9]+:[A-Za-z0-9._%:-]+$")
 
 
 def die(message: str, code: int = 1) -> None:
@@ -38,11 +39,11 @@ def get(method: str, params: dict[str, Any]) -> tuple[dict[str, Any], str]:
     except nzfetch.Blocked as exc:
         die(f"network error: {exc}", 4)
     except nzfetch.FetchError as exc:
+        # XRPC signals bad input as HTTP 400 (e.g. unknown actor, empty query);
+        # nzfetch surfaces that as FetchError before the JSON body is readable.
+        if "HTTP 400" in str(exc) or "HTTP 404" in str(exc):
+            die(f"request rejected by Bluesky ({exc}): check the handle or query", 2)
         die(f"upstream unavailable: {exc}", 5)
-    if isinstance(data, dict) and data.get("error"):
-        message = f"{data.get('error')}: {data.get('message')}"
-        low = str(data.get("error", "")).lower()
-        die(f"Bluesky error: {message}", 2 if "invalid" in low or "not found" in low.replace("_", " ") else 5)
     return data, url
 
 
@@ -50,7 +51,7 @@ def post_web_url(uri: str | None, handle: str | None) -> str | None:
     if not uri or not uri.startswith("at://"):
         return None
     parts = uri.split("/")
-    if len(parts) < 5:
+    if len(parts) < 5 or not parts[-1]:
         return None
     actor = handle or parts[2]
     return f"https://bsky.app/profile/{actor}/post/{parts[-1]}"
@@ -74,10 +75,15 @@ def normalise_post(post: dict[str, Any]) -> dict[str, Any]:
 
 
 def clean_handle(raw: str) -> str:
-    handle = raw.lstrip("@").strip().lower()
-    if not HANDLE_RE.match(handle) or "." not in handle:
-        die(f"invalid handle {raw!r}: expected e.g. metservice.bsky.social", 2)
-    return handle
+    actor = raw.strip().lstrip("@")
+    if actor.startswith("did:"):
+        if not DID_RE.match(actor):
+            die(f"invalid DID {raw!r}: expected e.g. did:plc:abc123...", 2)
+        return actor
+    actor = actor.lower()
+    if not HANDLE_RE.match(actor) or "." not in actor:
+        die(f"invalid handle {raw!r}: expected e.g. some-account.bsky.social or a did:plc: identifier", 2)
+    return actor
 
 
 def emit(payload: dict[str, Any], as_json: bool, lines: list[str]) -> None:
@@ -101,8 +107,13 @@ def render_posts(posts: list[dict[str, Any]]) -> list[str]:
 
 
 def cmd_search(args: argparse.Namespace) -> None:
-    if args.since and not ISO_RE.match(args.since):
-        die(f"invalid --since {args.since!r}: expected ISO 8601, e.g. 2026-07-21 or 2026-07-21T00:00:00Z", 2)
+    if not args.query.strip():
+        die("search query must not be empty", 2)
+    if args.since:
+        try:
+            datetime.fromisoformat(args.since.replace("Z", "+00:00"))
+        except ValueError:
+            die(f"invalid --since {args.since!r}: expected ISO 8601, e.g. 2026-07-21 or 2026-07-21T00:00:00Z", 2)
     data, url = get(
         "app.bsky.feed.searchPosts",
         {"q": args.query, "limit": args.limit, "sort": args.sort, "since": args.since, "lang": args.lang},
@@ -124,16 +135,26 @@ def cmd_search(args: argparse.Namespace) -> None:
 def cmd_feed(args: argparse.Namespace) -> None:
     handle = clean_handle(args.handle)
     data, url = get("app.bsky.feed.getAuthorFeed", {"actor": handle, "limit": args.limit, "filter": "posts_no_replies"})
-    posts = [normalise_post(item.get("post") or {}) for item in data.get("feed", [])]
+    # The API still returns the account's REPOSTS of other authors (marked by a
+    # `reason`); drop them so every row is genuinely authored by the account.
+    items = data.get("feed", [])
+    own = [item for item in items if not item.get("reason")]
+    posts = [normalise_post(item.get("post") or {}) for item in own]
     payload = {
         "kind": "feed",
         "source": SOURCE_NAME,
         "source_url": url,
         "handle": handle,
         "count": len(posts),
+        "reposts_excluded": len(items) - len(own),
         "posts": posts,
     }
-    emit(payload, args.json, [f"@{handle}: {len(posts)} recent posts"] + render_posts(posts))
+    emit(
+        payload,
+        args.json,
+        [f"@{handle}: {len(posts)} recent posts ({payload['reposts_excluded']} reposts of other accounts excluded)"]
+        + render_posts(posts),
+    )
 
 
 def cmd_profile(args: argparse.Namespace) -> None:

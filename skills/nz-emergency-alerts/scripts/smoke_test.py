@@ -62,9 +62,14 @@ r = subprocess.run([sys.executable, str(CLI), "feed-status", "--json"], capture_
 if r.returncode == 0:
     payload = json.loads(r.stdout)
     feeds = {row.get("feed") for row in payload["data"]}
+    warned = set()
+    for w in payload["warnings"]:
+        if "unavailable" in w:
+            if "NEMA" in w: warned.add("nema")
+            if "MetService" in w: warned.add("metservice")
     assert any(row.get("healthy") is True for row in payload["data"])
-    assert feeds & {"nema", "metservice"}, f"expected known feeds, got {feeds}"
-    print("[PASS] live official CAP feed status (NEMA + MetService)")
+    assert feeds | warned >= {"nema", "metservice"}, f"every feed must be present or explicitly warned about; got feeds={feeds} warned={warned}"
+    print("[PASS] live official CAP feed status (NEMA + MetService accounted for)")
 elif r.returncode in {4, 5}:
     print(f"[SKIP] network official CAP feed unavailable: {r.stderr.strip()}")
 else: print(r.stderr, file=sys.stderr); raise SystemExit(1)

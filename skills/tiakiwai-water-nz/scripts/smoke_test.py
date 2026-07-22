@@ -47,17 +47,26 @@ def main() -> int:
         assert jobs[1]["reported_at"] is None, "non-numeric epoch must not crash"
 
     def fixture_where():
-        ns = argparse.Namespace(council="wcc", water_type="storm", search="O'Brien", include_resolved=False)
+        ns = argparse.Namespace(council="wcc", water_type="storm", search="O'Brien 100%_x", include_resolved=False)
         where = cli.build_where(ns)
         assert "councilid = 'WCC'" in where and "watertype = 'Storm Water'" in where
         assert "O''BRIEN" in where, "single quotes must be doubled in SQL literals"
+        assert "100$%$_X" in where and "ESCAPE '$'" in where, "LIKE wildcards must be escaped to match literally"
         assert "Do Not Display" in where and "Resolved" in where
         ns2 = argparse.Namespace(include_resolved=True)
         assert "Resolved" not in cli.build_where(ns2).replace("Do Not Display", "")
+        for bad in ("", "   ", "x" * 201):
+            try:
+                cli.build_where(argparse.Namespace(search=bad))
+            except SystemExit as exc:
+                assert exc.code == 2
+            else:
+                raise AssertionError(f"search {bad!r} must be rejected")
 
     def fixture_epoch():
         assert cli.epoch_to_nz(1784600000000).startswith("2026-")
         assert cli.epoch_to_nz(None) is None and cli.epoch_to_nz("x") is None
+        assert cli.epoch_to_nz(0) is None and cli.epoch_to_nz(True) is None
 
     results.append(check("fixture job feature normalisation", fixture_jobs))
     results.append(check("fixture where-clause construction and quoting", fixture_where))
@@ -86,7 +95,7 @@ def main() -> int:
             live(
                 "summary counts",
                 ["summary", "--json"],
-                lambda d: d["total_open_jobs"] > 0 and any(r["council"] == "WCC" for r in d["by_council_and_type"]),
+                lambda d: d["total_jobs"] > 0 and any(r["council"] == "WCC" for r in d["by_council_and_type"]),
             )
             live(
                 "faults listing",

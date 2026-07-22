@@ -22,17 +22,18 @@ BASE = "https://www.wremo.nz"
 NEWS_PATH = "/news-and-events/wremo-news"
 SOURCE_NAME = "WREMO news (wremo.nz)"
 MONTHS = {
-    "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6, "june": 6,
-    "jul": 7, "july": 7, "aug": 8, "sep": 9, "sept": 9, "oct": 10, "nov": 11, "dec": 12,
+    "jan": 1, "january": 1, "feb": 2, "february": 2, "mar": 3, "march": 3,
+    "apr": 4, "april": 4, "may": 5, "jun": 6, "june": 6, "jul": 7, "july": 7,
+    "aug": 8, "august": 8, "sep": 9, "sept": 9, "september": 9,
+    "oct": 10, "october": 10, "nov": 11, "november": 11, "dec": 12, "december": 12,
 }
-CARD_RE = re.compile(
-    r'card-title"><a href="(?P<href>/news-and-events/[^"]+)"[^>]*>(?P<title>.*?)</a></h2>'
-    r".*?"
-    r'card-text[^>]*>(?P<snippet>.*?)</div>'
-    r".*?"
-    r'article-date">(?P<date>[^<]*)<',
-    re.S,
-)
+# Each news card starts with its title anchor; snippet and date are searched
+# only within that card's segment (up to the next title) so a card missing a
+# field can never steal the next card's date or snippet.
+TITLE_LINK_RE = re.compile(r'card-title"><a href="(?P<href>/news-and-events/[^"]+)"[^>]*>(?P<title>.*?)</a></h2>', re.S)
+SNIPPET_RE = re.compile(r'card-text[^>]*>(?P<snippet>.*?)</div>', re.S)
+DATE_RE = re.compile(r'article-date">(?P<date>[^<]*)<')
+SCRIPT_STYLE_RE = re.compile(r"<(script|style)\b.*?</\1>", re.S | re.I)
 TAG_RE = re.compile(r"<[^>]+>")
 PARAGRAPH_RE = re.compile(r"<p[^>]*>(.*?)</p>", re.S)
 TITLE_RE = re.compile(r"<title>(.*?)</title>", re.S)
@@ -51,15 +52,18 @@ def die(message: str, code: int = 1) -> None:
 
 def fetch_page(path: str) -> tuple[str, str]:
     url = urllib.parse.urljoin(BASE, path)
-    if urllib.parse.urlparse(url).hostname not in ("www.wremo.nz", "wremo.nz"):
-        die(f"unsupported URL host: only wremo.nz pages are read ({url})", 7)
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme != "https" or parsed.port is not None or parsed.hostname not in ("www.wremo.nz", "wremo.nz"):
+        die(f"unsupported URL: only https wremo.nz pages are read ({url})", 7)
     try:
-        text = nzfetch.fetch_text(url, timeout=30, accept="text/html,*/*")
+        text = nzfetch.fetch_text(url, timeout=30, accept="text/html,*/*", allowed_hosts=["www.wremo.nz", "wremo.nz"])
     except nzfetch.RateLimited as exc:
         die(f"network error: rate_limited: retry_after={exc.retry_after}: {exc}", 4)
     except nzfetch.Blocked as exc:
         die(f"network error: {exc}", 4)
     except nzfetch.FetchError as exc:
+        if "HTTP 404" in str(exc):
+            die(f"no page at {url}; check the slug with the news command", 2)
         die(f"upstream unavailable: {exc}", 5)
     return text, url
 
@@ -75,21 +79,26 @@ def parse_date(raw: str) -> str | None:
         return None
     day, month_name, year = parts
     month = MONTHS.get(month_name.rstrip(".").lower())
-    if not month or not day.isdigit() or not year.isdigit():
+    if not month or not day.isdigit() or not year.isdigit() or not 1 <= int(day) <= 31:
         return None
     return f"{int(year):04d}-{month:02d}-{int(day):02d}"
 
 
 def parse_news_listing(page: str) -> list[dict[str, Any]]:
     items = []
-    for match in CARD_RE.finditer(page):
-        raw_date = match.group("date").strip()
+    titles = list(TITLE_LINK_RE.finditer(page))
+    for index, match in enumerate(titles):
+        segment_end = titles[index + 1].start() if index + 1 < len(titles) else len(page)
+        segment = page[match.end():segment_end]
+        snippet_match = SNIPPET_RE.search(segment)
+        date_match = DATE_RE.search(segment)
+        raw_date = date_match.group("date").strip() if date_match else ""
         items.append(
             {
                 "title": clean(match.group("title")),
                 "url": urllib.parse.urljoin(BASE, match.group("href")),
                 "slug": match.group("href").rstrip("/").rsplit("/", 1)[-1],
-                "snippet": clean(match.group("snippet")),
+                "snippet": clean(snippet_match.group("snippet")) if snippet_match else None,
                 "date": parse_date(raw_date),
                 "date_text": raw_date or None,
             }
@@ -103,6 +112,7 @@ def parse_article(page: str) -> dict[str, Any]:
     if title:
         title = re.sub(r"\s*[|»].*$", "", title).strip() or None
     paragraphs = []
+    page = SCRIPT_STYLE_RE.sub(" ", page)
     for raw in PARAGRAPH_RE.findall(page):
         text = clean(raw)
         # Drop short fragments and site-chrome blobs (nav, breadcrumbs, footer).
@@ -127,7 +137,7 @@ def cmd_news(args: argparse.Namespace) -> None:
         die("source schema failure: no news cards found on the WREMO news page; the site markup may have changed", 6)
     if args.search:
         needle = args.search.casefold()
-        items = [i for i in items if needle in i["title"].casefold() or needle in i["snippet"].casefold()]
+        items = [i for i in items if needle in i["title"].casefold() or needle in (i["snippet"] or "").casefold()]
     items.sort(key=lambda i: i["date"] or "", reverse=True)
     total = len(items)
     items = items[: args.limit]
@@ -137,6 +147,7 @@ def cmd_news(args: argparse.Namespace) -> None:
         "source_url": url,
         "search": args.search,
         "total_matches": total,
+        "note": "first listing page only; older items require the site's pagination",
         "items": items,
     }
     lines = [f"WREMO news: {len(items)} shown of {total}"]
