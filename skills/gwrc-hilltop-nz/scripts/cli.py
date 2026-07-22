@@ -3,8 +3,8 @@
 
 Rainfall gauges and river/stream levels and flows through the public Hilltop
 REST endpoint. Read-only, no authentication. Timestamps are NZ local time as
-published by the server. The base URL is parameterisable so the same Hilltop
-query pattern works against other regional councils' servers.
+published by the server. A verified registry exposes the same Hilltop query
+pattern across supported regional councils without accepting arbitrary endpoints.
 """
 from __future__ import annotations
 
@@ -130,6 +130,24 @@ def parse_measurement_list(root: ET.Element) -> list[dict[str, Any]]:
                 }
             )
     return rows
+
+
+def select_measurement_request(rows: list[dict[str, Any]], requested: str, *, exact: bool = False) -> str:
+    """Resolve a display label to the freshest matching Hilltop RequestAs name."""
+    folded = requested.casefold()
+    if exact:
+        exact_matches = [row for row in rows if (row.get("request_as") or "").casefold() == folded]
+        if exact_matches:
+            return exact_matches[0]["request_as"]
+        die(f"no exact RequestAs value {requested!r} at this site; use the measurements command", 2)
+    matches = [row for row in rows if (row.get("measurement") or "").casefold() == folded]
+    if matches:
+        freshest = max(matches, key=lambda row: row.get("to") or "")
+        return freshest.get("request_as") or freshest.get("measurement") or requested
+    request_matches = [row for row in rows if (row.get("request_as") or "").casefold() == folded]
+    if request_matches:
+        return request_matches[0]["request_as"]
+    return requested
 
 
 def parse_time_series(root: ET.Element) -> list[dict[str, Any]]:
@@ -286,16 +304,27 @@ def cmd_measurements(args: argparse.Namespace) -> None:
     lines = [f"Measurements at {args.site}: {len(rows)}"]
     for r in rows:
         units = f" [{r['units']}]" if r["units"] else ""
-        lines.append(f"- {r['measurement']}{units} ({r['data_source']}, {r['from']} → {r['to']})")
+        request_as = r["request_as"] or r["measurement"]
+        lines.append(
+            f"- {r['measurement']}{units} ({r['data_source']}, {r['from']} → {r['to']}; "
+            f"request as: {request_as})"
+        )
     emit(payload, args.json, lines)
 
 
 def cmd_latest(args: argparse.Namespace) -> None:
+    measurements_url = hilltop_url(args.base_url, "MeasurementList", Site=args.site)
+    measurement_rows = parse_measurement_list(fetch_root(measurements_url, args.base_url))
+    resolved_measurement = select_measurement_request(
+        measurement_rows,
+        args.measurement,
+        exact=args.exact_request_as,
+    )
     url = hilltop_url(
         args.base_url,
         "GetData",
         Site=args.site,
-        Measurement=args.measurement,
+        Measurement=resolved_measurement,
         TimeInterval=f"PT{args.window_hours}H",
     )
     blocks = [b for b in parse_time_series(fetch_root(url, args.base_url)) if b["points"]]
@@ -322,6 +351,9 @@ def cmd_latest(args: argparse.Namespace) -> None:
         "source": source_name(args.base_url),
         "source_url": url,
         "site": block["site"],
+        "requested_measurement": args.measurement,
+        "resolved_measurement": resolved_measurement,
+        "exact_request_as": args.exact_request_as,
         "measurement": block["item_name"] or args.measurement,
         "units": block["units"],
         "window_hours": args.window_hours,
@@ -509,7 +541,12 @@ def main() -> None:
 
     s = sub.add_parser("latest", help="latest observation for one site and measurement")
     s.add_argument("--site", required=True, help="exact site name from the sites command")
-    s.add_argument("--measurement", required=True, help="measurement name, e.g. Stage, Flow, Rainfall")
+    s.add_argument("--measurement", required=True, help="display label or exact 'request as' value from measurements")
+    s.add_argument(
+        "--exact-request-as",
+        action="store_true",
+        help="treat --measurement only as a literal RequestAs value, even when it collides with a display label",
+    )
     s.add_argument("--window-hours", type=positive_int(720), default=72, help="lookback window in hours (default 72)")
     add_common(s)
     s.set_defaults(func=cmd_latest)

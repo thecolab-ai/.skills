@@ -62,26 +62,98 @@ def main() -> int:
 
     def fixture_sensor_meta():
         rows = list(csv.DictReader(io.StringIO((FIXTURES / "countline-meta-sample.csv").read_text(encoding="utf-8"))))
+        rows.append(
+            {
+                "COUNTLINE_ID": "90003",
+                "NAME": "Synthetic malformed coordinate",
+                "LATITUDE_START_LINE": "N/A",
+                "LONGITUDE_START_LINE": "174.8",
+                "EARLIEST": "2026-07-01",
+                "LATEST": "2026-07-20",
+            }
+        )
         sensors = cli.parse_sensor_meta(rows)
-        assert len(sensors) == 2, "row without COUNTLINE_ID must be dropped"
+        assert len(sensors) == 3, "row without COUNTLINE_ID must be dropped"
         assert sensors[0]["countline_id"] == "90001" and sensors[0]["latitude"] == -41.3
         assert sensors[0]["latest"] == "2026-07-21"
+        assert sensors[-1]["latitude"] is None and sensors[-1]["longitude"] == 174.8
+        assert cli.parse_optional_float("NaN") is None
+        assert cli.parse_optional_float("inf") is None
+        assert cli.parse_optional_float("-inf") is None
 
     def fixture_mobility():
         rows = list(csv.DictReader(io.StringIO((FIXTURES / "countline-mobility-sample.csv").read_text(encoding="utf-8"))))
+        rows.append(
+            {
+                "COUNTLINE_ID": "90003",
+                "COUNTLINE_DATE": "2026-07-20",
+                "COUNTLINE_HOUR": "8",
+                "DIRECTION_COUNT": "9",
+                "COUNTLINE_TRANSPORT_CLASS": "Car",
+                "DIRECTION": "N",
+            }
+        )
         summary = cli.summarise_mobility(rows)
         assert summary["latest_date"] == "2026-07-21"
         by_key = {(r["countline_id"], r["transport_class"]): r for r in summary["rows"]}
         walker = by_key[("90001", "Pedestrian")]
         assert walker["latest_date_count"] == 12, "hours and directions must sum; bad counts skipped"
+        assert walker["latest_observed_date"] == "2026-07-21" and walker["stale"] is False
         assert walker["days_observed"] == 2 and walker["daily_average"] == 18.0
         assert by_key[("90002", "Car")]["latest_date_count"] == 3
+        stale = by_key[("90003", "Car")]
+        assert stale["latest_date_count"] is None, "missing observations must not be fabricated as zero"
+        assert stale["latest_observed_date"] == "2026-07-20" and stale["stale"] is True
+
+    def fixture_council_scope():
+        allowed = "https://services1.arcgis.com/CPYspmTk3abe6d7i/arcgis/rest/services/example/FeatureServer"
+        allowed_gwrc_legacy = "https://services.arcgis.com/XTtANUDT8Va4DLwI/arcgis/rest/services/example/FeatureServer"
+        unrelated = "https://services1.arcgis.com/0MSEUqKaxRlEPj5g/arcgis/rest/services/example/FeatureServer"
+        for verified in (
+            allowed,
+            allowed_gwrc_legacy,
+            "https://maps.gw.govt.nz/portal/rest/services/example/MapServer",
+            "https://giswebprd.gw.govt.nz/arcgis/rest/services/example/MapServer",
+        ):
+            cli.check_layer_host(verified)
+        for rejected in (unrelated, allowed.replace("https://", "http://", 1)):
+            try:
+                cli.check_layer_host(rejected)
+            except SystemExit as exc:
+                assert exc.code == 7
+            else:
+                raise AssertionError(f"unverified ArcGIS route must be rejected: {rejected}")
+
+        calls = []
+
+        def fake_fetch(url, params=None):
+            calls.append(url)
+            return {
+                "id": "external-item",
+                "orgId": "UNRELATED_ORG",
+                "type": "Feature Service",
+                "url": unrelated,
+            }, url
+
+        original = cli.fetch_json
+        cli.fetch_json = fake_fetch
+        try:
+            try:
+                cli.resolve_layer_url("externalitem123", 0)
+            except SystemExit as exc:
+                assert exc.code == 7
+            else:
+                raise AssertionError("item outside WCC/GWRC must be rejected")
+        finally:
+            cli.fetch_json = original
+        assert len(calls) == 1, "unrelated service URL must fail before a second network request"
 
     results.append(check("fixture sharing-search item normalisation", fixture_search))
     results.append(check("fixture service layer/table parser", fixture_service))
     results.append(check("fixture bbox envelope parameters", fixture_bbox))
     results.append(check("fixture countline metadata parser", fixture_sensor_meta))
     results.append(check("fixture mobility count aggregation", fixture_mobility))
+    results.append(check("fixture council ArcGIS scope enforcement", fixture_council_scope))
 
     def live(name: str, args: list[str], assertion) -> None:
         completed = subprocess.run(

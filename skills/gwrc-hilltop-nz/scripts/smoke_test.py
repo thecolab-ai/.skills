@@ -7,6 +7,9 @@ import json
 import subprocess
 import sys
 import xml.etree.ElementTree as ET
+from contextlib import redirect_stdout
+from io import StringIO
+from types import SimpleNamespace
 from pathlib import Path
 
 CLI = Path(__file__).with_name("cli.py")
@@ -51,6 +54,33 @@ def main() -> int:
         assert rows[0]["units"] == "mm" and rows[0]["data_source"] == "Water Level"
         assert rows[1]["units"] == "m³/sec"
         assert rows[0]["from"] == "1979-03-16T12:15:00"
+
+        duplicate = {
+            **rows[0],
+            "data_source": "Gauging Results",
+            "request_as": "Stage [Gauging Results]",
+            "to": "2026-07-23T14:15:00",
+        }
+        assert cli.select_measurement_request([rows[0], duplicate], "Stage") == "Stage [Gauging Results]"
+        assert cli.select_measurement_request([rows[0], duplicate], "Stage", exact=True) == "Stage"
+        try:
+            cli.select_measurement_request([rows[0], duplicate], "NotARequestAs", exact=True)
+        except SystemExit as exc:
+            assert exc.code == 2
+        else:
+            raise AssertionError("unknown exact RequestAs must fail before GetData")
+        assert cli.select_measurement_request([rows[0], duplicate], "Stage [Gauging Results]") == "Stage [Gauging Results]"
+
+        original = cli.fetch_root
+        cli.fetch_root = lambda *_args, **_kwargs: root
+        output = StringIO()
+        try:
+            with redirect_stdout(output):
+                cli.cmd_measurements(SimpleNamespace(base_url=cli.DEFAULT_BASE, site="Synthetic River", json=False))
+        finally:
+            cli.fetch_root = original
+        assert "request as:" in output.getvalue().lower()
+        assert rows[0]["request_as"] in output.getvalue()
 
     def fixture_time_series():
         root = ET.parse(FIXTURES / "hilltop-get-data.xml").getroot()

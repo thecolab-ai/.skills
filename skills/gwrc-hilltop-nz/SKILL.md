@@ -61,8 +61,8 @@ python3 skills/gwrc-hilltop-nz/scripts/cli.py collections
 ```
 
 - `sites [--measurement NAME] [--search TEXT] [--limit N] [--json]` — monitoring sites with lat/long
-- `measurements --site NAME [--json]` — data sources, measurements, units, and date spans at one site
-- `latest --site NAME --measurement NAME [--window-hours N] [--json]` — most recent observation
+- `measurements --site NAME [--json]` — data sources, labels, copy-pastable `request as` names, units, and date spans at one site
+- `latest --site NAME --measurement NAME [--exact-request-as] [--window-hours N] [--json]` — most recent observation; a plain label resolves to the freshest matching series. Use `--exact-request-as` to force literal `request as` selection when a value such as `Stage` also collides with a display label.
 - `rainfall [--hours N] [--search TEXT] [--limit N] [--json]` — per-gauge totals over the window, wettest first
 - `rivers [--hours N] [--search TEXT] [--limit N] [--json]` — latest level/flow per site with min/max and rising/falling/steady trend
 - `collections [--json]` — Hilltop collection names
@@ -80,6 +80,12 @@ council run `collections --council <key>` and pass `--collection NAME`.
 - Gauges log every ~5–15 minutes but upload every 2–3 hours: treat "latest" as up to
   a few hours behind reality, and never as a substitute for official warnings.
 - Timestamps are NZ local time exactly as published by the server.
+- Sites can expose duplicate labels such as `Stage` under multiple data sources.
+  `measurements` prints each exact `request as` value; `latest --measurement Stage`
+  selects the matching series with the newest advertised `to` timestamp and reports
+  both `requested_measurement` and `resolved_measurement` in JSON. Add
+  `--exact-request-as` to select a literal `request as` value when it also matches
+  a display label.
 - `rainfall` and `rivers` exclude decommissioned gauges that still answer with
   years-old data, and report how many were excluded; `latest` flags such readings
   with `stale: true` and their age in hours.

@@ -3599,10 +3599,13 @@
         "data-gwrc.opendata.arcgis.com",
         "www.arcgis.com",
         "hub.arcgis.com",
+        "services.arcgis.com",
         "services1.arcgis.com",
         "services2.arcgis.com",
         "gis.wcc.govt.nz",
+        "giswebprd.gw.govt.nz",
         "mapping.gw.govt.nz",
+        "maps.gw.govt.nz",
         "gis-snowflake-opendata-public-wcc-arcgis-prod.s3.ap-southeast-2.amazonaws.com"
       ],
       "last_verified": "2026-07-22",

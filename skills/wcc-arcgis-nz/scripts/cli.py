@@ -13,6 +13,7 @@ import argparse
 import csv
 import io
 import json
+import math
 import pathlib
 import sys
 import urllib.parse
@@ -41,8 +42,20 @@ PORTALS = {
         "site": "https://data-gwrc.opendata.arcgis.com/",
     },
 }
-# Layer queries may only leave for council/Esri infrastructure.
-ALLOWED_LAYER_SUFFIXES = (".arcgis.com", ".wcc.govt.nz", ".gw.govt.nz")
+# Layer queries may only leave for the councils' verified infrastructure. ArcGIS
+# Online service URLs also carry the owning organisation id as their first path
+# segment, so enforce that rather than trusting every tenant on *.arcgis.com.
+ARCGIS_SERVICE_HOSTS = {"services.arcgis.com", "services1.arcgis.com", "services2.arcgis.com"}
+COUNCIL_SERVICE_HOSTS = {
+    "gis.wcc.govt.nz",
+    "giswebprd.gw.govt.nz",
+    "mapping.gw.govt.nz",
+    "maps.gw.govt.nz",
+}
+COUNCIL_ORG_IDS = {portal["org_id"] for portal in PORTALS.values()}
+# ArcGIS Online normally uses the org id as the tenant path. GWRC retains one
+# verified legacy tenant id on services.arcgis.com.
+COUNCIL_TENANT_IDS = COUNCIL_ORG_IDS | {"XTtANUDT8Va4DLwI"}
 ATTRIBUTION = "CC BY 4.0 — attribute the owning council"
 
 
@@ -55,7 +68,8 @@ def fetch_json(url: str, params: dict[str, Any] | None = None) -> tuple[Any, str
     if params:
         url = url + "?" + urllib.parse.urlencode({k: v for k, v in params.items() if v is not None})
     try:
-        data = nzfetch.fetch_json(url, timeout=45)
+        host = urllib.parse.urlparse(url).hostname
+        data = nzfetch.fetch_json(url, timeout=45, allowed_hosts=[host] if host else None)
     except nzfetch.RateLimited as exc:
         die(f"network error: rate_limited: retry_after={exc.retry_after}: {exc}", 4)
     except nzfetch.Blocked as exc:
@@ -82,13 +96,28 @@ def normalise_item(item: dict[str, Any]) -> dict[str, Any]:
 
 
 def check_layer_host(url: str) -> None:
-    host = (urllib.parse.urlparse(url).hostname or "").lower()
-    if not host or not host.endswith(ALLOWED_LAYER_SUFFIXES):
+    parsed = urllib.parse.urlparse("")
+    try:
+        parsed = urllib.parse.urlparse(url)
+        host = (parsed.hostname or "").lower()
+        invalid_authority = parsed.port is not None or parsed.username is not None or parsed.password is not None
+    except ValueError:
+        host = ""
+        invalid_authority = True
+    allowed = parsed.scheme == "https" and not invalid_authority and host in (ARCGIS_SERVICE_HOSTS | COUNCIL_SERVICE_HOSTS)
+    if allowed and host in ARCGIS_SERVICE_HOSTS:
+        path_parts = [urllib.parse.unquote(part) for part in parsed.path.split("/") if part]
+        allowed = bool(path_parts and path_parts[0] in COUNCIL_TENANT_IDS)
+    if not allowed:
         die(
-            f"unsupported layer host {host!r}: only council/Esri hosts "
-            f"({', '.join('*' + s for s in ALLOWED_LAYER_SUFFIXES)}) are queried",
+            f"unsupported layer URL {url!r}: use HTTPS and a verified WCC/GWRC service host or ArcGIS organisation",
             7,
         )
+
+
+def validate_item_org(item: dict[str, Any], reference: str) -> None:
+    if item.get("orgId") not in COUNCIL_ORG_IDS:
+        die(f"ArcGIS item {reference!r} is not owned by the verified WCC/GWRC organisations", 7)
 
 
 def resolve_layer_url(reference: str, layer_id: int | None) -> str:
@@ -99,6 +128,7 @@ def resolve_layer_url(reference: str, layer_id: int | None) -> str:
         if not reference.replace("-", "").isalnum() or len(reference) < 8:
             die(f"invalid layer reference {reference!r}: pass an item id or a service/layer URL", 2)
         item, _ = fetch_json(SHARING_ITEM + urllib.parse.quote(reference), {"f": "json"})
+        validate_item_org(item, reference)
         url = (item.get("url") or "").rstrip("/")
         if not url:
             die(f"item {reference} has no service URL (type {item.get('type')!r}); pick a Feature/Map Service item", 2)
@@ -195,6 +225,7 @@ def cmd_layers(args: argparse.Namespace) -> None:
         service_url = reference.rstrip("/")
     else:
         item, _ = fetch_json(SHARING_ITEM + urllib.parse.quote(reference), {"f": "json"})
+        validate_item_org(item, reference)
         service_url = (item.get("url") or "").rstrip("/")
         if not service_url:
             die(f"item {reference} has no service URL (type {item.get('type')!r})", 2)
@@ -279,13 +310,21 @@ def parse_sensor_meta(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
             {
                 "countline_id": row["COUNTLINE_ID"],
                 "name": row.get("NAME"),
-                "latitude": float(row["LATITUDE_START_LINE"]) if row.get("LATITUDE_START_LINE") else None,
-                "longitude": float(row["LONGITUDE_START_LINE"]) if row.get("LONGITUDE_START_LINE") else None,
+                "latitude": parse_optional_float(row.get("LATITUDE_START_LINE")),
+                "longitude": parse_optional_float(row.get("LONGITUDE_START_LINE")),
                 "earliest": row.get("EARLIEST"),
                 "latest": row.get("LATEST"),
             }
         )
     return out
+
+
+def parse_optional_float(raw: str | None) -> float | None:
+    try:
+        value = float(raw) if raw else None
+    except (TypeError, ValueError):
+        return None
+    return value if value is not None and math.isfinite(value) else None
 
 
 def summarise_mobility(rows: list[dict[str, str]]) -> dict[str, Any]:
@@ -310,9 +349,16 @@ def summarise_mobility(rows: list[dict[str, str]]) -> dict[str, Any]:
     for (countline, klass, date), count in daily.items():
         entry = summary.setdefault(
             (countline, klass),
-            {"countline_id": countline, "transport_class": klass, "latest_date_count": 0, "day_totals": []},
+            {
+                "countline_id": countline,
+                "transport_class": klass,
+                "latest_date_count": None,
+                "latest_observed_date": date,
+                "day_totals": [],
+            },
         )
         entry["day_totals"].append(count)
+        entry["latest_observed_date"] = max(entry["latest_observed_date"], date)
         if date == latest_date:
             entry["latest_date_count"] = count
     rows_out = []
@@ -320,6 +366,7 @@ def summarise_mobility(rows: list[dict[str, str]]) -> dict[str, Any]:
         totals = entry.pop("day_totals")
         entry["daily_average"] = round(sum(totals) / len(totals), 1)
         entry["days_observed"] = len(totals)
+        entry["stale"] = entry["latest_observed_date"] != latest_date
         rows_out.append(entry)
     return {"latest_date": latest_date, "rows": rows_out}
 
@@ -387,10 +434,14 @@ def cmd_sensors_latest(args: argparse.Namespace) -> None:
         row["name"] = info.get("name")
         row["latitude"] = info.get("latitude")
         row["longitude"] = info.get("longitude")
+        row["metadata_latest_date"] = info.get("latest")
     if args.search:
         needle = args.search.casefold()
         out_rows = [r for r in out_rows if needle in (r.get("name") or "").casefold()]
-    out_rows.sort(key=lambda r: r["latest_date_count"], reverse=True)
+    out_rows.sort(
+        key=lambda r: (r["latest_date_count"] is not None, r["latest_date_count"] or 0),
+        reverse=True,
+    )
     total = len(out_rows)
     if args.limit:
         out_rows = out_rows[: args.limit]
@@ -401,7 +452,7 @@ def cmd_sensors_latest(args: argparse.Namespace) -> None:
         "licence": ATTRIBUTION,
         "month": f"{used[0]}-{used[1]}",
         "latest_date": summary["latest_date"],
-        "note": "counts refresh no less than monthly; latest_date is the newest day in the published file",
+        "note": "counts refresh no less than monthly; null latest_date_count means the countline/class did not report on latest_date",
         "total_rows": total,
         "counts": out_rows,
     }
@@ -410,9 +461,13 @@ def cmd_sensors_latest(args: argparse.Namespace) -> None:
         f"{len(out_rows)} shown of {total}, busiest first):"
     ]
     for r in out_rows:
+        if r["latest_date_count"] is None:
+            reading = f"no observation on {summary['latest_date']} (last observed {r['latest_observed_date']})"
+        else:
+            reading = str(r["latest_date_count"])
         lines.append(
-            f"- {r['name'] or r['countline_id']} [{r['transport_class']}]: {r['latest_date_count']} "
-            f"(daily avg {r['daily_average']} over {r['days_observed']} days)"
+            f"- {r['name'] or r['countline_id']} [{r['transport_class']}]: {reading} "
+            f"(daily avg {r['daily_average']} over {r['days_observed']} observed days)"
         )
     emit(payload, args.json, lines)
 

@@ -48,6 +48,12 @@ Verified live 22 July 2026 (server version 2606.0.2.92, `<Agency>GWRC</Agency>`)
   every request type.
 - Errors come back as `<HilltopServer><Error>...</Error>` with HTTP 200; the CLI maps
   unknown-site errors to invalid-input exit 2 and other server errors to exit 5.
+- Measurement labels are not unique per site. `MeasurementList` can expose several
+  `Stage` rows under different data sources, each with a distinct `RequestAs` value.
+  The `measurements` command prints that copy-pastable value. For a plain label,
+  `latest` selects the matching row with the newest advertised `To` timestamp.
+  `--exact-request-as` forces literal `RequestAs` selection when that value also
+  collides with a display label. JSON records whether exact mode was used.
 
 ## Generalisation
 
