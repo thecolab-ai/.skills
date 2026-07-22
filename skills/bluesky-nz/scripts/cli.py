@@ -210,7 +210,7 @@ def main() -> None:
     s.set_defaults(func=cmd_search)
 
     s = sub.add_parser("feed", help="recent public posts from one account")
-    s.add_argument("handle", help="account handle, e.g. metservice.bsky.social")
+    s.add_argument("handle", help="account handle, e.g. metservice.com")
     s.add_argument("--limit", type=positive_int(100), default=20, help="maximum posts (default 20)")
     s.add_argument("--json", action="store_true", help="emit machine-readable JSON")
     s.set_defaults(func=cmd_feed)

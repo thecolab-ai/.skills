@@ -38,8 +38,8 @@ read-only CLI with human and JSON output.
 - A task needs current or recent Wellington-region river or stream levels/flows
 - A task needs rainfall totals across the region's gauges over a recent window
 - A task needs GWRC monitoring site locations or the measurements a site offers
-- A workflow needs machine-readable Hilltop time-series data (any council's server
-  via `--base-url`; GWRC is the default)
+- A workflow needs machine-readable Hilltop time-series data from a verified
+  council server in the built-in registry; GWRC is the default
 
 ## Do not use this for
 
@@ -68,8 +68,9 @@ python3 skills/gwrc-hilltop-nz/scripts/cli.py collections
 - `collections [--json]` — Hilltop collection names
 - `councils [--json]` — verified council Hilltop servers in the registry
 
-All data commands accept `--council gwrc|hbrc|marlborough|northland|tasman` (verified
-servers) or `--base-url` for any other council's Hilltop endpoint. Collection names
+All data commands accept `--council gwrc|hbrc|marlborough|northland|tasman`.
+Arbitrary endpoints are deliberately rejected; new official council servers must be
+verified and added to the registry and declared-domain metadata. Collection names
 differ per council: `rainfall`/`rivers` default to GWRC's collections — for another
 council run `collections --council <key>` and pass `--collection NAME`.
 

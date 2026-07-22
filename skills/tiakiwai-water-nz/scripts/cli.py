@@ -91,6 +91,11 @@ def build_where(args: argparse.Namespace) -> str:
     return " AND ".join(clauses)
 
 
+def build_fault_where(job_number: str) -> str:
+    """Direct lookup keeps historical resolved records but never suppressed rows."""
+    return f"wonum = {sql_quote(job_number)} AND StatusDescription <> {sql_quote(HIDDEN_STATUS)}"
+
+
 def epoch_to_nz(value: Any) -> str | None:
     if isinstance(value, bool) or not isinstance(value, (int, float)) or value <= 0:
         return None
@@ -174,8 +179,7 @@ def cmd_fault(args: argparse.Namespace) -> None:
         die(f"invalid job number {args.job_number!r}: expected ASCII digits (the wonum from faults output)", 2)
     data, url = query_layer(
         {
-            # Match the source's own publication contract even on direct lookup.
-            "where": f"wonum = {sql_quote(args.job_number)} AND StatusDescription <> {sql_quote(HIDDEN_STATUS)}",
+            "where": build_fault_where(args.job_number),
             "outFields": "*",
             "outSR": "4326",
             "f": "geojson",
@@ -275,8 +279,8 @@ def main() -> None:
     s.add_argument("--json", action="store_true", help="emit machine-readable JSON")
     s.set_defaults(func=cmd_faults)
 
-    s = sub.add_parser("fault", help="one job by its job number (wonum)")
-    s.add_argument("job_number", help="job number from faults output")
+    s = sub.add_parser("fault", help="one known job by wonum, including resolved history")
+    s.add_argument("job_number", help="known job number; resolved records may be returned")
     s.add_argument("--json", action="store_true", help="emit machine-readable JSON")
     s.set_defaults(func=cmd_fault)
 

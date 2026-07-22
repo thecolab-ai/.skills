@@ -25,7 +25,9 @@ supports `where`, `orderByFields`, `returnDistinctValues`, and `outStatistics`
 - `watertype`: Potable Water, Storm Water, Waste Water.
 - `StatusDescription`: New, In Queue, Under Investigation, In Progress, Resolved,
   Do Not Display. "Do Not Display" is the source's own suppression flag — always
-  excluded. Resolved is excluded by default (`--include-resolved` re-adds it).
+  excluded. `faults` and `summary` exclude Resolved by default
+  (`--include-resolved` re-adds it); direct `fault` lookup may return a resolved
+  record when its job number is known.
 - `reportdate`/`actstart`/`compdate`: epoch milliseconds; converted to
   Pacific/Auckland ISO in output.
 - `wonum` is the stable public job number; `externalrefid` is the council's

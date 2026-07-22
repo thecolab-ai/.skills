@@ -68,9 +68,16 @@ def main() -> int:
         assert cli.epoch_to_nz(None) is None and cli.epoch_to_nz("x") is None
         assert cli.epoch_to_nz(0) is None and cli.epoch_to_nz(True) is None
 
+    def fixture_direct_lookup_where():
+        where = cli.build_fault_where("940678")
+        assert "wonum = '940678'" in where
+        assert "Do Not Display" in where, "direct lookup must preserve the source suppression flag"
+        assert "Resolved" not in where, "known job numbers may retrieve resolved historical records"
+
     results.append(check("fixture job feature normalisation", fixture_jobs))
     results.append(check("fixture where-clause construction and quoting", fixture_where))
     results.append(check("fixture epoch conversion", fixture_epoch))
+    results.append(check("fixture direct lookup publication contract", fixture_direct_lookup_where))
 
     def live(name: str, args: list[str], assertion) -> None:
         completed = subprocess.run(

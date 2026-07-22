@@ -49,7 +49,7 @@ AppView API — a public social signal channel for detecting emerging NZ events
 ```bash
 python3 skills/bluesky-nz/scripts/cli.py search "wellington south coast waves" --limit 20 --json
 python3 skills/bluesky-nz/scripts/cli.py search "state of emergency" --since 2026-07-21 --lang en
-python3 skills/bluesky-nz/scripts/cli.py feed wremo.bsky.social --limit 10
+python3 skills/bluesky-nz/scripts/cli.py feed metservice.com --limit 10
 python3 skills/bluesky-nz/scripts/cli.py profile some-account.bsky.social
 ```
 
@@ -64,8 +64,8 @@ python3 skills/bluesky-nz/scripts/cli.py profile some-account.bsky.social
   "NZ", "Aotearoa", agency names.
 - **Verify handles before trusting an account.** Handles are self-registered:
   `metservice.bsky.social` is a band, not the weather service. Run `profile`
-  and check the description/domain handle (a `*.govt.nz`-style handle is
-  domain-verified) before treating an account as official.
+  and check the description/domain handle. A handle on the organisation's own
+  domain, such as `metservice.com`, is domain-verified.
 - Crowd posts are unverified by definition; the JSON output carries this warning.
 - Timestamps are UTC as published. Post URLs link to the public web app.
 

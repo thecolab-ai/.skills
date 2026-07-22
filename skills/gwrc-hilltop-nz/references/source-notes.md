@@ -65,7 +65,8 @@ Collection names are council-specific (e.g. HBRC uses `HBRC_Rainfall`), so the
 `rainfall`/`rivers` GWRC defaults need `--collection` when pointed elsewhere.
 Probed but not shipped: Horizons, Gisborne, Environment Southland (hosts did not
 resolve on the guessed patterns), Bay of Plenty (responded without an Agency
-element). `--base-url` still accepts any other endpoint explicitly.
+element). Arbitrary endpoints are not accepted: new official council servers must
+be verified, added to the registry, and declared in `thecolab.allowed_domains`.
 
 ## Stability and licence
 

@@ -55,15 +55,17 @@ python3 skills/tiakiwai-water-nz/scripts/cli.py fault 940173 --json
 ```
 
 - `faults [--council wcc|hcc|pcc|uhcc] [--water-type drinking|storm|waste] [--search TEXT] [--include-resolved] [--limit N] [--json]` — open jobs, newest first
-- `fault JOB_NUMBER [--json]` — one job with full detail
+- `fault JOB_NUMBER [--json]` — one known job with full detail, including a
+  resolved historical record when it remains on the public layer
 - `summary [--council ...] [--water-type ...] [--include-resolved] [--json]` — open-job counts by council and water type
 
 ## Notes
 
 - Data source: the public ArcGIS feature layer Tiaki Wai's own outage map reads
   (`Job_Status_Public_View`); no key or login.
-- Rows the source marks "Do Not Display" are always excluded; resolved jobs are
-  excluded unless `--include-resolved`.
+- Rows the source marks "Do Not Display" are always excluded. `faults` and
+  `summary` exclude resolved jobs unless `--include-resolved`; direct `fault`
+  lookup can return a resolved record when its job number is known.
 - Timestamps are converted to Pacific/Auckland ISO; raw epoch values remain in
   `fault`'s `raw_properties`.
 - Jobs are operational maintenance records, not customer-facing outage notices —

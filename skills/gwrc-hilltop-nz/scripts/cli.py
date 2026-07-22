@@ -69,15 +69,14 @@ def hilltop_url(base: str, request: str, **params: str | None) -> str:
 
 
 def fetch_root(url: str, base: str) -> ET.Element:
+    registry_urls = {council_url for _, council_url in COUNCILS.values()}
+    if base not in registry_urls:
+        die("unsupported Hilltop server: choose a verified server with --council", 2)
     parsed = urllib.parse.urlparse(base)
-    if parsed.scheme not in ("http", "https") or not parsed.hostname:
-        die(f"invalid base URL: {base!r}", 2)
-    # The host allowlist only applies to registry servers; a user-supplied
-    # --base-url is an explicit direction to another council's server (and may
-    # carry a non-default port, which the allowlist would reject).
-    allowed = [parsed.hostname] if base in {council_url for _, council_url in COUNCILS.values()} else None
+    if parsed.scheme != "https" or not parsed.hostname or parsed.port is not None or parsed.username or parsed.password:
+        die(f"invalid registered base URL: {base!r}", 2)
     try:
-        text = nzfetch.fetch_text(url, timeout=45, accept="application/xml,text/xml,*/*", allowed_hosts=allowed)
+        text = nzfetch.fetch_text(url, timeout=45, accept="application/xml,text/xml,*/*", allowed_hosts=[parsed.hostname])
     except nzfetch.RateLimited as exc:
         die(f"network error: rate_limited: retry_after={exc.retry_after}: {exc}", 4)
     except nzfetch.Blocked as exc:
@@ -474,7 +473,6 @@ def positive_int(maximum: int):
 
 def add_common(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--council", choices=sorted(COUNCILS), help="verified council Hilltop server (default gwrc)")
-    parser.add_argument("--base-url", default=None, help="explicit Hilltop endpoint for a council not in the registry")
     parser.add_argument("--json", action="store_true", help="emit machine-readable JSON")
 
 
@@ -482,12 +480,6 @@ def resolve_base(args: argparse.Namespace) -> None:
     collection = getattr(args, "collection", "unset")
     if collection is not None and not str(collection).strip():
         die("--collection must not be empty", 2)
-    if args.base_url is not None and args.council:
-        die("pass either --council or --base-url, not both", 2)
-    if args.base_url is not None:
-        if not args.base_url.strip():
-            die("--base-url must not be empty", 2)
-        return
     args.base_url = COUNCILS[args.council or "gwrc"][1]
 
 

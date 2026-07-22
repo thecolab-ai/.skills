@@ -47,7 +47,7 @@ def main() -> int:
     def fixture_urls_and_handles():
         assert cli.post_web_url("at://did:plc:x/app.bsky.feed.post/abc", None) == "https://bsky.app/profile/did:plc:x/post/abc"
         assert cli.post_web_url("not-an-at-uri", "h.example") is None
-        assert cli.clean_handle("@MetService.bsky.social") == "metservice.bsky.social"
+        assert cli.clean_handle("@MetService.com") == "metservice.com"
         for bad in ("nodots", "", "@"):
             try:
                 cli.clean_handle(bad)
@@ -56,8 +56,21 @@ def main() -> int:
             else:
                 raise AssertionError(f"handle {bad!r} must be rejected")
 
+    def fixture_verified_help_example():
+        completed = subprocess.run(
+            [sys.executable, str(CLI), "feed", "--help"],
+            text=True,
+            capture_output=True,
+            timeout=20,
+            check=False,
+        )
+        assert completed.returncode == 0
+        assert "metservice.com" in completed.stdout
+        assert "metservice.bsky.social" not in completed.stdout
+
     results.append(check("fixture post normalisation", fixture_posts))
     results.append(check("fixture web URLs and handle validation", fixture_urls_and_handles))
+    results.append(check("fixture domain-verified help example", fixture_verified_help_example))
 
     def live(name: str, args: list[str], assertion) -> None:
         completed = subprocess.run(
