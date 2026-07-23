@@ -43,6 +43,13 @@ UA = os.environ.get(
 )
 
 
+def account_commands_enabled(env: Any = None) -> bool:
+    """Expose personal commands only when the provider credential pair is present."""
+    source = os.environ if env is None else env
+    username = source.get("NEWWORLD_USERNAME") or source.get("NEWWORLD_EMAIL")
+    return bool(username and source.get("NEWWORLD_PASSWORD"))
+
+
 class AuthHTTPError(Exception):
     def __init__(self, status: int, code: str = "", message: str = ""):
         super().__init__(message or code or f"HTTP {status}")
@@ -1038,11 +1045,32 @@ def cmd_cart_remove(args: argparse.Namespace) -> None:
     print_mutation_result("cart-remove", data, json_output=args.json)
 
 
-def build_parser() -> argparse.ArgumentParser:
+def build_parser(include_account: bool | None = None) -> argparse.ArgumentParser:
+    if include_account is None:
+        include_account = account_commands_enabled()
+    scope = (
+        "public catalogue, account history, lists, and cart management"
+        if include_account
+        else "public catalogue lookup"
+    )
+    account_examples = """
+          newworld auth login
+          newworld orders --limit 20
+          newworld lists
+          newworld list-create "Weekly shop"
+          newworld list-add <list-id> 5201479
+          newworld cart
+          newworld cart-add 5201479 --quantity 2
+    """ if include_account else """
+
+        Optional account features:
+          Set NEWWORLD_USERNAME (or NEWWORLD_EMAIL) and NEWWORLD_PASSWORD
+          before launching the CLI to enable them.
+    """
     p = argparse.ArgumentParser(
         prog="newworld",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        description="Unofficial New World NZ CLI for public catalogue, account history, lists, and cart management.",
+        description=f"Unofficial New World NZ CLI for {scope}.",
         epilog=textwrap.dedent(f"""
         Defaults:
           store id: {DEFAULT_STORE_ID} (override with --store-id or NEWWORLD_STORE_ID)
@@ -1053,13 +1081,7 @@ def build_parser() -> argparse.ArgumentParser:
           newworld specials --limit 20
           newworld product 5201479
           newworld categories --depth 2
-          newworld auth login
-          newworld orders --limit 20
-          newworld lists
-          newworld list-create "Weekly shop"
-          newworld list-add <list-id> 5201479
-          newworld cart
-          newworld cart-add 5201479 --quantity 2
+        {account_examples}
         """),
     )
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -1103,6 +1125,9 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--store-id", default=DEFAULT_STORE_ID)
     sp.add_argument("--json", action="store_true")
     sp.set_defaults(func=cmd_product)
+
+    if not include_account:
+        return p
 
     sp = sub.add_parser("auth", help="manage optional Club+ authentication")
     auth_sub = sp.add_subparsers(dest="auth_cmd", required=True)

@@ -104,7 +104,7 @@ def test_auth_helpers_fixture():
             module.AUTH_FILE = original_auth_file
             module.auth_http = original_auth_http
 
-    parser = module.build_parser()
+    parser = module.build_parser(include_account=True)
     assert parser.parse_args(["orders", "--source", "IN_STORE"]).cmd == "orders"
     assert parser.parse_args(["auth", "mfa"]).auth_cmd == "mfa"
     assert parser.parse_args(["list", "synthetic-list"]).list_id == "synthetic-list"
@@ -138,7 +138,7 @@ def test_list_mutation_contract():
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
-    parser = module.build_parser()
+    parser = module.build_parser(include_account=True)
     calls = []
 
     def fake_account_api(method, path, data=None):
@@ -219,7 +219,7 @@ def test_cart_mutation_contract():
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
-    parser = module.build_parser()
+    parser = module.build_parser(include_account=True)
     calls = []
 
     def fake_account_api(method, path, data=None):
@@ -316,9 +316,45 @@ def test_cart_mutation_contract():
 results.append(test("fixture cart mutation contract", test_cart_mutation_contract))
 
 
+def test_account_command_gate():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("newworld_nz_command_gate_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+
+    assert not module.account_commands_enabled({})
+    assert not module.account_commands_enabled({"NEWWORLD_USERNAME": "member@example.invalid"})
+    assert module.account_commands_enabled(
+        {
+            "NEWWORLD_EMAIL": "member@example.invalid",
+            "NEWWORLD_PASSWORD": "synthetic-password",
+        }
+    )
+
+    guest_parser = module.build_parser(include_account=False)
+    guest_help = guest_parser.format_help()
+    for hidden_command in ("auth", "orders", "list-create", "cart-add"):
+        assert hidden_command not in guest_help
+
+    account_parser = module.build_parser(include_account=True)
+    account_help = account_parser.format_help()
+    for visible_command in ("auth", "orders", "list-create", "cart-add"):
+        assert visible_command in account_help
+    print("[PASS] account commands are hidden until provider credentials are present")
+    return True
+
+
+results.append(test("fixture account command environment gate", test_account_command_gate))
+
+
 def test_help():
     result = run(["--help"])
-    return result.returncode == 0
+    if result.returncode != 0:
+        return False
+    return all(command not in result.stdout for command in ("orders", "list-create", "cart-add"))
 
 
 results.append(test("--help exits 0", test_help))

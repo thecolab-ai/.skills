@@ -73,6 +73,8 @@ export NEWWORLD_PASSWORD='...'
 python3 skills/newworld-nz/scripts/cli.py auth login
 ```
 
+- The CLI registers and displays account, order, list, and cart commands only when both `NEWWORLD_USERNAME` (or `NEWWORLD_EMAIL`) and `NEWWORLD_PASSWORD` are present in its environment.
+- Without that credential pair, `--help` and command parsing expose only the guest catalogue commands.
 - The password is read only from the environment and is never written to disk.
 - Rotating access and refresh tokens are cached at `~/.cache/newworld-cli/auth.json` with file mode `0600`.
 - Override the cache location with `NEWWORLD_AUTH_FILE`.
@@ -93,6 +95,8 @@ Default store is New World Papakura: `ef977d89-f3d8-4e8b-8a48-b895ded38646`.
 Override with `--store-id <id>` or `NEWWORLD_STORE_ID`.
 
 ### Commands
+
+The first six guest commands are always available. The remaining account commands appear only when the Club+ username/email and password environment variables are set.
 
 - `stores [--query text] [--limit N] [--json]` — list or filter New World stores
 - `categories [--store-id id] [--depth N] [--json]` — browse a store category tree
