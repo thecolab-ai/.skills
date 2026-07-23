@@ -3,8 +3,9 @@
   "name": "nz-personal-data",
   "description": "User-authorised personal data with runtime credentials and no live personal CI fixtures.",
   "default": false,
-  "skill_count": 1,
+  "skill_count": 2,
   "skills": [
-    "akahu-personal"
+    "akahu-personal",
+    "newworld-nz"
   ]
 }

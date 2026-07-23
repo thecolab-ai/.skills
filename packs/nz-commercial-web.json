@@ -3,7 +3,7 @@
   "name": "nz-commercial-web",
   "description": "Read-only public commercial websites and market surfaces.",
   "default": false,
-  "skill_count": 42,
+  "skill_count": 41,
   "skills": [
     "airnz-flights",
     "animates-nz",
@@ -28,7 +28,6 @@
     "legacy-aquatics-nz",
     "mitre10-nz",
     "nature-baby-nz",
-    "newworld-nz",
     "nz-airports",
     "nz-cinemas",
     "nz-healthpoint",
