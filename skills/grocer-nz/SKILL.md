@@ -1,6 +1,6 @@
 ---
 name: grocer-nz
-description: "Query grocer.nz public NZ supermarket price data — store lookup, product search, current per-store prices, and historical product price rows from public DuckDB/parquet assets. Use for NZ grocery/supermarket pricing across Woolworths, New World, PAK'nSAVE, Fresh Choice, and related stores. Read-only; no login or private user data."
+description: "Query grocer.nz public NZ supermarket data — canonical product and barcode/GTIN lookup, cross-retailer product matching, store lookup, current per-store prices, and historical price rows from public DuckDB/parquet assets. Use for exact NZ grocery product matching or pricing across Woolworths, New World, PAK'nSAVE, Fresh Choice, and related stores. Read-only; no login or private user data."
 license: MIT
 compatibility: "Requires Python 3.10+ and network access for live data"
 metadata:
@@ -19,7 +19,7 @@ metadata:
   thecolab.pack: "nz-commercial-web"
   thecolab.source_url: "https://assets-prod.grocer.nz/public"
   thecolab.allowed_domains: "assets-prod.grocer.nz,grocer.nz,meilisearch.grocer.nz"
-  thecolab.last_verified: "2026-07-19"
+  thecolab.last_verified: "2026-07-24"
   thecolab.health: "healthy"
   thecolab.maintainer: "@adam91holt"
 ---
@@ -28,7 +28,7 @@ metadata:
 
 ## Overview
 
-This skill queries public data exposed by **grocer.nz**, a New Zealand grocery price comparison app. It is useful for current supermarket price checks, per-store comparisons, and historical product price rows.
+This skill queries public data exposed by **grocer.nz**, a New Zealand grocery price comparison app. It is useful as a canonical product/GTIN crosswalk as well as for current supermarket price checks, per-store comparisons, and historical product price rows.
 
 The CLI uses:
 
@@ -53,6 +53,8 @@ The script bootstraps `duckdb` via `uv` when the active Python does not already 
 - Adam wants a store id for a known store, e.g. Papakura.
 - Adam wants price history for a known Grocer product id.
 - Adam wants current prices for one product across selected stores.
+- Adam wants to identify the same exact product in the Woolworths, New World, or PAK'nSAVE skills.
+- Adam has a UPC, EAN, or GTIN and needs the corresponding Grocer product id.
 
 Do **not** use this for authenticated Grocer Pro features, private user lists, or anything requiring sign-in. This skill is read-only public data only.
 
@@ -93,7 +95,32 @@ python3 $GROCER search "milk" --store-query Papakura --limit 3
 python3 $GROCER search "whittakers" --store-id 230 --store-id 307 --json
 ```
 
-The search command returns Grocer product ids. Use those ids with `prices` and `history`.
+The search command returns Grocer product ids, canonical GTIN-14 `barcodes`, and compact `retailer_search_terms`. Use the product ids with `prices` and `history`; use the retailer search terms with the retailer-native skills.
+
+### Resolve a barcode
+
+Grocer stores barcodes in zero-padded GTIN-14 form. The command accepts compact UPC/EAN forms too:
+
+```bash
+python3 $GROCER barcode 94152210
+python3 $GROCER barcode 00000094152210 --json
+```
+
+For Anchor Blue Milk 2L, this resolves to Grocer product `5452`, canonical GTIN `00000094152210`, and retailer search term `94152210`.
+
+### Match the exact product across retailers
+
+1. Search Grocer by product description and select the right brand/name/size candidate.
+2. Copy a returned `retailer_search_terms` value.
+3. Search each retailer skill with that value:
+
+```bash
+python3 skills/woolworths-nz/scripts/cli.py search 94152210 --json
+python3 skills/paknsave-nz/scripts/cli.py search 94152210 --json
+python3 skills/newworld-nz/scripts/cli.py search 94152210 --json
+```
+
+Woolworths search can include loosely related results, so keep only rows whose `barcode`, normalised to GTIN-14, equals Grocer's canonical barcode. Foodstuffs barcode search returns the matching New World/PAK'nSAVE product id; both banners use the same Foodstuffs product id for the same product. If barcode search returns no exact result, do not silently substitute a similar size or variant—fall back to brand/name/size matching and label it as a probable match.
 
 ### Current prices for a product
 
@@ -128,7 +155,7 @@ python3 $GROCER product 5461 --json
 Run a single `SELECT`/`WITH` statement over the dataset for analysis the fixed
 commands don't cover (cheapest-across-stores, vendor trends, joins, aggregates).
 
-Always-available relations: `products`, `stores`, `vendors`. Load extra data with
+Always-available relations: `products`, `barcodes`, `stores`, `vendors`. Load extra data with
 flags: `--store-id`/`--store-query`/`--all-stores` populate a `prices` table;
 `--product` populates a `history` table (with a `product_id` column added).
 
@@ -138,6 +165,9 @@ python3 $GROCER query "select s.name, p.original_price_cent from prices p join s
 
 # count products by vendor that stock a given product's price rows
 python3 $GROCER query "with p as (select id,name,brand from products where lower(brand)='anchor') select * from p" --limit 20
+
+# resolve compact retailer barcodes against Grocer's canonical catalogue
+python3 $GROCER query "select b.barcode, p.* from barcodes b join products p on p.id=b.product_id where b.barcode='00000094152210'" --json
 
 # price history rows for a product
 python3 $GROCER query "select store_id, price_cent, updated_at from history order by updated_at desc" --product 5461 --limit 30 --json
@@ -157,6 +187,7 @@ See `references/api-notes.md` for the sniffed endpoints and file layout.
 Important model fields:
 
 - Products: `id`, `name`, `brand`, `unit`, `size`, `redirected_to`
+- Barcodes: zero-padded GTIN-14 `barcode`, `product_id`
 - Stores: `id`, `vendor_id`, `name`, `is_enabled`
 - Current prices: `updated_at`, `store_id`, `product_id`, `original_price_cent`, `sale_price_cent`, `club_price_cent`, `online_price_cent`, multibuy fields
 - Price history: `updated_at`, `store_id`, `price_cent`
@@ -174,6 +205,7 @@ Prices are stored in **NZ cents**. `$5.50` is represented as `550`.
 7. **Effective price is conservative.** The CLI reports `effective_price_cent` as the minimum of original/sale/club/online when present. Multibuy needs human interpretation because quantity matters.
 8. **Live smoke tests depend on upstream stock/history.** Product `5461` and Papakura stores were live-valid when added, but upstream catalogue changes can make the smoke fail without a code bug.
 9. **This is public read-only data.** Do not try to bypass sign-in or scrape private Grocer user/list/pro features.
+10. **Retailer barcode search has different shapes.** Search Foodstuffs with the compact barcode (leading zero padding removed). Woolworths returns its own `barcode`; normalise and verify that field because its text search may include unrelated rows.
 
 ## Verification Checklist
 

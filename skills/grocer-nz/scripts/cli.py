@@ -152,6 +152,20 @@ def bounded_offset(value: int) -> int:
     return max(0, int(value))
 
 
+def normalize_gtin(value: Any) -> str:
+    """Return a digits-only GTIN padded to the Grocer catalogue's GTIN-14 shape."""
+    digits = re.sub(r"\D", "", str(value or ""))
+    if not digits or len(digits) > 14:
+        return ""
+    return digits.zfill(14)
+
+
+def retailer_barcode(value: Any) -> str:
+    """Return the compact barcode form accepted by retailer product search."""
+    gtin = normalize_gtin(value)
+    return gtin.lstrip("0") or "0" if gtin else ""
+
+
 def meili_filter_string(value: str) -> str:
     return value.replace("\\", "\\\\").replace('"', '\\"')
 
@@ -237,12 +251,47 @@ def attach_price_views(c, store_ids: list[int], refresh: bool = False) -> list[i
     return ok
 
 
+def barcodes_for_product_ids(c, product_ids: list[int]) -> dict[int, list[str]]:
+    ids = list(dict.fromkeys(int(pid) for pid in product_ids))
+    if not ids:
+        return {}
+    placeholders = ",".join(["?"] * len(ids))
+    rows = c.execute(
+        f"""
+        select distinct product_id, barcode
+        from base.public_barcodes
+        where product_id in ({placeholders})
+        order by product_id, barcode
+        """,
+        ids,
+    ).fetchall()
+    result: dict[int, list[str]] = {}
+    for product_id, barcode in rows:
+        gtin = normalize_gtin(barcode)
+        if gtin:
+            result.setdefault(int(product_id), []).append(gtin)
+    return result
+
+
+def decorate_barcodes(c, products: list[dict[str, Any]], id_key: str = "id") -> None:
+    ids = [int(product[id_key]) for product in products if product.get(id_key) is not None]
+    by_product = barcodes_for_product_ids(c, ids)
+    for product in products:
+        product_id = product.get(id_key)
+        barcodes = by_product.get(int(product_id), []) if product_id is not None else []
+        product["barcodes"] = barcodes
+        product["retailer_search_terms"] = list(
+            dict.fromkeys(term for term in map(retailer_barcode, barcodes) if term)
+        )
+
+
 def cmd_search(args):
     c = con(force=args.refresh)
     store_ids = resolve_store_ids(c, args.store_id or [], args.store_query)
     result = meili_search(args.term, args.limit, args.offset, store_ids or None, args.category or "")
     hits = result.get("hits", [])
     ids = [int(h["id"]) for h in hits]
+    decorate_barcodes(c, hits)
     if store_ids and ids:
         ok = attach_price_views(c, store_ids, refresh=args.refresh)
         if ok:
@@ -280,8 +329,56 @@ def cmd_search(args):
         for h in hits:
             label = " ".join(str(x) for x in [h.get("brand"), h.get("name"), h.get("size")] if x)
             print(f"{h['id']} | {label}")
+            if h.get("barcodes"):
+                print(
+                    "  GTIN "
+                    + ", ".join(h["barcodes"])
+                    + " | retailer search "
+                    + ", ".join(h["retailer_search_terms"])
+                )
             for p in h.get("prices", [])[:10]:
                 print(f"  {p['store_name']}: eff {cents(p['effective_price_cent'])} orig {cents(p['original_price_cent'])} sale {cents(p['sale_price_cent'])} club {cents(p['club_price_cent'])} updated {p['updated_at']}")
+
+
+def cmd_barcode(args):
+    gtin = normalize_gtin(args.barcode)
+    if not gtin:
+        raise SystemExit("barcode: expected a numeric barcode no longer than 14 digits")
+    c = con(force=args.refresh)
+    rows = rows_to_dicts(c.execute(
+        """
+        select distinct p.id as product_id, p.brand, p.name, p.unit, p.size, p.redirected_to
+        from base.public_barcodes b
+        join base.public_products p on p.id=b.product_id
+        where b.barcode=?
+        order by p.id
+        """,
+        [gtin],
+    ))
+    decorate_barcodes(c, rows, id_key="product_id")
+    if args.json:
+        print_result(
+            {
+                "query_barcode": str(args.barcode),
+                "gtin": gtin,
+                "matches": rows,
+            },
+            True,
+        )
+        return
+    if not rows:
+        print(f"No Grocer product found for GTIN {gtin}")
+        return
+    for row in rows:
+        label = " ".join(
+            str(value)
+            for value in (row.get("brand"), row.get("name"), row.get("size"))
+            if value
+        )
+        print(
+            f"{row['product_id']} | {label} | GTIN {gtin} | "
+            f"retailer search {', '.join(row['retailer_search_terms'])}"
+        )
 
 
 def cmd_prices(args):
@@ -408,6 +505,7 @@ def cmd_query(args):
     # Convenience relations over the base catalogue.
     c.execute("create view products as select * from base.public_products")
     c.execute("create view stores as select * from base.public_stores")
+    c.execute("create view barcodes as select * from base.public_barcodes")
     try:
         c.execute("create view vendors as select * from base.public_vendors")
     except Exception:
@@ -452,7 +550,7 @@ def cmd_query(args):
     except Exception as e:
         raise SystemExit("query error: " + str(e).splitlines()[0])
 
-    relations = ["products", "stores", "vendors"]
+    relations = ["products", "barcodes", "stores", "vendors"]
     if price_parts:
         relations.append("prices")
     if hist_parts:
@@ -489,6 +587,7 @@ def cmd_product(args):
     # Category joins in the app are hierarchy-derived; raw product row is the reliable bit here.
     if not rows:
         rows = rows_to_dicts(c.execute("select * from base.public_products where id=?", [args.product_id]))
+    decorate_barcodes(c, rows)
     print_result(rows[0] if rows else {}, args.json)
 
 
@@ -514,6 +613,11 @@ def main(argv=None):
     sp.add_argument("--offset", type=int, default=0)
     sp.add_argument("--json", action="store_true")
     sp.set_defaults(func=cmd_search)
+
+    sp = sub.add_parser("barcode", help="resolve a UPC/EAN/GTIN to Grocer product ids")
+    sp.add_argument("barcode")
+    sp.add_argument("--json", action="store_true")
+    sp.set_defaults(func=cmd_barcode)
 
     sp = sub.add_parser("prices", help="current prices for a product id across selected stores")
     sp.add_argument("product_id", type=int)
@@ -542,7 +646,7 @@ def main(argv=None):
         help="run a guarded read-only SELECT over the grocer dataset",
         description=(
             "Run a single read-only SELECT/WITH statement. Relations: products, "
-            "stores, vendors (always), plus prices (load with --store-id/--store-query "
+            "barcodes, stores, vendors (always), plus prices (load with --store-id/--store-query "
             "or --all-stores) and history (load with --product). Filesystem and network "
             "access are disabled; only the public grocery data is readable."
         ),

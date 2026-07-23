@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
-  "last_verified": "2026-07-22",
+  "last_verified": "2026-07-24",
   "skill_count": 138,
   "skills": [
     {
@@ -1212,7 +1212,7 @@
     },
     {
       "name": "grocer-nz",
-      "description": "Query grocer.nz public NZ supermarket price data — store lookup, product search, current per-store prices, and historical product price rows from public DuckDB/parquet assets. Use for NZ grocery/supermarket pricing across Woolworths, New World, PAK'nSAVE, Fresh Choice, and related stores. Read-only; no login or private user data.",
+      "description": "Query grocer.nz public NZ supermarket data — canonical product and barcode/GTIN lookup, cross-retailer product matching, store lookup, current per-store prices, and historical price rows from public DuckDB/parquet assets. Use for exact NZ grocery product matching or pricing across Woolworths, New World, PAK'nSAVE, Fresh Choice, and related stores. Read-only; no login or private user data.",
       "path": "skills/grocer-nz",
       "category": "food-and-fuel",
       "source_owner": "Grocer.nz",
@@ -1233,7 +1233,7 @@
         "grocer.nz",
         "meilisearch.grocer.nz"
       ],
-      "last_verified": "2026-07-19",
+      "last_verified": "2026-07-24",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
