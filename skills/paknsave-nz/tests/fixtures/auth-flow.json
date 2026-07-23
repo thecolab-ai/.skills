@@ -1,0 +1,43 @@
+{
+  "schema_version": "1",
+  "fixture": "synthetic-auth-flow",
+  "contains_live_credentials": false,
+  "contains_personal_data": false,
+  "login_request": {
+    "email": "synthetic@example.invalid",
+    "password": "not-a-real-password",
+    "source": "WEB"
+  },
+  "mfa_verify_request": {
+    "code": "000000",
+    "phvToken": "synthetic-phv-token"
+  },
+  "clubplus_refresh_request": {
+    "refreshToken": "synthetic-refresh-token"
+  },
+  "clubplus_secure_request": {
+    "banner": "PNS",
+    "source": "WEB"
+  },
+  "paknsave_sso_request": {
+    "key": "synthetic-secure-code",
+    "forceNewSession": false,
+    "fingerprintUser": "synthetic-device",
+    "fingerprintGuest": "synthetic-user-agent"
+  },
+  "account_endpoints": [
+    "GET /order/paged?page=1&source=ALL&size=20",
+    "GET /order/{orderId}",
+    "GET /order/instore?orderId={orderId}",
+    "POST /order/previousPurchases",
+    "POST /cart/store/{storeId}",
+    "GET /list",
+    "GET /list/{listId}",
+    "PUT /list",
+    "POST /list/{listId}/rename",
+    "DELETE /list/{listId}",
+    "POST /list/{listId}/update-product",
+    "GET /cart",
+    "POST /cart"
+  ]
+}
