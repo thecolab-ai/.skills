@@ -70,7 +70,7 @@ Public catalogue commands need no account. Personal commands require the user's 
 ```bash
 export NEWWORLD_USERNAME='member@example.nz'
 export NEWWORLD_PASSWORD='...'
-python3 skills/newworld-nz/scripts/cli.py auth login
+newworld auth login
 ```
 
 - The CLI registers and displays account, order, list, and cart commands only when both `NEWWORLD_USERNAME` (or `NEWWORLD_EMAIL`) and `NEWWORLD_PASSWORD` are present in its environment.
@@ -132,13 +132,13 @@ python3 skills/newworld-nz/scripts/cli.py stores --query auckland --limit 5
 python3 skills/newworld-nz/scripts/cli.py search milk --limit 10
 python3 skills/newworld-nz/scripts/cli.py specials cheese --limit 10 --json
 python3 skills/newworld-nz/scripts/cli.py product 5201479 --json
-python3 skills/newworld-nz/scripts/cli.py auth status
-python3 skills/newworld-nz/scripts/cli.py orders --limit 20 --json
-python3 skills/newworld-nz/scripts/cli.py lists --json
-python3 skills/newworld-nz/scripts/cli.py list-create "Weekly shop"
-python3 skills/newworld-nz/scripts/cli.py list-add <list-id> 5201479 --quantity 2
-python3 skills/newworld-nz/scripts/cli.py cart
-python3 skills/newworld-nz/scripts/cli.py cart-add 5201479 --quantity 2
+newworld auth status
+newworld orders --limit 20 --json
+newworld lists --json
+newworld list-create "Weekly shop"
+newworld list-add <list-id> 5201479 --quantity 2
+newworld cart
+newworld cart-add 5201479 --quantity 2
 ```
 
 ## Resources
