@@ -46,7 +46,10 @@ def main() -> None:
     else:
         raise AssertionError("non-SELECT SQL fixture was accepted")
     assert cli.bounded_limit(999) == cli.MAX_LIMIT and cli.bounded_offset(-1) == 0
-    print("[PASS] fixture query guard and bounds")
+    assert cli.normalize_gtin("94152210") == "00000094152210"
+    assert cli.normalize_gtin("00 0000 9415 2210") == "00000094152210"
+    assert cli.retailer_barcode("00000094152210") == "94152210"
+    print("[PASS] fixture query guard, bounds, and GTIN normalisation")
 
     try:
         stores = json.loads(run("stores", "--query", "Papakura", "--json"))
@@ -61,9 +64,20 @@ def main() -> None:
     assert "PAK'nSAVE Papakura" in names
     assert "New World Papakura" in names
 
-    search = run("search", "milk", "--store-query", "Papakura", "--limit", "2")
-    assert "Anchor" in search
-    assert "PAK'nSAVE Papakura" in search or "New World Papakura" in search
+    search = json.loads(run("search", "milk", "--store-query", "Papakura", "--limit", "2", "--json"))
+    assert search["hits"]
+    assert any(hit.get("barcodes") for hit in search["hits"])
+    assert any(hit.get("retailer_search_terms") for hit in search["hits"])
+    price_rows = [price for hit in search["hits"] for price in hit.get("prices", [])]
+    assert any(
+        price.get("store_name") in {"PAK'nSAVE Papakura", "New World Papakura"}
+        for price in price_rows
+    )
+
+    barcode = json.loads(run("barcode", "94152210", "--json"))
+    assert barcode["gtin"] == "00000094152210"
+    assert barcode["matches"][0]["product_id"] == 5452
+    assert "94152210" in barcode["matches"][0]["retailer_search_terms"]
 
     prices = run("prices", "5461", "--store-query", "Papakura", "--limit", "10")
     assert "PAK'nSAVE Papakura" in prices
@@ -82,6 +96,7 @@ def main() -> None:
     ))
     assert q["row_count"] >= 1
     assert "prices" in q["available_relations"]
+    assert "barcodes" in q["available_relations"]
 
     # Query guard: a non-SELECT statement must be rejected (non-zero exit).
     rejected = subprocess.run(

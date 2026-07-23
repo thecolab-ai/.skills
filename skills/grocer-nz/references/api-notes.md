@@ -144,6 +144,18 @@ Useful payload:
 
 Search results include product ids and the store ids that carry each product, but not current prices. Current prices come from the per-store parquet files.
 
+## Cross-retailer barcode matching
+
+Verified live on 2026-07-24 with Anchor Blue Milk 2L:
+
+- Grocer product id: `5452`
+- Grocer canonical barcode: `00000094152210`
+- Compact retailer search term: `94152210`
+- Woolworths search returns SKU `282819` with barcode `94152210`
+- New World and PAK'nSAVE barcode search both return Foodstuffs product id `5000527-EA-000`
+
+Grocer's zero-padded barcode is the canonical join key. Remove left-padding zeroes when sending it to retailer search. For Woolworths, normalise each returned `barcode` back to GTIN-14 and require equality. Foodstuffs search does not echo the barcode in its decorated product response, so treat a result from the exact numeric barcode query as a barcode-query match and retain the returned Foodstuffs product id.
+
 ## Live smoke receipts
 
 Verified live with:
