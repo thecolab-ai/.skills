@@ -26,6 +26,7 @@
     "GET /order/{orderId}",
     "GET /order/instore?orderId={orderId}",
     "POST /order/previousPurchases",
+    "POST /cart/store/{storeId}",
     "GET /list",
     "GET /list/{listId}",
     "PUT /list",

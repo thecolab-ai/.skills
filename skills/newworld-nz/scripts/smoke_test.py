@@ -107,6 +107,7 @@ def test_auth_helpers_fixture():
     parser = module.build_parser(include_account=True)
     assert parser.parse_args(["orders", "--source", "IN_STORE"]).cmd == "orders"
     assert parser.parse_args(["auth", "mfa"]).auth_cmd == "mfa"
+    assert parser.parse_args(["store-select", "--store-id", "synthetic-store"]).store_id == "synthetic-store"
     assert parser.parse_args(["list", "synthetic-list"]).list_id == "synthetic-list"
     assert parser.parse_args(["list-add", "synthetic-list", "12345"]).quantity == 1
     assert parser.parse_args(
@@ -128,6 +129,62 @@ def test_auth_helpers_fixture():
 
 
 results.append(test("fixture authenticated-personal helpers", test_auth_helpers_fixture))
+
+
+def test_account_store_selection_contract():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("newworld_nz_store_cli", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    calls = []
+
+    def fake_auth_http(method, url, data=None, **kwargs):
+        calls.append((method, url, data, kwargs.get("token")))
+        if len(calls) == 1:
+            raise module.AuthHTTPError(412, "PreconditionFailed", "Store is not set")
+        if len(calls) == 2:
+            return None, {}
+        return {"fixture": True}, {}
+
+    original_auth_http = module.auth_http
+    original_get_account_token = module.get_account_token
+    module.auth_http = fake_auth_http
+    module.get_account_token = lambda force_refresh=False: "synthetic-access-token"
+    try:
+        result = module.account_api("PUT", "/list", {"name": "Fixture list", "products": []})
+    finally:
+        module.auth_http = original_auth_http
+        module.get_account_token = original_get_account_token
+
+    assert result == {"fixture": True}
+    assert calls == [
+        (
+            "PUT",
+            module.BASE_API + "/list",
+            {"name": "Fixture list", "products": []},
+            "synthetic-access-token",
+        ),
+        (
+            "POST",
+            module.BASE_API + f"/cart/store/{module.DEFAULT_STORE_ID}",
+            None,
+            "synthetic-access-token",
+        ),
+        (
+            "PUT",
+            module.BASE_API + "/list",
+            {"name": "Fixture list", "products": []},
+            "synthetic-access-token",
+        ),
+    ]
+    print("[PASS] fixture first authenticated write selects a default store and retries")
+    return True
+
+
+results.append(test("fixture authenticated store selection", test_account_store_selection_contract))
 
 
 def test_list_mutation_contract():
@@ -336,12 +393,12 @@ def test_account_command_gate():
 
     guest_parser = module.build_parser(include_account=False)
     guest_help = guest_parser.format_help()
-    for hidden_command in ("auth", "orders", "list-create", "cart-add"):
+    for hidden_command in ("auth", "orders", "store-select", "list-create", "cart-add"):
         assert hidden_command not in guest_help
 
     account_parser = module.build_parser(include_account=True)
     account_help = account_parser.format_help()
-    for visible_command in ("auth", "orders", "list-create", "cart-add"):
+    for visible_command in ("auth", "orders", "store-select", "list-create", "cart-add"):
         assert visible_command in account_help
     print("[PASS] account commands are hidden until provider credentials are present")
     return True

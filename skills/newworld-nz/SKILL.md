@@ -109,6 +109,7 @@ The first six guest commands are always available. The remaining account command
 - `auth refresh [--json]` — rotate the cached New World access token
 - `auth status [--json]` — report token availability without revealing tokens
 - `auth logout [--json]` — remove only the local authenticated-token cache
+- `store-select [--store-id id] [--json]` — select the store used for authenticated list and cart writes
 - `orders [--page N] [--limit N] [--source ALL|ONLINE|IN_STORE] [--json]` — retrieve previous orders
 - `order <order-id> [--source ONLINE|IN_STORE]` — retrieve one previous order
 - `previous-purchases [--limit N] [--include-cart] [--json]` — retrieve previously purchased products
@@ -133,6 +134,7 @@ python3 skills/newworld-nz/scripts/cli.py search milk --limit 10
 python3 skills/newworld-nz/scripts/cli.py specials cheese --limit 10 --json
 python3 skills/newworld-nz/scripts/cli.py product 5201479 --json
 newworld auth status
+newworld store-select
 newworld orders --limit 20 --json
 newworld lists --json
 newworld list-create "Weekly shop"
@@ -151,6 +153,8 @@ newworld cart-add 5201479 --quantity 2
 
 - Public commands use the guest-token flow and cache tokens under `~/.cache/newworld-cli/guest-token.json`
 - Personal commands mirror the Club+ login, secure-code exchange, and rotating New World refresh flow used by the website
+- If a fresh authenticated session has no store, the CLI selects `NEWWORLD_STORE_ID` (or the Papakura default) once and retries the request; `store-select` can change it explicitly
+- Store changes can be rejected when current cart products are unavailable at the target store; the CLI reports the service reason without clearing the cart
 - List writes use the same endpoints as the website and are intentionally exposed only as explicit subcommands
 - `list-delete` and `list-remove` require `--yes`; they cannot be invoked accidentally through a zero quantity
 - Cart writes use target quantities internally: `cart-add` reads and increments, while `cart-update` sets the target directly

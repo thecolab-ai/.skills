@@ -28,6 +28,7 @@ Public commands require no private credential. Personal commands read `NEWWORLD_
 - `GET /order/{orderId}` for one online order
 - `GET /order/instore?orderId={orderId}` for one in-store order
 - `POST /order/previousPurchases` for previously purchased products
+- `POST /cart/store/{storeId}` to select the store used by authenticated list and cart writes
 - `GET /list` for saved lists
 - `GET /list/{listId}` for one saved list
 - `PUT /list` to create an empty saved list
@@ -37,9 +38,11 @@ Public commands require no private credential. Personal commands read `NEWWORLD_
 - `GET /cart` to retrieve the current cart
 - `POST /cart` with `products[]` to set product quantities; quantity `0` removes a product
 
-The skill deliberately exposes no checkout, payment, timeslot, fulfilment, profile, favourite, or order mutation. List deletion and list/cart product removal require the CLI's explicit `--yes` guard.
+The skill deliberately exposes no checkout, payment, timeslot, fulfilment, profile, favourite, or order mutation. List deletion and list/cart product removal require the CLI's explicit `--yes` guard. If the account API reports that no store is set, the CLI selects `NEWWORLD_STORE_ID` (or its documented Papakura default) and retries once.
 
 Cart product payloads use `productId`, `sale_type`, and target `quantity`. `cart-add` first reads the cart and increments the target; `cart-update` sets it directly. `WEIGHT` quantities are grams, while `UNITS` quantities are item counts. Bare numeric product IDs are normalised to `KGM` variants for `WEIGHT` and `EA` variants for `UNITS`; an exact supplied variant ID is preserved.
+
+An explicit store change can be rejected when existing cart products are unavailable at the target store. The CLI preserves the service error and does not clear or rewrite the cart to force the change.
 
 ## Token lifecycle
 
@@ -52,7 +55,8 @@ Cart product payloads use `productId`, `sale_type`, and target `quantity`. `cart
 
 ## Stability and safety
 
-- Live-verified on 2026-07-24 with a temporary list create/rename/add/update/remove/delete cycle and a cart add/update/remove cycle; both were read back after each mutation and the original list/cart state was restored.
+- Live-verified on 2026-07-24 with explicit selection of the cart's current New World store, a temporary list create/rename/add/update/remove/delete cycle, and a cart add/update/remove cycle; mutations were read back and the original list/cart state was restored. A target-store switch with unavailable cart products was rejected without changing the cart.
+- CLI store-selection recovery, list/cart request shapes, and destructive guards are covered with synthetic fixtures.
 - Treat prices as live store-specific snapshots, not historical facts.
 - Treat authenticated output and token files as personal secrets.
 - Endpoint shapes can change without notice because this is not an official API.
