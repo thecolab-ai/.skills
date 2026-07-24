@@ -1,0 +1,20 @@
+{
+  "ListingId": 1234567890,
+  "Category": "Home & living > Furniture > Stools",
+  "Title": "Synthetic wooden stool",
+  "Description": "Synthetic fixture only.",
+  "StartPrice": 25.0,
+  "ReservePrice": 35.0,
+  "BuyNowPrice": 40.0,
+  "Duration": "7 days",
+  "Pickup": true,
+  "PaymentMethods": [
+    "Bank transfer"
+  ],
+  "ShippingOptions": [
+    {
+      "Method": "Pickup only"
+    }
+  ],
+  "PhotoPaths": []
+}

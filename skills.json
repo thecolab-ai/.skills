@@ -3540,29 +3540,38 @@
     },
     {
       "name": "trademe-nz",
-      "description": "Query Trade Me NZ public listings: marketplace, property sale/rental, motors, jobs, flatmates, rural, retirement, regions, categories, and listing details. No login or credentials required.",
+      "description": "Search public Trade Me NZ listings and help a normal signed-in user view and manage their own seller account through the ordinary Trade Me website. Use for public marketplace/property/motors/jobs discovery, Selling/Sold/Unsold inventory, seller listing details, and user-approved create/edit/withdraw/relist workflows. Seller work is browser-backed: use the user's existing website session or let them complete sign-in and email/2FA in the browser. Never request a password, developer/OAuth credentials, cookies, browser storage, or session tokens.",
       "path": "skills/trademe-nz",
       "category": "public-data",
       "source_owner": "Trade Me",
       "source_type": "commercial",
       "source_url": "https://www.trademe.co.nz",
-      "auth": "none",
-      "access_mode": "html-readonly",
-      "data_class": "public",
-      "writes": false,
-      "browser": false,
-      "risk": "low",
-      "cache_ttl": "24h",
+      "auth": "mixed",
+      "access_mode": "public-api-and-browser-authenticated-personal",
+      "data_class": "personal",
+      "writes": true,
+      "browser": true,
+      "risk": "high",
+      "cache_ttl": "none",
       "schema_version": "1",
-      "skill_type": "html-readonly",
-      "pack": "nz-commercial-web",
+      "skill_type": "authenticated-personal",
+      "pack": "nz-personal-data",
       "allowed_domains": [
         "api.trademe.co.nz",
         "www.trademe.co.nz"
       ],
-      "last_verified": "2026-07-19",
+      "last_verified": "2026-07-24",
       "health": "healthy",
-      "maintainer": "@adam91holt"
+      "maintainer": "@adam91holt",
+      "mutations": [
+        "create-own-listing",
+        "edit-own-listing",
+        "withdraw-own-listing",
+        "relist-own-listing"
+      ],
+      "local_output": [
+        "optional-user-supplied-listing-json"
+      ]
     },
     {
       "name": "treasury-fiscal-data-nz",
