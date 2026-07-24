@@ -14,6 +14,13 @@
     "contains_username": false,
     "contains_password": false
   },
+  "mutation_preflight": {
+    "method": "GET",
+    "path": "/bff/get-user",
+    "persists_only_woolworths_domain_cookies": true,
+    "empty_list_source": "Trolley",
+    "empty_list_requires_empty_trolley": true
+  },
   "account_endpoints": [
     "GET /bff/get-user",
     "GET /shoppers/my/past-orders",

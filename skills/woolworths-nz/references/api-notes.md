@@ -56,7 +56,7 @@ the optional `pdfplumber` package.
 ## Saved-list writes
 
 - `POST /api/v1/shoppers/my/saved-lists`
-  - Empty: `{"listName":"...","addFromListSource":"Unspecified"}`
+  - Empty: first verify `GET /api/v1/trolleys/my` has no products, then send `{"listName":"...","addFromListSource":"Trolley"}`. The current site returns HTTP 500 for the otherwise-valid `Unspecified` enum and exposes trolley-backed creation in its UI.
   - Optional `addFromListSource`: `Trolley`, `FavouritesAllItems`, `MySavedList`, `PastOrders`, or `PastOrdersMasterAllItems`
   - `sourceListId` is included for a source list or order.
 - `DELETE /api/v1/shoppers/my/saved-lists/{listId}`
@@ -75,7 +75,15 @@ the optional `pdfplumber` package.
 
 ## Request headers and refresh
 
-Requests use the web app's `x-requested-with`, `x-ui-ver`, `referer`, `origin`, and user-agent headers. Mutations also send the decoded `XSRF-TOKEN` cookie as `x-xsrf-token`. A definitive 401/403 rejection causes one browser login refresh and one retry. A safe GET that unexpectedly returns non-JSON may also refresh once. A mutation with an indeterminate non-JSON response is never replayed automatically.
+Requests use the web app's `content-type`, cache-control, `x-requested-with`,
+`x-ui-ver`, `referer`, `origin`, and user-agent headers. Authenticated response
+cookies are merged only for the Woolworths domain and atomically persisted in
+the private, account-bound cache. Before a mutation, a safe authenticated GET
+refreshes those cookies; mutations also send the decoded `XSRF-TOKEN` cookie as
+`x-xsrf-token`. A definitive 401/403 rejection causes one browser login refresh
+and one retry. A safe GET that unexpectedly returns non-JSON may also refresh
+once. A mutation with an indeterminate non-JSON response is never replayed
+automatically.
 
 ## Stability and safety
 

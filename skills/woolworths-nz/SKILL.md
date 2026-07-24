@@ -75,6 +75,7 @@ woolworths auth login
 - The cookie cache stores a SHA-256 hash of the normalised username and is reused only when it matches the currently supplied username. Changing accounts invalidates the old cache instead of silently reusing it.
 - Woolworths' login page uses a browser challenge. Install the optional helper with `python3 -m pip install camoufox`, then run `python3 -m camoufox fetch` once.
 - A reusable cookie cache is written to `~/.local/state/woolworths-nz/cookies.json` with file mode `0600`.
+- Authenticated responses can refresh Woolworths session/Akamai cookies; the CLI persists only cookies scoped to `woolworths.co.nz` back into the same private, account-bound cache.
 - Override the cache location with `WOOLWORTHS_SESSION_FILE`.
 - If a hidden browser login cannot complete a challenge, retry `auth login --headed`.
 - `auth status` never emits cookies or account details. `auth logout` removes only the local cookie cache; it does not sign out other devices or mutate the account.
@@ -132,6 +133,12 @@ woolworths list-create "Weekly shop"
 woolworths list-add <list-id> 705692 --quantity 2
 woolworths cart-add 705692 --quantity 2
 ```
+
+`list-create` defaults to `--source empty`. Woolworths currently implements
+that safely by saving the current trolley as a list, so the CLI first reads the
+trolley and refuses to create the list unless it is empty. Use
+`--source trolley` explicitly only when the user wants the trolley contents
+copied into the new list.
 
 ## Resources
 

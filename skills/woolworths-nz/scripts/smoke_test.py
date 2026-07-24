@@ -206,11 +206,54 @@ def test_custom_cache_parent_permissions_are_preserved():
 results.append(test("custom cache parent permissions are preserved", test_custom_cache_parent_permissions_are_preserved))
 
 
+def test_response_cookie_merge_is_domain_scoped():
+    module = load_cli()
+
+    class FakeHeaders:
+        def get_all(self, name):
+            if name.lower() != "set-cookie":
+                return []
+            return [
+                "ak_bmsc=fresh; Domain=.woolworths.co.nz; Path=/; Secure; HttpOnly",
+                "foreign=blocked; Domain=.example.test; Path=/; Secure",
+            ]
+
+    original = [
+        {
+            "name": "ak_bmsc",
+            "value": "stale",
+            "domain": ".woolworths.co.nz",
+            "path": "/",
+        },
+        {
+            "name": "session",
+            "value": "fixture",
+            "domain": ".woolworths.co.nz",
+            "path": "/",
+        },
+    ]
+    merged, changed = module.merge_response_cookies(original, FakeHeaders())
+    by_name = {item["name"]: item for item in merged}
+    assert changed is True
+    assert by_name["ak_bmsc"]["value"] == "fresh"
+    assert by_name["session"]["value"] == "fixture"
+    assert "foreign" not in by_name
+    assert original[0]["value"] == "stale"
+    return True
+
+
+results.append(test("response cookie refresh stays domain-scoped", test_response_cookie_merge_is_domain_scoped))
+
+
 def test_account_request_contract():
     module = load_cli()
-    captured = {}
+    captured = {"requests": [], "saved": []}
 
     class FakeResponse:
+        def __init__(self, payload, headers=None):
+            self.payload = payload
+            self.headers = headers
+
         def __enter__(self):
             return self
 
@@ -218,7 +261,14 @@ def test_account_request_contract():
             return False
 
         def read(self):
-            return b'{"ok":true}'
+            return json.dumps(self.payload).encode()
+
+    class FakeHeaders:
+        def __init__(self, values):
+            self.values = values
+
+        def get_all(self, name):
+            return self.values if name.lower() == "set-cookie" else []
 
     module.ensure_account_session = lambda **_kwargs: [
         {
@@ -227,12 +277,23 @@ def test_account_request_contract():
             "domain": ".woolworths.co.nz",
         },
         {"name": "session", "value": "fixture", "domain": ".woolworths.co.nz"},
+        {"name": "ak_bmsc", "value": "stale", "domain": ".woolworths.co.nz"},
     ]
+    module.save_session_cookies = lambda cookies: captured["saved"].append(cookies)
 
     def fake_urlopen(request, timeout):
-        captured["request"] = request
-        captured["timeout"] = timeout
-        return FakeResponse()
+        captured["requests"].append((request, timeout))
+        if request.method == "GET":
+            return FakeResponse(
+                {"isAuthenticated": True},
+                FakeHeaders(
+                    [
+                        "ak_bmsc=fresh; Domain=.woolworths.co.nz; "
+                        "Path=/; Secure; HttpOnly"
+                    ]
+                ),
+            )
+        return FakeResponse({"ok": True})
 
     module.urllib.request.urlopen = fake_urlopen
     result = module.account_api(
@@ -240,13 +301,21 @@ def test_account_request_contract():
         "/trolleys/my/items",
         {"sku": "705692", "quantity": 2, "pricingUnit": "Each"},
     )
-    request = captured["request"]
+    assert len(captured["requests"]) == 2
+    refresh_request = captured["requests"][0][0]
+    request = captured["requests"][1][0]
     headers = {key.lower(): value for key, value in request.header_items()}
     assert result == {"ok": True}
+    assert refresh_request.method == "GET"
+    assert refresh_request.full_url == "https://www.woolworths.co.nz/api/v1/bff/get-user"
     assert request.method == "POST"
     assert request.full_url == "https://www.woolworths.co.nz/api/v1/trolleys/my/items"
     assert headers["x-xsrf-token"] == "fixture token"
     assert headers["x-requested-with"] == "OnlineShopping.WebApp"
+    assert headers["cache-control"] == "no-cache"
+    assert "ak_bmsc=fresh" in headers["cookie"]
+    assert "ak_bmsc=stale" not in headers["cookie"]
+    assert captured["saved"]
     assert json.loads(request.data) == {
         "sku": "705692",
         "quantity": 2,
@@ -312,6 +381,8 @@ def test_non_json_mutation_is_never_replayed():
         return cookies
 
     class HtmlResponse:
+        headers = None
+
         def __enter__(self):
             return self
 
@@ -321,8 +392,22 @@ def test_non_json_mutation_is_never_replayed():
         def read(self):
             return b"<html>uncertain response</html>"
 
+    class AuthResponse:
+        headers = None
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self):
+            return b'{"isAuthenticated":true}'
+
     def fake_urlopen(request, timeout):
         request_calls.append((request, timeout))
+        if request.method == "GET":
+            return AuthResponse()
         return HtmlResponse()
 
     module.ensure_account_session = fake_session
@@ -337,7 +422,8 @@ def test_non_json_mutation_is_never_replayed():
         assert exc.code == 1
     else:
         raise AssertionError("non-JSON mutation should fail as uncertain")
-    assert len(request_calls) == 1
+    assert len(request_calls) == 2
+    assert [request.method for request, _timeout in request_calls] == ["GET", "POST"]
     assert not any(call.get("force") is True for call in session_calls)
     return True
 
@@ -428,8 +514,50 @@ def test_list_and_cart_payloads():
     )
     assert create_payload == {
         "listName": "Fixture list",
-        "addFromListSource": "Unspecified",
+        "addFromListSource": "Trolley",
     }
+    calls = []
+
+    def empty_trolley_account_api(method, path, data=None, **_kwargs):
+        calls.append((method, path, data))
+        if method == "GET":
+            return {"items": []}
+        return {"ok": True}
+
+    module.account_api = empty_trolley_account_api
+    module.cmd_list_create(
+        module.argparse.Namespace(
+            name="Fixture list",
+            source="empty",
+            source_id=None,
+            json=True,
+        )
+    )
+    assert calls == [
+        ("GET", "/trolleys/my", None),
+        (
+            "POST",
+            "/shoppers/my/saved-lists",
+            {"listName": "Fixture list", "addFromListSource": "Trolley"},
+        ),
+    ]
+
+    module.account_api = lambda *_args, **_kwargs: {
+        "items": [{"products": [{"sku": "705692", "quantity": {"value": 1}}]}]
+    }
+    try:
+        module.cmd_list_create(
+            module.argparse.Namespace(
+                name="Fixture list",
+                source="empty",
+                source_id=None,
+                json=True,
+            )
+        )
+    except SystemExit as exc:
+        assert exc.code == 2
+    else:
+        raise AssertionError("empty-list creation must refuse a non-empty trolley")
     try:
         module.positive_quantity("nan")
     except module.argparse.ArgumentTypeError:
