@@ -24,6 +24,16 @@ assert fixture_rows == [{"id": "fixture"}]
 assert fixture_fare["price"] == 123 and fixture_fare["available"] is True
 print("[PASS] fixture fare array extraction and fare normalisation")
 
+# A transient Chromium navigation abort must be classified as retryable (so the
+# browser path falls back to the timetable feed instead of leaking a traceback),
+# while a genuine coding error must not be swallowed.
+assert fixture_cli._is_transient_browser_error(
+    RuntimeError('Page.goto: net::ERR_ABORTED at https://flightbookings.airnewzealand.co.nz/...')
+)
+assert fixture_cli._is_transient_browser_error(RuntimeError("Timeout 90000ms exceeded"))
+assert not fixture_cli._is_transient_browser_error(ValueError("unexpected key in payload"))
+print("[PASS] fixture transient browser-navigation error classification")
+
 DATE = (date.today() + timedelta(days=7)).isoformat()
 browser_required = os.getenv("COLAB_SMOKE_USE_BROWSER") == "1"
 use_browser = browser_required or find_spec("cloakbrowser") is not None

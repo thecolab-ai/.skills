@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
+import contextlib
 import importlib.util
+import io
 import json
 import subprocess
 import sys
@@ -57,6 +59,39 @@ def test_fixture_vehicle_parser() -> bool:
 
 
 results.append(test("fixture public vehicle HTML parser", test_fixture_vehicle_parser))
+
+
+def _die_message(page: str) -> str:
+    """Return the stderr message emitted when parse_vehicle rejects *page*."""
+    buffer = io.StringIO()
+    with contextlib.redirect_stderr(buffer):
+        try:
+            fixture_cli.parse_vehicle(
+                page, source_url="u", identifier="PSP532", lookup_type="plate"
+            )
+        except SystemExit:
+            pass
+    return buffer.getvalue()
+
+
+def test_fixture_block_detection() -> bool:
+    # An HTTP-200 anti-bot interstitial (no CarJam shell) must be classified as a
+    # transient outage — the message carries a network marker so smoke reporting
+    # gates rather than hard-fails.
+    block_page = "<html><body>Access to this page has been denied.</body></html>"
+    if not fixture_cli.looks_like_block(block_page):
+        return False
+    if fixture_cli.has_carjam_shell(block_page):
+        return False
+    if "temporary failure" not in _die_message(block_page):
+        return False
+    # A genuine CarJam page with the app shell but no free fields stays a hard
+    # failure (a real no-data / structure regression, not an outage).
+    shell_no_fields = "<title>PSP532 | CARJAM</title><div id='app'></div>"
+    return "temporary failure" not in _die_message(shell_no_fields)
+
+
+results.append(test("fixture anti-bot block classified as transient outage", test_fixture_block_detection))
 
 # Current public Trade Me vehicle listing 5805102051 exposed this plate in
 # listing details on 2026-05-24. Use a real listed vehicle rather than a
