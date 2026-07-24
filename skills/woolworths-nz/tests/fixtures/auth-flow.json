@@ -1,0 +1,30 @@
+{
+  "schema_version": "1",
+  "fixture": "synthetic-woolworths-account-contract",
+  "contains_live_credentials": false,
+  "contains_personal_data": false,
+  "credentials": {
+    "username": "fixture@example.test",
+    "password": "fixture-only-not-a-real-password"
+  },
+  "session_cache": {
+    "schema_version": "1",
+    "account_binding": "sha256-of-normalised-username",
+    "file_mode": "0600",
+    "contains_username": false,
+    "contains_password": false
+  },
+  "account_endpoints": [
+    "GET /bff/get-user",
+    "GET /shoppers/my/past-orders",
+    "GET /shoppers/my/favourites",
+    "GET /shoppers/my/saved-lists",
+    "GET /trolleys/my",
+    "POST /shoppers/my/saved-lists",
+    "POST /shoppers/my/saved-lists/{listId}/items/{sku}",
+    "DELETE /shoppers/my/saved-lists/{listId}/items/{sku}",
+    "DELETE /shoppers/my/saved-lists/{listId}",
+    "POST /trolleys/my/items",
+    "DELETE /trolleys/my/items"
+  ]
+}
