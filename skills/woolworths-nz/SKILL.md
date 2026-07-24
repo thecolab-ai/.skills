@@ -72,6 +72,7 @@ woolworths auth login
 - `WOOLWORTHS_EMAIL` is accepted as an alias for `WOOLWORTHS_USERNAME`.
 - The CLI registers and displays account commands only when both a username/email and `WOOLWORTHS_PASSWORD` exist in its environment.
 - The password is passed only to Woolworths' browser login and is never written to disk.
+- The cookie cache stores a SHA-256 hash of the normalised username and is reused only when it matches the currently supplied username. Changing accounts invalidates the old cache instead of silently reusing it.
 - Woolworths' login page uses a browser challenge. Install the optional helper with `python3 -m pip install camoufox`, then run `python3 -m camoufox fetch` once.
 - A reusable cookie cache is written to `~/.local/state/woolworths-nz/cookies.json` with file mode `0600`.
 - Override the cache location with `WOOLWORTHS_SESSION_FILE`.
@@ -144,9 +145,10 @@ woolworths cart-add 705692 --quantity 2
 
 - Public commands remain stdlib-only and do not launch a browser.
 - Account reads/writes use the saved Woolworths session directly; a 401/403 triggers one browser refresh and retry.
-- `invoice-items` parses supplied/paid invoice rows from a text-based Woolworths tax-invoice PDF, fetches the matching past-order product list, and performs a one-to-one confidence-scored name join to SKUs.
+- `invoice-items` parses supplied/paid invoice rows from a text-based Woolworths tax-invoice PDF, verifies its Order Confirmation/Invoice Number against the requested order ID, fetches the matching past-order product list, and performs a one-to-one confidence-scored name join to SKUs.
 - Invoice parsing has one additional optional dependency: `python3 -m pip install pdfplumber`. It is imported only by `invoice-items`; public product commands remain standard-library-only.
 - A match below `--min-confidence` is left unmatched. Close runner-up candidates are marked ambiguous rather than silently accepted.
+- Safe reads may refresh an expired session once. Mutations are never replayed after an indeterminate non-JSON response; inspect the current list or trolley state before retrying.
 - Saved-list item writes use Woolworths' current `{itemsToAdd: [{sku, quantity}]}` request.
 - Trolley writes use target quantities. `cart-add` reads then increments; `cart-update` sets the target.
 - `Each` quantities must be whole numbers. Use `--unit Kg` for explicit weights.

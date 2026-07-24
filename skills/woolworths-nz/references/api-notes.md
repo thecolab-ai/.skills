@@ -9,7 +9,7 @@ This is an unofficial wrapper around endpoints currently used by `woolworths.co.
 - Personal endpoints use the website's authenticated cookie session and XSRF token.
 - Sign-in starts at `GET /api/v1/bff/initiate-oidc-signin?redirectUrl=...`, passes through Woolworths IAM/Auth0, and returns to the website BFF.
 - Because the Auth0 identifier step can present a browser challenge, raw credential POSTs are not a supported login method. The optional Camoufox helper performs the normal browser flow.
-- Only resulting Woolworths cookies are persisted with mode `0600`; credentials remain in environment variables.
+- Only resulting Woolworths cookies are persisted with mode `0600`; credentials remain in environment variables. The cache is atomically created and bound to a SHA-256 hash of the normalised username so it cannot be silently reused for different supplied credentials.
 
 ## Public product endpoints
 
@@ -40,10 +40,12 @@ price.
 
 `invoice-items` therefore:
 
-1. Parses item rows from the PDF's `Ref`, `Description`, `Ordered`, `Supplied`,
+1. Parses and verifies the PDF's Order Confirmation/Invoice Number against the
+   requested order ID.
+2. Parses item rows from the PDF's `Ref`, `Description`, `Ordered`, `Supplied`,
    `Unit Price`, and `Amount` table.
-2. Fetches `GET /api/v1/shoppers/my/past-orders/{orderId}/items`.
-3. Performs a one-to-one, normalised product-name match and emits a confidence,
+3. Fetches `GET /api/v1/shoppers/my/past-orders/{orderId}/items`.
+4. Performs a one-to-one, normalised product-name match and emits a confidence,
    method, and ambiguity flag for every joined row.
 
 The invoice remains the source for historical quantity/price fields. The API
@@ -73,7 +75,7 @@ the optional `pdfplumber` package.
 
 ## Request headers and refresh
 
-Requests use the web app's `x-requested-with`, `x-ui-ver`, `referer`, `origin`, and user-agent headers. Mutations also send the decoded `XSRF-TOKEN` cookie as `x-xsrf-token`. A 401/403 causes one browser login refresh and one retry.
+Requests use the web app's `x-requested-with`, `x-ui-ver`, `referer`, `origin`, and user-agent headers. Mutations also send the decoded `XSRF-TOKEN` cookie as `x-xsrf-token`. A definitive 401/403 rejection causes one browser login refresh and one retry. A safe GET that unexpectedly returns non-JSON may also refresh once. A mutation with an indeterminate non-JSON response is never replayed automatically.
 
 ## Stability and safety
 

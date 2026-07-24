@@ -9,9 +9,11 @@ stdlib-only.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import os
 import pathlib
+import tempfile
 from typing import Any
 
 BASE_WEB = "https://www.woolworths.co.nz"
@@ -21,6 +23,18 @@ LOGIN_URL = (
     + "/api/v1/bff/initiate-oidc-signin?redirectUrl="
     + "https%3A%2F%2Fwww.woolworths.co.nz%2Faccount%2Forders"
 )
+
+
+def _account_hash(username: str) -> str:
+    normalized = username.strip().lower().encode("utf-8")
+    return hashlib.sha256(normalized).hexdigest()
+
+
+def _default_session_parent() -> pathlib.Path:
+    state_home = pathlib.Path(
+        os.environ.get("XDG_STATE_HOME", pathlib.Path.home() / ".local/state")
+    )
+    return (state_home / "woolworths-nz").expanduser().absolute()
 
 
 def _cookie_for_browser(item: dict[str, Any]) -> dict[str, Any] | None:
@@ -46,12 +60,23 @@ def _cookie_for_browser(item: dict[str, Any]) -> dict[str, Any] | None:
     return cookie
 
 
-async def _load_cookies(context: Any, path: pathlib.Path) -> None:
+async def _load_cookies(context: Any, path: pathlib.Path, username: str) -> None:
     if not path.exists():
         return
     try:
         payload = json.loads(path.read_text())
-        cookies = [_cookie_for_browser(item) for item in payload if isinstance(item, dict)]
+        if (
+            not isinstance(payload, dict)
+            or payload.get("schema_version") != "1"
+            or payload.get("account_hash") != _account_hash(username)
+            or not isinstance(payload.get("cookies"), list)
+        ):
+            return
+        cookies = [
+            _cookie_for_browser(item)
+            for item in payload["cookies"]
+            if isinstance(item, dict)
+        ]
         clean = [item for item in cookies if item]
         if clean:
             await context.add_cookies(clean)
@@ -60,7 +85,11 @@ async def _load_cookies(context: Any, path: pathlib.Path) -> None:
         return
 
 
-def _save_cookies(path: pathlib.Path, cookies: list[dict[str, Any]]) -> None:
+def _save_cookies(
+    path: pathlib.Path,
+    cookies: list[dict[str, Any]],
+    username: str,
+) -> None:
     clean = [
         item
         for item in cookies
@@ -68,12 +97,35 @@ def _save_cookies(path: pathlib.Path, cookies: list[dict[str, Any]]) -> None:
         and item.get("name")
         and str(item.get("domain", "")).lower() in SESSION_COOKIE_DOMAINS
     ]
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(path.suffix + ".tmp")
-    temporary.write_text(json.dumps(clean, indent=2))
-    temporary.chmod(0o600)
-    temporary.replace(path)
-    path.chmod(0o600)
+    payload = {
+        "schema_version": "1",
+        "account_hash": _account_hash(username),
+        "cookies": clean,
+    }
+    parent_existed = path.parent.exists()
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    if (
+        not parent_existed
+        or path.parent.expanduser().absolute() == _default_session_parent()
+    ):
+        path.parent.chmod(0o700)
+    descriptor, temporary_name = tempfile.mkstemp(
+        dir=path.parent,
+        prefix=path.name + ".",
+        suffix=".tmp",
+    )
+    temporary = pathlib.Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            json.dump(payload, handle, indent=2)
+            handle.flush()
+            os.fsync(handle.fileno())
+        temporary.chmod(0o600)
+        temporary.replace(path)
+        path.chmod(0o600)
+    finally:
+        if temporary.exists():
+            temporary.unlink()
 
 
 async def _session_is_valid(page: Any) -> bool:
@@ -116,7 +168,7 @@ async def _perform_login(
         manager = AsyncCamoufox(headless=not headed, proxy=proxy)
         async with manager as browser:
             context = browser.contexts[0] if browser.contexts else await browser.new_context()
-            await _load_cookies(context, path)
+            await _load_cookies(context, path, username)
             page = await context.new_page()
 
             if not await _session_is_valid(page):
@@ -146,7 +198,7 @@ async def _perform_login(
                     "Retry with `auth login --headed` to complete any visible challenge."
                 )
             cookies = await context.cookies([BASE_WEB])
-            _save_cookies(path, cookies)
+            _save_cookies(path, cookies, username)
             return {"session_file": str(path), "cookie_count": len(cookies)}
     except RuntimeError:
         raise

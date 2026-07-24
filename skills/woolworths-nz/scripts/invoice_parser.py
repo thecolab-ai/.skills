@@ -93,6 +93,55 @@ def _group_words(words: list[dict[str, Any]], tolerance: float = 1.2) -> list[tu
     return groups
 
 
+def extract_invoice_order_number(words: list[dict[str, Any]]) -> str | None:
+    """Extract the `Order Confirmation/Invoice Number` header value."""
+    for _top, group in _group_words(words):
+        ordered = sorted(group, key=lambda item: float(item["x0"]))
+        labels = [str(word.get("text", "")).strip() for word in ordered]
+        lower = [label.lower() for label in labels]
+        for order_index, label in enumerate(lower):
+            if label != "order":
+                continue
+            number_index = next(
+                (
+                    index
+                    for index in range(order_index + 1, min(order_index + 5, len(lower)))
+                    if lower[index] == "number"
+                ),
+                None,
+            )
+            if number_index is None or number_index + 1 >= len(labels):
+                continue
+            qualifier = " ".join(lower[order_index + 1 : number_index])
+            if "confirmation" not in qualifier or "invoice" not in qualifier:
+                continue
+            candidate = labels[number_index + 1].strip()
+            if len(re.sub(r"[^A-Za-z0-9]", "", candidate)) >= 4:
+                return candidate
+    return None
+
+
+def normalize_order_identifier(value: Any) -> str:
+    return "".join(re.findall(r"[A-Za-z0-9]+", str(value or ""))).lower()
+
+
+def validate_invoice_order_number(
+    invoice_order_number: str | None,
+    expected_order_id: str,
+) -> None:
+    actual = normalize_order_identifier(invoice_order_number)
+    expected = normalize_order_identifier(expected_order_id)
+    if not actual:
+        raise InvoiceParseError(
+            "the invoice order confirmation number could not be read; refusing to join it to an order"
+        )
+    if not expected or actual != expected:
+        raise InvoiceParseError(
+            "the invoice order confirmation number does not match the requested order; "
+            "refusing to join potentially unrelated products"
+        )
+
+
 def _line_text(words: list[dict[str, Any]], left: float, right: float) -> str:
     selected = [
         word
@@ -262,6 +311,7 @@ def parse_invoice_pdf(path: str | pathlib.Path) -> dict[str, Any]:
         ) from exc
 
     rows: list[dict[str, Any]] = []
+    order_numbers: list[str] = []
     try:
         with pdfplumber.open(pdf_path) as document:
             page_count = len(document.pages)
@@ -271,6 +321,9 @@ def parse_invoice_pdf(path: str | pathlib.Path) -> dict[str, Any]:
                     y_tolerance=2,
                     extra_attrs=["fontname", "size"],
                 )
+                order_number = extract_invoice_order_number(words)
+                if order_number:
+                    order_numbers.append(order_number)
                 vertical_xs = sorted(
                     {
                         round(float(line["x0"]), 3)
@@ -299,7 +352,18 @@ def parse_invoice_pdf(path: str | pathlib.Path) -> dict[str, Any]:
         raise InvoiceParseError(
             "no Woolworths invoice line rows were found; check that this is a text-based tax invoice PDF"
         )
-    return {"page_count": page_count, "items": rows}
+    normalized_order_numbers = {
+        normalize_order_identifier(value) for value in order_numbers if value
+    }
+    if len(normalized_order_numbers) > 1:
+        raise InvoiceParseError(
+            "the invoice pages contain inconsistent order confirmation numbers"
+        )
+    return {
+        "page_count": page_count,
+        "order_number": order_numbers[0] if order_numbers else None,
+        "items": rows,
+    }
 
 
 def order_products(payload: Any) -> list[dict[str, Any]]:
@@ -423,17 +487,34 @@ def match_invoice_items(
     }
 
 
-def combine_invoice_with_order_items(
-    pdf_path: str | pathlib.Path,
+def combine_parsed_invoice_with_order_items(
+    invoice: dict[str, Any],
     order_items_payload: Any,
     *,
     min_confidence: float = 0.72,
 ) -> dict[str, Any]:
-    invoice = parse_invoice_pdf(pdf_path)
     result = match_invoice_items(
         invoice["items"],
         order_products(order_items_payload),
         min_confidence=min_confidence,
     )
     result["invoice_page_count"] = invoice["page_count"]
+    result["invoice_order_number"] = invoice.get("order_number")
     return result
+
+
+def combine_invoice_with_order_items(
+    pdf_path: str | pathlib.Path,
+    order_items_payload: Any,
+    *,
+    min_confidence: float = 0.72,
+    expected_order_id: str | None = None,
+) -> dict[str, Any]:
+    invoice = parse_invoice_pdf(pdf_path)
+    if expected_order_id is not None:
+        validate_invoice_order_number(invoice.get("order_number"), expected_order_id)
+    return combine_parsed_invoice_with_order_items(
+        invoice,
+        order_items_payload,
+        min_confidence=min_confidence,
+    )

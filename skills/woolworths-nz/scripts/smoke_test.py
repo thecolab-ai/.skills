@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 import json
+import os
+import stat
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
+from unittest import mock
 
 SKILL_DIR = Path(__file__).parent.parent
 CLI = SKILL_DIR / "scripts" / "cli.py"
@@ -88,6 +92,118 @@ def test_account_command_gating():
 
 
 results.append(test("account commands are credential-gated", test_account_command_gating))
+
+
+def test_session_cache_is_bound_to_account():
+    module = load_cli()
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "cookies.json"
+        module.session_file = lambda: path
+        matching_env = {
+            "WOOLWORTHS_EMAIL": "first.fixture@example.test",
+            "WOOLWORTHS_PASSWORD": "fixture",
+        }
+        with mock.patch.dict(os.environ, matching_env, clear=False):
+            account_hash = module.account_cache_key()
+            path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "1",
+                        "account_hash": account_hash,
+                        "cookies": [
+                            {
+                                "name": "session",
+                                "value": "fixture",
+                                "domain": ".woolworths.co.nz",
+                            }
+                        ],
+                    }
+                )
+            )
+            assert len(module.load_session_cookies()) == 1
+            with mock.patch.dict(
+                os.environ,
+                {"WOOLWORTHS_EMAIL": "second.fixture@example.test"},
+                clear=False,
+            ):
+                assert module.load_session_cookies() == []
+
+            # Legacy unbound list caches are intentionally invalidated.
+            path.write_text(
+                json.dumps(
+                    [
+                        {
+                            "name": "session",
+                            "value": "fixture",
+                            "domain": ".woolworths.co.nz",
+                        }
+                    ]
+                )
+            )
+            assert module.load_session_cookies() == []
+    return True
+
+
+results.append(test("session cache is bound to supplied account", test_session_cache_is_bound_to_account))
+
+
+def test_cookie_cache_is_created_private():
+    module = load_cli()
+    sys.path.insert(0, str(CLI.parent))
+    import browser_auth
+
+    with tempfile.TemporaryDirectory() as directory:
+        parent = Path(directory) / "woolworths-nz"
+        path = parent / "cookies.json"
+        browser_auth._save_cookies(
+            path,
+            [
+                {
+                    "name": "session",
+                    "value": "fixture",
+                    "domain": ".woolworths.co.nz",
+                }
+            ],
+            "fixture@example.test",
+        )
+        payload = json.loads(path.read_text())
+        assert stat.S_IMODE(path.stat().st_mode) == 0o600
+        assert stat.S_IMODE(parent.stat().st_mode) == 0o700
+        assert payload["account_hash"] == module.account_cache_key("fixture@example.test")
+        assert "fixture@example.test" not in path.read_text()
+        assert not list(parent.glob("*.tmp"))
+    return True
+
+
+results.append(test("cookie cache is atomically private", test_cookie_cache_is_created_private))
+
+
+def test_custom_cache_parent_permissions_are_preserved():
+    sys.path.insert(0, str(CLI.parent))
+    import browser_auth
+
+    with tempfile.TemporaryDirectory() as directory:
+        parent = Path(directory) / "woolworths-nz"
+        parent.mkdir(mode=0o755)
+        parent.chmod(0o755)
+        path = parent / "cookies.json"
+        browser_auth._save_cookies(
+            path,
+            [
+                {
+                    "name": "session",
+                    "value": "fixture",
+                    "domain": ".woolworths.co.nz",
+                }
+            ],
+            "fixture@example.test",
+        )
+        assert stat.S_IMODE(parent.stat().st_mode) == 0o755
+        assert stat.S_IMODE(path.stat().st_mode) == 0o600
+    return True
+
+
+results.append(test("custom cache parent permissions are preserved", test_custom_cache_parent_permissions_are_preserved))
 
 
 def test_account_request_contract():
@@ -182,6 +298,75 @@ def test_account_request_refresh_retry():
 results.append(test("401 refreshes and retries once", test_account_request_refresh_retry))
 
 
+def test_non_json_mutation_is_never_replayed():
+    module = load_cli()
+    request_calls = []
+    session_calls = []
+    cookies = [
+        {"name": "XSRF-TOKEN", "value": "fixture", "domain": ".woolworths.co.nz"},
+        {"name": "session", "value": "fixture", "domain": ".woolworths.co.nz"},
+    ]
+
+    def fake_session(**kwargs):
+        session_calls.append(kwargs)
+        return cookies
+
+    class HtmlResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self):
+            return b"<html>uncertain response</html>"
+
+    def fake_urlopen(request, timeout):
+        request_calls.append((request, timeout))
+        return HtmlResponse()
+
+    module.ensure_account_session = fake_session
+    module.urllib.request.urlopen = fake_urlopen
+    try:
+        module.account_api(
+            "POST",
+            "/trolleys/my/items",
+            {"sku": "705692", "quantity": 2, "pricingUnit": "Each"},
+        )
+    except SystemExit as exc:
+        assert exc.code == 1
+    else:
+        raise AssertionError("non-JSON mutation should fail as uncertain")
+    assert len(request_calls) == 1
+    assert not any(call.get("force") is True for call in session_calls)
+    return True
+
+
+results.append(test("non-JSON mutations are never replayed", test_non_json_mutation_is_never_replayed))
+
+
+def test_text_auth_status_rejects_anonymous_response():
+    module = load_cli()
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "cookies.json"
+        path.write_text("{}")
+        module.session_file = lambda: path
+        module.account_api = lambda *_args, **_kwargs: {
+            "isAuthenticated": False,
+            "isLoggedIn": False,
+        }
+        try:
+            module.cmd_auth_status(module.argparse.Namespace(json=False))
+        except SystemExit as exc:
+            assert exc.code == 1
+        else:
+            raise AssertionError("anonymous status must not report a valid session")
+    return True
+
+
+results.append(test("text auth status rejects anonymous response", test_text_auth_status_rejects_anonymous_response))
+
+
 def test_past_order_item_pagination():
     module = load_cli()
     calls = []
@@ -245,10 +430,58 @@ def test_list_and_cart_payloads():
         "listName": "Fixture list",
         "addFromListSource": "Unspecified",
     }
+    try:
+        module.positive_quantity("nan")
+    except module.argparse.ArgumentTypeError:
+        pass
+    else:
+        raise AssertionError("NaN must not be accepted as a quantity")
+    try:
+        module.cart_payload("705692", float("nan"), "Kg")
+    except SystemExit as exc:
+        assert exc.code == 2
+    else:
+        raise AssertionError("NaN must not reach a trolley payload")
     return True
 
 
 results.append(test("saved-list and trolley payload contracts", test_list_and_cart_payloads))
+
+
+def test_invoice_mismatch_fails_before_account_fetch():
+    module = load_cli()
+    sys.path.insert(0, str(CLI.parent))
+    import invoice_parser
+
+    events = []
+
+    def fake_parse(_path):
+        events.append("parse")
+        return {"page_count": 1, "order_number": "invoice-order", "items": []}
+
+    def fake_fetch(_order_id):
+        events.append("fetch")
+        return {"products": {"items": [], "totalItems": 0}}
+
+    module.fetch_past_order_items = fake_fetch
+    args = module.argparse.Namespace(
+        order_id="different-order",
+        invoice_pdf="fixture.pdf",
+        min_confidence=0.72,
+        json=True,
+    )
+    with mock.patch.object(invoice_parser, "parse_invoice_pdf", fake_parse):
+        try:
+            module.cmd_invoice_items(args)
+        except SystemExit as exc:
+            assert exc.code == 2
+        else:
+            raise AssertionError("a mismatched invoice must be rejected")
+    assert events == ["parse"]
+    return True
+
+
+results.append(test("invoice mismatch fails before account fetch", test_invoice_mismatch_fails_before_account_fetch))
 
 
 def test_invoice_row_parser_and_sku_join():
@@ -276,6 +509,11 @@ def test_invoice_row_parser_and_sku_join():
 
     boundaries = [0, 40, 300, 360, 420, 500, 580]
     fixture_words = []
+    fixture_words += words(
+        "Order Confirmation/Invoice Number fixture-order-123",
+        370,
+        2,
+    )
     fixture_words += words("1", 10, 30)
     fixture_words += words("Fixture Tea Bags", 50, 30)
     fixture_words += words("2 ea", 310, 30)
@@ -300,6 +538,21 @@ def test_invoice_row_parser_and_sku_join():
     assert rows[0]["invoice_description"] == "Fixture Tea Bags 40 pack"
     assert rows[0]["supplied_quantity"] == 2
     assert rows[1]["unit_price"] == 4.2
+    invoice_order_number = invoice_parser.extract_invoice_order_number(fixture_words)
+    assert invoice_order_number == "fixture-order-123"
+    invoice_parser.validate_invoice_order_number(
+        invoice_order_number,
+        "FIXTUREORDER123",
+    )
+    try:
+        invoice_parser.validate_invoice_order_number(
+            invoice_order_number,
+            "different-order",
+        )
+    except invoice_parser.InvoiceParseError:
+        pass
+    else:
+        raise AssertionError("mismatched invoice/order identifiers must be rejected")
 
     products = [
         {

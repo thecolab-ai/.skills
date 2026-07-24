@@ -8,7 +8,9 @@ to ``browser_auth.py`` and persists cookies, never the password.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import math
 import os
 import pathlib
 import sys
@@ -51,6 +53,26 @@ def account_commands_enabled(env: Any = None) -> bool:
     source = os.environ if env is None else env
     username = any(source.get(key) for key in ACCOUNT_USER_KEYS)
     return bool(username and source.get(ACCOUNT_SIGNIN_ENV))
+
+
+def account_cache_key(username: str | None = None) -> str | None:
+    value = username or credential_value(ACCOUNT_USER_KEYS)
+    if not value:
+        return None
+    normalized = value.strip().lower().encode("utf-8")
+    return hashlib.sha256(normalized).hexdigest()
+
+
+def authenticated_user(data: Any) -> bool:
+    return bool(
+        isinstance(data, dict)
+        and (
+            data.get("isAuthenticated")
+            or data.get("isLoggedIn")
+            or data.get("isShopper")
+            or data.get("shopper")
+        )
+    )
 
 
 def session_file() -> pathlib.Path:
@@ -99,11 +121,21 @@ def load_session_cookies() -> list[dict[str, Any]]:
         payload = json.loads(path.read_text())
     except (OSError, json.JSONDecodeError) as exc:
         die(f"could not read session cache {path}: {exc}")
-    if not isinstance(payload, list):
-        die(f"invalid session cache {path}")
+    expected_account = account_cache_key()
+    if (
+        not isinstance(payload, dict)
+        or payload.get("schema_version") != "1"
+        or not expected_account
+        or payload.get("account_hash") != expected_account
+    ):
+        # Legacy, malformed, or differently-bound caches must never be reused.
+        return []
+    cookies = payload.get("cookies")
+    if not isinstance(cookies, list):
+        return []
     return [
         item
-        for item in payload
+        for item in cookies
         if isinstance(item, dict)
         and item.get("name")
         and str(item.get("domain", "")).lower() in SESSION_COOKIE_DOMAINS
@@ -196,7 +228,8 @@ def account_api(
                 return account_api(method, path, data, params=params, retry_auth=False)
             die("authenticated session is missing the XSRF token; run `auth login`")
         headers["X-XSRF-TOKEN"] = token
-    request = urllib.request.Request(url, data=body, headers=headers, method=method.upper())
+    request_method = method.upper()
+    request = urllib.request.Request(url, data=body, headers=headers, method=request_method)
     try:
         with urllib.request.urlopen(request, timeout=25) as response:
             raw = response.read().decode("utf-8", "replace")
@@ -205,9 +238,15 @@ def account_api(
             try:
                 return json.loads(raw)
             except json.JSONDecodeError:
-                if retry_auth:
+                if request_method == "GET" and retry_auth:
                     ensure_account_session(force=True)
                     return account_api(method, path, data, params=params, retry_auth=False)
+                if request_method != "GET":
+                    die(
+                        "Woolworths returned a non-JSON response after an account "
+                        "mutation; the result is uncertain and was not retried. "
+                        "Inspect the list or trolley before retrying."
+                    )
                 die("Woolworths returned a non-JSON account response; run `auth login`")
     except urllib.error.HTTPError as exc:
         if exc.code in (401, 403) and retry_auth:
@@ -236,7 +275,7 @@ def positive_quantity(value: str) -> float:
         quantity = float(value)
     except ValueError:
         raise argparse.ArgumentTypeError("quantity must be numeric")
-    if quantity <= 0 or quantity > 999:
+    if not math.isfinite(quantity) or quantity <= 0 or quantity > 999:
         raise argparse.ArgumentTypeError("quantity must be greater than 0 and at most 999")
     return int(quantity) if quantity.is_integer() else quantity
 
@@ -532,21 +571,16 @@ def cmd_auth_status(args: argparse.Namespace) -> None:
         print("No cached Woolworths session")
         return
     data = account_api("GET", "/bff/get-user")
+    is_authenticated = authenticated_user(data)
     if args.json:
         safe = {
             "session_file": str(path),
-            "authenticated": bool(
-                isinstance(data, dict)
-                and (
-                    data.get("isAuthenticated")
-                    or data.get("isLoggedIn")
-                    or data.get("isShopper")
-                    or data.get("shopper")
-                )
-            ),
+            "authenticated": is_authenticated,
         }
         print(json.dumps(safe, indent=2))
     else:
+        if not is_authenticated:
+            die("cached Woolworths session is not authenticated; run `auth login`")
         print(f"Woolworths session is valid ({path})")
 
 
@@ -630,16 +664,28 @@ def fetch_past_order_items(order_id: str, *, page_size: int = 100) -> Any:
 
 def cmd_invoice_items(args: argparse.Namespace) -> None:
     order_id = urllib.parse.quote(args.order_id, safe="")
-    payload = fetch_past_order_items(order_id)
     try:
-        from invoice_parser import InvoiceParseError, combine_invoice_with_order_items
+        from invoice_parser import (
+            InvoiceParseError,
+            combine_parsed_invoice_with_order_items,
+            parse_invoice_pdf,
+            validate_invoice_order_number,
+        )
     except ImportError:
         sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-        from invoice_parser import InvoiceParseError, combine_invoice_with_order_items
+        from invoice_parser import (
+            InvoiceParseError,
+            combine_parsed_invoice_with_order_items,
+            parse_invoice_pdf,
+            validate_invoice_order_number,
+        )
 
     try:
-        data = combine_invoice_with_order_items(
-            args.invoice_pdf,
+        invoice = parse_invoice_pdf(args.invoice_pdf)
+        validate_invoice_order_number(invoice.get("order_number"), args.order_id)
+        payload = fetch_past_order_items(order_id)
+        data = combine_parsed_invoice_with_order_items(
+            invoice,
             payload,
             min_confidence=args.min_confidence,
         )
@@ -785,13 +831,20 @@ def cart_item_quantity(item: dict[str, Any]) -> float:
     if isinstance(value, dict):
         value = first_value(value, "value", "quantity")
     try:
-        return float(value or 0)
+        quantity = float(value or 0)
+        return quantity if math.isfinite(quantity) else 0
     except (TypeError, ValueError):
         return 0
 
 
 def cart_payload(sku: str, quantity: int | float, unit: str) -> dict[str, Any]:
-    if unit == "Each" and float(quantity) != int(float(quantity)):
+    try:
+        numeric_quantity = float(quantity)
+    except (TypeError, ValueError):
+        die("trolley quantity must be numeric", 2)
+    if not math.isfinite(numeric_quantity) or numeric_quantity < 0 or numeric_quantity > 999:
+        die("trolley quantity must be between 0 and 999", 2)
+    if unit == "Each" and numeric_quantity != int(numeric_quantity):
         die("Each quantities must be whole numbers; use --unit Kg for a weight", 2)
     return {"sku": str(sku), "quantity": quantity, "pricingUnit": unit}
 
