@@ -8,7 +8,9 @@ to ``browser_auth.py`` and persists cookies, never the password.
 from __future__ import annotations
 
 import argparse
+import email.utils
 import hashlib
+import http.cookies
 import json
 import math
 import os
@@ -29,7 +31,7 @@ UA = os.environ.get(
     "WOOLWORTHS_NZ_USER_AGENT",
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
 )
-UI_VER = os.environ.get("WOOLWORTHS_NZ_UI_VER", "7.70.51")
+UI_VER = os.environ.get("WOOLWORTHS_NZ_UI_VER", "7.76.44")
 ACCOUNT_USER_KEYS = ("WOOLWORTHS_USERNAME", "WOOLWORTHS_EMAIL")
 ACCOUNT_SIGNIN_ENV = "WOOLWORTHS_PASSWORD"
 SESSION_COOKIE_DOMAINS = {"woolworths.co.nz", ".woolworths.co.nz", "www.woolworths.co.nz"}
@@ -153,6 +155,177 @@ def xsrf_token(cookies: list[dict[str, Any]]) -> str | None:
     return None
 
 
+def save_session_cookies(cookies: list[dict[str, Any]]) -> None:
+    credentials = account_credentials()
+    if not credentials:
+        die(
+            "account commands require WOOLWORTHS_USERNAME (or WOOLWORTHS_EMAIL) "
+            "and WOOLWORTHS_PASSWORD",
+            2,
+        )
+    try:
+        from browser_auth import _save_cookies
+    except ImportError:
+        sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+        from browser_auth import _save_cookies
+    _save_cookies(session_file(), cookies, credentials[0])
+
+
+def response_set_cookie_headers(headers: Any) -> list[str]:
+    if headers is None:
+        return []
+    getter = getattr(headers, "get_all", None)
+    if callable(getter):
+        values = getter("Set-Cookie") or []
+        return [str(value) for value in values]
+    value = headers.get("Set-Cookie") if hasattr(headers, "get") else None
+    return [str(value)] if value else []
+
+
+def cookie_expiry_epoch(value: str) -> float | None:
+    if not value:
+        return None
+    try:
+        parsed = email.utils.parsedate_to_datetime(value)
+        return parsed.timestamp()
+    except (TypeError, ValueError, OverflowError):
+        return None
+
+
+def merge_response_cookies(
+    cookies: list[dict[str, Any]],
+    headers: Any,
+) -> tuple[list[dict[str, Any]], bool]:
+    merged = [dict(item) for item in cookies]
+    changed = False
+    for raw_header in response_set_cookie_headers(headers):
+        parsed = http.cookies.SimpleCookie()
+        try:
+            parsed.load(raw_header)
+        except http.cookies.CookieError:
+            continue
+        for name, morsel in parsed.items():
+            domain = str(morsel["domain"] or "www.woolworths.co.nz").lower()
+            if domain not in SESSION_COOKIE_DOMAINS:
+                continue
+            path = str(morsel["path"] or "/")
+            existing = [
+                item
+                for item in merged
+                if item.get("name") == name and str(item.get("path") or "/") == path
+            ]
+            max_age = str(morsel["max-age"] or "")
+            should_remove = morsel.value == "" or max_age == "0"
+            if should_remove:
+                if existing:
+                    merged = [
+                        item
+                        for item in merged
+                        if not (
+                            item.get("name") == name
+                            and str(item.get("path") or "/") == path
+                        )
+                    ]
+                    changed = True
+                continue
+
+            updated: dict[str, Any] = {
+                "name": name,
+                "value": morsel.value,
+                "domain": domain,
+                "path": path,
+                "secure": bool(morsel["secure"]),
+                "httpOnly": bool(morsel["httponly"]),
+            }
+            same_site = str(morsel["samesite"] or "").capitalize()
+            if same_site in {"Strict", "Lax", "None"}:
+                updated["sameSite"] = same_site
+            expires = cookie_expiry_epoch(str(morsel["expires"] or ""))
+            if expires is not None:
+                updated["expires"] = expires
+            if existing != [updated]:
+                merged = [
+                    item
+                    for item in merged
+                    if not (
+                        item.get("name") == name
+                        and str(item.get("path") or "/") == path
+                    )
+                ]
+                merged.append(updated)
+                changed = True
+    return merged, changed
+
+
+def update_session_from_response(
+    cookies: list[dict[str, Any]],
+    headers: Any,
+) -> list[dict[str, Any]]:
+    updated, changed = merge_response_cookies(cookies, headers)
+    if changed:
+        save_session_cookies(updated)
+    return updated
+
+
+def account_headers(cookies: list[dict[str, Any]], *, mutation: bool = False) -> dict[str, str]:
+    headers = {
+        "Accept": "application/json, text/plain, */*",
+        "Content-Type": "application/json",
+        "X-Requested-With": "OnlineShopping.WebApp",
+        "X-UI-Ver": UI_VER,
+        "Cache-Control": "no-cache",
+        "Pragma": "no-cache",
+        "Expires": "Sat, 01 Jan 2000 00:00:00 GMT",
+        "Referer": BASE_WEB + "/",
+        "Origin": BASE_WEB,
+        "User-Agent": UA,
+        "Cookie": session_cookie_header(cookies),
+    }
+    if mutation:
+        token = xsrf_token(cookies)
+        if token:
+            headers["X-XSRF-TOKEN"] = token
+    return headers
+
+
+def refresh_account_cookies(
+    cookies: list[dict[str, Any]],
+    *,
+    retry_auth: bool = True,
+) -> list[dict[str, Any]]:
+    request = urllib.request.Request(
+        BASE_API + "/bff/get-user",
+        headers=account_headers(cookies),
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=25) as response:
+            refreshed = update_session_from_response(cookies, getattr(response, "headers", None))
+            raw = response.read().decode("utf-8", "replace")
+    except urllib.error.HTTPError as exc:
+        update_session_from_response(cookies, getattr(exc, "headers", None))
+        if exc.code in (401, 403) and retry_auth:
+            return refresh_account_cookies(
+                ensure_account_session(force=True),
+                retry_auth=False,
+            )
+        die(f"Woolworths session refresh failed (HTTP {exc.code})")
+    except urllib.error.URLError as exc:
+        die(f"network error while refreshing Woolworths session: {exc.reason}")
+    try:
+        payload = json.loads(raw) if raw else None
+    except json.JSONDecodeError:
+        die("Woolworths returned a non-JSON session refresh response; run `auth login`")
+    if not authenticated_user(payload):
+        if retry_auth:
+            return refresh_account_cookies(
+                ensure_account_session(force=True),
+                retry_auth=False,
+            )
+        die("Woolworths session refresh did not authenticate; run `auth login`")
+    return refreshed
+
+
 def browser_login(*, headed: bool = False) -> dict[str, Any]:
     credentials = account_credentials()
     if not credentials:
@@ -206,32 +379,32 @@ def account_api(
         clean = {key: str(value) for key, value in params.items() if value is not None}
         if clean:
             url += "?" + urllib.parse.urlencode(clean)
+    request_method = method.upper()
     cookies = ensure_account_session()
-    headers = {
-        "Accept": "application/json, text/plain, */*",
-        "X-Requested-With": "OnlineShopping.WebApp",
-        "X-UI-Ver": UI_VER,
-        "Referer": BASE_WEB + "/",
-        "Origin": BASE_WEB,
-        "User-Agent": UA,
-        "Cookie": session_cookie_header(cookies),
-    }
+    if request_method in {"POST", "PUT", "PATCH", "DELETE"}:
+        # Woolworths refreshes Akamai/session cookies on ordinary account reads.
+        # Refresh them before a mutation so the first write in a new CLI process
+        # does not use the login-time cookie snapshot. The mutation itself is
+        # still sent exactly once unless the server definitively rejects auth.
+        cookies = refresh_account_cookies(cookies)
+    headers = account_headers(
+        cookies,
+        mutation=request_method in {"POST", "PUT", "PATCH", "DELETE"},
+    )
     body = None
     if data is not None:
         body = json.dumps(data).encode("utf-8")
-        headers["Content-Type"] = "application/json"
-    if method.upper() in {"POST", "PUT", "PATCH", "DELETE"}:
+    if request_method in {"POST", "PUT", "PATCH", "DELETE"}:
         token = xsrf_token(cookies)
         if not token:
             if retry_auth:
                 ensure_account_session(force=True)
                 return account_api(method, path, data, params=params, retry_auth=False)
             die("authenticated session is missing the XSRF token; run `auth login`")
-        headers["X-XSRF-TOKEN"] = token
-    request_method = method.upper()
     request = urllib.request.Request(url, data=body, headers=headers, method=request_method)
     try:
         with urllib.request.urlopen(request, timeout=25) as response:
+            update_session_from_response(cookies, getattr(response, "headers", None))
             raw = response.read().decode("utf-8", "replace")
             if not raw:
                 return None
@@ -249,6 +422,7 @@ def account_api(
                     )
                 die("Woolworths returned a non-JSON account response; run `auth login`")
     except urllib.error.HTTPError as exc:
+        update_session_from_response(cookies, getattr(exc, "headers", None))
         if exc.code in (401, 403) and retry_auth:
             ensure_account_session(force=True)
             return account_api(method, path, data, params=params, retry_auth=False)
@@ -744,7 +918,9 @@ def cmd_list_detail(args: argparse.Namespace) -> None:
 
 
 LIST_CREATE_SOURCES = {
-    "empty": "Unspecified",
+    # Woolworths' current UI/API does not expose a standalone empty-list
+    # source. Saving an empty trolley is the supported way to create one.
+    "empty": "Trolley",
     "trolley": "Trolley",
     "favourites": "FavouritesAllItems",
     "list": "MySavedList",
@@ -766,6 +942,16 @@ def list_create_payload(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def cmd_list_create(args: argparse.Namespace) -> None:
+    if args.source == "empty":
+        trolley = account_api("GET", "/trolleys/my")
+        if not isinstance(trolley, dict):
+            die("could not verify an empty trolley before creating the list")
+        if cart_products(trolley):
+            die(
+                "empty list creation requires an empty trolley; remove its items "
+                "first or explicitly use --source trolley to copy them",
+                2,
+            )
     data = account_api("POST", "/shoppers/my/saved-lists", list_create_payload(args))
     emit_json_or_summary(data, args.json, "list created")
 
