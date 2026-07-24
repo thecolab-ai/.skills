@@ -2,7 +2,7 @@
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
   "last_verified": "2026-07-24",
-  "skill_count": 138,
+  "skill_count": 141,
   "skills": [
     {
       "name": "airnz-flights",
@@ -1211,6 +1211,31 @@
       "maintainer": "@adam91holt"
     },
     {
+      "name": "gns-hazards-nz",
+      "description": "Query GNS Science public ArcGIS hazard services through a lightweight no-login CLI: the NZ Active Faults Database (fault traces, recurrence intervals, slip rates, avoidance zones) and live ShakingLayers ground-motion contours (MMI, PGA, PGV) generated after significant earthquakes. Use when the task involves NZ active fault locations, fault hazard attributes, or measured ground-shaking extents from recent earthquakes. Read-only; no authentication required.",
+      "path": "skills/gns-hazards-nz",
+      "category": "environment",
+      "source_owner": "GNS Science",
+      "source_type": "official",
+      "source_url": "https://gis.gns.cri.nz/server/rest/services",
+      "auth": "none",
+      "access_mode": "public-api",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "24h",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "gis.gns.cri.nz"
+      ],
+      "last_verified": "2026-07-24",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
       "name": "grocer-nz",
       "description": "Query grocer.nz public NZ supermarket data — canonical product and barcode/GTIN lookup, cross-retailer product matching, store lookup, current per-store prices, and historical price rows from public DuckDB/parquet assets. Use for exact NZ grocery product matching or pricing across Woolworths, New World, PAK'nSAVE, Fresh Choice, and related stores. Read-only; no login or private user data.",
       "path": "skills/grocer-nz",
@@ -1841,6 +1866,36 @@
         "authenticated-api-post",
         "authenticated-api-delete"
       ]
+    },
+    {
+      "name": "niwa-coastal-nz",
+      "description": "Search and query NIWA (National Institute of Water and Atmospheric Research) public ArcGIS open data through a lightweight no-login CLI: org-scoped dataset search plus GeoJSON layer queries for the Coastal Sensitivity Index (erosion and inundation), beach exposure, coastal landform and hinterland classification, and other national coastal and climate layers. Use when the task involves NZ coastal hazard sensitivity, coastal classification, or NIWA open geospatial datasets. Read-only; no authentication required.",
+      "path": "skills/niwa-coastal-nz",
+      "category": "environment",
+      "source_owner": "NIWA",
+      "source_type": "official",
+      "source_url": "https://data-niwa.opendata.arcgis.com/",
+      "auth": "none",
+      "access_mode": "public-api",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "24h",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "data-niwa.opendata.arcgis.com",
+        "www.arcgis.com",
+        "hub.arcgis.com",
+        "services.arcgis.com",
+        "services3.arcgis.com",
+        "gis.niwa.co.nz"
+      ],
+      "last_verified": "2026-07-24",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
     },
     {
       "name": "nz-ai-policy",
@@ -3359,6 +3414,31 @@
       "maintainer": "@adam91holt"
     },
     {
+      "name": "searise-nz",
+      "description": "Query NZ SeaRise sea-level rise and vertical land movement projections for every 2 km of the Aotearoa New Zealand coastline, from the official Zenodo-published dataset (Naish et al. 2024): find the nearest projection site to a location, read its vertical land movement rate, and read sea-level projections to 2300 by SSP scenario with and without VLM. Use when the task involves NZ sea-level rise projections, coastal subsidence or uplift rates, or climate adaptation planning inputs. Read-only; no authentication required.",
+      "path": "skills/searise-nz",
+      "category": "environment",
+      "source_owner": "NZ SeaRise programme (Victoria University of Wellington, GNS Science, NIWA)",
+      "source_type": "official",
+      "source_url": "https://zenodo.org/records/11398538",
+      "auth": "none",
+      "access_mode": "public-download",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "24h",
+      "schema_version": "1",
+      "skill_type": "public-download",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "zenodo.org"
+      ],
+      "last_verified": "2026-07-24",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
       "name": "seek-co-nz",
       "description": "Search and inspect public SEEK.co.nz job listings through a lightweight no-login CLI. Use when the task involves New Zealand job search, SEEK listing IDs, role/company/location snapshots, salary snippets, classifications, or machine-readable public job data. Read-only; no login, saved searches, applications, account, recruiter, or job-posting actions.",
       "path": "skills/seek-co-nz",
@@ -3619,7 +3699,9 @@
         "gis.wcc.govt.nz",
         "giswebprd.gw.govt.nz",
         "mapping.gw.govt.nz",
+        "mapping1.gw.govt.nz",
         "maps.gw.govt.nz",
+        "gis.wellingtonwater.co.nz",
         "gis-snowflake-opendata-public-wcc-arcgis-prod.s3.ap-southeast-2.amazonaws.com"
       ],
       "last_verified": "2026-07-22",

@@ -18,7 +18,7 @@ metadata:
   thecolab.skill_type: "public-api"
   thecolab.pack: "nz-public-data"
   thecolab.source_url: "https://data-wcc.opendata.arcgis.com/"
-  thecolab.allowed_domains: "data-wcc.opendata.arcgis.com,data-gwrc.opendata.arcgis.com,www.arcgis.com,hub.arcgis.com,services.arcgis.com,services1.arcgis.com,services2.arcgis.com,gis.wcc.govt.nz,giswebprd.gw.govt.nz,mapping.gw.govt.nz,maps.gw.govt.nz,gis-snowflake-opendata-public-wcc-arcgis-prod.s3.ap-southeast-2.amazonaws.com"
+  thecolab.allowed_domains: "data-wcc.opendata.arcgis.com,data-gwrc.opendata.arcgis.com,www.arcgis.com,hub.arcgis.com,services.arcgis.com,services1.arcgis.com,services2.arcgis.com,gis.wcc.govt.nz,giswebprd.gw.govt.nz,mapping.gw.govt.nz,mapping1.gw.govt.nz,maps.gw.govt.nz,gis.wellingtonwater.co.nz,gis-snowflake-opendata-public-wcc-arcgis-prod.s3.ap-southeast-2.amazonaws.com"
   thecolab.last_verified: "2026-07-22"
   thecolab.health: "healthy"
   thecolab.maintainer: "@adam91holt"
@@ -67,7 +67,12 @@ python3 skills/wcc-arcgis-nz/scripts/cli.py sensors-latest --limit 20 --json
 
 ## Notes
 
-- Licence: CC BY 4.0 — attribute "Wellington City Council" (or GWRC for `--portal gwrc` data)
+- Licence: CC BY 4.0 — attribute "Wellington City Council" (or GWRC for `--portal gwrc` data;
+  Wellington Water for `gis.wellingtonwater.co.nz` flood model layers)
+- GWRC hazard and climate layers (sea level rise, storm surge, regional flood hazard,
+  `Emergencies_P` landslide/liquefaction/tsunami, `Modelled_Climate_Change`) live on
+  `mapping1.gw.govt.nz`; Wellington Water stormwater flood depth models live on
+  `gis.wellingtonwater.co.nz` — both are accepted by `layers`/`query`
 - Searches are scoped to each council's ArcGIS organisation; hub-wide search APIs
   return a global catalogue and are deliberately not used
 - Layer queries require HTTPS, exact declared hosts, and a verified WCC/GWRC ArcGIS

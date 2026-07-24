@@ -5,7 +5,7 @@
 - Declared outbound hosts: data-wcc.opendata.arcgis.com, data-gwrc.opendata.arcgis.com,
   www.arcgis.com, hub.arcgis.com, services.arcgis.com, services1.arcgis.com,
   services2.arcgis.com, gis.wcc.govt.nz, giswebprd.gw.govt.nz,
-  mapping.gw.govt.nz, maps.gw.govt.nz,
+  mapping.gw.govt.nz, mapping1.gw.govt.nz, maps.gw.govt.nz, gis.wellingtonwater.co.nz,
   gis-snowflake-opendata-public-wcc-arcgis-prod.s3.ap-southeast-2.amazonaws.com
 - Access mode: public-api
 - Authentication: none
@@ -34,14 +34,33 @@ Feature/Map service layers answer standard ArcGIS REST `query` requests with
 `f=geojson`, no key. Server page cap is 2000 records (`exceededTransferLimit`
 surfaces as `truncated`). Services live on `services.arcgis.com` /
 `services1.arcgis.com` / `services2.arcgis.com` (Esri-hosted),
-`gis.wcc.govt.nz`, `giswebprd.gw.govt.nz`, `mapping.gw.govt.nz`, and
-`maps.gw.govt.nz`; the CLI refuses any other host (exit 7). Note some
+`gis.wcc.govt.nz`, `giswebprd.gw.govt.nz`, `mapping.gw.govt.nz`,
+`mapping1.gw.govt.nz`, `maps.gw.govt.nz`, and `gis.wellingtonwater.co.nz`; the
+CLI refuses any other host (exit 7). Note some
 services do not start layer ids at 0 — the CLI reads the service's own layer
 list when no `--layer-id` is given. Item ids must belong to the WCC or GWRC org
 ids above. Direct service/layer URLs must use HTTPS and either an exact council
 host or an Esri service path whose first segment is one of those org ids (plus
-GWRC's verified legacy tenant `XTtANUDT8Va4DLwI`). Every request pins redirects
-to its already-validated hostname.
+the verified Eagle Technologies tenant `XTtANUDT8Va4DLwI`, which serves the
+MetService weather CAP and NZTA highway warning feeds used by NZ EM GIS users).
+Every request pins redirects to its already-validated hostname.
+
+### Verified hazard/climate services (WCC-EM GIS overview, 2026-07-24)
+
+- `mapping1.gw.govt.nz/arcgis/rest/services/Hazards/Sea_Level_Rise/MapServer` —
+  GWRC/NIWA sea level rise grids (1–5 m above MHWS10)
+- `mapping1.gw.govt.nz/arcgis/rest/services/Hazards/Storm_Surge/MapServer` —
+  1% AEP storm-tide flooding with 0.5/1.0/1.5 m SLR increments
+- `mapping1.gw.govt.nz/arcgis/rest/services/GW/Flood_Hazards_Areas/MapServer` —
+  50/100/400-year modelled flood hazard areas
+- `mapping1.gw.govt.nz/arcgis/rest/services/GW/Emergencies_P/MapServer` — layer 10
+  liquefaction potential, 11 earthquake slope failure, 21 landslide lines,
+  23 tsunami evacuation zones (2019)
+- `mapping1.gw.govt.nz/arcgis/rest/services/ClimateChange/Modelled_Climate_Change/MapServer`
+  — 26 NIWA modelled climate-change layers (wind, temperature, rainfall, PED,
+  soil moisture, GDD, snow days, solar, humidity)
+- `gis.wellingtonwater.co.nz/server1/rest/services/Modelling/WCC100yrCC2025FloodDepths_FB/MapServer`
+  — Wellington Water combined stormwater flood depths, 100yr ARI + climate change
 
 ## Pōneke Travel Insights transport sensors
 

@@ -50,11 +50,14 @@ COUNCIL_SERVICE_HOSTS = {
     "gis.wcc.govt.nz",
     "giswebprd.gw.govt.nz",
     "mapping.gw.govt.nz",
+    "mapping1.gw.govt.nz",
     "maps.gw.govt.nz",
+    "gis.wellingtonwater.co.nz",
 }
 COUNCIL_ORG_IDS = {portal["org_id"] for portal in PORTALS.values()}
-# ArcGIS Online normally uses the org id as the tenant path. GWRC retains one
-# verified legacy tenant id on services.arcgis.com.
+# ArcGIS Online normally uses the org id as the tenant path. XTtANUDT8Va4DLwI is
+# the Eagle Technologies tenant that hosts the MetService weather CAP and NZTA
+# highway warning feeds referenced by Wellington emergency-management datasets.
 COUNCIL_TENANT_IDS = COUNCIL_ORG_IDS | {"XTtANUDT8Va4DLwI"}
 ATTRIBUTION = "CC BY 4.0 — attribute the owning council"
 

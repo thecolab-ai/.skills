@@ -1,0 +1,14 @@
+{
+  "fixture": "synthetic ArcGIS service listing (shape matches gis.gns.cri.nz)",
+  "contains_live_credentials": false,
+  "contains_personal_data": false,
+  "currentVersion": 11.5,
+  "serviceDescription": "Synthetic fault dataset listing",
+  "layers": [
+    {"id": 0, "name": "1:250 000 Active Faults", "geometryType": "esriGeometryPolyline"},
+    {"id": 7, "name": "Fault Avoidance Zones", "geometryType": "esriGeometryPolygon"}
+  ],
+  "tables": [
+    {"id": 99, "name": "Synthetic Attribute Table"}
+  ]
+}

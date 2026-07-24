@@ -1,0 +1,5 @@
+Site ID,Lon,Lat,Vertical Rate (mm/yr),Vertical Rate - BOP corrected (mm/yr),1-sigma uncertainty (mm/yr),Number of obs,Quality Factor,Average distance between coastal point and observations,,,,,,,
+0,173.11751,-34.740926,-1.32,-1.32,15.485643,1,4.333333,39.246499,,,,,,,
+1,173.127726,-34.756665,-1.32,-1.32,14.613627,1,4.333333,37.272582,,,,,,,
+3414,174.780345,-41.290111,-2.10,-2.10,1.204,42,1.5,0.9,,,,,,,
+bad,not,numeric,,,,,,,,,,,,,
