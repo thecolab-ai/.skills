@@ -2,9 +2,9 @@
 
 - Primary owner: Woolworths New Zealand
 - Primary source: https://www.woolworths.co.nz
-- Declared outbound hosts: www.woolworths.co.nz
-- Access mode: html-readonly
-- Authentication: none
-- Last verified: 2026-07-19
+- Declared outbound hosts: auth.woolworths.co.nz,iam.woolworths.co.nz,www.woolworths.co.nz
+- Access mode: authenticated-personal
+- Authentication: mixed
+- Last verified: 2026-07-24
 
-The skill is read-only unless its SKILL.md metadata explicitly declares mutations. Live results must retain source and retrieval-time context. A blocked, unavailable, or changed source is an explicit failure state, never an empty successful dataset.
+Public product requests require no account. Orders, favourites, saved lists, and trolley reads require user-authorised Woolworths credentials and return personal data. Tax-invoice enrichment combines a user-provided local PDF with the matching past-order items response, retaining invoice quantities/prices while adding confidence-scored catalogue SKUs. Explicit commands can create/delete saved lists, add/update/remove saved-list products, and add/update/remove/clear trolley products. Passwords remain environment-only; browser session cookies are stored in a private local cache. Destructive removals require `--yes`, and checkout/order placement is not exposed. Live results must retain source and retrieval-time context. A blocked, unavailable, or changed source is an explicit failure state, never an empty successful dataset.

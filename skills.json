@@ -3678,28 +3678,34 @@
     },
     {
       "name": "woolworths-nz",
-      "description": "Query Woolworths NZ product search, specials, category browse, and SKU detail. Use for Woolworths NZ grocery prices, specials, and product lookup. Read-only; no trolley or checkout actions.",
+      "description": "Query Woolworths NZ product search, specials, category browse, and SKU details, plus a user's own past orders, favourites, saved lists, and trolley when they explicitly provide account credentials. Manage the user's saved lists or trolley only when they explicitly request a specific change.",
       "path": "skills/woolworths-nz",
       "category": "food-and-fuel",
       "source_owner": "Woolworths New Zealand",
       "source_type": "commercial",
       "source_url": "https://www.woolworths.co.nz",
-      "auth": "none",
-      "access_mode": "html-readonly",
-      "data_class": "public",
-      "writes": false,
-      "browser": false,
-      "risk": "low",
-      "cache_ttl": "24h",
+      "auth": "mixed",
+      "access_mode": "authenticated-personal",
+      "data_class": "personal",
+      "writes": true,
+      "browser": true,
+      "risk": "high",
+      "cache_ttl": "30m",
       "schema_version": "1",
-      "skill_type": "html-readonly",
-      "pack": "nz-commercial-web",
+      "skill_type": "authenticated-personal",
+      "pack": "nz-personal-data",
       "allowed_domains": [
+        "auth.woolworths.co.nz",
+        "iam.woolworths.co.nz",
         "www.woolworths.co.nz"
       ],
-      "last_verified": "2026-07-19",
-      "health": "healthy",
-      "maintainer": "@adam91holt"
+      "last_verified": "2026-07-24",
+      "health": "gated",
+      "maintainer": "@adam91holt",
+      "mutations": [
+        "authenticated-api-post",
+        "authenticated-api-delete"
+      ]
     },
     {
       "name": "wremo-nz",

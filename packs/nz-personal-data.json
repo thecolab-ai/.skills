@@ -3,10 +3,11 @@
   "name": "nz-personal-data",
   "description": "User-authorised personal data with runtime credentials and no live personal CI fixtures.",
   "default": false,
-  "skill_count": 3,
+  "skill_count": 4,
   "skills": [
     "akahu-personal",
     "newworld-nz",
-    "paknsave-nz"
+    "paknsave-nz",
+    "woolworths-nz"
   ]
 }
