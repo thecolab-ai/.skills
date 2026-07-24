@@ -15,7 +15,11 @@
   "clubplus_refresh_request": {
     "refreshToken": "synthetic-refresh-token"
   },
-  "newworld_sso_request": {
+  "clubplus_secure_request": {
+    "banner": "PNS",
+    "source": "WEB"
+  },
+  "paknsave_sso_request": {
     "key": "synthetic-secure-code",
     "forceNewSession": false,
     "fingerprintUser": "synthetic-device",

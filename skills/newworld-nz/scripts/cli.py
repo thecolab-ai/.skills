@@ -493,6 +493,20 @@ def get_account_token(force_refresh: bool = False) -> str:
     die("account authentication required; set New World credentials and run `auth login`", 2)
 
 
+def select_account_store(token: str, store_id: str = DEFAULT_STORE_ID) -> Any:
+    encoded_store_id = urllib.parse.quote(store_id, safe="")
+    try:
+        result, _headers = auth_http(
+            "POST",
+            BASE_API + f"/cart/store/{encoded_store_id}",
+            token=token,
+        )
+        return result
+    except AuthHTTPError as exc:
+        detail = f": {exc.message}" if exc.message else ""
+        die(f"New World store selection failed ({exc.code or 'HTTP ' + str(exc.status)}){detail}")
+
+
 def account_api(method: str, path: str, data: Any = None) -> Any:
     url = BASE_API + path
     token = get_account_token()
@@ -502,11 +516,24 @@ def account_api(method: str, path: str, data: Any = None) -> Any:
     except AuthHTTPError as exc:
         if exc.status == 401:
             try:
-                result, _headers = auth_http(method, url, data, token=get_account_token(force_refresh=True))
+                token = get_account_token(force_refresh=True)
+                result, _headers = auth_http(method, url, data, token=token)
                 return result
             except AuthHTTPError as retry_exc:
                 exc = retry_exc
-        die(f"New World account request failed ({exc.code or 'HTTP ' + str(exc.status)})")
+        if (
+            exc.status == 412
+            and exc.code == "PreconditionFailed"
+            and exc.message.strip().lower() == "store is not set"
+        ):
+            select_account_store(token)
+            try:
+                result, _headers = auth_http(method, url, data, token=token)
+                return result
+            except AuthHTTPError as retry_exc:
+                exc = retry_exc
+        detail = f": {exc.message}" if exc.message else ""
+        die(f"New World account request failed ({exc.code or 'HTTP ' + str(exc.status)}){detail}")
 
 
 def positive_int(value: str) -> int:
@@ -917,6 +944,11 @@ def cmd_list_create(args: argparse.Namespace) -> None:
     print_mutation_result("list-create", data, json_output=args.json)
 
 
+def cmd_store_select(args: argparse.Namespace) -> None:
+    data = select_account_store(get_account_token(), args.store_id)
+    print_mutation_result("store-select", data, json_output=args.json)
+
+
 def cmd_list_rename(args: argparse.Namespace) -> None:
     list_id = urllib.parse.quote(args.list_id, safe="")
     data = account_api("POST", f"/list/{list_id}/rename", {"name": args.name})
@@ -1055,6 +1087,7 @@ def build_parser(include_account: bool | None = None) -> argparse.ArgumentParser
     )
     account_examples = """
           newworld auth login
+          newworld store-select
           newworld orders --limit 20
           newworld lists
           newworld list-create "Weekly shop"
@@ -1151,6 +1184,11 @@ def build_parser(include_account: bool | None = None) -> argparse.ArgumentParser
     auth_sp = auth_sub.add_parser("logout", help="remove only the local token cache")
     auth_sp.add_argument("--json", action="store_true")
     auth_sp.set_defaults(func=cmd_auth_logout)
+
+    sp = sub.add_parser("store-select", help="select the store used by authenticated list and cart writes")
+    sp.add_argument("--store-id", default=DEFAULT_STORE_ID)
+    sp.add_argument("--json", action="store_true")
+    sp.set_defaults(func=cmd_store_select)
 
     sp = sub.add_parser("orders", help="list previous online and in-store orders")
     sp.add_argument("--page", type=positive_int, default=1)
