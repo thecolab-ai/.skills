@@ -3,7 +3,7 @@
   "name": "nz-commercial-web",
   "description": "Read-only public commercial websites and market surfaces.",
   "default": false,
-  "skill_count": 39,
+  "skill_count": 38,
   "skills": [
     "airnz-flights",
     "animates-nz",
@@ -42,7 +42,6 @@
     "petstock-nz",
     "raw-essentials-nz",
     "seek-co-nz",
-    "the-warehouse-nz",
-    "trademe-nz"
+    "the-warehouse-nz"
   ]
 }
