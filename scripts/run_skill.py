@@ -206,7 +206,8 @@ def _child_limits():
         raise RuntimeError("SKILL_PROCESS_MEMORY_LIMIT_MODE must be rlimit or cgroup")
     if (
         memory_mode == "cgroup"
-        and os.environ.get("THECOLAB_BROWSER_RUNTIME") != "playwright"
+        and os.environ.get("THECOLAB_BROWSER_RUNTIME")
+        not in {"playwright", "camoufox"}
     ):
         raise RuntimeError(
             "cgroup memory mode is allowed only in the isolated browser worker"

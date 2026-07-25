@@ -231,21 +231,22 @@ class RunSkillIntegrationTests(unittest.TestCase):
                 os.environ["SKILL_COMMAND_TIMEOUT_SECONDS"] = previous
 
     def test_browser_worker_uses_its_hard_cgroup_instead_of_rlimit_as(self) -> None:
-        browser_env = {
-            "THECOLAB_PUBLIC_SERVER": "1",
-            "THECOLAB_BROWSER_RUNTIME": "playwright",
-            "SKILL_PROCESS_MEMORY_LIMIT_MODE": "cgroup",
-            "SKILL_PROCESS_MEMORY_LIMIT_MB": "1536",
-        }
-        with (
-            mock.patch.dict(os.environ, browser_env, clear=False),
-            mock.patch.object(sys, "platform", "linux"),
-            mock.patch.object(resource, "setrlimit") as setrlimit,
-        ):
-            apply = RUN_SKILL_MODULE._child_limits()
-            self.assertIsNotNone(apply)
-            apply()
-        setrlimit.assert_called_once_with(resource.RLIMIT_CPU, (60, 61))
+        for runtime in ("playwright", "camoufox"):
+            browser_env = {
+                "THECOLAB_PUBLIC_SERVER": "1",
+                "THECOLAB_BROWSER_RUNTIME": runtime,
+                "SKILL_PROCESS_MEMORY_LIMIT_MODE": "cgroup",
+                "SKILL_PROCESS_MEMORY_LIMIT_MB": "1536",
+            }
+            with (
+                mock.patch.dict(os.environ, browser_env, clear=False),
+                mock.patch.object(sys, "platform", "linux"),
+                mock.patch.object(resource, "setrlimit") as setrlimit,
+            ):
+                apply = RUN_SKILL_MODULE._child_limits()
+                self.assertIsNotNone(apply)
+                apply()
+            setrlimit.assert_called_once_with(resource.RLIMIT_CPU, (60, 61))
 
         with mock.patch.dict(
             os.environ,
