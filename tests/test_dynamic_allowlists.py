@@ -123,6 +123,29 @@ class DynamicAllowlistTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "declared API host"):
                     cli.validate_api_url(url)
 
+    def test_nz_council_browser_probe_refuses_catalog_fallback(self) -> None:
+        cli = self.load_cli("nz-council")
+        cli.try_fetch_live_page = lambda url: (
+            None,
+            url,
+            403,
+            "browser_blocked",
+        )
+        cli.BROWSER_MODE = True
+        with self.assertRaisesRegex(cli.BrowserBlockedError, "browser_blocked"):
+            cli.source_probe("https://pools.huttcity.govt.nz/our-pools")
+
+        cli.BROWSER_MODE = False
+        self.assertEqual(
+            cli.source_probe("https://pools.huttcity.govt.nz/our-pools"),
+            {
+                "ok": False,
+                "method": "browser_blocked",
+                "status": 403,
+                "url": "https://pools.huttcity.govt.nz/our-pools",
+            },
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

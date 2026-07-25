@@ -1864,6 +1864,10 @@ def try_fetch_live_page(url: str, use_cdp: bool = True) -> tuple[str | None, str
 def source_probe(url: str) -> dict[str, Any]:
     _, final_url, status, method = try_fetch_live_page(url)
     ok = method in {"direct", "cdp", "browser"}
+    if BROWSER_MODE and not ok:
+        raise BrowserBlockedError(
+            f"browser_blocked: live source probe failed ({method})"
+        )
     return {"ok": ok, "method": method, "status": status, "url": final_url}
 
 
