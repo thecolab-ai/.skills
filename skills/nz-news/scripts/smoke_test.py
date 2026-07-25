@@ -62,6 +62,49 @@ def test_rss_fixture():
 results.append(test("fixture RSS parser", test_rss_fixture))
 
 
+def test_thread_starvation_fallback():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("nz_news_thread_test", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+
+    class StarvedPool:
+        def __init__(self, max_workers):
+            assert max_workers == 2
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def submit(self, *_args):
+            raise RuntimeError("can't start new thread")
+
+    module.ThreadPoolExecutor = StarvedPool
+    module.fetch_feed = lambda feed: {
+        "feed": feed,
+        "items": [{"title": feed["name"]}],
+        "ok": True,
+        "error": None,
+        "durationMs": 0,
+    }
+    fetched = module.fetch_feeds(["rnz", "newsroom", "spinoff"])
+    assert [result["feed"]["id"] for result in fetched] == [
+        "rnz",
+        "newsroom",
+        "spinoff",
+    ]
+    print("[PASS] fixture thread-starvation fallback")
+    return True
+
+
+results.append(test("fixture thread-starvation fallback", test_thread_starvation_fallback))
+
+
 def test_help():
     result = run(["--help"])
     return result.returncode == 0

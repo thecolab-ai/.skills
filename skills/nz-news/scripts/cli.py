@@ -227,14 +227,43 @@ def fetch_feed(feed: dict) -> dict:
 
 def fetch_feeds(feed_ids: list[str] | None = None) -> list[dict]:
     selected = [FEED_BY_ID[fid] for fid in (feed_ids or PRIMARY_FEED_IDS) if fid in FEED_BY_ID]
-    results = []
-    with ThreadPoolExecutor(max_workers=8) as pool:
-        futures = {pool.submit(fetch_feed, feed): feed for feed in selected}
-        for future in as_completed(futures):
-            results.append(future.result())
+    results = fetch_selected(selected)
     # Maintain stable order matching selected
     order = {f["id"]: i for i, f in enumerate(selected)}
     results.sort(key=lambda r: order.get(r["feed"]["id"], 999))
+    return results
+
+
+def fetch_selected(selected: list[dict]) -> list[dict]:
+    """Fetch with small bounded concurrency and a thread-starvation fallback."""
+    if len(selected) < 2:
+        return [fetch_feed(feed) for feed in selected]
+    futures = {}
+    results = []
+    try:
+        # The MCP container shares a deliberately small PID budget across
+        # concurrent requests. Two workers preserve latency without assuming
+        # that six or more native threads are available.
+        with ThreadPoolExecutor(max_workers=min(2, len(selected))) as pool:
+            for feed in selected:
+                futures[pool.submit(fetch_feed, feed)] = feed
+            for future in as_completed(futures):
+                results.append(future.result())
+    except RuntimeError as error:
+        if "thread" not in str(error).lower():
+            raise
+        # A saturated container may be unable to start even one worker. Any
+        # submitted futures are joined by the context manager; retain their
+        # results and fetch only the unsubmitted feeds synchronously.
+        for future in futures:
+            if future.done() and not future.cancelled():
+                results.append(future.result())
+        completed_ids = {result["feed"]["id"] for result in results}
+        results.extend(
+            fetch_feed(feed)
+            for feed in selected
+            if feed["id"] not in completed_ids
+        )
     return results
 
 
@@ -522,11 +551,7 @@ def cmd_search(args: argparse.Namespace) -> None:
 
 
 def cmd_sources(args: argparse.Namespace) -> None:
-    results = []
-    with ThreadPoolExecutor(max_workers=8) as pool:
-        futures = {pool.submit(fetch_feed, feed): feed for feed in FEEDS}
-        for future in as_completed(futures):
-            results.append(future.result())
+    results = fetch_selected(FEEDS)
     results.sort(key=lambda r: next((i for i, f in enumerate(FEEDS) if f["id"] == r["feed"]["id"]), 999))
 
     source_list = [
