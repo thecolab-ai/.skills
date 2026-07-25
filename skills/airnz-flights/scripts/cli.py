@@ -11,6 +11,7 @@ import argparse
 import asyncio
 import html
 import json
+import os
 import re
 import sys
 import urllib.error
@@ -42,6 +43,77 @@ FARE_LABELS = {
 
 class BrowserUnavailableError(RuntimeError):
     """Raised when --browser is requested but CloakBrowser is not installed."""
+
+
+class TransientBrowserError(RuntimeError):
+    """A transient browser/navigation failure (anti-bot abort, timeout, connection
+    reset). Retryable via the public timetable fallback rather than a hard failure."""
+
+
+# Substrings that identify a transient Chromium/Playwright navigation failure —
+# the live booking host aborting an anti-bot-sensitive navigation, a timeout, or a
+# reset — as opposed to a real bug in our request/parse code.
+_TRANSIENT_BROWSER_MARKERS = (
+    "net::err_aborted",
+    "net::err_timed_out",
+    "net::err_connection",
+    "net::err_network_changed",
+    "net::err_name_not_resolved",
+    "net::err_empty_response",
+    "net::err_failed",
+    "err_aborted",
+    "timeout",
+    "timed out",
+    "navigation failed",
+)
+
+# Search-API HTTP statuses that signal an anti-bot block or upstream outage — worth
+# falling back to the public timetable feed rather than surfacing a raw error.
+_TRANSIENT_SEARCH_STATUSES = {403, 406, 408, 409, 429, 500, 502, 503, 504}
+
+
+def _playwright_launch_options() -> dict[str, Any]:
+    """Use the isolated worker's system Chromium and scoped egress proxy."""
+    options: dict[str, Any] = {
+        "headless": True,
+        "args": ["--no-sandbox", "--disable-dev-shm-usage"],
+    }
+    executable = os.environ.get("THECOLAB_CHROMIUM_PATH")
+    if executable:
+        options["executable_path"] = executable
+    raw_proxy = os.environ.get("HTTPS_PROXY")
+    if raw_proxy:
+        parsed = urllib.parse.urlparse(raw_proxy)
+        if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+            raise RuntimeError("browser worker proxy configuration is invalid")
+        server = f"{parsed.scheme}://{parsed.hostname}"
+        if parsed.port:
+            server += f":{parsed.port}"
+        proxy: dict[str, str] = {"server": server}
+        if parsed.username is not None:
+            proxy["username"] = urllib.parse.unquote(parsed.username)
+        if parsed.password is not None:
+            proxy["password"] = urllib.parse.unquote(parsed.password)
+        options["proxy"] = proxy
+    return options
+
+
+def _is_transient_browser_error(exc: BaseException) -> bool:
+    text = str(exc).lower()
+    return any(marker in text for marker in _TRANSIENT_BROWSER_MARKERS)
+
+
+def _browser_goto(page: Any, url: str, *, timeout: int = 90000) -> None:
+    """Navigate *page* to *url*, converting transient nav failures into a
+    TransientBrowserError instead of leaking a raw Playwright traceback."""
+    try:
+        page.goto(url, wait_until="networkidle", timeout=timeout)
+    except BrowserUnavailableError:
+        raise
+    except Exception as exc:  # noqa: BLE001 - classify, never leak a traceback
+        if _is_transient_browser_error(exc):
+            raise TransientBrowserError(str(exc)) from exc
+        raise
 
 
 def _request(
@@ -271,7 +343,7 @@ async def fetch_timetable(origin: str, destination: str, depart_date: str, direc
         raise RuntimeError("Air NZ fallback timetable search requires Python Playwright installed") from exc
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True, args=["--no-sandbox"])
+        browser = await p.chromium.launch(**_playwright_launch_options())
         page = await browser.new_page(user_agent=USER_AGENT)
         await page.goto(SCHEDULE_PAGE, wait_until="networkidle", timeout=60000)
         payload = await page.evaluate(
@@ -372,6 +444,32 @@ def fetch_fares_with_cloakbrowser(origin: str, destination: str, depart_date: st
         ) from exc
 
     start_url = booking_url(origin, destination, depart_date)
+    try:
+        return _cloakbrowser_fare_search(launch, start_url, origin, destination, depart_date, adults, direct)
+    except TransientBrowserError as exc:
+        # The live booking host aborted/blocked the anonymous browser session
+        # (anti-bot navigation abort, timeout, or reset). Fall back to the public
+        # timetable feed — the same recovery the CAPTCHA branch already uses —
+        # rather than leaking a stack trace and hard-failing.
+        try:
+            return fetch_timetable_sync(origin, destination, depart_date, direct)
+        except Exception as fallback_exc:  # noqa: BLE001 - report cleanly, no traceback
+            raise RuntimeError(
+                "Air NZ browser fare search was blocked (network error: "
+                f"{exc}); the public timetable fallback was also unavailable "
+                f"(network error: {fallback_exc})"
+            ) from fallback_exc
+
+
+def _cloakbrowser_fare_search(
+    launch: Any,
+    start_url: str,
+    origin: str,
+    destination: str,
+    depart_date: str,
+    adults: int,
+    direct: bool,
+) -> dict[str, Any]:
     browser = None
     try:
         browser = launch(
@@ -381,7 +479,7 @@ def fetch_fares_with_cloakbrowser(origin: str, destination: str, depart_date: st
             locale="en-NZ",
         )
         page = browser.new_page()
-        page.goto(start_url, wait_until="networkidle", timeout=90000)
+        _browser_goto(page, start_url)
         payload = search_payload(origin, destination, depart_date, adults)
         search_result_raw = page.evaluate(
             """async ({url, payload}) => {
@@ -394,16 +492,18 @@ def fetch_fares_with_cloakbrowser(origin: str, destination: str, depart_date: st
             }""",
             {"url": SEARCH_API_PATH, "payload": payload},
         )
-        if int(search_result_raw.get("status") or 0) != 200:
-            raise RuntimeError(
-                f"Air NZ browser fare search returned HTTP {search_result_raw.get('status')}: "
-                f"{str(search_result_raw.get('text') or '')[:300]}"
-            )
+        status = int(search_result_raw.get("status") or 0)
+        if status != 200:
+            detail = str(search_result_raw.get("text") or "")[:300]
+            if status in _TRANSIENT_SEARCH_STATUSES:
+                # Anti-bot block / upstream outage — recover via the timetable feed.
+                raise TransientBrowserError(f"search API returned HTTP {status}: {detail}")
+            raise RuntimeError(f"Air NZ browser fare search returned HTTP {status}: {detail}")
         search_result = json.loads(str(search_result_raw.get("text") or "{}"))
         redirect_url = str(search_result.get("redirectUrl") or SELECT_ITINERARY_PATH)
         if "captcha" in redirect_url.lower():
             return fetch_timetable_sync(origin, destination, depart_date, direct)
-        page.goto(f"{BASE}{redirect_url}", wait_until="networkidle", timeout=90000)
+        _browser_goto(page, f"{BASE}{redirect_url}")
         select_html = page.content()
         return build_fare_result(
             extract_json_array(select_html, '"legOptions"'),

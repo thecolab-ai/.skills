@@ -62,7 +62,7 @@ class RunSkillIntegrationTests(unittest.TestCase):
         argv = [str(RUNNER), skill, *arguments]
         with (
             mock.patch.object(sys, "argv", argv),
-            mock.patch.object(RUN_SKILL_MODULE.subprocess, "run", return_value=completed),
+            mock.patch.object(RUN_SKILL_MODULE, "run_bounded", return_value=completed),
             redirect_stdout(stdout),
             redirect_stderr(stderr),
         ):
@@ -198,6 +198,36 @@ class RunSkillIntegrationTests(unittest.TestCase):
         self.assertTrue(payload["ok"])
         self.assertIn("usage:", payload["data"]["help"])
         self.assertEqual(payload["query"]["argv"], ["--help"])
+
+    def test_incremental_capture_stops_oversized_child_output(self) -> None:
+        previous = os.environ.get("SKILL_CAPTURE_LIMIT_BYTES")
+        os.environ["SKILL_CAPTURE_LIMIT_BYTES"] = "4096"
+        try:
+            with self.assertRaises(RUN_SKILL_MODULE.OutputLimitExceeded):
+                RUN_SKILL_MODULE.run_bounded(
+                    [sys.executable, "-c", "print('x' * 5000)"],
+                    timeout=5,
+                )
+        finally:
+            if previous is None:
+                os.environ.pop("SKILL_CAPTURE_LIMIT_BYTES", None)
+            else:
+                os.environ["SKILL_CAPTURE_LIMIT_BYTES"] = previous
+
+    def test_command_timeout_is_configurable_but_tightly_bounded(self) -> None:
+        previous = os.environ.get("SKILL_COMMAND_TIMEOUT_SECONDS")
+        try:
+            os.environ["SKILL_COMMAND_TIMEOUT_SECONDS"] = "120"
+            self.assertEqual(RUN_SKILL_MODULE.command_timeout_seconds(), 120)
+            os.environ["SKILL_COMMAND_TIMEOUT_SECONDS"] = "9999"
+            self.assertEqual(RUN_SKILL_MODULE.command_timeout_seconds(), 180)
+            os.environ["SKILL_COMMAND_TIMEOUT_SECONDS"] = "not-an-integer"
+            self.assertEqual(RUN_SKILL_MODULE.command_timeout_seconds(), 60)
+        finally:
+            if previous is None:
+                os.environ.pop("SKILL_COMMAND_TIMEOUT_SECONDS", None)
+            else:
+                os.environ["SKILL_COMMAND_TIMEOUT_SECONDS"] = previous
 
     def test_credential_like_arguments_are_redacted_from_provenance(self) -> None:
         self.assertEqual(

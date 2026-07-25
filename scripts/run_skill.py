@@ -7,8 +7,10 @@ import argparse
 import json
 import os
 import re
+import selectors
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -181,6 +183,96 @@ def command_for(skill_dir: Path, args: list[str]) -> list[str]:
     raise FileNotFoundError("skill has no scripts/cli.py or declared legacy scripts/cli.mjs")
 
 
+class OutputLimitExceeded(RuntimeError):
+    pass
+
+
+def command_timeout_seconds() -> int:
+    """Return a tightly bounded per-command timeout for isolated runners."""
+    raw = os.environ.get("SKILL_COMMAND_TIMEOUT_SECONDS", "60")
+    try:
+        value = int(raw)
+    except ValueError:
+        return 60
+    return max(1, min(value, 180))
+
+
+def _child_limits():
+    """Apply public-server resource limits in the child immediately before exec."""
+    if os.environ.get("THECOLAB_PUBLIC_SERVER") != "1":
+        return None
+    import resource
+
+    memory_mb = int(os.environ.get("SKILL_PROCESS_MEMORY_LIMIT_MB", "320"))
+    memory_bytes = memory_mb * 1024 * 1024
+
+    def apply() -> None:
+        if sys.platform.startswith("linux"):
+            resource.setrlimit(resource.RLIMIT_AS, (memory_bytes, memory_bytes))
+        resource.setrlimit(resource.RLIMIT_CPU, (60, 61))
+
+    return apply
+
+
+def run_bounded(command: list[str], *, timeout: int) -> subprocess.CompletedProcess[str]:
+    """Capture both pipes incrementally so a CLI cannot exhaust runner memory."""
+    raw_limit = os.environ.get("SKILL_CAPTURE_LIMIT_BYTES", str(16 * 1024 * 1024))
+    try:
+        capture_limit = int(raw_limit)
+    except ValueError as exc:
+        raise OutputLimitExceeded("SKILL_CAPTURE_LIMIT_BYTES must be an integer") from exc
+    if capture_limit < 4096:
+        raise OutputLimitExceeded("SKILL_CAPTURE_LIMIT_BYTES must be at least 4096")
+
+    process = subprocess.Popen(
+        command,
+        cwd=REPO_ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        preexec_fn=_child_limits(),
+    )
+    selector = selectors.DefaultSelector()
+    streams = {"stdout": bytearray(), "stderr": bytearray()}
+    assert process.stdout is not None and process.stderr is not None
+    selector.register(process.stdout, selectors.EVENT_READ, "stdout")
+    selector.register(process.stderr, selectors.EVENT_READ, "stderr")
+    deadline = time.monotonic() + timeout
+    try:
+        while selector.get_map():
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                process.kill()
+                raise subprocess.TimeoutExpired(command, timeout)
+            events = selector.select(min(remaining, 0.25))
+            for key, _mask in events:
+                chunk = os.read(key.fileobj.fileno(), 64 * 1024)
+                if not chunk:
+                    selector.unregister(key.fileobj)
+                    key.fileobj.close()
+                    continue
+                streams[key.data].extend(chunk)
+                if sum(len(value) for value in streams.values()) > capture_limit:
+                    process.kill()
+                    raise OutputLimitExceeded(
+                        f"skill output exceeded the {capture_limit}-byte capture limit"
+                    )
+        returncode = process.wait(timeout=max(0.1, deadline - time.monotonic()))
+    finally:
+        selector.close()
+        if process.poll() is None:
+            process.kill()
+        process.wait()
+        for stream in (process.stdout, process.stderr):
+            if stream is not None and not stream.closed:
+                stream.close()
+    return subprocess.CompletedProcess(
+        command,
+        returncode,
+        bytes(streams["stdout"]).decode("utf-8", "replace"),
+        bytes(streams["stderr"]).decode("utf-8", "replace"),
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         prog="run-skill",
@@ -219,13 +311,9 @@ def main() -> int:
     query_args = redact_arguments(cli_args)
 
     try:
-        completed = subprocess.run(
+        completed = run_bounded(
             command_for(skill_dir, cli_args),
-            cwd=REPO_ROOT,
-            text=True,
-            capture_output=True,
-            timeout=60,
-            check=False,
+            timeout=command_timeout_seconds(),
         )
     except FileNotFoundError as exc:
         payload = result_envelope(
@@ -248,6 +336,18 @@ def main() -> int:
             data=None,
             warnings=[],
             error={"code": 5, "message": "skill command exceeded the bounded 60-second runtime"},
+        )
+        emit_envelope(payload)
+        return 5
+    except OutputLimitExceeded as exc:
+        payload = result_envelope(
+            ok=False,
+            source_name=metadata.get("thecolab.source_owner", args.skill),
+            source_url=metadata.get("thecolab.source_url", "about:blank"),
+            query={"argv": query_args},
+            data=None,
+            warnings=[],
+            error={"code": 5, "message": str(exc)},
         )
         emit_envelope(payload)
         return 5

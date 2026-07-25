@@ -24,6 +24,41 @@ assert fixture_rows == [{"id": "fixture"}]
 assert fixture_fare["price"] == 123 and fixture_fare["available"] is True
 print("[PASS] fixture fare array extraction and fare normalisation")
 
+# A transient Chromium navigation abort must be classified as retryable (so the
+# browser path falls back to the timetable feed instead of leaking a traceback),
+# while a genuine coding error must not be swallowed.
+assert fixture_cli._is_transient_browser_error(
+    RuntimeError('Page.goto: net::ERR_ABORTED at https://flightbookings.airnewzealand.co.nz/...')
+)
+assert fixture_cli._is_transient_browser_error(RuntimeError("Timeout 90000ms exceeded"))
+assert not fixture_cli._is_transient_browser_error(ValueError("unexpected key in payload"))
+print("[PASS] fixture transient browser-navigation error classification")
+
+_previous_proxy = os.environ.get("HTTPS_PROXY")
+_previous_chromium = os.environ.get("THECOLAB_CHROMIUM_PATH")
+try:
+    os.environ["HTTPS_PROXY"] = (
+        "http://airnz-flights:"
+        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        "@egress-proxy:3128/"
+    )
+    os.environ["THECOLAB_CHROMIUM_PATH"] = "/usr/bin/chromium"
+    _launch = fixture_cli._playwright_launch_options()
+    assert _launch["executable_path"] == "/usr/bin/chromium"
+    assert _launch["proxy"]["server"] == "http://egress-proxy:3128"
+    assert _launch["proxy"]["username"] == "airnz-flights"
+    assert len(_launch["proxy"]["password"]) == 64
+finally:
+    if _previous_proxy is None:
+        os.environ.pop("HTTPS_PROXY", None)
+    else:
+        os.environ["HTTPS_PROXY"] = _previous_proxy
+    if _previous_chromium is None:
+        os.environ.pop("THECOLAB_CHROMIUM_PATH", None)
+    else:
+        os.environ["THECOLAB_CHROMIUM_PATH"] = _previous_chromium
+print("[PASS] fixture browser worker proxy and Chromium launch options")
+
 DATE = (date.today() + timedelta(days=7)).isoformat()
 browser_required = os.getenv("COLAB_SMOKE_USE_BROWSER") == "1"
 use_browser = browser_required or find_spec("cloakbrowser") is not None
