@@ -2,6 +2,7 @@ import json
 import importlib.util
 import io
 import os
+import resource
 import subprocess
 import sys
 import unittest
@@ -228,6 +229,35 @@ class RunSkillIntegrationTests(unittest.TestCase):
                 os.environ.pop("SKILL_COMMAND_TIMEOUT_SECONDS", None)
             else:
                 os.environ["SKILL_COMMAND_TIMEOUT_SECONDS"] = previous
+
+    def test_browser_worker_uses_its_hard_cgroup_instead_of_rlimit_as(self) -> None:
+        browser_env = {
+            "THECOLAB_PUBLIC_SERVER": "1",
+            "THECOLAB_BROWSER_RUNTIME": "playwright",
+            "SKILL_PROCESS_MEMORY_LIMIT_MODE": "cgroup",
+            "SKILL_PROCESS_MEMORY_LIMIT_MB": "1536",
+        }
+        with (
+            mock.patch.dict(os.environ, browser_env, clear=False),
+            mock.patch.object(sys, "platform", "linux"),
+            mock.patch.object(resource, "setrlimit") as setrlimit,
+        ):
+            apply = RUN_SKILL_MODULE._child_limits()
+            self.assertIsNotNone(apply)
+            apply()
+        setrlimit.assert_called_once_with(resource.RLIMIT_CPU, (60, 61))
+
+        with mock.patch.dict(
+            os.environ,
+            {
+                "THECOLAB_PUBLIC_SERVER": "1",
+                "SKILL_PROCESS_MEMORY_LIMIT_MODE": "cgroup",
+            },
+            clear=False,
+        ):
+            os.environ.pop("THECOLAB_BROWSER_RUNTIME", None)
+            with self.assertRaisesRegex(RuntimeError, "isolated browser worker"):
+                RUN_SKILL_MODULE._child_limits()
 
     def test_credential_like_arguments_are_redacted_from_provenance(self) -> None:
         self.assertEqual(

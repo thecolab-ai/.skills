@@ -201,13 +201,23 @@ def _child_limits():
     """Apply public-server resource limits in the child immediately before exec."""
     if os.environ.get("THECOLAB_PUBLIC_SERVER") != "1":
         return None
+    memory_mode = os.environ.get("SKILL_PROCESS_MEMORY_LIMIT_MODE", "rlimit")
+    if memory_mode not in {"rlimit", "cgroup"}:
+        raise RuntimeError("SKILL_PROCESS_MEMORY_LIMIT_MODE must be rlimit or cgroup")
+    if (
+        memory_mode == "cgroup"
+        and os.environ.get("THECOLAB_BROWSER_RUNTIME") != "playwright"
+    ):
+        raise RuntimeError(
+            "cgroup memory mode is allowed only in the isolated browser worker"
+        )
     import resource
 
     memory_mb = int(os.environ.get("SKILL_PROCESS_MEMORY_LIMIT_MB", "320"))
     memory_bytes = memory_mb * 1024 * 1024
 
     def apply() -> None:
-        if sys.platform.startswith("linux"):
+        if sys.platform.startswith("linux") and memory_mode == "rlimit":
             resource.setrlimit(resource.RLIMIT_AS, (memory_bytes, memory_bytes))
         resource.setrlimit(resource.RLIMIT_CPU, (60, 61))
 
