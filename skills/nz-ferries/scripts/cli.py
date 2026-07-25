@@ -452,6 +452,10 @@ class BrowserUnavailableError(RuntimeError):
     """Raised when --browser is requested but CloakBrowser is unavailable."""
 
 
+class BrowserBlockedError(RuntimeError):
+    """Raised when an explicit browser probe cannot retrieve the live source."""
+
+
 def die(message: str, code: int = 1) -> None:
     print(f"nz-ferries: {message}", file=sys.stderr)
     raise SystemExit(code)
@@ -804,6 +808,14 @@ def fetch_fullers_public_page_with_browser(route: dict[str, Any], day: date) -> 
             browser.close()
 
 
+def require_loaded_browser_probe(probe: dict[str, Any]) -> None:
+    if probe.get("blocked") or probe.get("status") != "loaded":
+        raise BrowserBlockedError(
+            "browser_blocked: Fullers live timetable page could not be loaded; "
+            "AT GTFS fallback is available only without --browser"
+        )
+
+
 def emit(data: Any, as_json: bool, render) -> None:  # type: ignore[no-untyped-def]
     if as_json:
         print(json.dumps(data, indent=2, ensure_ascii=False))
@@ -1034,9 +1046,8 @@ def fullers_sailings(route_id: str, route: dict[str, Any], day: date) -> dict[st
     }
     if BROWSER_MODE:
         probe = fetch_fullers_public_page_with_browser(route, day)
+        require_loaded_browser_probe(probe)
         result["browser_probe"] = probe
-        if probe.get("blocked"):
-            result.setdefault("warnings", []).append("Fullers public timetable page browser probe was blocked by CAPTCHA/PerfDrive/hCaptcha; AT GTFS schedule fallback was used.")
     return result
 
 
@@ -1887,6 +1898,18 @@ def main(argv: list[str] | None = None) -> None:
             print(f"ERROR: {payload['message']}", file=sys.stderr)
             print(f"Recommendation: {payload['recommendation']}", file=sys.stderr)
         raise SystemExit(2)
+    except BrowserBlockedError as exc:
+        payload = {
+            "error": "browser_blocked",
+            "message": str(exc),
+            "recommendation": "Rerun without --browser for the AT GTFS schedule, or retry later; do not attempt to bypass CAPTCHA/challenge pages.",
+        }
+        if getattr(args, "json", False):
+            print(json.dumps(payload, indent=2, ensure_ascii=False))
+        else:
+            print(f"ERROR: {payload['message']}", file=sys.stderr)
+            print(f"Recommendation: {payload['recommendation']}", file=sys.stderr)
+        raise SystemExit(3)
 
 
 if __name__ == "__main__":

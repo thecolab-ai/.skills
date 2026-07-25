@@ -146,6 +146,24 @@ class DynamicAllowlistTests(unittest.TestCase):
             },
         )
 
+    def test_nz_ferries_browser_probe_refuses_gtfs_fallback(self) -> None:
+        cli = self.load_cli("nz-ferries")
+        with self.assertRaisesRegex(cli.BrowserBlockedError, "browser_blocked"):
+            cli.require_loaded_browser_probe(
+                {
+                    "status": "blocked",
+                    "blocked": True,
+                    "source_url": "https://www.fullers.co.nz/timetables-and-fares/",
+                }
+            )
+        cli.require_loaded_browser_probe(
+            {
+                "status": "loaded",
+                "blocked": False,
+                "source_url": "https://www.fullers.co.nz/timetables-and-fares/",
+            }
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

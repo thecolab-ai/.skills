@@ -128,6 +128,12 @@ def test_fullers_browser_probe():
         return True
     result = run(["sailings", "auckland-devonport", "--json", "--browser"])
     if result.returncode != 0:
+        try:
+            error_payload = json.loads(result.stdout)
+        except json.JSONDecodeError:
+            error_payload = {}
+        if result.returncode == 3 and error_payload.get("error") == "browser_blocked":
+            return True
         print(f"  stderr: {result.stderr[:200]}")
         return False
     data = json.loads(result.stdout)
