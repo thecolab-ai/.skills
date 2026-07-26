@@ -1,6 +1,6 @@
 ---
 name: niwa-coastal-nz
-description: "Search and query NIWA (National Institute of Water and Atmospheric Research) public ArcGIS open data through a lightweight no-login CLI: org-scoped dataset search plus GeoJSON layer queries for the Coastal Sensitivity Index (erosion and inundation), beach exposure, coastal landform and hinterland classification, and other national coastal and climate layers. Use when the task involves NZ coastal hazard sensitivity, coastal classification, or NIWA open geospatial datasets. Read-only; no authentication required."
+description: "Search and query NIWA (National Institute of Water and Atmospheric Research) public ArcGIS open data through a lightweight no-login CLI: org-scoped dataset search plus GeoJSON layer queries for the Coastal Sensitivity Index (erosion), beach exposure, coastal landform and hinterland classification, and other national coastal and climate layers. Use when the task involves NZ coastal hazard sensitivity, coastal classification, or NIWA open geospatial datasets. Read-only; no authentication required."
 license: MIT
 compatibility: "Requires Python 3.10+ and network access for live data"
 metadata:
@@ -19,7 +19,7 @@ metadata:
   thecolab.pack: "nz-public-data"
   thecolab.source_url: "https://data-niwa.opendata.arcgis.com/"
   thecolab.allowed_domains: "data-niwa.opendata.arcgis.com,www.arcgis.com,hub.arcgis.com,services.arcgis.com,services3.arcgis.com,gis.niwa.co.nz"
-  thecolab.last_verified: "2026-07-24"
+  thecolab.last_verified: "2026-07-26"
   thecolab.health: "healthy"
   thecolab.maintainer: "@adam91holt"
 ---
@@ -35,10 +35,14 @@ and MapServer identify operations.
 
 ## Use this when
 
-- A task needs national coastal hazard sensitivity layers (CSI erosion, CSI
-  inundation), beach exposure, coastal landform type, or hinterland
-  characteristics as GeoJSON
+- A task needs national coastal hazard sensitivity layers (CSI erosion), beach
+  exposure, coastal landform type, or hinterland characteristics as GeoJSON
 - A task needs to discover what datasets NIWA publishes openly
+
+The CSI **inundation** item is still listed in NIWA's catalogue but its backing
+service was withdrawn (verified 2026-07-26) — `search` will surface it and a
+query against it fails with an upstream `Service not found`. Use CSI erosion,
+or `searise-nz` for site-level inundation drivers.
 
 ## Do not use this for
 

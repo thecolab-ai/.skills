@@ -1870,7 +1870,7 @@
     },
     {
       "name": "niwa-coastal-nz",
-      "description": "Search and query NIWA (National Institute of Water and Atmospheric Research) public ArcGIS open data through a lightweight no-login CLI: org-scoped dataset search plus GeoJSON layer queries for the Coastal Sensitivity Index (erosion and inundation), beach exposure, coastal landform and hinterland classification, and other national coastal and climate layers. Use when the task involves NZ coastal hazard sensitivity, coastal classification, or NIWA open geospatial datasets. Read-only; no authentication required.",
+      "description": "Search and query NIWA (National Institute of Water and Atmospheric Research) public ArcGIS open data through a lightweight no-login CLI: org-scoped dataset search plus GeoJSON layer queries for the Coastal Sensitivity Index (erosion), beach exposure, coastal landform and hinterland classification, and other national coastal and climate layers. Use when the task involves NZ coastal hazard sensitivity, coastal classification, or NIWA open geospatial datasets. Read-only; no authentication required.",
       "path": "skills/niwa-coastal-nz",
       "category": "environment",
       "source_owner": "NIWA",
@@ -1894,7 +1894,7 @@
         "services3.arcgis.com",
         "gis.niwa.co.nz"
       ],
-      "last_verified": "2026-07-24",
+      "last_verified": "2026-07-26",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
@@ -3416,12 +3416,12 @@
     },
     {
       "name": "searise-nz",
-      "description": "Query NZ SeaRise sea-level rise and vertical land movement projections for every 2 km of the Aotearoa New Zealand coastline, from the official Zenodo-published dataset (Naish et al. 2024): inspect record metadata and files, find projection sites, read vertical land movement, and retrieve one or many sites' projections to 2300 by SSP scenario with and without VLM. Use when the task involves NZ sea-level rise projections, coastal subsidence or uplift rates, dataset provenance, or climate adaptation planning inputs. Read-only; no authentication required.",
+      "description": "Query NZ SeaRise sea-level rise and vertical land movement projections for every 2 km of the Aotearoa New Zealand coastline, from the official Zenodo-published dataset (Hamling, Naish, Levy et al.): inspect record metadata and files, find projection sites, read vertical land movement, and retrieve one or many sites' projections to 2300 by SSP scenario with and without VLM. Use when the task involves NZ sea-level rise projections, coastal subsidence or uplift rates, dataset provenance, or climate adaptation planning inputs. Read-only; no authentication required.",
       "path": "skills/searise-nz",
       "category": "environment",
       "source_owner": "NZ SeaRise programme (Victoria University of Wellington, GNS Science, NIWA)",
       "source_type": "official",
-      "source_url": "https://zenodo.org/records/11398538",
+      "source_url": "https://zenodo.org/records/14722058",
       "auth": "none",
       "access_mode": "public-download",
       "data_class": "public",
@@ -3435,7 +3435,7 @@
       "allowed_domains": [
         "zenodo.org"
       ],
-      "last_verified": "2026-07-24",
+      "last_verified": "2026-07-26",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },

@@ -91,7 +91,13 @@ runtime validation.
 - `mapping1.gw.govt.nz/arcgis/rest/services/Hazards/Storm_Surge/MapServer` —
   1% AEP storm-tide flooding with 0.5/1.0/1.5 m SLR increments
 - `mapping1.gw.govt.nz/arcgis/rest/services/GW/Flood_Hazards_Areas/MapServer` —
-  50/100/400-year modelled flood hazard areas
+  layer 0 GWRC-maintained watercourses (RMA classification), 1 river corridor,
+  2 1% AEP flood hazard extent (Wellington Water), 3 1% AEP flood hazard
+  extent, 4 0.23% AEP flood hazard extent. Verified 2026-07-26: the service
+  publishes AEP-labelled extents (1% ≈ 100-year, 0.23% ≈ 400-year) and there
+  is **no 50-year layer**, contrary to the source spreadsheet's
+  "50, 100 and 400 year" description — cite the AEP labels, not return periods
+  the service does not expose
 - `mapping1.gw.govt.nz/arcgis/rest/services/GW/Emergencies_P/MapServer` — layer 10
   liquefaction potential, 11 earthquake slope failure, 21 landslide lines,
   23 tsunami evacuation zones (2019)

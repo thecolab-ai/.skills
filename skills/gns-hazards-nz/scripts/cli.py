@@ -697,6 +697,33 @@ def cmd_faults(args: argparse.Namespace) -> None:
     emit(payload, args.json, feature_lines(features, truncated, layer_url))
 
 
+def distinct_contours(features: list[dict[str, Any]]) -> list[Any]:
+    """Sorted distinct `Contour` values, skipping features that carry none.
+
+    A feature without a Contour property is a real upstream possibility, and it
+    must not become a `None` entry in the reported contour set.
+    """
+    values = set()
+    for feature in features:
+        if not isinstance(feature, dict):
+            continue
+        properties = feature.get("properties") or {}
+        value = properties.get("Contour") if isinstance(properties, dict) else None
+        if value is not None:
+            values.add(value)
+    return sorted(values)
+
+
+def expected_shaking_layer_name(measure: str) -> str:
+    """The layer name the service must expose for `measure`.
+
+    Lets a live probe detect upstream layer-id drift instead of trusting the
+    hardcoded map, which would otherwise silently query the wrong measure.
+    `psa0.3` -> `psa0p3_mean_cont`; `mmi` -> `mmi_mean_cont`.
+    """
+    return measure.replace(".", "p") + "_mean_cont"
+
+
 def cmd_shaking(args: argparse.Namespace) -> None:
     layer_id = SHAKING_MEASURES[args.measure]
     layer_url = f"{SHAKING_SERVICE}/{layer_id}"
@@ -735,9 +762,7 @@ def cmd_shaking(args: argparse.Namespace) -> None:
         return
     features = data["features"]
     truncated = bool(data.get("exceededTransferLimit") or (data.get("properties") or {}).get("exceededTransferLimit"))
-    contours = sorted(
-        {p.get("Contour") for f in features if (p := f.get("properties") or {}).get("Contour") is not None}
-    )
+    contours = distinct_contours(features)
     payload = {
         "kind": "shaking",
         "source": "GNS ShakingLayers modelled ground-motion contours",

@@ -1,14 +1,18 @@
 {
-  "id": 11398538,
-  "doi": "10.5281/zenodo.11398538",
+  "id": 14722058,
+  "doi": "10.5281/zenodo.14722058",
   "metadata": {
-    "title": "New Zealand Vertical Land Movement and Sea Rise Projections",
-    "publication_date": "2024-05-31",
+    "title": "New Zealand Vertical land movement and sea rise projections",
+    "publication_date": "2025-01-23",
     "creators": [
       {
-        "name": "Naish, Tim",
-        "affiliation": "Victoria University of Wellington",
+        "name": "Hamling, Ian",
+        "affiliation": "GNS Science",
         "orcid": "0000-0002-1111-2222"
+      },
+      {
+        "name": "Naish, Tim",
+        "affiliation": "Victoria University of Wellington"
       },
       {
         "name": "Levy, Richard",
@@ -22,8 +26,8 @@
     "relations": {
       "version": [
         {
-          "index": 2,
-          "is_last": false,
+          "index": 3,
+          "is_last": true,
           "parent": {
             "pid_type": "recid",
             "pid_value": "10976241"
@@ -34,27 +38,19 @@
   },
   "files": [
     {
-      "key": "NZ_VLM_final_May24.csv",
-      "size": 674321,
+      "key": "NZ_Searise_noVLM-2005.csv",
+      "size": 57854135,
       "checksum": "md5:11111111111111111111111111111111",
       "links": {
-        "self": "https://zenodo.org/api/records/11398538/files/11111111-1111-1111-1111-111111111111/content"
+        "self": "https://zenodo.org/api/records/14722058/files/11111111-1111-1111-1111-111111111111/content"
       }
     },
     {
-      "key": "NZSeaRise_proj_vlm.csv",
-      "size": 53800000,
+      "key": "NZ_Searise_VLM-2005.csv",
+      "size": 57961514,
       "checksum": "md5:22222222222222222222222222222222",
       "links": {
-        "content": "https://zenodo.org/api/records/11398538/files/22222222-2222-2222-2222-222222222222/content"
-      }
-    },
-    {
-      "key": "NZSeaRise_proj_novlm.csv",
-      "size": 53600000,
-      "checksum": "md5:33333333333333333333333333333333",
-      "links": {
-        "download": "https://zenodo.org/api/records/11398538/files/33333333-3333-3333-3333-333333333333/content"
+        "content": "https://zenodo.org/api/records/14722058/files/22222222-2222-2222-2222-222222222222/content"
       }
     }
   ]
