@@ -23,6 +23,23 @@ BASE_URL = "https://www.carjam.co.nz"
 USER_AGENT = "Mozilla/5.0 (compatible; thecolab-carjam-nz-skill/1.0)"
 LOCKED_MARKERS = ("Get Report", "May be in Report", "Subscribe")
 
+# HTTP-200 anti-bot / interstitial bodies that some CDNs return in place of the
+# real page. These are transient (shared CI IPs, rate limits) rather than a real
+# "plate not found" or an HTML-structure change, so they should be retried and,
+# if still blocked, surfaced as an upstream outage — not a hard failure.
+BLOCK_MARKERS = (
+    "just a moment",
+    "attention required",
+    "access denied",
+    "access to this page has been denied",
+    "request unsuccessful",
+    "pardon our interruption",
+    "verify you are a human",
+    "are you a robot",
+    "enable javascript and cookies to continue",
+    "checking your browser before accessing",
+)
+
 LABELS = {
     "year_of_manufacture": "Year",
     "make": "Make",
@@ -88,6 +105,23 @@ _RETRY_STATUSES = {429, 502, 503, 504}
 _RETRY_DELAYS = (2, 5, 10)  # seconds between attempts 1→2, 2→3, 3→fail
 
 
+def looks_like_block(body: str) -> bool:
+    """True when *body* is an anti-bot/interstitial page rather than a CarJam page."""
+    low = body.lower()
+    return any(marker in low for marker in BLOCK_MARKERS)
+
+
+def has_carjam_shell(page: str) -> bool:
+    """True when *page* is a genuine CarJam vehicle response.
+
+    A real CarJam page — even for a plate with no free public fields — carries the
+    application shell (``data-key`` field spans and/or the CarJam-branded title).
+    A blocked/empty/proxy-error response carries none of these.
+    """
+    low = page.lower()
+    return "data-key=" in low or "carjam" in low
+
+
 def fetch(url: str) -> str:
     """Fetch *url* with up to 3 attempts and exponential backoff.
 
@@ -107,10 +141,10 @@ def fetch(url: str) -> str:
         try:
             with urllib.request.urlopen(req, timeout=30) as response:
                 body = response.read().decode("utf-8", "replace")
-                # Cloudflare challenge — treat as transient
+                # Cloudflare / anti-bot interstitial (HTTP 200) — treat as transient
                 cf_mitigated = response.headers.get("cf-mitigated", "")
-                if cf_mitigated or "Just a moment" in body:
-                    last_error = f"Cloudflare challenge on attempt {attempt}"
+                if cf_mitigated or looks_like_block(body):
+                    last_error = f"anti-bot challenge on attempt {attempt}"
                     should_retry = True
                 else:
                     return body
@@ -127,8 +161,8 @@ def fetch(url: str) -> str:
 
         if should_retry:
             if delay is None:
-                # All retries exhausted
-                die(f"all {attempt} attempts failed — last error: {last_error}")
+                # All retries exhausted — this is an upstream outage, not a bad plate.
+                die(f"all {attempt} attempts failed (temporary failure) — last error: {last_error}")
             time.sleep(delay)
 
     raise AssertionError("unreachable")
@@ -204,6 +238,14 @@ def parse_vehicle(page: str, *, source_url: str, identifier: str, lookup_type: s
     title = extract_title(page) or ""
     fields = extract_fields(page)
     if not any(fields.get(k) for k in ("year_of_manufacture", "make", "model", "plate", "vin", "chassis")):
+        if looks_like_block(page) or not has_carjam_shell(page):
+            # No CarJam application shell at all — a transient block/empty/proxy-error
+            # response (common on shared CI IPs), not a genuine result. Surface as an
+            # upstream outage so smoke reporting gates rather than hard-fails.
+            die(
+                f"no CarJam vehicle page returned for {lookup_type} {identifier!r} "
+                "(temporary failure — likely a transient block or rate-limit; retry later)"
+            )
         die(f"no public vehicle fields found for {lookup_type} {identifier!r}")
 
     summary = {key: fields.get(key) for key in SUMMARY_KEYS if key in fields}

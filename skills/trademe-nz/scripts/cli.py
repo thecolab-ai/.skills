@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Trade Me NZ lightweight public-search CLI.
+"""Trade Me NZ public-search CLI and browser seller-workflow planner.
 
-Self-contained stdlib wrapper around Trade Me's public read-only web API endpoints.
-No login, OAuth app credentials, watchlist, bidding, or listing mutation.
+Public commands call keyless public endpoints. Seller commands emit deterministic
+plans for the skill's browser automation; they never handle passwords, cookies,
+browser storage, session tokens, or developer credentials.
 """
 from __future__ import annotations
 
@@ -38,6 +39,14 @@ SEARCH_ENDPOINTS = {
     "commercial-lease": "/search/property/commerciallease",
     "rural": "/search/property/rural",
     "retirement": "/search/property/retirement",
+}
+
+SELLER_ROUTES = {
+    "summary": "/a/my-trade-me/sell",
+    "selling": "/a/my-trade-me/sell/selling",
+    "sold": "/a/my-trade-me/sell/sold",
+    "unsold": "/a/my-trade-me/sell/unsold",
+    "create": "/a/list",
 }
 
 # Region IDs sourced from the live /regions endpoint. Keep in sync with that
@@ -102,7 +111,9 @@ def parse_tm_date(value: Any) -> str | None:
     if not m:
         return value
     try:
-        return datetime.fromtimestamp(int(m.group(1)) / 1000, tz=timezone.utc).isoformat()
+        raw = int(m.group(1))
+        seconds = raw / 1000 if raw >= 100_000_000_000 else raw
+        return datetime.fromtimestamp(seconds, tz=timezone.utc).isoformat()
     except Exception:
         return value
 
@@ -170,6 +181,75 @@ def parse_listing(item: dict[str, Any], *, detail: bool = False) -> dict[str, An
     }
 
 
+def read_json_object(path_value: str) -> dict[str, Any]:
+    path = pathlib.Path(path_value).expanduser()
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except OSError as exc:
+        die(f"cannot read JSON file {path}: {exc}", 2)
+    except json.JSONDecodeError as exc:
+        die(f"invalid JSON file {path}: {exc}", 2)
+    if not isinstance(payload, dict):
+        die(f"JSON file {path} must contain one object", 2)
+    return payload
+
+
+def seller_url(route: str, listing_id: int | None = None) -> str:
+    if route == "listing":
+        if listing_id is None:
+            die("listing route requires a listing id", 2)
+        return f"{BASE_WEB}/a/listing/{listing_id}"
+    if route in {"edit", "withdraw"}:
+        if listing_id is None:
+            die(f"{route} route requires a listing id", 2)
+        return f"{BASE_WEB}/a/marketplace/edit/{listing_id}?reloadDraft=1"
+    return BASE_WEB + SELLER_ROUTES[route]
+
+
+def browser_plan(
+    operation: str,
+    *,
+    route: str,
+    listing_id: int | None = None,
+    mutation: bool = False,
+    input_file: str | None = None,
+    details: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    if listing_id is not None and listing_id <= 0:
+        die("listing id must be a positive integer", 2)
+    plan: dict[str, Any] = {
+        "operation": operation,
+        "surface": "browser",
+        "url": seller_url(route, listing_id),
+        "authentication": "ordinary Trade Me website session",
+        "browser_session_data": "never read, copy, export, persist, or send",
+        "login_handoff": (
+            "If redirected to sign-in, email/2FA verification, or CAPTCHA, let "
+            "the user complete it in the same browser, then resume."
+        ),
+        "mutation": mutation,
+        "action_time_confirmation_required": mutation,
+        "instructions": (
+            "Use the browser-backed workflow in references/browser-workflow.md; "
+            "this CLI only validates and describes the browser task."
+        ),
+    }
+    if listing_id is not None:
+        plan["listing_id"] = listing_id
+        plan["target_match"] = "match the exact visible listing id before reading or acting"
+    if input_file:
+        plan["input_file"] = str(pathlib.Path(input_file).expanduser())
+    if details:
+        plan["details"] = details
+    if mutation:
+        plan["final_step"] = (
+            "Stop on Trade Me's review/confirmation screen. Report the exact "
+            "target, changes, and fee shown, then obtain a separate user "
+            "confirmation immediately before the final submit click."
+        )
+    return plan
+
+
 def search(args: argparse.Namespace) -> dict[str, Any]:
     endpoint = SEARCH_ENDPOINTS[args.type]
     params: dict[str, Any] = {
@@ -188,13 +268,18 @@ def search(args: argparse.Namespace) -> dict[str, Any]:
     started = time.perf_counter()
     payload = request_json(endpoint, params)
     elapsed_ms = round((time.perf_counter() - started) * 1000)
-    listings = [parse_listing(x) for x in (payload or {}).get("List", []) if isinstance(x, dict)]
+    listings = [
+        parse_listing(x)
+        for x in (payload or {}).get("List", [])
+        if isinstance(x, dict)
+    ][: args.limit]
     return {
         "type": args.type,
         "query": args.query,
         "total_count": (payload or {}).get("TotalCount"),
         "page": (payload or {}).get("Page"),
         "page_size": (payload or {}).get("PageSize"),
+        "requested_limit": args.limit,
         "elapsed_ms": elapsed_ms,
         "listings": listings,
     }
@@ -243,6 +328,150 @@ def cmd_categories(args: argparse.Namespace) -> None:
     emit({"count": len(rows), "categories": rows[: args.limit]}, args.json)
 
 
+def cmd_seller_summary(args: argparse.Namespace) -> None:
+    emit(browser_plan("seller-summary", route="summary"), args.json)
+
+
+def cmd_my_selling(args: argparse.Namespace) -> None:
+    emit(browser_plan("my-selling", route="selling"), args.json)
+
+
+def cmd_my_sold(args: argparse.Namespace) -> None:
+    emit(browser_plan("my-sold", route="sold"), args.json)
+
+
+def cmd_my_unsold(args: argparse.Namespace) -> None:
+    emit(browser_plan("my-unsold", route="unsold"), args.json)
+
+
+def cmd_seller_listing(args: argparse.Namespace) -> None:
+    emit(
+        browser_plan(
+            "seller-listing",
+            route="listing",
+            listing_id=args.listing_id,
+        ),
+        args.json,
+    )
+
+
+def cmd_prepare_edit(args: argparse.Namespace) -> None:
+    emit(
+        browser_plan(
+            "prepare-edit",
+            route="edit",
+            listing_id=args.listing_id,
+        ),
+        args.json,
+    )
+
+
+def cmd_validate_listing(args: argparse.Namespace) -> None:
+    payload = read_json_object(args.data_file)
+    checks = {
+        "title_present": bool(str(payload.get("Title") or "").strip()),
+        "description_present": bool(payload.get("Description")),
+        "category_present": bool(payload.get("Category")),
+        "price_present": any(
+            payload.get(key) is not None
+            for key in ("StartPrice", "BuyNowPrice", "Price")
+        ),
+    }
+    emit(
+        {
+            "valid_for_browser_preparation": all(checks.values()),
+            "checks": checks,
+            "note": (
+                "Trade Me performs authoritative validation in the normal "
+                "website form; no authenticated API call was made."
+            ),
+        },
+        args.json,
+    )
+
+
+def cmd_create_listing(args: argparse.Namespace) -> None:
+    payload = read_json_object(args.data_file)
+    title = str(payload.get("Title") or "").strip()
+    if not title:
+        die("listing payload must include a non-empty Title", 2)
+    emit(
+        browser_plan(
+            "create-listing",
+            route="create",
+            mutation=True,
+            input_file=args.data_file,
+            details={"title": title},
+        ),
+        args.json,
+    )
+
+
+def cmd_edit_listing(args: argparse.Namespace) -> None:
+    payload = read_json_object(args.data_file)
+    listing_id = payload.get("ListingId")
+    if listing_id is None:
+        die("edit payload must include ListingId", 2)
+    try:
+        listing_number = int(listing_id)
+    except (TypeError, ValueError):
+        die("edit payload ListingId must be an integer", 2)
+    emit(
+        browser_plan(
+            "edit-listing",
+            route="edit",
+            listing_id=listing_number,
+            mutation=True,
+            input_file=args.data_file,
+            details={"title": payload.get("Title")},
+        ),
+        args.json,
+    )
+
+
+def validate_withdraw_args(args: argparse.Namespace) -> None:
+    if args.sold and args.sale_price is None:
+        die("--sale-price is required with --sold", 2)
+    if not args.sold and args.sale_price is not None:
+        die("--sale-price may only be used with --sold", 2)
+
+
+def cmd_withdraw_listing(args: argparse.Namespace) -> None:
+    validate_withdraw_args(args)
+    emit(
+        browser_plan(
+            "withdraw-listing",
+            route="withdraw",
+            listing_id=args.listing_id,
+            mutation=True,
+            details={
+                "disposition": "sold" if args.sold else "not-sold",
+                "sale_price": args.sale_price,
+                "reason": args.reason,
+            },
+        ),
+        args.json,
+    )
+
+
+def cmd_relist_listing(args: argparse.Namespace) -> None:
+    emit(
+        browser_plan(
+            "relist-listing",
+            route="unsold",
+            listing_id=args.listing_id,
+            mutation=True,
+            details={
+                "note": (
+                    "Find the listing by exact id on Unsold and use the visible "
+                    "relist action; do not guess a direct action URL."
+                )
+            },
+        ),
+        args.json,
+    )
+
+
 def print_search(data: dict[str, Any]) -> None:
     print(f"Trade Me {data.get('type')}: {data.get('total_count')} total, showing {len(data.get('listings') or [])} ({data.get('elapsed_ms')} ms)")
     print()
@@ -284,7 +513,12 @@ def emit(data: dict[str, Any], as_json: bool) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    ap = argparse.ArgumentParser(description="Lightweight Trade Me NZ public read-only search CLI.")
+    ap = argparse.ArgumentParser(
+        description=(
+            "Trade Me NZ public search and browser-backed seller workflow planner. "
+            "Seller commands do not access or persist browser credentials."
+        )
+    )
     sub = ap.add_subparsers(dest="command", required=True)
 
     sp = sub.add_parser("search", help="search Trade Me public listing endpoints")
@@ -318,11 +552,78 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--limit", type=int, default=80)
     sp.add_argument("--json", action="store_true")
     sp.set_defaults(func=cmd_categories)
+
+    sp = sub.add_parser("seller-summary", help="plan a browser-backed seller summary read")
+    sp.add_argument("--json", action="store_true")
+    sp.set_defaults(func=cmd_seller_summary)
+
+    def add_browser_flags(parser: argparse.ArgumentParser) -> None:
+        parser.add_argument("--json", action="store_true")
+
+    sp = sub.add_parser("my-selling", help="plan a signed-in browser read of active listings")
+    add_browser_flags(sp)
+    sp.set_defaults(func=cmd_my_selling)
+
+    sp = sub.add_parser("my-sold", help="plan a signed-in browser read of sold items")
+    add_browser_flags(sp)
+    sp.set_defaults(func=cmd_my_sold)
+
+    sp = sub.add_parser("my-unsold", help="plan a signed-in browser read of unsold items")
+    add_browser_flags(sp)
+    sp.set_defaults(func=cmd_my_unsold)
+
+    sp = sub.add_parser("seller-listing", help="plan a browser read of one seller listing")
+    sp.add_argument("listing_id", type=int)
+    sp.add_argument("--json", action="store_true")
+    sp.set_defaults(func=cmd_seller_listing)
+
+    sp = sub.add_parser("prepare-edit", help="open an existing listing's website edit flow")
+    sp.add_argument("listing_id", type=int)
+    sp.add_argument("--json", action="store_true")
+    sp.set_defaults(func=cmd_prepare_edit)
+
+    sp = sub.add_parser("validate-listing", help="perform local checks before filling the website form")
+    sp.add_argument("--data-file", required=True)
+    sp.add_argument("--json", action="store_true")
+    sp.set_defaults(func=cmd_validate_listing)
+
+    def add_mutation_plan_flags(parser: argparse.ArgumentParser) -> None:
+        parser.add_argument("--json", action="store_true")
+
+    sp = sub.add_parser("create-listing", help="plan filling a new website listing from JSON")
+    sp.add_argument("--data-file", required=True)
+    add_mutation_plan_flags(sp)
+    sp.set_defaults(func=cmd_create_listing)
+
+    sp = sub.add_parser("edit-listing", help="plan filling an existing website edit form from JSON")
+    sp.add_argument("--data-file", required=True)
+    add_mutation_plan_flags(sp)
+    sp.set_defaults(func=cmd_edit_listing)
+
+    sp = sub.add_parser("withdraw-listing", help="plan withdrawing an active listing in the browser")
+    sp.add_argument("listing_id", type=int)
+    sp.add_argument("--sold", action="store_true", help="declare the item sold")
+    sp.add_argument("--sale-price", type=float)
+    sp.add_argument("--reason", help="reason for withdrawing as not sold; maximum 255 characters")
+    add_mutation_plan_flags(sp)
+    sp.set_defaults(func=cmd_withdraw_listing)
+
+    sp = sub.add_parser("relist-listing", help="plan relisting an unsold item in the browser")
+    sp.add_argument("listing_id", type=int)
+    add_mutation_plan_flags(sp)
+    sp.set_defaults(func=cmd_relist_listing)
+
     return ap
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if hasattr(args, "limit") and not 1 <= args.limit <= 100:
+        die("--limit must be between 1 and 100", 2)
+    if hasattr(args, "page") and args.page < 1:
+        die("--page must be at least 1", 2)
+    if getattr(args, "reason", None) and len(args.reason) > 255:
+        die("--reason must be 255 characters or fewer", 2)
     args.func(args)
     return 0
 

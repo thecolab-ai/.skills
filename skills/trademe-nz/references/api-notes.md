@@ -1,14 +1,18 @@
 # Trade Me NZ API notes
 
-This skill is an unofficial wrapper around public read-only Trade Me web API endpoints used by the modern site.
+The Python CLI wraps public Trade Me endpoints. Seller work uses the ordinary
+Trade Me website through the Browser skill.
 
 ## Source and auth
 
 - Website: `https://www.trademe.co.nz`
 - API base: `https://api.trademe.co.nz/v1`
-- Auth model for supported commands: none
+- Public auth model: none
+- Seller auth model: normal website sign-in completed by the user in the browser
 
-No username, password, account cookie, OAuth app credentials, private token, or browser session is required for the implemented read-only operations.
+The CLI never accepts a username, password, cookie, developer credential, or
+session token. Browser-backed seller work does not inspect or export the
+browser's authentication state.
 
 ## Endpoint families used
 
@@ -24,6 +28,13 @@ No username, password, account cookie, OAuth app credentials, private token, or 
 - `GET /v1/categories` for public category tree
 - `GET /v1/localities/regions` for region/district/suburb hierarchy
 
+## Seller boundary
+
+Seller inventory and actions are not implemented as API calls. The CLI emits a
+browser task with a verified website starting route. The skill reads and
+interacts with visible website state in the user's normal signed-in session.
+See `browser-workflow.md`.
+
 ## Discovery note
 
 The legacy uppercase paths such as `/v1/Search/General.json` returned `401` unless app credentials were supplied. The lowercase modern web paths, e.g. `/v1/search/general`, returned public JSON with browser-like headers and no OAuth credentials.
@@ -34,5 +45,8 @@ The legacy uppercase paths such as `/v1/Search/General.json` returned `401` unle
 - Listings can change, close, sell, or disappear at any time.
 - Endpoint shapes and filter names can change without notice because this is not a formally supported public skill API.
 - Avoid high-volume scraping and dataset redistribution; keep queries narrow and human-scale.
-- Do not use this skill for bidding, buying, selling, watchlists, saved searches, messages, or account actions.
-- Do not commit cookies, account data, raw authenticated captures, or screenshots with private information.
+- Do not commit account data or complete listing forms.
+- Never inspect or export cookies, browser storage, request authorization
+  headers, session tokens, or passwords.
+- Stop on the website's final review screen and require action-time
+  confirmation for every seller mutation.
