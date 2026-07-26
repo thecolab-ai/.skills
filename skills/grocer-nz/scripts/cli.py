@@ -49,6 +49,7 @@ ALLOWED_HOSTS = {"assets-prod.grocer.nz", "grocer.nz", "meilisearch.grocer.nz"}
 CACHE = pathlib.Path(os.environ.get("GROCER_NZ_CACHE", "~/.cache/grocer-nz")).expanduser()
 HEADERS = {"Referer": "https://grocer.nz/"}
 MAX_LIMIT = 100
+MAX_ASSET_LINKS = 50
 
 
 def http_get(url: str, *, headers: dict[str, str] | None = None) -> bytes:
@@ -178,6 +179,90 @@ def print_result(data: Any, as_json: bool) -> None:
             print(" | ".join(f"{k}={v}" for k, v in item.items()))
     else:
         print(data)
+
+
+def positive_id(value: str) -> int:
+    parsed = int(value)
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("expected a positive integer id")
+    return parsed
+
+
+def asset_manifest(
+    *,
+    include_base: bool,
+    store_ids: list[int],
+    product_ids: list[int],
+) -> dict[str, Any]:
+    """Construct public asset URLs without fetching or parsing their bodies."""
+    stores = list(dict.fromkeys(store_ids))
+    products = list(dict.fromkeys(product_ids))
+    requested = int(include_base) + len(stores) + len(products)
+    if requested == 0:
+        include_base = True
+        requested = 1
+    if requested > MAX_ASSET_LINKS:
+        raise SystemExit(
+            f"assets: at most {MAX_ASSET_LINKS} download links may be requested"
+        )
+
+    resources: list[dict[str, Any]] = []
+    if include_base:
+        resources.append(
+            {
+                "kind": "base_catalogue",
+                "format": "duckdb",
+                "compression": "br",
+                "filename": "base_v3.duckdb.br",
+                "media_type": "application/octet-stream",
+                "url": f"{BASE}/base_v3.duckdb.br",
+            }
+        )
+    for store_id in stores:
+        filename = f"public_prices_{store_id}.parquet"
+        resources.append(
+            {
+                "kind": "current_prices",
+                "format": "parquet",
+                "store_id": store_id,
+                "filename": filename,
+                "media_type": "application/vnd.apache.parquet",
+                "url": f"{BASE}/prices_per_store_v3/{filename}",
+            }
+        )
+    for product_id in products:
+        filename = f"price_history_{product_id}.parquet"
+        resources.append(
+            {
+                "kind": "price_history",
+                "format": "parquet",
+                "product_id": product_id,
+                "filename": filename,
+                "media_type": "application/vnd.apache.parquet",
+                "url": f"{BASE}/price_history_v3/{filename}",
+            }
+        )
+    return {
+        "delivery": "external_url",
+        "resources": resources,
+        "network_requests_made": 0,
+        "warnings": [
+            "URLs are constructed from Grocer's public asset layout without probing them; a requested store or product asset may not exist."
+        ],
+    }
+
+
+def cmd_assets(args):
+    result = asset_manifest(
+        include_base=args.base,
+        store_ids=args.store_id or [],
+        product_ids=args.product or [],
+    )
+    if args.json:
+        print_result(result, True)
+        return
+    for resource in result["resources"]:
+        print(resource["url"])
 
 
 def cmd_stores(args):
@@ -595,6 +680,32 @@ def main(argv=None):
     p = argparse.ArgumentParser(description="Query public grocer.nz supermarket price/search/history data")
     p.add_argument("--refresh", action="store_true", help="refresh cached public files")
     sub = p.add_subparsers(dest="cmd", required=True)
+
+    sp = sub.add_parser(
+        "assets",
+        help="return public DuckDB/parquet download URLs without downloading or parsing them",
+    )
+    sp.add_argument(
+        "--base",
+        action="store_true",
+        help="include the public base catalogue DuckDB URL (the default when no selectors are supplied)",
+    )
+    sp.add_argument(
+        "--store-id",
+        type=positive_id,
+        action="append",
+        default=[],
+        help="include the current-price parquet URL for this store id (repeatable)",
+    )
+    sp.add_argument(
+        "--product",
+        type=positive_id,
+        action="append",
+        default=[],
+        help="include the price-history parquet URL for this product id (repeatable)",
+    )
+    sp.add_argument("--json", action="store_true")
+    sp.set_defaults(func=cmd_assets)
 
     sp = sub.add_parser("stores", help="list stores")
     sp.add_argument("--query", "-q")
