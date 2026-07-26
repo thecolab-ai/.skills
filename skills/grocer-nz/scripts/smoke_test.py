@@ -49,7 +49,24 @@ def main() -> None:
     assert cli.normalize_gtin("94152210") == "00000094152210"
     assert cli.normalize_gtin("00 0000 9415 2210") == "00000094152210"
     assert cli.retailer_barcode("00000094152210") == "94152210"
-    print("[PASS] fixture query guard, bounds, and GTIN normalisation")
+    assets = json.loads(run(
+        "assets",
+        "--base",
+        "--store-id", "230",
+        "--store-id", "230",
+        "--product", "5452",
+        "--json",
+    ))
+    assert assets["network_requests_made"] == 0
+    assert [resource["kind"] for resource in assets["resources"]] == [
+        "base_catalogue",
+        "current_prices",
+        "price_history",
+    ]
+    assert assets["resources"][0]["url"].endswith("/base_v3.duckdb.br")
+    assert assets["resources"][1]["url"].endswith("/public_prices_230.parquet")
+    assert assets["resources"][2]["url"].endswith("/price_history_5452.parquet")
+    print("[PASS] fixture query guard, bounds, GTIN normalisation, and URL-only assets")
 
     try:
         stores = json.loads(run("stores", "--query", "Papakura", "--json"))

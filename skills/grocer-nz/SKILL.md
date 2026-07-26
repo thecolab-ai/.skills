@@ -53,6 +53,7 @@ The script bootstraps `duckdb` via `uv` when the active Python does not already 
 - Adam wants a store id for a known store, e.g. Papakura.
 - Adam wants price history for a known Grocer product id.
 - Adam wants current prices for one product across selected stores.
+- Adam wants the public DuckDB/parquet download URLs so another agent can download or analyse the raw files itself.
 - Adam wants to identify the same exact product in the Woolworths, New World, or PAK'nSAVE skills.
 - Adam has a UPC, EAN, or GTIN and needs the corresponding Grocer product id.
 
@@ -65,6 +66,35 @@ Set a helper variable:
 ```bash
 GROCER=skills/grocer-nz/scripts/cli.py
 ```
+
+### Get raw asset download URLs
+
+Use `assets` when the caller wants the source files rather than parsed rows. This
+command only constructs links from Grocer's fixed public asset layout. It makes
+no network request, starts no DuckDB process, and does not download or parse any
+file.
+
+```bash
+# Base catalogue DuckDB URL (also the default with no selectors)
+python3 $GROCER assets --base --json
+
+# Current-price parquet URLs for selected stores
+python3 $GROCER assets --store-id 230 --store-id 307 --json
+
+# Per-product history parquet URLs
+python3 $GROCER assets --product 5452 --product 5461 --json
+
+# Combine all three asset types
+python3 $GROCER assets --base --store-id 230 --product 5452 --json
+```
+
+The result contains `delivery: external_url` and a `resources` array. Each
+resource has a declared `format`, filename, and public `url`. Through The Colab
+MCP, supported resources are also emitted as native MCP `resource_link` content,
+so the client downloads directly from Grocer rather than through the MCP server.
+The URLs are deliberately not probed; a nonexistent store or product id can
+therefore produce a link that returns 403/404 when downloaded. At most 50 links
+may be requested in one call.
 
 ### List stores
 
@@ -206,6 +236,7 @@ Prices are stored in **NZ cents**. `$5.50` is represented as `550`.
 8. **Live smoke tests depend on upstream stock/history.** Product `5461` and Papakura stores were live-valid when added, but upstream catalogue changes can make the smoke fail without a code bug.
 9. **This is public read-only data.** Do not try to bypass sign-in or scrape private Grocer user/list/pro features.
 10. **Retailer barcode search has different shapes.** Search Foodstuffs with the compact barcode (leading zero padding removed). Woolworths returns its own `barcode`; normalise and verify that field because its text search may include unrelated rows.
+11. **`assets` constructs but does not validate links.** Use it for low-overhead handoff of raw public files. Use the parsed commands when the agent needs verified rows immediately.
 
 ## Verification Checklist
 
@@ -213,6 +244,7 @@ Run these before relying on a fresh install:
 
 ```bash
 python3 $GROCER stores --query Papakura --json
+python3 $GROCER assets --base --store-id 230 --product 5452 --json
 python3 $GROCER search "milk" --store-query Papakura --limit 2
 python3 $GROCER prices 5461 --store-query Papakura --limit 10
 python3 $GROCER history 5461 --store-query Papakura --limit 5
