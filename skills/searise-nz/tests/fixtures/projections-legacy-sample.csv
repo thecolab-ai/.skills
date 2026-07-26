@@ -1,0 +1,4 @@
+Confidence,site,year,0.17,0.5,0.83,SSP,scenario
+low_confidence,2503,2020,-0.19,0.08,0.36,SSP1,2.6
+medium_confidence,2503,2100,0.44,0.71,1.05,SSP2,4.5
+medium_confidence,2503,2100,0.77,1.02,1.31,SSP3,7.0

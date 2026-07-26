@@ -1,6 +1,8 @@
-Confidence,site,year,0.17,0.5,0.83,SSP,scenario
-low_confidence,3414,2020,-0.19,0.08,0.36,SSP1,2.6
-medium_confidence,3414,2100,0.44,0.71,1.05,SSP2,4.5
-medium_confidence,3414,2150,0.71,1.15,1.78,SSP2,4.5
-medium_confidence,9999,2100,0.40,0.66,0.99,SSP2,4.5
-medium_confidence,3414,2100,0.61,0.99,1.51,SSP5,8.5
+Confidence,site,year,17,50,83,SSP,scenario
+low_confidence,2503,2005,0,0,0,ssp1,2.6
+low_confidence,2503,2020,-0.19,0.08,0.36,ssp1,2.6
+medium_confidence,2503,2100,0.44,0.71,1.05,ssp2,4.5
+medium_confidence,2503,2150,0.71,1.15,1.78,ssp2,4.5
+medium_confidence,9999,2100,0.40,0.66,0.99,ssp2,4.5
+medium_confidence,2503,2100,0.61,0.99,1.51,ssp5,8.5
+medium_confidence,2503,2100,0.768,1.018,1.308,ssp3,7

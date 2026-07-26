@@ -7,7 +7,7 @@
   services.arcgis.com, services3.arcgis.com, gis.niwa.co.nz
 - Access mode: public-api
 - Authentication: none
-- Last verified: 2026-07-24
+- Last verified: 2026-07-26
 
 ## Search: org-scoped sharing search
 

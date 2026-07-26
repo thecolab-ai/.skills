@@ -22,15 +22,29 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
 import nzfetch  # noqa: E402
 
 HOST = "zenodo.org"
-RECORD_URL = "https://zenodo.org/records/11398538"
-RECORD_API_URL = "https://zenodo.org/api/records/11398538"
-VLM_URL = RECORD_URL + "/files/NZ_VLM_final_May24.csv"
-PROJ_VLM_URL = RECORD_URL + "/files/NZSeaRise_proj_vlm.csv"
-PROJ_NOVLM_URL = RECORD_URL + "/files/NZSeaRise_proj_novlm.csv"
-SOURCE_NAME = "NZ SeaRise projections (Zenodo record 11398538)"
+# The dataset deliberately straddles two Zenodo versions of concept record
+# 10976241. v4 (14722058, 2025-01-23) is the current projections release, but it
+# republished ONLY the two projection tables — the site-details/VLM file was last
+# published in v3 (11398538, 2024-05-31). Reading each file from the newest
+# version that actually publishes it is more accurate than pinning either alone.
+SITE_RECORD_ID = "11398538"
+PROJECTION_RECORD_ID = "14722058"
+CONCEPT_RECORD_URL = "https://zenodo.org/records/10976241"
+SITE_RECORD_URL = "https://zenodo.org/records/" + SITE_RECORD_ID
+PROJECTION_RECORD_URL = "https://zenodo.org/records/" + PROJECTION_RECORD_ID
+RECORD_URL = PROJECTION_RECORD_URL
+RECORD_API_URL = "https://zenodo.org/api/records/" + PROJECTION_RECORD_ID
+VLM_URL = SITE_RECORD_URL + "/files/NZ_VLM_final_May24.csv"
+PROJ_VLM_URL = PROJECTION_RECORD_URL + "/files/NZ_Searise_VLM-2005.csv"
+PROJ_NOVLM_URL = PROJECTION_RECORD_URL + "/files/NZ_Searise_noVLM-2005.csv"
+SOURCE_NAME = (
+    f"NZ SeaRise projections (Zenodo records {PROJECTION_RECORD_ID} projections, "
+    f"{SITE_RECORD_ID} site details)"
+)
 ATTRIBUTION = (
-    "CC BY 4.0 — cite Naish et al. (2024), New Zealand Vertical Land Movement "
-    "and Sea Rise Projections, https://zenodo.org/records/11398538"
+    "CC BY 4.0 — cite the dataset as Hamling, I., Naish, T., Levy, R. et al., "
+    "New Zealand Vertical land movement and sea rise projections, "
+    f"https://zenodo.org/records/{PROJECTION_RECORD_ID}"
 )
 CITATION_NOTE = (
     "projections are research outputs with uncertainty bounds (17th/50th/83rd "
@@ -144,15 +158,68 @@ def parse_latlon(raw: str) -> tuple[float, float]:
     return lat, lon
 
 
+def normalise_scenario(ssp: str, forcing: str) -> str:
+    """Build a canonical `SSP3-7.0` label from either release's spelling.
+
+    The 2024 tables emit `SSP3` + `7.0`; the 2025 tables emit `ssp3` + `7`.
+    Both must normalise to one label so filters behave identically.
+    """
+    try:
+        level = f"{float(forcing.strip()):.1f}"
+    except (AttributeError, ValueError) as exc:
+        raise SourceSchemaError(
+            f"projection CSV scenario must be a numeric forcing level, got {forcing!r}"
+        ) from exc
+    return f"{ssp.strip().upper()}-{level}"
+
+
 def scenario_label(row: dict[str, str]) -> str:
-    return f"{(row.get('SSP') or '').strip()}-{(row.get('scenario') or '').strip()}"
+    return normalise_scenario(row.get("SSP") or "", row.get("scenario") or "")
 
 
-PROJECTION_COLUMNS = frozenset(
-    {"Confidence", "site", "year", "0.17", "0.5", "0.83", "SSP", "scenario"}
+def normalise_scenario_filter(raw: str) -> str:
+    """Accept `SSP3-7`, `ssp3-7.0`, or `SSP3 - 7.0` from the caller."""
+    candidate = raw.replace(" ", "")
+    ssp, _, forcing = candidate.rpartition("-")
+    if not ssp or not forcing:
+        die(
+            f"invalid --scenario {raw!r}: expected a label like SSP2-4.5",
+            2,
+            "invalid_input",
+        )
+    try:
+        return normalise_scenario(ssp, forcing)
+    except SourceSchemaError:
+        die(
+            f"invalid --scenario {raw!r}: expected a label like SSP2-4.5",
+            2,
+            "invalid_input",
+        )
+        raise  # unreachable; die() exits
+
+
+PROJECTION_BASE_COLUMNS = frozenset({"Confidence", "site", "year", "SSP", "scenario"})
+# v3 labels the percentile columns 0.17/0.5/0.83; v4 labels the same columns
+# 17/50/83. Accept either spelling rather than pinning one release's headers.
+PERCENTILE_COLUMN_SETS = (
+    {"p17_m": "0.17", "p50_m": "0.5", "p83_m": "0.83"},
+    {"p17_m": "17", "p50_m": "50", "p83_m": "83"},
 )
-PROJECTION_YEAR_MIN = 2020
+PROJECTION_COLUMNS = PROJECTION_BASE_COLUMNS | set(PERCENTILE_COLUMN_SETS[0].values())
+# v4 adds a 2005 baseline row (all zeros) ahead of the decadal 2020-2300 steps.
+PROJECTION_YEAR_MIN = 2005
 PROJECTION_YEAR_MAX = 2300
+
+
+def resolve_percentile_columns(available: Iterable[str]) -> dict[str, str]:
+    present = set(available)
+    for mapping in PERCENTILE_COLUMN_SETS:
+        if set(mapping.values()) <= present:
+            return mapping
+    raise SourceSchemaError(
+        "projection CSV must carry percentile columns 0.17/0.5/0.83 or 17/50/83; got "
+        + ", ".join(sorted(present))
+    )
 PROJECTION_CONFIDENCE = {
     "low_confidence": "low",
     "medium_confidence": "medium",
@@ -180,12 +247,16 @@ def required_projection_float(row: dict[str, str], field: str) -> float:
     return value
 
 
-def projection_from_row(row: dict[str, str]) -> tuple[int, dict[str, Any]]:
-    missing = PROJECTION_COLUMNS - set(row)
+def projection_from_row(
+    row: dict[str, str], percentiles: dict[str, str] | None = None
+) -> tuple[int, dict[str, Any]]:
+    missing = PROJECTION_BASE_COLUMNS - set(row)
     if missing:
         raise SourceSchemaError(
             "projection CSV row is missing required columns: " + ", ".join(sorted(missing))
         )
+    if percentiles is None:
+        percentiles = resolve_percentile_columns(row)
 
     raw_site_id = required_projection_text(row, "site")
     if not raw_site_id.isdigit():
@@ -203,7 +274,7 @@ def projection_from_row(row: dict[str, str]) -> tuple[int, dict[str, Any]]:
 
     ssp = required_projection_text(row, "SSP")
     scenario_component = required_projection_text(row, "scenario")
-    scenario = f"{ssp}-{scenario_component}"
+    scenario = normalise_scenario(ssp, scenario_component)
     if scenario not in PROJECTION_SCENARIOS:
         raise SourceSchemaError(
             f"projection CSV SSP/scenario produced unsupported scenario {scenario!r}"
@@ -220,9 +291,9 @@ def projection_from_row(row: dict[str, str]) -> tuple[int, dict[str, Any]]:
         "scenario": scenario,
         "confidence": confidence,
         "year": int(year),
-        "p17_m": required_projection_float(row, "0.17"),
-        "p50_m": required_projection_float(row, "0.5"),
-        "p83_m": required_projection_float(row, "0.83"),
+        "p17_m": required_projection_float(row, percentiles["p17_m"]),
+        "p50_m": required_projection_float(row, percentiles["p50_m"]),
+        "p83_m": required_projection_float(row, percentiles["p83_m"]),
     }
 
 
@@ -232,18 +303,20 @@ def scan_projection_rows(
     requested = set(site_ids)
     grouped: dict[int, list[dict[str, Any]]] = {site_id: [] for site_id in requested}
     fieldnames = getattr(rows, "fieldnames", None)
+    percentiles: dict[str, str] | None = None
     if fieldnames is not None:
-        missing = PROJECTION_COLUMNS - set(fieldnames)
+        missing = PROJECTION_BASE_COLUMNS - set(fieldnames)
         if missing:
             raise SourceSchemaError(
                 "projection CSV is missing required columns: " + ", ".join(sorted(missing))
             )
+        percentiles = resolve_percentile_columns(fieldnames)
 
     source_rows = 0
     for row in rows:
         if not isinstance(row, dict):
             raise SourceSchemaError("projection CSV yielded a non-object row")
-        site_id, projection = projection_from_row(row)
+        site_id, projection = projection_from_row(row, percentiles)
         source_rows += 1
         if site_id in grouped:
             grouped[site_id].append(projection)
@@ -338,6 +411,12 @@ def normalize_record(data: dict[str, Any]) -> dict[str, Any]:
         "source": SOURCE_NAME,
         "source_url": RECORD_API_URL,
         "record_url": RECORD_URL,
+        "concept_record_url": CONCEPT_RECORD_URL,
+        "site_details_record_url": SITE_RECORD_URL,
+        "site_details_note": (
+            "projections come from the current version; site details come from "
+            f"record {SITE_RECORD_ID}, the newest version that publishes them"
+        ),
         "record_id": record_id,
         "doi": doi,
         "version": version,
@@ -420,7 +499,13 @@ def cmd_vlm(args: argparse.Namespace) -> None:
     sites = load_sites()
     match = next((s for s in sites if s["site_id"] == args.site_id), None)
     if match is None:
-        die(f"unknown site id {args.site_id}: ids run 0..{max(s['site_id'] for s in sites)}; find one with `sites --near lat,lon`", 2)
+        die(
+            f"no site details for site id {args.site_id}: ids run "
+            f"0..{max(s['site_id'] for s in sites)} but a few ids in that range carry "
+            "projections without a site-details row; find a usable id with "
+            "`sites --near lat,lon`",
+            2,
+        )
     payload = {
         "kind": "vlm",
         "source": SOURCE_NAME,
@@ -443,8 +528,8 @@ def filtered_projection_rows(
 ) -> list[dict[str, Any]]:
     selected = rows
     if args.scenario is not None:
-        wanted = args.scenario.upper().replace(" ", "")
-        selected = [row for row in selected if row["scenario"].upper() == wanted]
+        wanted = normalise_scenario_filter(args.scenario)
+        selected = [row for row in selected if row["scenario"] == wanted]
     if args.confidence != "all":
         selected = [row for row in selected if row["confidence"] == args.confidence]
     if args.year is not None:
@@ -468,8 +553,8 @@ def single_projection_payload(
     available_scenarios = sorted({row["scenario"] for row in rows})
     selected = rows
     if args.scenario is not None:
-        wanted = args.scenario.upper().replace(" ", "")
-        selected = [row for row in selected if row["scenario"].upper() == wanted]
+        wanted = normalise_scenario_filter(args.scenario)
+        selected = [row for row in selected if row["scenario"] == wanted]
         if not selected:
             die(
                 f"scenario {args.scenario!r} not present for this site; "

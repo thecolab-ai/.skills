@@ -67,22 +67,24 @@ class SeaRiseContractTests(unittest.TestCase):
         )
         payload = json.loads(stdout)
         self.assertEqual(payload["kind"], "record")
-        self.assertEqual(payload["record_id"], 11398538)
-        self.assertEqual(payload["doi"], "10.5281/zenodo.11398538")
-        self.assertEqual(payload["version"], "3")
-        self.assertEqual(payload["publication_date"], "2024-05-31")
-        self.assertEqual(payload["title"], "New Zealand Vertical Land Movement and Sea Rise Projections")
-        self.assertEqual(payload["creators"][0]["name"], "Naish, Tim")
+        self.assertEqual(payload["record_id"], 14722058)
+        self.assertEqual(payload["doi"], "10.5281/zenodo.14722058")
+        self.assertEqual(payload["version"], "4")
+        self.assertEqual(payload["publication_date"], "2025-01-23")
+        self.assertEqual(payload["title"], "New Zealand Vertical land movement and sea rise projections")
+        self.assertEqual(payload["creators"][0]["name"], "Hamling, Ian")
         self.assertEqual(payload["licence"], "cc-by-4.0")
-        self.assertEqual(payload["file_count"], 3)
+        self.assertEqual(payload["file_count"], 2)
+        # Site details are NOT in this record; provenance must say where they come from.
+        self.assertTrue(payload["site_details_record_url"].endswith("/11398538"))
         self.assertEqual(
             payload["files"][0],
             {
-                "key": "NZ_VLM_final_May24.csv",
-                "size": 674321,
+                "key": "NZ_Searise_noVLM-2005.csv",
+                "size": 57854135,
                 "checksum": "md5:11111111111111111111111111111111",
                 "download_url": (
-                    "https://zenodo.org/api/records/11398538/files/"
+                    "https://zenodo.org/api/records/14722058/files/"
                     "11111111-1111-1111-1111-111111111111/content"
                 ),
             },
@@ -90,7 +92,7 @@ class SeaRiseContractTests(unittest.TestCase):
 
     def test_record_rejects_malformed_upstream_payload_with_structured_error(self):
         args = self.cli.parse_cli_args(["record", "--json"])
-        with mock.patch.object(self.cli.nzfetch, "fetch_json", return_value={"id": 11398538, "metadata": []}):
+        with mock.patch.object(self.cli.nzfetch, "fetch_json", return_value={"id": 14722058, "metadata": []}):
             code, _stdout, stderr = self.run_command(self.cli.cmd_record, args)
 
         self.assertEqual(code, 6)
@@ -119,10 +121,10 @@ class SeaRiseContractTests(unittest.TestCase):
 
         self.assertNotIsInstance(rows, list)
         self.assertIs(iter(rows), rows)
-        self.assertEqual(next(rows)["site"], "3414")
+        self.assertEqual(next(rows)["site"], "2503")
 
     def test_single_site_projection_payload_is_backward_compatible(self):
-        args = self.cli.parse_cli_args(["projections", "3414", "--json"])
+        args = self.cli.parse_cli_args(["projections", "2503", "--json"])
         with mock.patch.object(
             self.cli,
             "fetch_csv",
@@ -148,9 +150,12 @@ class SeaRiseContractTests(unittest.TestCase):
                 "projections",
             },
         )
-        self.assertEqual(payload["site_id"], 3414)
-        self.assertEqual(payload["row_count"], 4)
-        self.assertEqual(payload["projections"][1]["p50_m"], 0.71)
+        self.assertEqual(payload["site_id"], 2503)
+        self.assertEqual(payload["row_count"], 6)
+        # Sorted by (scenario, confidence, year): the 2005 baseline sorts first
+        # within SSP1-2.6/low, so SSP2-4.5/medium/2100 is index 2.
+        self.assertEqual(payload["projections"][0]["year"], 2005)
+        self.assertEqual(payload["projections"][2]["p50_m"], 0.71)
 
     def test_projection_scan_rejects_every_corrupt_required_value(self):
         valid = fixture_rows("projections-sample.csv")[0]
@@ -160,7 +165,7 @@ class SeaRiseContractTests(unittest.TestCase):
             ("negative site", "site", "-1"),
             ("blank year", "year", ""),
             ("malformed year", "year", "twenty-twenty"),
-            ("year below source bounds", "year", "2019"),
+            ("year below source bounds", "year", "2004"),
             ("year above source bounds", "year", "2301"),
             ("blank SSP", "SSP", ""),
             ("unsupported SSP", "SSP", "SSP9"),
@@ -169,24 +174,24 @@ class SeaRiseContractTests(unittest.TestCase):
             ("blank confidence", "Confidence", ""),
             ("malformed confidence", "Confidence", "medium"),
             ("unsupported confidence", "Confidence", "high_confidence"),
-            ("blank p17", "0.17", ""),
-            ("non-numeric p50", "0.5", "not-a-number"),
-            ("NaN p83", "0.83", "nan"),
-            ("infinite p17", "0.17", "inf"),
-            ("negative infinite p50", "0.5", "-inf"),
+            ("blank p17", "17", ""),
+            ("non-numeric p50", "50", "not-a-number"),
+            ("NaN p83", "83", "nan"),
+            ("infinite p17", "17", "inf"),
+            ("negative infinite p50", "50", "-inf"),
         )
         for label, field, value in corruptions:
             with self.subTest(label=label):
                 row = dict(valid)
                 row[field] = value
                 with self.assertRaises(self.cli.SourceSchemaError):
-                    self.cli.scan_projection_rows(iter([row]), [3414])
+                    self.cli.scan_projection_rows(iter([row]), [2503])
 
     def test_corrupt_projection_rows_are_structured_failures_for_single_and_multi_site(self):
         valid = fixture_rows("projections-sample.csv")[0]
         cases = (
-            (["projections", "3414", "--json"], "0.5", "nan"),
-            (["projections", "3414", "9999", "--json"], "scenario", ""),
+            (["projections", "2503", "--json"], "50", "nan"),
+            (["projections", "2503", "9999", "--json"], "scenario", ""),
         )
         for argv, field, value in cases:
             with self.subTest(argv=argv, field=field):
@@ -213,7 +218,7 @@ class SeaRiseContractTests(unittest.TestCase):
                 return iter(self.rows)
 
         source = OnePassRows(fixture_rows("projections-sample.csv"))
-        args = self.cli.parse_cli_args(["projections", "9999", "3414", "3414", "7777", "--json"])
+        args = self.cli.parse_cli_args(["projections", "9999", "2503", "2503", "7777", "--json"])
         with mock.patch.object(self.cli, "fetch_csv", return_value=source) as fetch:
             code, stdout, stderr = self.run_command(self.cli.cmd_projections, args)
 
@@ -221,8 +226,8 @@ class SeaRiseContractTests(unittest.TestCase):
         fetch.assert_called_once_with(self.cli.PROJ_VLM_URL, timeout=120)
         self.assertEqual(source.iterations, 1)
         payload = json.loads(stdout)
-        self.assertEqual(payload["requested_site_ids"], [9999, 3414, 3414, 7777])
-        self.assertEqual([site["site_id"] for site in payload["sites"]], [9999, 3414, 3414, 7777])
+        self.assertEqual(payload["requested_site_ids"], [9999, 2503, 2503, 7777])
+        self.assertEqual([site["site_id"] for site in payload["sites"]], [9999, 2503, 2503, 7777])
         self.assertEqual([site["status"] for site in payload["sites"]], ["ok", "ok", "ok", "not_found"])
         self.assertEqual(payload["sites"][1], payload["sites"][2])
         self.assertEqual(payload["sites"][3]["row_count"], 0)
@@ -232,7 +237,7 @@ class SeaRiseContractTests(unittest.TestCase):
         args = self.cli.parse_cli_args(
             [
                 "projections",
-                "3414",
+                "2503",
                 "9999",
                 "--scenario",
                 "SSP2-4.5",
@@ -263,7 +268,7 @@ class SeaRiseContractTests(unittest.TestCase):
 
     def test_multi_site_distinguishes_filtered_empty_from_missing(self):
         args = self.cli.parse_cli_args(
-            ["projections", "3414", "7777", "--scenario", "SSP1-1.9", "--json"]
+            ["projections", "2503", "7777", "--scenario", "SSP1-1.9", "--json"]
         )
         with mock.patch.object(
             self.cli,
@@ -288,15 +293,15 @@ class SeaRiseContractTests(unittest.TestCase):
             self.assertEqual(error["error"], "invalid_input")
 
     def test_projection_year_filter_is_bounded_and_zero_never_disables_filtering(self):
-        for raw in ("0", "2019", "2301", "not-a-year"):
+        for raw in ("0", "2004", "2301", "not-a-year"):
             stderr = io.StringIO()
             with contextlib.redirect_stderr(stderr):
                 with self.assertRaises(SystemExit) as raised:
-                    self.cli.parse_cli_args(["projections", "3414", "--year", raw, "--json"])
+                    self.cli.parse_cli_args(["projections", "2503", "--year", raw, "--json"])
             self.assertEqual(raised.exception.code, 2)
             self.assertEqual(json.loads(stderr.getvalue())["error"], "invalid_input")
-        for raw in ("2020", "2300"):
-            args = self.cli.parse_cli_args(["projections", "3414", "--year", raw, "--json"])
+        for raw in ("2005", "2020", "2300"):
+            args = self.cli.parse_cli_args(["projections", "2503", "--year", raw, "--json"])
             self.assertEqual(args.year, int(raw))
 
         rows = [
@@ -321,7 +326,7 @@ class SeaRiseContractTests(unittest.TestCase):
             with self.assertRaises(SystemExit) as raised:
                 self.cli.single_projection_payload(
                     rows,
-                    3414,
+                    2503,
                     self.cli.PROJ_VLM_URL,
                     direct_args,
                 )
@@ -354,7 +359,7 @@ class SeaRiseContractTests(unittest.TestCase):
 
     def test_malformed_projection_response_is_structured_schema_failure(self):
         malformed = csv.DictReader(io.StringIO("wrong,headers\n1,2\n"))
-        args = self.cli.parse_cli_args(["projections", "3414", "--json"])
+        args = self.cli.parse_cli_args(["projections", "2503", "--json"])
         with mock.patch.object(self.cli, "fetch_csv", return_value=malformed):
             code, _stdout, stderr = self.run_command(self.cli.cmd_projections, args)
 

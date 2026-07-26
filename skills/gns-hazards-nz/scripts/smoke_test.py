@@ -63,17 +63,32 @@ def main() -> int:
 
     def fixture_shaking_contours():
         data = json.loads((FIXTURES / "shaking-geojson-sample.json").read_text(encoding="utf-8"))
-        features = data["features"]
-        contours = sorted(
-            {p.get("Contour") for f in features if (p := f.get("properties") or {}).get("Contour") is not None}
-        )
+        # Exercise the CLI's own extractor, not a re-implementation of it.
+        contours = cli.distinct_contours(data["features"])
         assert contours == [7, 8], "distinct contour extraction must skip the Contour-less feature"
         assert data.get("exceededTransferLimit") is True
+        assert cli.distinct_contours([]) == []
+        assert cli.distinct_contours([{"properties": None}, {"properties": {}}]) == [], (
+            "a null or empty properties bag must not become a None contour value"
+        )
+        assert cli.distinct_contours([{"properties": {"Contour": 5}}, "not-a-feature"]) == [5], (
+            "a malformed feature entry must be skipped, not crash the extractor"
+        )
 
-    def fixture_measure_map():
-        assert cli.SHAKING_MEASURES == {
-            "mmi": 1, "pga": 4, "pgv": 7, "psa0.3": 10, "psa1.0": 13, "psa3.0": 16,
-        }, "measure→layer map must match the documented service layout"
+    def fixture_measure_layer_names():
+        """The measure→layer map is only meaningful with the names it implies.
+
+        The map itself is a constant, so asserting it against a literal proves
+        nothing. Instead pin the derived layer NAME per measure — the live probe
+        below compares these against the service and fails on upstream drift.
+        """
+        assert cli.expected_shaking_layer_name("mmi") == "mmi_mean_cont"
+        assert cli.expected_shaking_layer_name("psa0.3") == "psa0p3_mean_cont"
+        assert cli.expected_shaking_layer_name("psa1.0") == "psa1p0_mean_cont"
+        assert set(cli.SHAKING_MEASURES) == {"mmi", "pga", "pgv", "psa0.3", "psa1.0", "psa3.0"}
+        assert len(set(cli.SHAKING_MEASURES.values())) == len(cli.SHAKING_MEASURES), (
+            "two measures must never resolve to the same layer id"
+        )
 
     def fixture_archive_metadata():
         events = cli.normalise_events(
@@ -123,7 +138,7 @@ def main() -> int:
     results.append(check("fixture service layer parser", fixture_service_layers))
     results.append(check("fixture bbox validation", fixture_bbox))
     results.append(check("fixture shaking contour extraction", fixture_shaking_contours))
-    results.append(check("fixture measure layer map", fixture_measure_map))
+    results.append(check("fixture measure layer names", fixture_measure_layer_names))
     results.append(check("fixture archive metadata", fixture_archive_metadata))
     results.append(check("fixture describe and query controls", fixture_describe_and_controls))
 
@@ -185,6 +200,30 @@ def main() -> int:
                 print(f"[SKIP] live archive metadata: {recent.stderr.strip()}")
             else:
                 raise AssertionError(f"events exit {recent.returncode}: {recent.stderr.strip()}")
+            def measure_map_matches_service(payload: dict) -> bool:
+                """Fail if any hardcoded layer id no longer names its measure.
+
+                Without this the CLI would keep querying a drifted id and return
+                the wrong ground-motion measure with no error at all.
+                """
+                live_names = {
+                    layer["id"]: layer["name"] for layer in payload["layers"]
+                }
+                mismatches = []
+                for measure, layer_id in cli.SHAKING_MEASURES.items():
+                    expected = cli.expected_shaking_layer_name(measure)
+                    actual = live_names.get(layer_id)
+                    if actual != expected:
+                        mismatches.append(f"{measure}: layer {layer_id} is {actual!r}, expected {expected!r}")
+                if mismatches:
+                    raise AssertionError("ShakingLayers layer-id drift — " + "; ".join(mismatches))
+                return True
+
+            live(
+                "shaking measure map matches live layer names",
+                ["layers", "--service", "shaking", "--json"],
+                measure_map_matches_service,
+            )
             live(
                 "fault layer description",
                 ["describe", "faults", "--layer-id", "0", "--json"],
