@@ -53,6 +53,45 @@ class FoodRecallRuntimeTests(unittest.TestCase):
         ):
             cli._details(rows, "2026-07-26T00:00:00Z")
 
+    def test_thread_admission_failure_retries_with_smaller_pool(self):
+        cli = load_cli()
+        rows = [
+            {
+                "title": f"notice {index}",
+                "source_url": f"https://www.mpi.govt.nz/notice-{index}",
+            }
+            for index in range(5)
+        ]
+        real_executor = cli.concurrent.futures.ThreadPoolExecutor
+        attempts = []
+
+        def executor(*, max_workers):
+            attempts.append(max_workers)
+            if len(attempts) == 1:
+                raise RuntimeError("can't start new thread")
+            return real_executor(max_workers=max_workers)
+
+        with (
+            mock.patch.object(
+                cli,
+                "_detail",
+                side_effect=lambda row, _retrieved_at: {
+                    **row,
+                    "detail_available": True,
+                },
+            ),
+            mock.patch.object(
+                cli.concurrent.futures,
+                "ThreadPoolExecutor",
+                side_effect=executor,
+            ),
+        ):
+            detailed, failures = cli._details(rows, "2026-07-26T00:00:00Z")
+
+        self.assertEqual(attempts, [5, 4])
+        self.assertEqual(failures, 0)
+        self.assertEqual(len(detailed), 5)
+
 
 if __name__ == "__main__":
     unittest.main()

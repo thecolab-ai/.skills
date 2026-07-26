@@ -6,6 +6,7 @@ import argparse
 import concurrent.futures
 import json
 import sys
+import threading
 import urllib.parse
 from pathlib import Path
 
@@ -21,7 +22,8 @@ WARNINGS = ["Do not infer coverage outside the listed batch/date scope.", "Prese
 DETAIL_TIMEOUT_SECONDS = 2
 DETAIL_WORKERS = 8
 DETAIL_SCAN_CAP = 24
-LIST_TIMEOUT_SECONDS = 8
+LIST_TIMEOUT_SECONDS = 3
+DETAIL_THREAD_STACK_BYTES = 1024 * 1024
 
 
 def _detail(row: dict[str, object], retrieved_at: str) -> dict[str, object]:
@@ -48,24 +50,44 @@ def _details(
     """
     if not rows:
         return [], 0
-    results: list[dict[str, object] | None] = [None] * len(rows)
+    worker_options = list(
+        dict.fromkeys(
+            (
+                min(DETAIL_WORKERS, len(rows)),
+                min(4, len(rows)),
+            )
+        )
+    )
+    previous_stack_size = threading.stack_size()
+    results: list[dict[str, object] | None] = []
     failures: list[BaseException] = []
-    workers = min(DETAIL_WORKERS, len(rows))
-    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
-        pending = {
-            pool.submit(_detail, row, retrieved_at): index
-            for index, row in enumerate(rows)
-        }
-        for future in concurrent.futures.as_completed(pending):
-            index = pending[future]
+    try:
+        threading.stack_size(DETAIL_THREAD_STACK_BYTES)
+        for workers in worker_options:
+            results = [None] * len(rows)
+            failures = []
             try:
-                results[index] = future.result()
-            except (nzfetch.FetchError, ValueError) as exc:
-                failures.append(exc)
-                results[index] = {
-                    **rows[index],
-                    "detail_available": False,
-                }
+                with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
+                    pending = {
+                        pool.submit(_detail, row, retrieved_at): index
+                        for index, row in enumerate(rows)
+                    }
+                    for future in concurrent.futures.as_completed(pending):
+                        index = pending[future]
+                        try:
+                            results[index] = future.result()
+                        except (nzfetch.FetchError, ValueError) as exc:
+                            failures.append(exc)
+                            results[index] = {
+                                **rows[index],
+                                "detail_available": False,
+                            }
+                break
+            except RuntimeError as exc:
+                if "can't start new thread" not in str(exc) or workers == worker_options[-1]:
+                    raise
+    finally:
+        threading.stack_size(previous_stack_size)
     if failures and len(failures) == len(rows):
         first = failures[0]
         if isinstance(first, nzfetch.FetchError):
