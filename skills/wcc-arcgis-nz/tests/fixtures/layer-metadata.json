@@ -1,0 +1,31 @@
+{
+  "currentVersion": 11.1,
+  "id": 10,
+  "name": "Liquefaction potential",
+  "description": "Synthetic hazard classification",
+  "type": "Feature Layer",
+  "geometryType": "esriGeometryPolygon",
+  "objectIdField": "OBJECTID",
+  "capabilities": "Map,Query,Data",
+  "maxRecordCount": 2000,
+  "units": "esriMeters",
+  "extent": {
+    "xmin": 1700000,
+    "ymin": 5400000,
+    "xmax": 1800000,
+    "ymax": 5500000,
+    "spatialReference": {"wkid": 2193, "latestWkid": 2193}
+  },
+  "spatialReference": {"wkid": 2193, "latestWkid": 2193},
+  "fields": [
+    {"name": "OBJECTID", "alias": "OBJECTID", "type": "esriFieldTypeOID"},
+    {
+      "name": "HAZARD_CLASS",
+      "alias": "Hazard class",
+      "type": "esriFieldTypeString",
+      "description": "Published upstream classification",
+      "domain": {"type": "codedValue", "name": "Hazard classes"},
+      "unit": "category"
+    }
+  ]
+}

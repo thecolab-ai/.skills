@@ -1,0 +1,10 @@
+{
+  "type": "FeatureCollection",
+  "exceededTransferLimit": true,
+  "features": [
+    {"type": "Feature", "id": 1, "geometry": null, "properties": {"OBJECTID": 1, "Contour": 8}},
+    {"type": "Feature", "id": 2, "geometry": null, "properties": {"OBJECTID": 2, "Contour": 7}},
+    {"type": "Feature", "id": 3, "geometry": null, "properties": {"OBJECTID": 3, "Contour": 7}},
+    {"type": "Feature", "id": 4, "geometry": null, "properties": {"OBJECTID": 4}}
+  ]
+}

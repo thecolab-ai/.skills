@@ -1,0 +1,15 @@
+{
+  "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "title": "Synthetic coastal classification",
+  "type": "Feature Service",
+  "owner": "synthetic_niwa",
+  "orgId": "fp1tibNcN9mbExhG",
+  "access": "public",
+  "licenseInfo": "<p>CC BY 4.0</p>",
+  "description": "<p>Synthetic coastal service metadata.</p>",
+  "tags": ["coastal", "classification"],
+  "created": 1730000000000,
+  "modified": 1750000000000,
+  "size": 3210,
+  "url": "https://services3.arcgis.com/fp1tibNcN9mbExhG/arcgis/rest/services/Synthetic/FeatureServer"
+}

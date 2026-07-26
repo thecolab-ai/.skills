@@ -1,0 +1,20 @@
+{
+  "currentVersion": 11.1,
+  "serviceDescription": "Synthetic NIWA coastal MapServer",
+  "capabilities": "Map,Query,Data",
+  "maxRecordCount": 2000,
+  "supportedQueryFormats": "JSON, geoJSON",
+  "units": "esriMeters",
+  "initialExtent": {
+    "xmin": 1000000,
+    "ymin": 4700000,
+    "xmax": 2100000,
+    "ymax": 6200000,
+    "spatialReference": {"wkid": 2193, "latestWkid": 2193}
+  },
+  "spatialReference": {"wkid": 2193, "latestWkid": 2193},
+  "layers": [
+    {"id": 3, "name": "Beach exposure", "geometryType": "esriGeometryPolyline"}
+  ],
+  "tables": []
+}

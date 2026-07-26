@@ -1,0 +1,30 @@
+{
+  "fixture": "synthetic ArcGIS sharing search response (shape matches www.arcgis.com)",
+  "contains_live_credentials": false,
+  "contains_personal_data": false,
+  "total": 2,
+  "results": [
+    {
+      "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "title": "Synthetic Coastal Sensitivity Index CSI erosion",
+      "type": "Feature Service",
+      "owner": "synthetic_niwa",
+      "orgId": "fp1tibNcN9mbExhG",
+      "url": "https://services3.arcgis.com/fp1tibNcN9mbExhG/arcgis/rest/services/Synthetic_CSI/FeatureServer",
+      "snippet": "Synthetic CSI fixture item",
+      "tags": ["coastal", "synthetic"],
+      "modified": 1750000000000
+    },
+    {
+      "id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "title": "Synthetic Beach Exposure",
+      "type": "Map Service",
+      "owner": "synthetic_niwa",
+      "orgId": "fp1tibNcN9mbExhG",
+      "url": null,
+      "snippet": null,
+      "tags": [],
+      "modified": 1740000000000
+    }
+  ]
+}

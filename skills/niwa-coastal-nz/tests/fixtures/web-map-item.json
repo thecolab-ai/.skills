@@ -1,0 +1,15 @@
+{
+  "id": "cccccccccccccccccccccccccccccccc",
+  "title": "Synthetic NIWA coastal web map",
+  "type": "Web Map",
+  "owner": "synthetic_niwa",
+  "orgId": "fp1tibNcN9mbExhG",
+  "access": "public",
+  "licenseInfo": "<p>CC BY 4.0</p>",
+  "description": "<p>Synthetic catalogue metadata with a non-service URL.</p>",
+  "tags": ["coastal", "web-map"],
+  "created": 1730000000000,
+  "modified": 1750000000000,
+  "size": 4567,
+  "url": "https://data-niwa.opendata.arcgis.com/apps/mapviewer/index.html?webmap=cccccccccccccccccccccccccccccccc"
+}

@@ -16,6 +16,10 @@ FLOOD_LAYER = (
     "https://services1.arcgis.com/CPYspmTk3abe6d7i/arcgis/rest/services/"
     "dp_ihp_recommended_flood_hazard_overlays/FeatureServer/51"
 )
+FLOOD_ITEM = "8292f1b6b6144a73ae2bc81fd795f067"
+GWRC_EMERGENCIES = (
+    "https://mapping1.gw.govt.nz/arcgis/rest/services/GW/Emergencies_P/MapServer"
+)
 
 
 def load_cli():
@@ -54,6 +58,17 @@ def main() -> int:
         rows = cli.parse_service_layers(service)
         assert [(r["id"], r["kind"]) for r in rows] == [(51, "layer"), (60, "table")]
         assert rows[0]["geometry_type"] == "esriGeometryPolygon"
+
+    def fixture_capabilities():
+        item = json.loads((FIXTURES / "item-gwrc.json").read_text(encoding="utf-8"))
+        metadata = cli.normalise_catalogue_item(item)
+        assert metadata["organisation"] == cli.PORTALS["gwrc"]["org_id"]
+        assert metadata["licence"] == "CC BY 4.0"
+        layer = json.loads((FIXTURES / "layer-metadata.json").read_text(encoding="utf-8"))
+        description = cli.normalise_description(layer)
+        assert description["object_id_field"] == "OBJECTID"
+        assert description["fields"][1]["unit"] == "category"
+        assert cli.parse_point("174.78,-41.29") == (174.78, -41.29)
 
     def fixture_bbox():
         params = cli.parse_bbox("174.7,-41.4,174.9,-41.2")
@@ -114,6 +129,8 @@ def main() -> int:
             allowed_gwrc_legacy,
             "https://maps.gw.govt.nz/portal/rest/services/example/MapServer",
             "https://giswebprd.gw.govt.nz/arcgis/rest/services/example/MapServer",
+            "https://mapping1.gw.govt.nz/arcgis/rest/services/Hazards/Sea_Level_Rise/MapServer",
+            "https://gis.wellingtonwater.co.nz/server1/rest/services/Modelling/example/MapServer",
         ):
             cli.check_layer_host(verified)
         for rejected in (unrelated, allowed.replace("https://", "http://", 1)):
@@ -139,7 +156,7 @@ def main() -> int:
         cli.fetch_json = fake_fetch
         try:
             try:
-                cli.resolve_layer_url("externalitem123", 0)
+                cli.resolve_layer_url("dddddddddddddddddddddddddddddddd", 0)
             except SystemExit as exc:
                 assert exc.code == 7
             else:
@@ -150,6 +167,7 @@ def main() -> int:
 
     results.append(check("fixture sharing-search item normalisation", fixture_search))
     results.append(check("fixture service layer/table parser", fixture_service))
+    results.append(check("fixture item/description/point capability parsers", fixture_capabilities))
     results.append(check("fixture bbox envelope parameters", fixture_bbox))
     results.append(check("fixture countline metadata parser", fixture_sensor_meta))
     results.append(check("fixture mobility count aggregation", fixture_mobility))
@@ -177,13 +195,76 @@ def main() -> int:
         try:
             live(
                 "org-scoped search",
-                ["search", "flood", "--limit", "3", "--json"],
-                lambda d: bool(d["items"]) and d["total_matches"] > 0 and all(i["id"] and i["owner"] for i in d["items"]),
+                ["search", "flood", "--limit", "3", "--start", "1", "--json"],
+                lambda d: bool(d["items"])
+                and d["total_matches"] > 0
+                and d["start"] == 1
+                and "next_start" in d
+                and all(i["id"] and i["owner"] for i in d["items"]),
+            )
+            live(
+                "catalogue item metadata",
+                ["item", FLOOD_ITEM, "--json"],
+                lambda d: d["item"]["id"] == FLOOD_ITEM
+                and d["item"]["organisation"] == "CPYspmTk3abe6d7i",
+            )
+            live(
+                "flood layer metadata",
+                ["describe", FLOOD_LAYER, "--json"],
+                lambda d: d["description"]["geometry_type"] is not None
+                and d["description"]["max_record_count"] is not None,
+            )
+            live(
+                "flood layer count",
+                [
+                    "query",
+                    FLOOD_LAYER,
+                    "--bbox",
+                    "174.75,-41.35,174.82,-41.27",
+                    "--count",
+                    "--json",
+                ],
+                lambda d: d["kind"] == "query-count" and d["count"] >= 1,
             )
             live(
                 "flood layer bbox query",
                 ["query", FLOOD_LAYER, "--bbox", "174.75,-41.35,174.82,-41.27", "--limit", "2", "--json"],
                 lambda d: d["feature_count"] >= 1,
+            )
+            live(
+                "GWRC hazard service on mapping1",
+                [
+                    "layers",
+                    "https://mapping1.gw.govt.nz/arcgis/rest/services/Hazards/Sea_Level_Rise/MapServer",
+                    "--json",
+                ],
+                lambda d: bool(d["layers"]),
+            )
+            live(
+                "GWRC raw identify",
+                [
+                    "identify",
+                    GWRC_EMERGENCIES,
+                    "--point",
+                    "174.78,-41.29",
+                    "--layer-id",
+                    "10",
+                    "--no-geometry",
+                    "--json",
+                ],
+                lambda d: d["kind"] == "identify"
+                and isinstance(d["results"], list)
+                and d["point"]["spatial_reference"] == 4326,
+            )
+            live(
+                "Wellington Water flood service",
+                [
+                    "layers",
+                    "https://gis.wellingtonwater.co.nz/server1/rest/services/Modelling/"
+                    "WCC100yrCC2025FloodDepths_FB/MapServer",
+                    "--json",
+                ],
+                lambda d: bool(d["layers"]),
             )
             live(
                 "sensor countline metadata",
