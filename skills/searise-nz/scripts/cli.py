@@ -259,7 +259,7 @@ def positive_int(maximum: int):
     return parse
 
 
-def main() -> None:
+def parse_cli_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="NZ SeaRise sea-level rise and vertical land movement projections (read-only)"
     )
@@ -293,7 +293,17 @@ def main() -> None:
     s.add_argument("--json", action="store_true", help="emit machine-readable JSON")
     s.set_defaults(func=cmd_projections)
 
-    args = parser.parse_args()
+    raw_args = list(sys.argv[1:] if argv is None else argv)
+    for index in range(len(raw_args) - 1):
+        value = raw_args[index + 1]
+        if raw_args[index] == "--near" and value.startswith("-") and "," in value:
+            raw_args[index : index + 2] = [f"--near={value}"]
+            break
+    return parser.parse_args(raw_args)
+
+
+def main() -> None:
+    args = parse_cli_args()
     args.func(args)
 
 

@@ -80,10 +80,20 @@ def main() -> int:
             else:
                 raise AssertionError(f"bad --near {bad!r} was accepted")
 
+    def fixture_negative_near_cli():
+        args = cli.parse_cli_args(
+            ["sites", "--near", "-41.29,174.78", "--limit", "3", "--json"]
+        )
+        assert args.near == "-41.29,174.78"
+        assert args.limit == 3
+        assert args.json is True
+        assert args.func is cli.cmd_sites
+
     results.append(check("fixture VLM site parser", fixture_sites))
     results.append(check("fixture haversine distance", fixture_haversine))
     results.append(check("fixture projections parser", fixture_projections))
     results.append(check("fixture lat,lon validation", fixture_latlon))
+    results.append(check("fixture CLI accepts a negative --near latitude", fixture_negative_near_cli))
 
     def live(name: str, args: list[str], assertion) -> None:
         completed = subprocess.run(

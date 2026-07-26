@@ -106,6 +106,11 @@ def main() -> int:
                 lambda d: any(l["name"] == "1:250 000 Active Faults" for l in d["layers"]),
             )
             live(
+                "shaking service layers",
+                ["layers", "--service", "shaking", "--json"],
+                lambda d: any(l["id"] == cli.SHAKING_MEASURES["mmi"] for l in d["layers"]),
+            )
+            live(
                 "fault trace query",
                 ["faults", "--bbox", "174.6,-41.5,175.1,-41.0", "--limit", "3", "--json"],
                 lambda d: d["feature_count"] >= 1 and all("properties" in f for f in d["features"]),

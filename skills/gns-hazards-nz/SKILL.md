@@ -1,6 +1,6 @@
 ---
 name: gns-hazards-nz
-description: "Query GNS Science public ArcGIS hazard services through a lightweight no-login CLI: the NZ Active Faults Database (fault traces, recurrence intervals, slip rates, avoidance zones) and live ShakingLayers ground-motion contours (MMI, PGA, PGV) generated after significant earthquakes. Use when the task involves NZ active fault locations, fault hazard attributes, or measured ground-shaking extents from recent earthquakes. Read-only; no authentication required."
+description: "Query GNS Science public ArcGIS hazard services through a lightweight no-login CLI: the NZ Active Faults Database (fault traces, recurrence intervals, slip rates, avoidance zones) and live ShakingLayers ground-motion contours (MMI, PGA, PGV) generated after significant earthquakes. Use when the task involves NZ active fault locations, fault hazard attributes, or modelled ground-shaking extents from recent earthquakes. Read-only; no authentication required."
 license: MIT
 compatibility: "Requires Python 3.10+ and network access for live data"
 metadata:
@@ -36,7 +36,7 @@ deterministic read-only CLI with human and JSON output.
 
 - A task needs NZ active fault traces, recurrence intervals, slip rates,
   fault avoidance zones, or fault awareness areas as GeoJSON
-- A task needs measured ground-shaking contours (MMI, PGA, PGV, PSA) from the
+- A task needs modelled ground-shaking contours (MMI, PGA, PGV, PSA) from the
   most recently published significant NZ earthquake
 
 ## Do not use this for

@@ -112,6 +112,11 @@ def main() -> int:
                 lambda d: d["total_matches"] >= 1 and all(i["id"] for i in d["items"]),
             )
             live(
+                "CSI erosion service layers",
+                ["layers", "c894b53b102f4f9db55278f7572ca4f6", "--json"],
+                lambda d: bool(d["layers"]),
+            )
+            live(
                 "CSI erosion layer query",
                 [
                     "query",

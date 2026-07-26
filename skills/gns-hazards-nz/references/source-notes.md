@@ -61,7 +61,7 @@ Endpoints came from the WCC Emergency Management "Public Data for GIS
 Overview" spreadsheet (2026-07-24), National sheet rows "Fault" and "Shaking
 layers". The server root also exposes geology map services, landslide
 response, and groundwater folders that this skill deliberately does not wrap —
-one clear job: fault hazard and measured shaking.
+one clear job: fault hazard and modelled shaking.
 
 ## Failure modes
 

@@ -62,7 +62,7 @@ python3 skills/searise-nz/scripts/cli.py projections 3414 --year 2100 --json
 ## Notes
 
 - Licence: CC BY 4.0 — cite Naish et al. (2024), Zenodo record 11398538
-- `projections` streams a ~54 MB CSV per call (about 20–30 s); filter flags
+- `projections` downloads and parses a ~54 MB CSV per call (about 20–30 s); filter flags
   reduce output, not transfer — prefer one call and reuse the JSON
 - Scenarios: SSP1-1.9, SSP1-2.6, SSP2-4.5, SSP3-7.0, SSP5-8.5; values are
   metres relative to the 1995–2014 baseline

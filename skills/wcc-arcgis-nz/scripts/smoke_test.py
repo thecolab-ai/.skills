@@ -114,6 +114,8 @@ def main() -> int:
             allowed_gwrc_legacy,
             "https://maps.gw.govt.nz/portal/rest/services/example/MapServer",
             "https://giswebprd.gw.govt.nz/arcgis/rest/services/example/MapServer",
+            "https://mapping1.gw.govt.nz/arcgis/rest/services/Hazards/Sea_Level_Rise/MapServer",
+            "https://gis.wellingtonwater.co.nz/server1/rest/services/Modelling/example/MapServer",
         ):
             cli.check_layer_host(verified)
         for rejected in (unrelated, allowed.replace("https://", "http://", 1)):
@@ -184,6 +186,25 @@ def main() -> int:
                 "flood layer bbox query",
                 ["query", FLOOD_LAYER, "--bbox", "174.75,-41.35,174.82,-41.27", "--limit", "2", "--json"],
                 lambda d: d["feature_count"] >= 1,
+            )
+            live(
+                "GWRC hazard service on mapping1",
+                [
+                    "layers",
+                    "https://mapping1.gw.govt.nz/arcgis/rest/services/Hazards/Sea_Level_Rise/MapServer",
+                    "--json",
+                ],
+                lambda d: bool(d["layers"]),
+            )
+            live(
+                "Wellington Water flood service",
+                [
+                    "layers",
+                    "https://gis.wellingtonwater.co.nz/server1/rest/services/Modelling/"
+                    "WCC100yrCC2025FloodDepths_FB/MapServer",
+                    "--json",
+                ],
+                lambda d: bool(d["layers"]),
             )
             live(
                 "sensor countline metadata",
