@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import concurrent.futures
 import json
+import os
 import sys
 import threading
 import urllib.parse
@@ -22,7 +23,7 @@ WARNINGS = ["Do not infer coverage outside the listed batch/date scope.", "Prese
 DETAIL_TIMEOUT_SECONDS = 2
 DETAIL_WORKERS = 8
 DETAIL_SCAN_CAP = 24
-LIST_TIMEOUT_SECONDS = 3
+LIST_TIMEOUT_SECONDS = 8
 DETAIL_THREAD_STACK_BYTES = 1024 * 1024
 
 
@@ -107,6 +108,11 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
+    # MPI pages are large enough to need a realistic read timeout, but repeating
+    # that timeout across the shared proxy's default three retries recreates the
+    # old minute-long stall. One bounded proxy retry keeps the complete command
+    # below the MCP runtime while still trying a second route after direct access.
+    os.environ["PROXY_RETRIES"] = "1"
     args = _parser().parse_args()
     try:
         if not 1 <= args.limit <= 100:
