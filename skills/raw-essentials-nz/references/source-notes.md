@@ -2,7 +2,7 @@
 
 - Primary owner: Raw Essentials
 - Primary source: https://rawessentials.co.nz
-- Declared outbound hosts: rawessentials.co.nz
+- Declared outbound hosts: rawessentials.co.nz,www.rawessentials.co.nz
 - Access mode: html-readonly
 - Authentication: none
 - Last verified: 2026-07-19

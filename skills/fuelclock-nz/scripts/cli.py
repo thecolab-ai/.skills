@@ -18,7 +18,8 @@ from typing import Any
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
 import nzfetch  # noqa: E402
 
-BASE_URL = "https://fuelclock.nz"
+BASE_URL = "https://www.fuelclock.nz"
+ALLOWED_HOSTS = {"fuelclock.nz", "www.fuelclock.nz"}
 UA = "fuelclock-nz-skill/1.0 (+https://github.com/thecolab-ai/.skills)"
 DEFAULT_TIMEOUT = 10
 
@@ -40,7 +41,12 @@ def die(message: str, code: int = 1) -> None:
 def request_json(path: str, timeout: int = DEFAULT_TIMEOUT) -> Any:
     url = f"{BASE_URL}{path}"
     try:
-        body, _ct, _final = nzfetch.fetch_bytes(url, timeout=timeout, accept="application/json")
+        body, _ct, _final = nzfetch.fetch_bytes(
+            url,
+            timeout=timeout,
+            accept="application/json",
+            allowed_hosts=ALLOWED_HOSTS,
+        )
     except nzfetch.Blocked as e:
         die(f"network error calling {url}: {e}")
     except nzfetch.FetchError as e:

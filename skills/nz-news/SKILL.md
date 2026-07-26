@@ -18,7 +18,7 @@ metadata:
   thecolab.skill_type: "html-readonly"
   thecolab.pack: "nz-commercial-web"
   thecolab.source_url: "https://rss.nzherald.co.nz/rss/xml/nzhrsscid_000000001.xml"
-  thecolab.allowed_domains: "rss.nzherald.co.nz,thespinoff.co.nz,www.interest.co.nz,www.newsroom.co.nz,www.rnz.co.nz,www.stuff.co.nz"
+  thecolab.allowed_domains: "rss.nzherald.co.nz,thespinoff.co.nz,www.interest.co.nz,www.newsroom.co.nz,www.nzherald.co.nz,www.rnz.co.nz,www.stuff.co.nz"
   thecolab.last_verified: "2026-07-19"
   thecolab.health: "healthy"
   thecolab.maintainer: "@adam91holt"

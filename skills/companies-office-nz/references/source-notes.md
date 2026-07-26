@@ -2,7 +2,7 @@
 
 - Primary owner: New Zealand Companies Office
 - Primary source: https://app.companiesoffice.govt.nz/companies/app
-- Declared outbound hosts: app.companiesoffice.govt.nz
+- Declared outbound hosts: app.companiesoffice.govt.nz,www.companiesoffice.govt.nz
 - Access mode: public-api
 - Authentication: none
 - Last verified: 2026-07-19

@@ -2,7 +2,7 @@
 
 - Primary owner: Baby On The Move
 - Primary source: https://babyonthemove.co.nz/
-- Declared outbound hosts: babyonthemove.co.nz,www.babycity.co.nz,www.dimples.co.nz,www.naturebaby.co.nz
+- Declared outbound hosts: babyonthemove.co.nz,www.babyonthemove.co.nz,www.babycity.co.nz,www.dimples.co.nz,www.naturebaby.co.nz
 - Access mode: html-readonly
 - Authentication: none
 - Last verified: 2026-07-19

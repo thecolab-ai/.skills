@@ -41,6 +41,8 @@ def test_price_rows_fixture():
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
+    assert module.BASE_URL == "https://www.fuelclock.nz"
+    assert module.ALLOWED_HOSTS == {"fuelclock.nz", "www.fuelclock.nz"}
     rows = module.select_price_rows(
         [
             {"type": "Diesel", "price": 1.99, "stationCount": 20},

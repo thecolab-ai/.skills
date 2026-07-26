@@ -34,7 +34,7 @@ CONFIGS = {
     },
     "baby-on-the-move-nz": {
         "label": "Baby On The Move NZ",
-        "base": "https://babyonthemove.co.nz",
+        "base": "https://www.babyonthemove.co.nz",
         "store_path": "/pages/store-locations",
     },
 }

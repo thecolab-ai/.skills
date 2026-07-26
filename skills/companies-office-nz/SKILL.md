@@ -18,7 +18,7 @@ metadata:
   thecolab.skill_type: "public-api"
   thecolab.pack: "nz-public-data"
   thecolab.source_url: "https://app.companiesoffice.govt.nz/companies/app"
-  thecolab.allowed_domains: "app.companiesoffice.govt.nz"
+  thecolab.allowed_domains: "app.companiesoffice.govt.nz,www.companiesoffice.govt.nz"
   thecolab.last_verified: "2026-07-19"
   thecolab.health: "healthy"
   thecolab.maintainer: "@adam91holt"

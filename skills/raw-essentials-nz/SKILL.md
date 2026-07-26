@@ -18,7 +18,7 @@ metadata:
   thecolab.skill_type: "html-readonly"
   thecolab.pack: "nz-commercial-web"
   thecolab.source_url: "https://rawessentials.co.nz"
-  thecolab.allowed_domains: "rawessentials.co.nz"
+  thecolab.allowed_domains: "rawessentials.co.nz,www.rawessentials.co.nz"
   thecolab.last_verified: "2026-07-19"
   thecolab.health: "healthy"
   thecolab.maintainer: "@adam91holt"

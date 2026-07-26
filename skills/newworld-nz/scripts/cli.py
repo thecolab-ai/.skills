@@ -27,6 +27,7 @@ UA = os.environ.get(
     "NEWWORLD_USER_AGENT",
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
 )
+MAX_SEARCH_LIMIT = 50
 
 
 def die(msg: str, code: int = 1) -> None:
@@ -188,6 +189,7 @@ def product_summary(p: dict[str, Any]) -> str:
 
 
 def search_payload(query: str, store_id: str, limit: int, page: int, promo_only: bool = False, category: str | None = None) -> dict[str, Any]:
+    limit = max(1, min(int(limit), MAX_SEARCH_LIMIT))
     filters = [f"stores:{store_id}"]
     if promo_only:
         filters.append(f"onPromotion:{store_id}")
@@ -225,8 +227,16 @@ def search_payload(query: str, store_id: str, limit: int, page: int, promo_only:
 
 
 def cmd_search(args: argparse.Namespace) -> None:
-    data = api("POST", "/search/paginated/products", search_payload(args.query, args.store_id, args.limit, args.page, args.promo))
+    effective_limit = max(1, min(int(args.limit), MAX_SEARCH_LIMIT))
+    data = api("POST", "/search/paginated/products", search_payload(args.query, args.store_id, effective_limit, args.page, args.promo))
     products = data.get("products") or []
+    data["_thecolab"] = {
+        "store_id": args.store_id,
+        "requested_limit": args.limit,
+        "effective_limit": effective_limit,
+        "limit_clamped": effective_limit != args.limit,
+        "on_promotion_facet_scope": "querying_store_assortment",
+    }
     if args.json:
         print_json(data)
         return
@@ -247,7 +257,44 @@ def normalize_product_id(pid: str) -> str:
 def cmd_product(args: argparse.Namespace) -> None:
     ids = [normalize_product_id(x) for x in args.product_ids]
     data = api("POST", f"/store/{args.store_id}/decorateProducts", {"productIds": ids})
-    products = data.get("products") or []
+    if not isinstance(data, dict):
+        data = {}
+    products = [
+        product
+        for product in (data.get("products") or [])
+        if isinstance(product, dict)
+        and any(
+            product.get(field) is not None
+            for field in (
+                "name",
+                "displayName",
+                "singlePrice",
+                "averagePrice",
+                "promotions",
+                "categoryTrees",
+            )
+        )
+    ]
+    data["products"] = products
+    found_ids = {
+        normalize_product_id(
+            str(
+                product.get("productId")
+                or product.get("productID")
+                or product.get("objectID")
+                or ""
+            )
+        )
+        for product in products
+        if isinstance(product, dict)
+    }
+    missing_ids = [product_id for product_id in ids if product_id not in found_ids]
+    data["found"] = bool(products) if len(ids) == 1 else None
+    data["found_count"] = len(products)
+    data["requested_product_ids"] = ids
+    data["missing_product_ids"] = missing_ids
+    if not products:
+        data["reason"] = "not_ranged"
     if args.json:
         print_json(data)
         return

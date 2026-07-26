@@ -121,6 +121,25 @@ def test_cases():
 results.append(test("cases lists case register entries", test_cases))
 
 
+def test_cases_keyword():
+    r = run(["cases", "--keyword", "grocery", "--limit", "5", "--json"])
+    if r.returncode != 0:
+        if is_transient(r.stderr):
+            print(f"  [SKIP] upstream unavailable: {r.stderr.strip()[:140]}")
+            return True
+        print(f"  stderr: {r.stderr[:200]}")
+        return False
+    payload = json.loads(r.stdout)
+    if not cards_ok(r.stdout) or "/case-register/?" not in payload.get("source", ""):
+        print(f"  stdout: {r.stdout[:200]}")
+        print("  Expected keyword filtering through the canonical case register")
+        return False
+    return True
+
+
+results.append(test("cases --keyword uses case-register filtering", test_cases_keyword))
+
+
 def test_news():
     r = run(["news", "--limit", "5", "--json"])
     if r.returncode != 0:

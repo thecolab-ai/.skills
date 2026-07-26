@@ -47,7 +47,25 @@ def test_search_payload_fixture():
     assert params["hitsPerPage"] == 8
     assert params["page"] == 2
     assert "onPromotion:true" not in params["filters"]
+    capped = module.search_payload("bread", "PAK-001", 100, 1)
+    assert capped["algoliaQuery"]["hitsPerPage"] == 50
     assert module.normalize_product_id("12345") == "12345-EA-000"
+    import argparse
+    import contextlib
+    import io
+    module.api = lambda *_args, **_kwargs: {"productId": "5000527-EA-000"}
+    output = io.StringIO()
+    with contextlib.redirect_stdout(output):
+        module.cmd_product(
+            argparse.Namespace(
+                product_ids=["5000527-EA-000"],
+                store_id="QUEENSTOWN",
+                json=True,
+            )
+        )
+    missing = json.loads(output.getvalue())
+    assert missing["found"] is False
+    assert missing["reason"] == "not_ranged"
     print("[PASS] fixture PAK'nSAVE search payload normalisation")
     return True
 
@@ -88,6 +106,9 @@ def test_search():
     if not isinstance(search.get("products"), list):
         print(f"  stdout: {result.stdout[:200]}")
         print("  Expected PAK'nSAVE search JSON to include products[]")
+        return False
+    if search.get("_thecolab", {}).get("on_promotion_facet_scope") != "querying_store_assortment":
+        print("  Expected explicit querying-store promotion facet scope")
         return False
     return True
 

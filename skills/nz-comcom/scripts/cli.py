@@ -135,13 +135,13 @@ def cmd_search(args: argparse.Namespace) -> int:
 
 
 def cmd_cases(args: argparse.Namespace) -> int:
+    params = {"size": max(10, min(args.limit, 100))}
     if args.keyword:
-        url = f"{BASE}/search/?q=" + urllib.parse.quote(args.keyword)
-        cards = [c for c in parse_cards(fetch(url), 50) if "/case-register/" in c["url"]][: args.limit]
-        source = url
+        params["q"] = args.keyword
+        source = f"{BASE}/case-register/?" + urllib.parse.urlencode(params)
     else:
-        source = f"{BASE}/case-register/case-register-entries/"
-        cards = parse_cards(fetch(source), args.limit)
+        source = f"{BASE}/case-register/?" + urllib.parse.urlencode(params)
+    cards = parse_cards(fetch(source), args.limit)
     payload = {"keyword": args.keyword, "source": source, "count": len(cards), "results": cards}
     if args.json:
         print(json.dumps(payload, indent=2, ensure_ascii=False))

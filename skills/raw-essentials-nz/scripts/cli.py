@@ -4,7 +4,7 @@ from __future__ import annotations
 import argparse, datetime as dt, html, json, math, re, sys, urllib.error, urllib.parse, urllib.request
 from html.parser import HTMLParser
 
-BASE="https://rawessentials.co.nz"; UA="TheColabSkills/1.0 (+https://github.com/thecolab-ai/.skills; read-only)"; MAX=50; MAX_BYTES=5_000_000
+BASE="https://www.rawessentials.co.nz"; UA="TheColabSkills/1.0 (+https://github.com/thecolab-ai/.skills; read-only)"; MAX=50; MAX_BYTES=5_000_000
 class CliError(Exception): pass
 def allowed(url):
  try:p=urllib.parse.urlparse(url);port=p.port

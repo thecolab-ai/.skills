@@ -13,7 +13,18 @@ import pathlib
 import re
 import shutil
 import sys
+import tempfile
 from typing import Any
+
+# DuckDB's Python wheel can initialise a native BLAS/OpenMP worker pool while it
+# is imported.  Under the MCP process address-space limit that eager pool can
+# abort before DuckDB's SQL-level `threads` setting is applied.  Keep native
+# libraries single-threaded for this CLI; each MCP request already runs in its
+# own process and parallel requests provide the desired concurrency.
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
 import nzfetch  # noqa: E402
@@ -49,6 +60,9 @@ ALLOWED_HOSTS = {"assets-prod.grocer.nz", "grocer.nz", "meilisearch.grocer.nz"}
 CACHE = pathlib.Path(os.environ.get("GROCER_NZ_CACHE", "~/.cache/grocer-nz")).expanduser()
 HEADERS = {"Referer": "https://grocer.nz/"}
 MAX_LIMIT = 100
+DUCKDB_MEMORY_LIMIT = os.environ.get("GROCER_NZ_DUCKDB_MEMORY_LIMIT", "128MB")
+DUCKDB_THREADS = max(1, min(int(os.environ.get("GROCER_NZ_DUCKDB_THREADS", "1")), 2))
+DUCKDB_MAX_TEMP = os.environ.get("GROCER_NZ_DUCKDB_MAX_TEMP", "512MB")
 
 
 def http_get(url: str, *, headers: dict[str, str] | None = None) -> bytes:
@@ -84,7 +98,17 @@ def _is_missing(err: nzfetch.FetchError) -> bool:
 def download(url: str, path: pathlib.Path, *, force: bool = False) -> pathlib.Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     if force or not path.exists() or path.stat().st_size == 0:
-        path.write_bytes(http_get(url))
+        body = http_get(url)
+        fd, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+        temporary = pathlib.Path(temporary_name)
+        try:
+            with os.fdopen(fd, "wb") as stream:
+                stream.write(body)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temporary, path)
+        finally:
+            temporary.unlink(missing_ok=True)
     return path
 
 
@@ -117,7 +141,18 @@ def history_file(product_id: int, force: bool = False) -> pathlib.Path | None:
 def con(force: bool = False):
     ensure_dependencies()
     db = base_db(force=force)
-    c = duckdb.connect(":memory:")
+    temp_dir = CACHE / "duckdb-tmp"
+    temp_dir.mkdir(parents=True, exist_ok=True)
+    c = duckdb.connect(
+        ":memory:",
+        config={
+            "threads": str(DUCKDB_THREADS),
+            "memory_limit": DUCKDB_MEMORY_LIMIT,
+            "temp_directory": str(temp_dir),
+            "max_temp_directory_size": DUCKDB_MAX_TEMP,
+            "preserve_insertion_order": "false",
+        },
+    )
     sql = "attach " + sql_quote_path(db) + " as base (READ_ONLY)"
     c.execute(sql)
     return c

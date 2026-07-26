@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
-  "last_verified": "2026-07-24",
+  "last_verified": "2026-07-26",
   "skill_count": 138,
   "skills": [
     {
@@ -186,6 +186,7 @@
       "pack": "nz-commercial-web",
       "allowed_domains": [
         "babyonthemove.co.nz",
+        "www.babyonthemove.co.nz",
         "www.babycity.co.nz",
         "www.dimples.co.nz",
         "www.naturebaby.co.nz"
@@ -639,7 +640,8 @@
       "skill_type": "public-api",
       "pack": "nz-public-data",
       "allowed_domains": [
-        "app.companiesoffice.govt.nz"
+        "app.companiesoffice.govt.nz",
+        "www.companiesoffice.govt.nz"
       ],
       "last_verified": "2026-07-19",
       "health": "healthy",
@@ -1099,9 +1101,10 @@
       "skill_type": "public-api",
       "pack": "nz-public-data",
       "allowed_domains": [
-        "fuelclock.nz"
+        "fuelclock.nz",
+        "www.fuelclock.nz"
       ],
-      "last_verified": "2026-07-19",
+      "last_verified": "2026-07-26",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
@@ -2502,6 +2505,7 @@
         "thespinoff.co.nz",
         "www.interest.co.nz",
         "www.newsroom.co.nz",
+        "www.nzherald.co.nz",
         "www.rnz.co.nz",
         "www.stuff.co.nz"
       ],
@@ -3258,7 +3262,8 @@
       "skill_type": "html-readonly",
       "pack": "nz-commercial-web",
       "allowed_domains": [
-        "rawessentials.co.nz"
+        "rawessentials.co.nz",
+        "www.rawessentials.co.nz"
       ],
       "last_verified": "2026-07-19",
       "health": "healthy",

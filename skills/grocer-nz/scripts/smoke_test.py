@@ -83,9 +83,18 @@ def main() -> None:
     assert "PAK'nSAVE Papakura" in prices
     assert "$" in prices
 
-    history = run("history", "5461", "--store-query", "Papakura", "--limit", "5")
+    # This exact product/store pair previously aborted under the public MCP's
+    # 320 MiB address-space limit when DuckDB initialised unconstrained workers.
+    history = run("history", "5452", "--store-id", "230", "--limit", "40")
     assert "$" in history
     assert "Papakura" in history
+
+    regex_query = json.loads(run(
+        "query",
+        "select count(*) as n from products where regexp_matches(name, 'milk', 'i')",
+        "--json",
+    ))
+    assert regex_query["rows"][0]["n"] > 0
 
     # Guarded read-only query: a priced join returns rows.
     q = json.loads(run(

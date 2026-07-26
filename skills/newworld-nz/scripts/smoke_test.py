@@ -47,6 +47,8 @@ def test_search_payload_fixture():
     assert params["hitsPerPage"] == 12
     assert params["page"] == 1
     assert "onPromotion:NW-001" in params["filters"]
+    capped = module.search_payload("milk", "NW-001", 100, 1)
+    assert capped["algoliaQuery"]["hitsPerPage"] == 50
     assert module.normalize_product_id("12345") == "12345-EA-000"
     print("[PASS] fixture New World search payload normalisation")
     return True
@@ -88,6 +90,9 @@ def test_search():
     if not isinstance(search.get("products"), list):
         print(f"  stdout: {result.stdout[:200]}")
         print("  Expected New World search JSON to include products[]")
+        return False
+    if search.get("_thecolab", {}).get("on_promotion_facet_scope") != "querying_store_assortment":
+        print("  Expected explicit querying-store promotion facet scope")
         return False
     return True
 

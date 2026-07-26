@@ -56,6 +56,8 @@ def test_product_fixture():
     )
     assert record["sku"] == "705692"
     assert record["sale_price"] == 3.9
+    assert record["save_price"] == 0.6
+    assert record["save_percentage"] == 13.3
     assert record["is_special"] is True and record["in_stock"] is True
     assert record["category"] == "Fresh / Dairy"
     print("[PASS] fixture Woolworths product normalisation")
@@ -85,6 +87,9 @@ def test_search():
     if not isinstance(search.get("products"), list) or len(search["products"]) < 1:
         print(f"  stdout: {result.stdout[:200]}")
         print("  Expected Woolworths search JSON to include products[]")
+        return False
+    if not isinstance(search.get("raw_total"), int) or search["raw_total"] < len(search["products"]):
+        print("  Expected Woolworths search JSON to expose products.totalItems")
         return False
     sku = search["products"][0].get("sku")
     if sku:

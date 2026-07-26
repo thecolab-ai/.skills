@@ -18,8 +18,8 @@ metadata:
   thecolab.skill_type: "public-api"
   thecolab.pack: "nz-public-data"
   thecolab.source_url: "https://fuelclock.nz"
-  thecolab.allowed_domains: "fuelclock.nz"
-  thecolab.last_verified: "2026-07-19"
+  thecolab.allowed_domains: "fuelclock.nz,www.fuelclock.nz"
+  thecolab.last_verified: "2026-07-26"
   thecolab.health: "healthy"
   thecolab.maintainer: "@adam91holt"
 ---

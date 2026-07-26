@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import pathlib
 import sys
@@ -90,6 +91,23 @@ def category_from(item: dict[str, Any]) -> str:
     return ""
 
 
+def discount_percentage(original_price: Any, sale_price: Any) -> float | None:
+    try:
+        original = float(original_price)
+        sale = float(sale_price)
+    except (TypeError, ValueError):
+        return None
+    if (
+        not math.isfinite(original)
+        or not math.isfinite(sale)
+        or original <= 0
+        or sale < 0
+        or sale >= original
+    ):
+        return None
+    return round((original - sale) / original * 100, 1)
+
+
 def parse_product(item: dict[str, Any]) -> dict[str, Any]:
     price = item.get("price") or {}
     size = item.get("size") or {}
@@ -104,7 +122,17 @@ def parse_product(item: dict[str, Any]) -> dict[str, Any]:
         image = None
     sale_price = price.get("salePrice")
     original_price = price.get("originalPrice")
-    is_special = bool(price.get("isSpecial") or price.get("isClubPrice"))
+    computed_discount = discount_percentage(original_price, sale_price)
+    is_special = bool(
+        price.get("isSpecial")
+        or price.get("isClubPrice")
+        or computed_discount is not None
+    )
+    save_price = (
+        round(float(original_price) - float(sale_price), 2)
+        if computed_discount is not None
+        else price.get("savePrice")
+    )
     return {
         "sku": str(item.get("sku") or ""),
         "name": item.get("name") or "",
@@ -113,8 +141,12 @@ def parse_product(item: dict[str, Any]) -> dict[str, Any]:
         "slug": item.get("slug") or "",
         "price": original_price,
         "sale_price": sale_price,
-        "save_price": price.get("savePrice"),
-        "save_percentage": price.get("savePercentage"),
+        "save_price": save_price,
+        "save_percentage": (
+            computed_discount
+            if computed_discount is not None
+            else price.get("savePercentage")
+        ),
         "is_special": is_special,
         "is_club_price": bool(price.get("isClubPrice")),
         "unit": item.get("unit") or "Each",
@@ -165,14 +197,20 @@ def products_query(target: str, *, search: str | None = None, category_id: str |
     payload = request_json("/products", params=params)
     products = product_items(payload)[:limit]
     elapsed_ms = round((time.perf_counter() - started) * 1000)
+    raw_total = nested(payload or {}, "products", "totalItems")
+    if raw_total is None:
+        raw_total = nested(payload or {}, "products", "totalRecordCount")
     return {
         "target": target,
         "query": search,
         "category_id": category_id,
+        "requested_limit": limit,
+        "source_page_size": size,
         "count": len(products),
         "elapsed_ms": elapsed_ms,
         "products": products,
-        "raw_total": nested(payload or {}, "products", "totalRecordCount"),
+        "raw_total": raw_total,
+        "truncated": isinstance(raw_total, int) and len(products) < raw_total,
     }
 
 

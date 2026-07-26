@@ -18,7 +18,7 @@ metadata:
   thecolab.skill_type: "html-readonly"
   thecolab.pack: "nz-commercial-web"
   thecolab.source_url: "https://babyonthemove.co.nz/"
-  thecolab.allowed_domains: "babyonthemove.co.nz,www.babycity.co.nz,www.dimples.co.nz,www.naturebaby.co.nz"
+  thecolab.allowed_domains: "babyonthemove.co.nz,www.babyonthemove.co.nz,www.babycity.co.nz,www.dimples.co.nz,www.naturebaby.co.nz"
   thecolab.last_verified: "2026-07-19"
   thecolab.health: "healthy"
   thecolab.maintainer: "@adam91holt"

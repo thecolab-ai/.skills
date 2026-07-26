@@ -95,3 +95,6 @@ python3 skills/newworld-nz/scripts/cli.py product 5201479 --json
 - Uses the same guest-token flow as the public website and caches tokens under `~/.cache/newworld-cli/guest-token.json`
 - Endpoint shapes can change; retry with a fresh token before assuming data is unavailable
 - `--json` output is intended for exact product matching, basket comparison, and agent workflows
+- Product search limits above 50 are clamped to the upstream maximum and reported in `_thecolab.effective_limit`
+- The upstream `onPromotion` facet is scoped to the querying store's assortment; JSON output declares this as `_thecolab.on_promotion_facet_scope`
+- Product decoration reports `found`, `missing_product_ids`, and `reason: "not_ranged"` when an item is not ranged by the selected store
