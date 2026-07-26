@@ -19,7 +19,7 @@ BASE = "https://www.mpi.govt.nz/food-safety-home/food-recalls-and-complaints/rec
 HOSTS = {"www.mpi.govt.nz"}
 WARNINGS = ["Do not infer coverage outside the listed batch/date scope.", "Preserve exact allergen names and official consumer actions."]
 DETAIL_TIMEOUT_SECONDS = 2
-DETAIL_WORKERS = 4
+DETAIL_WORKERS = 8
 DETAIL_SCAN_CAP = 24
 LIST_TIMEOUT_SECONDS = 8
 
