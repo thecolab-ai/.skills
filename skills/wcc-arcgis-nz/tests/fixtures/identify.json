@@ -1,0 +1,13 @@
+{
+  "results": [
+    {
+      "layerId": 10,
+      "layerName": "Liquefaction potential",
+      "displayFieldName": "HAZARD_CLASS",
+      "value": "Synthetic",
+      "attributes": {"OBJECTID": "2", "HAZARD_CLASS": "Synthetic"},
+      "geometryType": "esriGeometryPolygon",
+      "geometry": {"rings": [[[174.7, -41.3], [174.8, -41.3], [174.7, -41.3]]]}
+    }
+  ]
+}

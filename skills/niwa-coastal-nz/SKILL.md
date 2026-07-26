@@ -28,10 +28,10 @@ metadata:
 
 ## Goal
 
-Search and query NIWA's public ArcGIS open data — the national Coastal
+Discover and query NIWA's public ArcGIS open data — the national Coastal
 Sensitivity Index, beach exposure, and coastal classification layers among
-~1,400 open items — through a deterministic read-only CLI with human and JSON
-output.
+~1,400 open items — through source-native catalogue, metadata, feature-query,
+and MapServer identify operations.
 
 ## Use this when
 
@@ -52,13 +52,24 @@ output.
 
 ```bash
 python3 skills/niwa-coastal-nz/scripts/cli.py search "coastal sensitivity" --limit 5
+python3 skills/niwa-coastal-nz/scripts/cli.py item c894b53b102f4f9db55278f7572ca4f6 --json
 python3 skills/niwa-coastal-nz/scripts/cli.py layers c894b53b102f4f9db55278f7572ca4f6
+python3 skills/niwa-coastal-nz/scripts/cli.py describe c894b53b102f4f9db55278f7572ca4f6 --layer-id 0 --json
 python3 skills/niwa-coastal-nz/scripts/cli.py query c894b53b102f4f9db55278f7572ca4f6 --bbox "174.5,-41.5,175.2,-40.9" --limit 20 --json
+python3 skills/niwa-coastal-nz/scripts/cli.py query c894b53b102f4f9db55278f7572ca4f6 --count --json
+python3 skills/niwa-coastal-nz/scripts/cli.py identify 2e2f8ea5ea31453e808b36b2a1ca43a0 --point "174.78,-41.29" --no-geometry --json
 ```
 
-- `search KEYWORD [--type TYPE] [--limit N] [--json]` — org-scoped catalogue search, newest first
+- `search KEYWORD [--type TYPE] [--limit N] [--start N] [--json]` — org-scoped catalogue search, newest first; JSON preserves ArcGIS `start` and `next_start`
+- `item ITEM_ID [--json]` — normalized title, type, owner, organisation, access, licence, description, tags, timestamps, size, raw item URL, and a verified service URL only for Feature/Map Services
 - `layers ITEM_OR_URL [--json]` — layers/tables of a verified NIWA Feature/Map service
-- `query LAYER [--layer-id N] [--where SQL] [--bbox minLon,minLat,maxLon,maxLat] [--fields F1,F2] [--limit N] [--json]` — GeoJSON features; LAYER is a verified NIWA item id, HTTPS service URL, or HTTPS layer URL
+- `describe SERVICE [--layer-id N] [--json]` — normalized service/layer fields, aliases, types, descriptions/units when supplied, extent, spatial reference, capabilities, geometry type, object ID field, and record limit
+- `query LAYER [--layer-id N] [--where SQL] [--bbox minLon,minLat,maxLon,maxLat] [--fields F1,F2] [--limit N] [--count | --ids-only] [--no-geometry] [--offset N] [--order-by FIELDS] [--geometry-precision N] [--max-allowable-offset N] [--json]` — GeoJSON by default, or normalized count/ID envelopes
+- `identify SERVICE --point LON,LAT [--layer-id N] [--tolerance N] [--no-geometry] [--json]` — raw MapServer identify results using a WGS84 point
+
+`--count` and `--ids-only` are mutually exclusive. Query offset, ordering,
+geometry precision, allowable offset, and geometry suppression map directly to
+the ArcGIS REST controls; they do not add scientific interpretation.
 
 ## Notes
 
@@ -67,12 +78,21 @@ python3 skills/niwa-coastal-nz/scripts/cli.py query c894b53b102f4f9db55278f7572c
   hub-wide search APIs return a global catalogue and are deliberately not used
 - Layer queries require HTTPS and either a NIWA-owned host
   (`gis.niwa.co.nz`) or an Esri service path under the NIWA tenant; anything
-  else is refused (exit 7)
+  else is refused (exit 7). Service paths and final redirects are revalidated.
+- `--point` is always `LON,LAT` and `--bbox` is always
+  `minLon,minLat,maxLon,maxLat`, in WGS84. Coordinates must be finite and in
+  longitude/latitude range. For Wellington, both
+  `--point "174.78,-41.29"` and `--point=174.78,-41.29` forms work.
+- `identify` is a raw MapServer identify primitive, not a hazard assessment.
+  Its tolerance is in display pixels and results retain upstream layer,
+  attribute, and geometry values.
 - Useful verified items: CSI erosion `c894b53b102f4f9db55278f7572ca4f6`;
   the COAST folder on `gis.niwa.co.nz/server/rest/services` carries the
   coastal classification MapServers
 - `truncated: true` means the server transfer limit was hit — narrow with
-  `--where`/`--bbox`
+  `--where`/`--bbox`, or page with `--offset`
+- Errors distinguish invalid input, blocked host/organisation, upstream
+  failure, malformed response, and legitimate empty results as JSON on stderr.
 
 ## Resources
 

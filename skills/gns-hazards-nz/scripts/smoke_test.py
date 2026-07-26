@@ -75,10 +75,57 @@ def main() -> int:
             "mmi": 1, "pga": 4, "pgv": 7, "psa0.3": 10, "psa1.0": 13, "psa3.0": 16,
         }, "measure→layer map must match the documented service layout"
 
+    def fixture_archive_metadata():
+        events = cli.normalise_events(
+            json.loads((FIXTURES / "events.json").read_text(encoding="utf-8")),
+            year=2026,
+            source_url="https://shakinglayers.geonet.org.nz/api/v1/events?year=2026",
+        )
+        assert events["event_count"] == 2
+        versions = cli.normalise_versions(
+            json.loads((FIXTURES / "versions.json").read_text(encoding="utf-8")),
+            requested_event_id="771645",
+            source_url="https://shakinglayers.geonet.org.nz/api/v1/events/771645",
+        )
+        assert versions["versions"][0]["type"] == "reviewed"
+        files = cli.normalise_event_files(
+            json.loads((FIXTURES / "event-files.json").read_text(encoding="utf-8")),
+            event_id="771645",
+            requested_version="latest",
+        )
+        assert files["versionpath"] == "2023-09-07T22:28:40-reviewed"
+        assert {row["measure"] for row in files["available_measures"]} == {
+            "mmi", "pga", "pgv", "psa0.3", "psa1.0", "psa3.0",
+        }
+
+    def fixture_describe_and_controls():
+        metadata = cli.normalise_description(
+            json.loads((FIXTURES / "layer-description.json").read_text(encoding="utf-8")),
+            service="faults",
+            layer_id=0,
+            layer_url=cli.FAULTS_SERVICE + "/0",
+            source_url=cli.FAULTS_SERVICE + "/0?f=json",
+        )
+        assert metadata["object_id_field"] == "objectid"
+        assert metadata["extent"]["spatial_reference"]["wkid"] == 4326
+        parser = cli.build_parser()
+        args = parser.parse_args(
+            [
+                "faults", "--count", "--offset", "10", "--order-by", "OBJECTID DESC",
+                "--geometry-precision", "4", "--max-allowable-offset", "0.25",
+            ]
+        )
+        params = cli.build_query_params(args)
+        assert params["returnCountOnly"] == "true"
+        assert params["resultOffset"] == 10
+        assert params["orderByFields"] == "OBJECTID DESC"
+
     results.append(check("fixture service layer parser", fixture_service_layers))
     results.append(check("fixture bbox validation", fixture_bbox))
     results.append(check("fixture shaking contour extraction", fixture_shaking_contours))
     results.append(check("fixture measure layer map", fixture_measure_map))
+    results.append(check("fixture archive metadata", fixture_archive_metadata))
+    results.append(check("fixture describe and query controls", fixture_describe_and_controls))
 
     def live(name: str, args: list[str], assertion) -> None:
         completed = subprocess.run(
@@ -111,14 +158,42 @@ def main() -> int:
                 lambda d: any(l["id"] == cli.SHAKING_MEASURES["mmi"] for l in d["layers"]),
             )
             live(
-                "fault trace query",
-                ["faults", "--bbox", "174.6,-41.5,175.1,-41.0", "--limit", "3", "--json"],
-                lambda d: d["feature_count"] >= 1 and all("properties" in f for f in d["features"]),
+                "recent ShakingLayers events",
+                ["events", "--json"],
+                lambda d: d["event_count"] >= 1 and isinstance(d["event_ids"][0], str),
+            )
+            recent = subprocess.run(
+                [sys.executable, str(CLI), "events", "--json"],
+                text=True,
+                capture_output=True,
+                timeout=90,
+                check=False,
+            )
+            if recent.returncode == 0:
+                event_id = json.loads(recent.stdout)["event_ids"][0]
+                live(
+                    "event versions",
+                    ["versions", event_id, "--json"],
+                    lambda d: d["event_id"] == event_id and d["version_count"] >= 1,
+                )
+                live(
+                    "event files",
+                    ["event-files", event_id, "--version", "latest", "--json"],
+                    lambda d: d["event_id"] == event_id and d["file_count"] >= 1,
+                )
+            elif "network error" in recent.stderr or "upstream unavailable" in recent.stderr:
+                print(f"[SKIP] live archive metadata: {recent.stderr.strip()}")
+            else:
+                raise AssertionError(f"events exit {recent.returncode}: {recent.stderr.strip()}")
+            live(
+                "fault layer description",
+                ["describe", "faults", "--layer-id", "0", "--json"],
+                lambda d: d["object_id_field"] and isinstance(d["fields"], list),
             )
             live(
-                "shaking mmi contours",
-                ["shaking", "--measure", "mmi", "--limit", "3", "--json"],
-                lambda d: isinstance(d["features"], list) and d["measure"] == "mmi",
+                "bounded fault count",
+                ["faults", "--bbox", "174.6,-41.5,175.1,-41.0", "--count", "--json"],
+                lambda d: isinstance(d["count"], int) and d["count"] >= 0,
             )
             return True
         except Exception as exc:  # noqa: BLE001

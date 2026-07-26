@@ -1,0 +1,15 @@
+{
+  "id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "title": "Synthetic Wellington hazard viewer",
+  "type": "Web Mapping Application",
+  "owner": "synthetic_wcc",
+  "orgId": "CPYspmTk3abe6d7i",
+  "access": "public",
+  "licenseInfo": "<p>CC BY 4.0</p>",
+  "description": "<p>Synthetic owned application metadata.</p>",
+  "tags": ["viewer", "hazard"],
+  "created": 1730000000000,
+  "modified": 1750000000000,
+  "size": 1234,
+  "url": "https://wcc.maps.arcgis.com/apps/experiencebuilder/experience/?id=synthetic"
+}

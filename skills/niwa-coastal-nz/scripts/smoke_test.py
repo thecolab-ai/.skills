@@ -45,6 +45,22 @@ def main() -> int:
         assert items[1]["url"] is None, "items without a service URL must stay None, not become ''"
         assert items[1]["tags"] == []
 
+    def fixture_capability_shapes():
+        item = json.loads((FIXTURES / "item.json").read_text(encoding="utf-8"))
+        cli.validate_item_org(item, item["id"])
+        metadata = cli.normalise_catalogue_item(item)
+        assert metadata["licence"] == "CC BY 4.0"
+        assert metadata["service_url"].endswith("/FeatureServer")
+
+        layer = json.loads((FIXTURES / "layer.json").read_text(encoding="utf-8"))
+        description = cli.normalise_description(layer)
+        assert description["object_id_field"] == "OBJECTID"
+        assert description["fields"][1]["alias"] == "Exposure class"
+        assert description["spatial_reference"]["wkid"] == 2193
+
+        lon, lat = cli.parse_point("174.78,-41.29")
+        assert (lon, lat) == (174.78, -41.29)
+
     def fixture_host_allowlist():
         cli.check_layer_host("https://services3.arcgis.com/fp1tibNcN9mbExhG/arcgis/rest/services/X/FeatureServer")
         cli.check_layer_host("https://gis.niwa.co.nz/server/rest/services/COAST/Synthetic/MapServer")
@@ -82,6 +98,7 @@ def main() -> int:
             raise AssertionError("inverted bbox was accepted")
 
     results.append(check("fixture search item normaliser", fixture_search_normalise))
+    results.append(check("fixture item/describe/point capabilities", fixture_capability_shapes))
     results.append(check("fixture layer host allowlist", fixture_host_allowlist))
     results.append(check("fixture item org validation", fixture_org_validation))
     results.append(check("fixture bbox validation", fixture_bbox))
@@ -108,8 +125,17 @@ def main() -> int:
         try:
             live(
                 "catalogue search",
-                ["search", "coastal sensitivity", "--limit", "3", "--json"],
-                lambda d: d["total_matches"] >= 1 and all(i["id"] for i in d["items"]),
+                ["search", "coastal sensitivity", "--limit", "2", "--start", "1", "--json"],
+                lambda d: d["total_matches"] >= 1
+                and d["start"] == 1
+                and "next_start" in d
+                and all(i["id"] for i in d["items"]),
+            )
+            live(
+                "CSI erosion item metadata",
+                ["item", "c894b53b102f4f9db55278f7572ca4f6", "--json"],
+                lambda d: d["item"]["organisation"] == "fp1tibNcN9mbExhG"
+                and bool(d["item"]["service_url"]),
             )
             live(
                 "CSI erosion service layers",
@@ -117,15 +143,35 @@ def main() -> int:
                 lambda d: bool(d["layers"]),
             )
             live(
-                "CSI erosion layer query",
+                "CSI erosion layer describe",
+                [
+                    "describe",
+                    "c894b53b102f4f9db55278f7572ca4f6",
+                    "--layer-id", "0",
+                    "--json",
+                ],
+                lambda d: d["description"]["object_id_field"] is not None,
+            )
+            live(
+                "CSI erosion layer count",
                 [
                     "query",
                     "c894b53b102f4f9db55278f7572ca4f6",
-                    "--limit", "2",
-                    "--fields", "OBJECTID",
+                    "--count",
                     "--json",
                 ],
-                lambda d: d["feature_count"] >= 1,
+                lambda d: d["kind"] == "query-count" and d["count"] >= 1,
+            )
+            live(
+                "beach exposure MapServer identify",
+                [
+                    "identify",
+                    "2e2f8ea5ea31453e808b36b2a1ca43a0",
+                    "--point", "174.78,-41.29",
+                    "--no-geometry",
+                    "--json",
+                ],
+                lambda d: d["kind"] == "identify" and isinstance(d["results"], list),
             )
             return True
         except Exception as exc:  # noqa: BLE001

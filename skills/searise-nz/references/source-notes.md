@@ -3,6 +3,7 @@
 - Primary owner: NZ SeaRise programme (Antarctic Research Centre at Victoria
   University of Wellington, GNS Science, NIWA; Takiwā hosts the public map)
 - Primary source: https://zenodo.org/records/11398538
+- Record API: https://zenodo.org/api/records/11398538
 - Declared outbound hosts: zenodo.org
 - Access mode: public-download
 - Authentication: none
@@ -20,6 +21,14 @@ Download URLs are `<record>/files/<name>` (a `?download=1` suffix is
 accepted but unnecessary). Zenodo serves anonymous requests and supports HTTP
 Range; a full `projections` call measured ~22 s in verification.
 
+The `record` command reads the small Zenodo JSON API response and normalizes
+the record ID, DOI, version, publication date, title, creators, licence, and
+file inventory. File entries retain the upstream key, byte size, checksum, and
+download URL. Record 11398538 does not declare a free-form
+`metadata.version`; Zenodo's zero-based `metadata.relations.version[].index`
+is surfaced as the one-based version (`2` → `"3"`). This metadata call does
+not download any dataset file.
+
 ## Column layout (verified 2026-07-24)
 
 `NZ_VLM_final_May24.csv`: `Site ID, Lon, Lat, Vertical Rate (mm/yr),
@@ -31,7 +40,9 @@ ids 0..N, 2 km coastal spacing. Negative rate = subsidence.
 `NZSeaRise_proj_*.csv`: `Confidence, site, year, 0.17, 0.5, 0.83, SSP,
 scenario`. Rows are block-ordered by (confidence, SSP/scenario, year) with
 all sites inside each block, so per-site extraction requires a full scan —
-there is no early exit. Values are metres of sea-level rise relative to the
+there is no early exit. Multi-site extraction builds one requested-ID lookup
+and selects every requested site during the same iterator pass; it does not
+materialize a list containing every CSV row. Values are metres of sea-level rise relative to the
 1995–2014 baseline at decadal steps 2020–2300. Scenario label = `SSP` +
 `scenario` columns joined (`SSP2` + `4.5` → `SSP2-4.5`); confidence values
 are `low_confidence`/`medium_confidence`, surfaced as `low`/`medium`.
@@ -55,7 +66,13 @@ updated after peer review — check the Zenodo record for newer versions when
 
 ## Failure modes
 
-- A truncated transfer of the 54 MB file parses to zero rows for the site and
-  exits 2 with a message naming the possibility.
+- Missing required record fields or projection columns produce a structured
+  `source_schema_failure` rather than an invented or fixture-backed result.
+- A valid single-site request with no source rows exits non-zero with
+  `site_not_found`. In multi-site mode the same condition is retained in input
+  order as a `not_found` result; a known site removed by filters is `empty`.
 - Zenodo rate-limits aggressively parallel downloads; the CLI makes exactly
-  one request per command.
+  one request per command. A multi-site projection call still performs one
+  fetch and one CSV scan, including when IDs are duplicated.
+- Projection CSV bodies are held only for the lifetime of the process by the
+  shared fetch layer and CSV reader. No persistent file or cache is created.

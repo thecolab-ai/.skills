@@ -1,0 +1,30 @@
+{
+  "total": 15,
+  "start": 11,
+  "num": 2,
+  "nextStart": 13,
+  "results": [
+    {
+      "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "title": "Synthetic WCC flood layer",
+      "type": "Feature Service",
+      "owner": "synthetic_wcc",
+      "orgId": "CPYspmTk3abe6d7i",
+      "url": "https://services1.arcgis.com/CPYspmTk3abe6d7i/arcgis/rest/services/Synthetic/FeatureServer",
+      "snippet": "Synthetic fixture",
+      "tags": ["flood"],
+      "modified": 1750000000000
+    },
+    {
+      "id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "title": "Synthetic WCC web map",
+      "type": "Web Map",
+      "owner": "synthetic_wcc",
+      "orgId": "CPYspmTk3abe6d7i",
+      "url": null,
+      "snippet": null,
+      "tags": [],
+      "modified": 1740000000000
+    }
+  ]
+}

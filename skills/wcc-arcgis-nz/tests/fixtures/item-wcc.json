@@ -1,0 +1,15 @@
+{
+  "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "title": "Synthetic WCC flood overlay",
+  "type": "Feature Service",
+  "owner": "synthetic_wcc",
+  "orgId": "CPYspmTk3abe6d7i",
+  "access": "public",
+  "licenseInfo": "<p>CC BY 4.0</p>",
+  "description": "<p>Synthetic Wellington City service metadata.</p>",
+  "tags": ["flood", "hazard"],
+  "created": 1730000000000,
+  "modified": 1750000000000,
+  "size": 3210,
+  "url": "https://services1.arcgis.com/CPYspmTk3abe6d7i/arcgis/rest/services/Synthetic/FeatureServer"
+}

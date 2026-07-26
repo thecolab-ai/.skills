@@ -1,6 +1,6 @@
 ---
 name: searise-nz
-description: "Query NZ SeaRise sea-level rise and vertical land movement projections for every 2 km of the Aotearoa New Zealand coastline, from the official Zenodo-published dataset (Naish et al. 2024): find the nearest projection site to a location, read its vertical land movement rate, and read sea-level projections to 2300 by SSP scenario with and without VLM. Use when the task involves NZ sea-level rise projections, coastal subsidence or uplift rates, or climate adaptation planning inputs. Read-only; no authentication required."
+description: "Query NZ SeaRise sea-level rise and vertical land movement projections for every 2 km of the Aotearoa New Zealand coastline, from the official Zenodo-published dataset (Naish et al. 2024): inspect record metadata and files, find projection sites, read vertical land movement, and retrieve one or many sites' projections to 2300 by SSP scenario with and without VLM. Use when the task involves NZ sea-level rise projections, coastal subsidence or uplift rates, dataset provenance, or climate adaptation planning inputs. Read-only; no authentication required."
 license: MIT
 compatibility: "Requires Python 3.10+ and network access for live data"
 metadata:
@@ -49,27 +49,40 @@ scenario and percentile.
 ## Commands
 
 ```bash
+python3 skills/searise-nz/scripts/cli.py record --json
 python3 skills/searise-nz/scripts/cli.py sites --near "-41.29,174.78" --limit 5
 python3 skills/searise-nz/scripts/cli.py vlm 3414 --json
 python3 skills/searise-nz/scripts/cli.py projections 3414 --scenario SSP2-4.5 --confidence medium --json
-python3 skills/searise-nz/scripts/cli.py projections 3414 --year 2100 --json
+python3 skills/searise-nz/scripts/cli.py projections 3414 3550 4021 --year 2100 --json
 ```
 
+- `record [--json]` — Zenodo DOI, version, publication date, title, creators, licence, and file inventory with byte sizes, checksums, and download URLs
 - `sites [--near lat,lon] [--limit N] [--json]` — projection sites, nearest-first when `--near` is given (downloads a ~674 KB CSV)
 - `vlm SITE_ID [--json]` — vertical land movement rate, uncertainty, and quality for one site
-- `projections SITE_ID [--scenario SSPx-y.z] [--confidence low|medium|all] [--year YYYY] [--no-vlm] [--json]` — decadal sea-level projections 2020–2300 with 17th/50th/83rd percentiles
+- `projections SITE_ID [SITE_ID ...] [--scenario SSPx-y.z] [--confidence low|medium|all] [--year YYYY] [--no-vlm] [--json]` — decadal sea-level projections 2020–2300 with 17th/50th/83rd percentiles
 
 ## Notes
 
 - Licence: CC BY 4.0 — cite Naish et al. (2024), Zenodo record 11398538
-- `projections` downloads and parses a ~54 MB CSV per call (about 20–30 s); filter flags
-  reduce output, not transfer — prefer one call and reuse the JSON
+- `projections` downloads and scans one ~54 MB CSV per invocation (about 20–30 s),
+  regardless of the number of site IDs. The CSV is iterated once and is not
+  persisted or cached; all downloaded data remains ephemeral.
+- Scenario, confidence, year, and `--no-vlm` apply to every requested site.
+  Filters reduce output, not transfer size.
+- One requested site preserves the original response shape. Multiple requested
+  IDs return `requested_site_ids` plus ordered `sites` results. Duplicate IDs
+  are repeated in input order. Each result has `status: ok`, `empty` when the
+  site exists but filters select no rows, or `not_found` when the source has no
+  rows for that ID.
 - Scenarios: SSP1-1.9, SSP1-2.6, SSP2-4.5, SSP3-7.0, SSP5-8.5; values are
   metres relative to the 1995–2014 baseline
 - Negative VLM is subsidence and adds to relative sea-level rise; the default
   projections file already includes VLM (`--no-vlm` for climate-only)
 - This is the 2024 (V2) dataset that supersedes the 2022 release — medians are
   similar but uncertainty bounds widened
+- Invalid input and upstream/schema failures are structured JSON on stderr with
+  a non-zero exit code. Missing sites in a multi-site request are data results,
+  not command failures.
 
 ## Resources
 

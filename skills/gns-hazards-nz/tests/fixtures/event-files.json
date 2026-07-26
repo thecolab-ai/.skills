@@ -1,0 +1,16 @@
+{
+  "versionpath": "2023-09-07T22:28:40-reviewed",
+  "status": "published",
+  "issue_time": "2023-09-07T22:28:40Z",
+  "type": "reviewed",
+  "files": [
+    "intensity_mmi.tif",
+    "intensity_mmi_contour_lines.json",
+    "pga_g_contour_lines.json",
+    "pgv_cms_contour_lines.json",
+    "psa_0p3_g_contour_lines.json",
+    "psa_1p0_g_contour_lines.json",
+    "psa_3p0_g_contour_lines.json",
+    "param.json"
+  ]
+}

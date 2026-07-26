@@ -1,0 +1,30 @@
+{
+  "total": 15,
+  "start": 11,
+  "num": 2,
+  "nextStart": 13,
+  "results": [
+    {
+      "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "title": "Synthetic NIWA coastal layer",
+      "type": "Feature Service",
+      "owner": "synthetic_niwa",
+      "orgId": "fp1tibNcN9mbExhG",
+      "url": "https://services3.arcgis.com/fp1tibNcN9mbExhG/arcgis/rest/services/Synthetic/FeatureServer",
+      "snippet": "Synthetic fixture",
+      "tags": ["coastal"],
+      "modified": 1750000000000
+    },
+    {
+      "id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "title": "Synthetic NIWA metadata",
+      "type": "Web Map",
+      "owner": "synthetic_niwa",
+      "orgId": "fp1tibNcN9mbExhG",
+      "url": null,
+      "snippet": null,
+      "tags": [],
+      "modified": 1740000000000
+    }
+  ]
+}

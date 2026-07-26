@@ -1,0 +1,15 @@
+{
+  "id": "cccccccccccccccccccccccccccccccc",
+  "title": "Synthetic GWRC emergency layer",
+  "type": "Map Service",
+  "owner": "synthetic_gwrc",
+  "orgId": "RS7BXJAO6ksvblJm",
+  "access": "public",
+  "licenseInfo": "<p>CC BY 4.0</p>",
+  "description": "<p>Synthetic Greater Wellington service metadata.</p>",
+  "tags": ["emergency", "hazard"],
+  "created": 1730000000000,
+  "modified": 1750000000000,
+  "size": 4321,
+  "url": "https://mapping1.gw.govt.nz/arcgis/rest/services/GW/Emergencies_P/MapServer"
+}

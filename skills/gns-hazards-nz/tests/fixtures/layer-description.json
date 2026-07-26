@@ -1,0 +1,32 @@
+{
+  "id": 0,
+  "name": "1:250 000 Active Faults",
+  "description": "National-scale active fault traces.",
+  "geometryType": "esriGeometryPolyline",
+  "maxRecordCount": 2000,
+  "capabilities": "Map,Query,Data",
+  "extent": {
+    "xmin": 166.0,
+    "ymin": -48.0,
+    "xmax": 179.0,
+    "ymax": -34.0,
+    "spatialReference": {
+      "wkid": 4326,
+      "latestWkid": 4326
+    }
+  },
+  "fields": [
+    {
+      "name": "objectid",
+      "alias": "OBJECTID",
+      "type": "esriFieldTypeOID"
+    },
+    {
+      "name": "name",
+      "alias": "Fault name",
+      "type": "esriFieldTypeString",
+      "description": "Published fault name",
+      "length": 120
+    }
+  ]
+}

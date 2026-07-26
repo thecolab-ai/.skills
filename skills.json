@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
-  "last_verified": "2026-07-24",
+  "last_verified": "2026-07-26",
   "skill_count": 141,
   "skills": [
     {
@@ -1212,12 +1212,12 @@
     },
     {
       "name": "gns-hazards-nz",
-      "description": "Query GNS Science public ArcGIS hazard services through a lightweight no-login CLI: the NZ Active Faults Database (fault traces, recurrence intervals, slip rates, avoidance zones) and live ShakingLayers ground-motion contours (MMI, PGA, PGV) generated after significant earthquakes. Use when the task involves NZ active fault locations, fault hazard attributes, or modelled ground-shaking extents from recent earthquakes. Read-only; no authentication required.",
+      "description": "Use when a task needs source-derived New Zealand active-fault features, ArcGIS layer metadata, latest modelled shaking contours, or versioned GeoNet ShakingLayers event files and contour GeoJSON. Provides read-only GNS Science and GeoNet discovery, count, ID, paging, metadata, and spatial-query primitives without authentication.",
       "path": "skills/gns-hazards-nz",
       "category": "environment",
       "source_owner": "GNS Science",
       "source_type": "official",
-      "source_url": "https://gis.gns.cri.nz/server/rest/services",
+      "source_url": "https://shakinglayers.geonet.org.nz/api/v1/events",
       "auth": "none",
       "access_mode": "public-api",
       "data_class": "public",
@@ -1229,9 +1229,10 @@
       "skill_type": "public-api",
       "pack": "nz-public-data",
       "allowed_domains": [
-        "gis.gns.cri.nz"
+        "gis.gns.cri.nz",
+        " shakinglayers.geonet.org.nz"
       ],
-      "last_verified": "2026-07-24",
+      "last_verified": "2026-07-26",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
@@ -3415,7 +3416,7 @@
     },
     {
       "name": "searise-nz",
-      "description": "Query NZ SeaRise sea-level rise and vertical land movement projections for every 2 km of the Aotearoa New Zealand coastline, from the official Zenodo-published dataset (Naish et al. 2024): find the nearest projection site to a location, read its vertical land movement rate, and read sea-level projections to 2300 by SSP scenario with and without VLM. Use when the task involves NZ sea-level rise projections, coastal subsidence or uplift rates, or climate adaptation planning inputs. Read-only; no authentication required.",
+      "description": "Query NZ SeaRise sea-level rise and vertical land movement projections for every 2 km of the Aotearoa New Zealand coastline, from the official Zenodo-published dataset (Naish et al. 2024): inspect record metadata and files, find projection sites, read vertical land movement, and retrieve one or many sites' projections to 2300 by SSP scenario with and without VLM. Use when the task involves NZ sea-level rise projections, coastal subsidence or uplift rates, dataset provenance, or climate adaptation planning inputs. Read-only; no authentication required.",
       "path": "skills/searise-nz",
       "category": "environment",
       "source_owner": "NZ SeaRise programme (Victoria University of Wellington, GNS Science, NIWA)",

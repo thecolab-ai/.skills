@@ -1,0 +1,31 @@
+{
+  "currentVersion": 11.1,
+  "id": 3,
+  "name": "Beach exposure",
+  "description": "Synthetic exposure classification",
+  "type": "Feature Layer",
+  "geometryType": "esriGeometryPolyline",
+  "objectIdField": "OBJECTID",
+  "capabilities": "Map,Query,Data",
+  "maxRecordCount": 2000,
+  "units": "esriMeters",
+  "extent": {
+    "xmin": 1000000,
+    "ymin": 4700000,
+    "xmax": 2100000,
+    "ymax": 6200000,
+    "spatialReference": {"wkid": 2193, "latestWkid": 2193}
+  },
+  "spatialReference": {"wkid": 2193, "latestWkid": 2193},
+  "fields": [
+    {"name": "OBJECTID", "alias": "OBJECTID", "type": "esriFieldTypeOID"},
+    {
+      "name": "EXPOSURE",
+      "alias": "Exposure class",
+      "type": "esriFieldTypeString",
+      "description": "Published exposure classification",
+      "domain": {"type": "codedValue", "name": "Exposure classes"},
+      "unit": "class"
+    }
+  ]
+}

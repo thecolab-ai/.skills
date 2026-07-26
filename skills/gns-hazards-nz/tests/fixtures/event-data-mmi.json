@@ -1,0 +1,31 @@
+{
+  "type": "FeatureCollection",
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "urn:ogc:def:crs:OGC:1.3:CRS84"
+    }
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "value": 5.0,
+        "units": "mmi"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [172.0, -43.0],
+          [172.1, -43.1]
+        ]
+      }
+    }
+  ],
+  "metadata": {
+    "eventid": "771645",
+    "longitude": 171.819,
+    "latitude": -42.953
+  },
+  "bbox": [171.9, -43.2, 172.2, -42.9]
+}

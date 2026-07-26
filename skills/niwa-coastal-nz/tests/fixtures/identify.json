@@ -1,0 +1,13 @@
+{
+  "results": [
+    {
+      "layerId": 3,
+      "layerName": "Beach exposure",
+      "displayFieldName": "EXPOSURE",
+      "value": "Exposed",
+      "attributes": {"OBJECTID": "2", "EXPOSURE": "Exposed"},
+      "geometryType": "esriGeometryPolyline",
+      "geometry": {"paths": [[[174.7, -41.3], [174.8, -41.2]]]}
+    }
+  ]
+}
