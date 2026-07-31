@@ -11,7 +11,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "lib"))
 
-from skill_metadata import PACKS, iter_skill_dirs, load_skill  # noqa: E402
+from skill_metadata import PACKS, iter_skill_dirs, load_skill, split_csv  # noqa: E402
 
 
 PACK_DESCRIPTIONS = {
@@ -29,6 +29,39 @@ def records() -> list[dict[str, object]]:
     for skill_dir in iter_skill_dirs(REPO_ROOT):
         document = load_skill(skill_dir)
         metadata = document.metadata
+        public_profile = None
+        if metadata.get("thecolab.public_pack"):
+            required_public = (
+                "thecolab.public_commands",
+                "thecolab.public_description",
+                "thecolab.public_access_mode",
+                "thecolab.public_health",
+                "thecolab.public_risk",
+                "thecolab.public_allowed_domains",
+            )
+            missing = [key for key in required_public if not metadata.get(key)]
+            if missing:
+                raise ValueError(
+                    f"{skill_dir.name}: public profile is missing {', '.join(missing)}"
+                )
+            public_pack = metadata["thecolab.public_pack"]
+            if public_pack not in PACKS or public_pack == metadata["thecolab.pack"]:
+                raise ValueError(
+                    f"{skill_dir.name}: public profile must name a distinct known pack"
+                )
+            public_profile = {
+                "pack": public_pack,
+                "description": metadata["thecolab.public_description"],
+                "auth": "none",
+                "access_mode": metadata["thecolab.public_access_mode"],
+                "data_class": "public",
+                "writes": False,
+                "browser": False,
+                "risk": metadata["thecolab.public_risk"],
+                "health": metadata["thecolab.public_health"],
+                "allowed_commands": split_csv(metadata["thecolab.public_commands"]),
+                "allowed_domains": split_csv(metadata["thecolab.public_allowed_domains"]),
+            }
         output.append(
             {
                 "name": document.fields["name"],
@@ -54,6 +87,7 @@ def records() -> list[dict[str, object]]:
                 "maintainer": metadata["thecolab.maintainer"],
                 **({"mutations": metadata["thecolab.mutations"].split(",")} if metadata.get("thecolab.mutations") else {}),
                 **({"local_output": metadata["thecolab.local_output"].split(",")} if metadata.get("thecolab.local_output") else {}),
+                **({"public_profile": public_profile} if public_profile else {}),
             }
         )
     return output
@@ -78,9 +112,13 @@ def readme_with_table(catalogue: list[dict[str, object]]) -> str:
     for record in catalogue:
         description = str(record["description"]).replace("|", "\\|").replace("\n", " ")
         owner = str(record["source_owner"]).replace("|", "\\|")
+        pack_label = f"`{record['pack']}`"
+        public_profile = record.get("public_profile")
+        if isinstance(public_profile, dict):
+            pack_label += f", `{public_profile['pack']}` public profile"
         rows.append(
             f"| [{record['name']}](skills/{record['name']}/SKILL.md) | "
-            f"`{record['pack']}` | {owner} | {description} |"
+            f"{pack_label} | {owner} | {description} |"
         )
     rows.extend(
         (
@@ -110,6 +148,12 @@ def desired_files() -> dict[Path, str]:
     }
     for pack in sorted(PACKS):
         members = [record for record in catalogue if record["pack"] == pack]
+        profiles = {
+            str(record["name"]): record["public_profile"]
+            for record in catalogue
+            if isinstance(record.get("public_profile"), dict)
+            and record["public_profile"]["pack"] == pack
+        }
         outputs[REPO_ROOT / "packs" / f"{pack}.json"] = encode(
             {
                 "schema_version": "1",
@@ -118,6 +162,14 @@ def desired_files() -> dict[Path, str]:
                 "default": pack == "nz-public-data",
                 "skill_count": len(members),
                 "skills": [record["name"] for record in members],
+                **(
+                    {
+                        "public_profile_count": len(profiles),
+                        "public_profiles": profiles,
+                    }
+                    if profiles
+                    else {}
+                ),
             }
         )
     return outputs
