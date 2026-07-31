@@ -127,6 +127,54 @@ def validate(skill_dir: Path) -> dict[str, object]:
     for domain in domains:
         if not valid_outbound_domain(domain):
             errors.append(f"invalid outbound allowlist host: {domain}")
+    public_pack = metadata.get("thecolab.public_pack")
+    public_profile_keys = (
+        "thecolab.public_commands",
+        "thecolab.public_description",
+        "thecolab.public_access_mode",
+        "thecolab.public_health",
+        "thecolab.public_risk",
+        "thecolab.public_allowed_domains",
+    )
+    if public_pack:
+        missing_public = [key for key in public_profile_keys if not metadata.get(key)]
+        if missing_public:
+            errors.append(
+                f"public profile is missing metadata: {', '.join(missing_public)}"
+            )
+        if public_pack != "nz-commercial-web":
+            errors.append("public profiles may target only nz-commercial-web")
+        if metadata["thecolab.pack"] != "nz-personal-data":
+            errors.append("public profiles are supported only for personal-pack skills")
+        if metadata["thecolab.auth"] != "mixed":
+            errors.append("a public profile requires the parent skill to declare mixed auth")
+        commands = split_csv(metadata.get("thecolab.public_commands", ""))
+        if not commands or len(commands) != len(set(commands)):
+            errors.append("thecolab.public_commands must contain unique commands")
+        for command in commands:
+            if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", command):
+                errors.append(f"invalid public command: {command}")
+        if metadata.get("thecolab.public_access_mode") not in SKILL_TYPES - {
+            "authenticated-personal",
+            "documentation-workflow",
+        }:
+            errors.append("thecolab.public_access_mode must be a public skill type")
+        if metadata.get("thecolab.public_health") not in HEALTH_STATES - {"untested"}:
+            errors.append("thecolab.public_health must be healthy, degraded, or gated")
+        if metadata.get("thecolab.public_risk") not in RISK_LEVELS:
+            errors.append("thecolab.public_risk must be low, medium, or high")
+        public_domains = split_csv(metadata.get("thecolab.public_allowed_domains", ""))
+        if not public_domains:
+            errors.append("thecolab.public_allowed_domains must contain at least one host")
+        for domain in public_domains:
+            if not valid_outbound_domain(domain):
+                errors.append(f"invalid public-profile outbound host: {domain}")
+            if domain not in domains:
+                errors.append(
+                    f"public-profile outbound host is not in the parent allowlist: {domain}"
+                )
+    elif any(metadata.get(key) for key in public_profile_keys):
+        errors.append("public profile metadata requires thecolab.public_pack")
 
     required_files = [
         "scripts/cli.py",

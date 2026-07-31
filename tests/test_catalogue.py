@@ -63,6 +63,32 @@ class CatalogueContractTests(unittest.TestCase):
             self.assertFalse(record["writes"])
             self.assertIn(record["source_type"], {"commercial", "mixed"})
 
+    def test_public_profiles_are_capability_scoped_not_installable_pack_members(self) -> None:
+        commercial = json.loads(
+            (ROOT / "packs" / "nz-commercial-web.json").read_text(encoding="utf-8")
+        )
+        profiles = commercial["public_profiles"]
+        self.assertEqual(commercial["public_profile_count"], len(profiles))
+        self.assertEqual(
+            set(profiles),
+            {"newworld-nz", "paknsave-nz", "trademe-nz", "woolworths-nz"},
+        )
+        self.assertTrue(set(profiles).isdisjoint(commercial["skills"]))
+        by_name = {record["name"]: record for record in self.records}
+        personal = json.loads(
+            (ROOT / "packs" / "nz-personal-data.json").read_text(encoding="utf-8")
+        )
+        for name, profile in profiles.items():
+            self.assertIn(name, personal["skills"])
+            self.assertEqual(by_name[name]["public_profile"], profile)
+            self.assertEqual(profile["pack"], "nz-commercial-web")
+            self.assertEqual(profile["auth"], "none")
+            self.assertEqual(profile["data_class"], "public")
+            self.assertFalse(profile["writes"])
+            self.assertFalse(profile["browser"])
+            self.assertTrue(profile["allowed_commands"])
+            self.assertTrue(profile["allowed_domains"])
+
 
 if __name__ == "__main__":
     unittest.main()
