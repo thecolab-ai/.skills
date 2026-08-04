@@ -12,7 +12,8 @@ from pathlib import Path
 SKILL_DIR = Path(__file__).parent.parent
 CLI = SKILL_DIR / "scripts" / "cli.py"
 
-LIVE_TRACKING_NUMBER = "00794210392715622565"
+# Authorised delivered parcel, supplied as "ND 004702 018 NZ".
+LIVE_TRACKING_NUMBER = "ND004702018NZ"
 UNKNOWN_TRACKING_NUMBER = "99999999999999999999"
 
 
