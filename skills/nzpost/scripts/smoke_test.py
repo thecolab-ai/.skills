@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 """Smoke tests for nzpost skill -- basic API and CLI checks."""
+import argparse
+import contextlib
+import importlib.util
+import io
 import json
 import subprocess
 import sys
@@ -9,7 +13,7 @@ SKILL_DIR = Path(__file__).parent.parent
 CLI = SKILL_DIR / "scripts" / "cli.py"
 
 LIVE_TRACKING_NUMBER = "00794210392715622565"
-UNKNOWN_TRACKING_NUMBER = "00000000000000000000"
+UNKNOWN_TRACKING_NUMBER = "99999999999999999999"
 
 
 def run(args: list) -> subprocess.CompletedProcess:
@@ -34,17 +38,20 @@ def test(name: str, fn):
         return False
 
 
-results = []
-
-
-def test_api_error_fixture():
-    import importlib.util
-
+def load_cli_module():
     spec = importlib.util.spec_from_file_location("nzpost_cli", CLI)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
+    return module
+
+
+results = []
+
+
+def test_api_error_fixture():
+    module = load_cli_module()
     message = module.extract_api_error(
         [
             {"errors": [{"code": "NOT_FOUND", "details": "No parcel found"}]},
@@ -190,17 +197,33 @@ results.append(test("too-long numeric tracking number is rejected", test_too_lon
 
 
 def test_unknown_tracking_number():
-    result = run(["track", UNKNOWN_TRACKING_NUMBER, "--json"])
-    if result.returncode == 0:
-        print("  Expected non-zero exit for unknown tracking number")
-        return False
-    if result.stdout.strip():
-        print(f"  Expected no stdout in --json error path, got: {result.stdout[:100]}")
-        return False
-    return "No data found" in result.stderr or "tracking lookup failed" in result.stderr
+    module = load_cli_module()
+    setattr(
+        module,
+        "fetch_tracking_multi",
+        lambda refs: {
+            "success": False,
+            "status_code": 2,
+            "results": [
+                {
+                    "tracking_reference": refs[0],
+                    "errors": [{"code": "NOT_FOUND", "details": "No data found for this Tracking Reference"}],
+                }
+            ],
+        },
+    )
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    exit_code = 0
+    try:
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            module.cmd_track(argparse.Namespace(numbers=[UNKNOWN_TRACKING_NUMBER], json=True))
+    except SystemExit as exc:
+        exit_code = int(exc.code or 0)
+    return exit_code != 0 and not stdout.getvalue().strip() and "No data found" in stderr.getvalue()
 
 
-results.append(test("unknown valid-format tracking number exits non-zero", test_unknown_tracking_number))
+results.append(test("unknown valid-format tracking fixture exits non-zero", test_unknown_tracking_number))
 
 
 def test_delivered_status():
