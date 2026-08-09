@@ -153,6 +153,16 @@ def parse_rates_page(page_html: str, year: int, source_url: str, status: int, el
         if title:
             sections.append(parse_rate_section(title, m.group(2)))
     if not sections:
+        content = main_content(page_html)
+        headings = list(re.finditer(r"<h2\b[^>]*>(.*?)</h2>", content, flags=re.I | re.S))
+        for index, heading in enumerate(headings):
+            title = strip_tags(heading.group(1))
+            start = heading.end()
+            end = headings[index + 1].start() if index + 1 < len(headings) else len(content)
+            section = parse_rate_section(title, content[start:end])
+            if title and section["tables"]:
+                sections.append(section)
+    if not sections:
         die("could not find benefit-rate sections in Work and Income HTML")
     return {
         "source_url": source_url,
@@ -181,6 +191,31 @@ def parse_benefit_list(page_html: str, source_url: str, status: int, elapsed_ms:
             "slug": href.rsplit("/", 1)[-1].removesuffix(".html"),
             "title": title,
             "summary": strip_tags(m.group(3)),
+            "url": urljoin(href),
+        })
+    seen = {benefit["slug"] for benefit in benefits}
+    for card in re.findall(r"<li\b[^>]*>(.*?)</li>", page_html, flags=re.I | re.S):
+        link = re.search(r"<a\s+([^>]+)>(.*?)</a>", card, flags=re.I | re.S)
+        summary = re.search(r"<p\b[^>]*>(.*?)</p>", card, flags=re.I | re.S)
+        if not link or not summary:
+            continue
+        href = attr(link.group(1), "href") or ""
+        path = urllib.parse.urlparse(urljoin(href)).path.rstrip("/")
+        match = re.fullmatch(r"/products/a-z-benefits/([^/]+?)(?:\.html)?", path, flags=re.I)
+        if not match:
+            continue
+        slug = match.group(1)
+        if slug in seen:
+            continue
+        title = strip_tags(link.group(2))
+        description = strip_tags(summary.group(1))
+        if not title or not description:
+            continue
+        seen.add(slug)
+        benefits.append({
+            "slug": slug,
+            "title": title,
+            "summary": description,
             "url": urljoin(href),
         })
     return {

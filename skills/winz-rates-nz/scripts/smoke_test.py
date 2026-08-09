@@ -146,6 +146,49 @@ def test_rate_table_fixture():
 
 results.append(test("fixture rate table parser", test_rate_table_fixture))
 
+
+def load_cli_module():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("winz_rates_current_markup", CLI)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_current_rates_page_fixture():
+    module = load_cli_module()
+    fixture = (SKILL_DIR / "tests" / "fixtures" / "current-rates-page.html").read_text()
+    data = module.parse_rates_page(fixture, 2026, "https://example.test/rates", 200, 1)
+    by_slug = {payment["slug"]: payment for payment in data["payments"]}
+    assert "jobseeker-support" in by_slug
+    assert by_slug["jobseeker-support"]["tables"][0]["rows"] == [
+        {"Category": "Single, 25 years or over", "Weekly rate after tax": "$372.55"}
+    ]
+    print("[PASS] fixture current flat WINZ rates-page parser")
+    return True
+
+
+results.append(test("fixture current flat rates-page parser", test_current_rates_page_fixture))
+
+
+def test_current_benefit_list_fixture():
+    module = load_cli_module()
+    fixture = (SKILL_DIR / "tests" / "fixtures" / "current-benefit-list.html").read_text()
+    data = module.parse_benefit_list(fixture, "https://example.test/benefits", 200, 1)
+    assert [benefit["slug"] for benefit in data["benefits"]] == [
+        "accommodation-supplement",
+        "jobseeker-support",
+    ]
+    assert data["benefits"][0]["summary"] == "A weekly payment towards accommodation costs."
+    print("[PASS] fixture current WINZ benefit-card parser")
+    return True
+
+
+results.append(test("fixture current benefit-card parser", test_current_benefit_list_fixture))
+
 failures = [r for r in results if r is False]
 if failures:
     print(f"{len(failures)} test(s) failed.")
