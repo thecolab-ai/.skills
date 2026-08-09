@@ -142,16 +142,44 @@ def parse_rate_section(title: str, body: str) -> dict[str, Any]:
 
 def parse_rates_page(page_html: str, year: int, source_url: str, status: int, elapsed_ms: int) -> dict[str, Any]:
     sections = []
-    pattern = re.compile(
-        r'<div\b[^>]*class=["\'][^"\']*wi-accordion--section[^"\']*["\'][^>]*>\s*'
-        r'<h2\b[^>]*>.*?<span>(.*?)</span>.*?</h2>\s*'
-        r'<div\b[^>]*class=["\'][^"\']*wi-accordion--content[^"\']*["\'][^>]*>(.*?)</div>\s*<!--\s*widget-content',
+    content = main_content(page_html)
+
+    current_pattern = re.compile(
+        r'<details\b(?=[^>]*class=["\'][^"\']*\baccordion-details\b[^"\']*["\'])[^>]*>(.*?)</details>',
         flags=re.I | re.S,
     )
-    for m in pattern.finditer(page_html):
-        title = strip_tags(m.group(1))
+    for match in current_pattern.finditer(content):
+        block = match.group(1)
+        heading = re.search(r"<h2\b[^>]*>(.*?)</h2>", block, flags=re.I | re.S)
+        if not heading:
+            continue
+        title = strip_tags(heading.group(1))
+        body = re.split(r"</summary>", block, maxsplit=1, flags=re.I | re.S)[-1]
         if title:
-            sections.append(parse_rate_section(title, m.group(2)))
+            sections.append(parse_rate_section(title, body))
+
+    if not sections:
+        legacy_pattern = re.compile(
+            r'<div\b[^>]*class=["\'][^"\']*wi-accordion--section[^"\']*["\'][^>]*>\s*'
+            r'<h2\b[^>]*>.*?<span>(.*?)</span>.*?</h2>\s*'
+            r'<div\b[^>]*class=["\'][^"\']*wi-accordion--content[^"\']*["\'][^>]*>(.*?)</div>\s*<!--\s*widget-content',
+            flags=re.I | re.S,
+        )
+        for match in legacy_pattern.finditer(content):
+            title = strip_tags(match.group(1))
+            if title:
+                sections.append(parse_rate_section(title, match.group(2)))
+
+    if not sections:
+        headings = list(re.finditer(r"<h2\b[^>]*>(.*?)</h2>", content, flags=re.I | re.S))
+        for index, heading in enumerate(headings):
+            title = strip_tags(heading.group(1))
+            start = heading.end()
+            end = headings[index + 1].start() if index + 1 < len(headings) else len(content)
+            section = parse_rate_section(title, content[start:end])
+            if title and section["tables"]:
+                sections.append(section)
+
     if not sections:
         die("could not find benefit-rate sections in Work and Income HTML")
     return {
@@ -172,17 +200,51 @@ def get_rates(year: int) -> dict[str, Any]:
 
 def parse_benefit_list(page_html: str, source_url: str, status: int, elapsed_ms: int) -> dict[str, Any]:
     benefits = []
-    for m in re.finditer(r'<div\b[^>]*class=["\'][^"\']*links\s+default[^"\']*["\'][^>]*>\s*<a\s+([^>]+)>(.*?)</a>\s*<p[^>]*>(.*?)</p>', page_html, flags=re.I | re.S):
-        href = attr(m.group(1), "href") or ""
-        if not re.search(r"/products/a-z-benefits/[^/]+\.html$", href):
-            continue
-        title = strip_tags(m.group(2))
+    seen = set()
+
+    def append_card(card: str) -> None:
+        link = re.search(r"<a\s+([^>]+)>(.*?)</a>", card, flags=re.I | re.S)
+        summary = re.search(r"<p\b[^>]*>(.*?)</p>", card, flags=re.I | re.S)
+        if not link or not summary:
+            return
+        href = attr(link.group(1), "href") or ""
+        path = urllib.parse.urlparse(urljoin(href)).path.rstrip("/")
+        match = re.fullmatch(r"/products/a-z-benefits/([^/]+?)(?:\.html)?", path, flags=re.I)
+        if not match:
+            return
+        slug = match.group(1)
+        title = strip_tags(link.group(2))
+        description = strip_tags(summary.group(1))
+        if slug in seen or not title or not description:
+            return
+        seen.add(slug)
         benefits.append({
-            "slug": href.rsplit("/", 1)[-1].removesuffix(".html"),
+            "slug": slug,
             "title": title,
-            "summary": strip_tags(m.group(3)),
+            "summary": description,
             "url": urljoin(href),
         })
+
+    content = main_content(page_html)
+    collections = re.findall(
+        r'<ul\b(?=[^>]*class=["\'][^"\']*\balphacollection\b[^"\']*["\'])[^>]*>(.*?)</ul>',
+        content,
+        flags=re.I | re.S,
+    )
+    for collection in collections:
+        for card in re.findall(r"<li\b[^>]*>(.*?)</li>", collection, flags=re.I | re.S):
+            append_card(card)
+
+    if not benefits:
+        for match in re.finditer(
+            r'<div\b[^>]*class=["\'][^"\']*links\s+default[^"\']*["\'][^>]*>\s*'
+            r'<a\s+([^>]+)>(.*?)</a>\s*<p[^>]*>(.*?)</p>',
+            content,
+            flags=re.I | re.S,
+        ):
+            href = attr(match.group(1), "href") or ""
+            append_card(f'<a href="{html.escape(href, quote=True)}">{match.group(2)}</a><p>{match.group(3)}</p>')
+
     return {
         "source_url": source_url,
         "status": status,
