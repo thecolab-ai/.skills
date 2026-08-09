@@ -167,6 +167,8 @@ def test_current_rates_page_fixture():
     assert by_slug["jobseeker-support"]["tables"][0]["rows"] == [
         {"Category": "Single, 25 years or over", "Weekly rate after tax": "$372.55"}
     ]
+    assert by_slug["funeral-grant"]["tables"] == []
+    assert "income and asset tested" in " ".join(by_slug["funeral-grant"]["notes"])
     print("[PASS] fixture current flat WINZ rates-page parser")
     return True
 

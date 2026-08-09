@@ -26,6 +26,9 @@ class CurrentMarkupTests(unittest.TestCase):
             by_slug["jobseeker-support"]["tables"][0]["rows"],
             [{"Category": "Single, 25 years or over", "Weekly rate after tax": "$372.55"}],
         )
+        self.assertIn("funeral-grant", by_slug)
+        self.assertEqual(by_slug["funeral-grant"]["tables"], [])
+        self.assertIn("income and asset tested", " ".join(by_slug["funeral-grant"]["notes"]))
 
     def test_current_benefit_cards_support_extensionless_links(self):
         fixture = (FIXTURES / "current-benefit-list.html").read_text()
