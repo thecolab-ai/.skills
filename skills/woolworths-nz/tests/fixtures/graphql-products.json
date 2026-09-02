@@ -1,0 +1,55 @@
+{
+  "data": {
+    "My": {
+      "products": {
+        "results": [
+          {
+            "__typename": "ProductSummary",
+            "sku": "705692",
+            "productName": "Synthetic Milk 2L",
+            "slug": "synthetic-milk-2l",
+            "imageUrl": "https://assets.example.test/milk.jpg",
+            "storeKey": "9171",
+            "brand": "Example",
+            "categoryHierarchyNames": {
+              "lvl0": "Fresh",
+              "lvl1": "Dairy",
+              "lvl2": "Milk",
+              "lvl3": null
+            },
+            "variants": [
+              {
+                "variantKey": "705692-EA",
+                "name": "Synthetic Milk 2L",
+                "unitOfMeasure": "EACH",
+                "purchaseUnit": {
+                  "unit": "EACH"
+                },
+                "variantPrice": {
+                  "currency": "NZD",
+                  "isSpecial": true,
+                  "isClubPrice": false,
+                  "sellingUnit": "EA",
+                  "sellingPrice": 3.9,
+                  "savedAmount": 0.6,
+                  "wasPrice": 4.5,
+                  "cupPrice": 0.2,
+                  "cupUnit": "100ml"
+                }
+              }
+            ]
+          },
+          {
+            "__typename": "ContentSummary",
+            "sku": "content-only",
+            "name": "Synthetic editorial tile"
+          }
+        ],
+        "totalCount": 1,
+        "pageSize": 24,
+        "totalPages": 1,
+        "currentPage": 0
+      }
+    }
+  }
+}

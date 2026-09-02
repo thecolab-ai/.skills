@@ -26,12 +26,12 @@
     "GET /shoppers/my/past-orders",
     "GET /shoppers/my/favourites",
     "GET /shoppers/my/saved-lists",
-    "GET /trolleys/my",
+    "POST /graphql CustomerCart",
     "POST /shoppers/my/saved-lists",
     "POST /shoppers/my/saved-lists/{listId}/items/{sku}",
     "DELETE /shoppers/my/saved-lists/{listId}/items/{sku}",
     "DELETE /shoppers/my/saved-lists/{listId}",
-    "POST /trolleys/my/items",
-    "DELETE /trolleys/my/items"
+    "POST /graphql SetCartLineItemQuantity",
+    "POST /graphql ClearCart"
   ]
 }

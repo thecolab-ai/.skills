@@ -1,0 +1,42 @@
+{
+  "data": {
+    "My": {
+      "product": {
+        "key": "424242",
+        "name": "Synthetic Produce",
+        "slug": "synthetic-produce",
+        "brand": "Example",
+        "variants": [
+          {
+            "__typename": "GroceryVariant",
+            "key": "424242-EA",
+            "sku": "424242-EA",
+            "name": "Synthetic Produce Each",
+            "slug": "synthetic-produce",
+            "purchasingUnits": {
+              "unit": "EA"
+            },
+            "variantPrice": {
+              "currency": "NZD",
+              "sellingPrice": 2.5
+            }
+          },
+          {
+            "__typename": "GroceryVariant",
+            "key": "424242-KG",
+            "sku": "424242-KG",
+            "name": "Synthetic Produce By Weight",
+            "slug": "synthetic-produce",
+            "purchasingUnits": {
+              "unit": "KG"
+            },
+            "variantPrice": {
+              "currency": "NZD",
+              "sellingPrice": 8.99
+            }
+          }
+        ]
+      }
+    }
+  }
+}
