@@ -1,0 +1,49 @@
+{
+  "data": {
+    "customerCart": {
+      "key": "synthetic-cart",
+      "totalItemQuantity": 2,
+      "totalUniqueProductSku": 1,
+      "shoppingMode": {
+        "mode": "PICKUP",
+        "pickupLocationId": "9171"
+      },
+      "lineItems": [
+        {
+          "sku": "705692",
+          "productVariantSku": "705692-EA",
+          "quantity": 2,
+          "product": {
+            "name": "Synthetic Milk 2L",
+            "slug": "synthetic-milk-2l",
+            "brand": "Example",
+            "variants": [
+              {
+                "key": "705692-EA",
+                "purchasingUnits": {
+                  "unit": "EA"
+                }
+              }
+            ]
+          },
+          "unitPrice": {
+            "beforeDiscountAsCents": 450,
+            "afterDiscountAsCents": 390
+          },
+          "lineTotal": {
+            "afterDiscountAsCents": 780,
+            "discountAmountAsCents": 120
+          }
+        }
+      ],
+      "pricing": {
+        "productSubtotal": {
+          "afterDiscountAsCents": 780
+        },
+        "orderSubtotal": {
+          "afterDiscountAsCents": 780
+        }
+      }
+    }
+  }
+}

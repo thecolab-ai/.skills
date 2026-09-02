@@ -57,22 +57,201 @@ def test_product_fixture():
             "name": "Synthetic Milk",
             "brand": "Example",
             "slug": "synthetic-milk",
-            "price": {"originalPrice": 4.5, "salePrice": 3.9, "isSpecial": True, "savePrice": 0.6},
+            "price": {
+                "originalPrice": 4.5,
+                "salePrice": 3.9,
+                "isSpecial": True,
+                "savePrice": 0.6,
+            },
             "size": {"volumeSize": "2L", "cupPrice": 0.20, "cupMeasure": "100ml"},
-            "quantity": {"min": 1, "max": 12, "increment": 1},
-            "availabilityStatus": "In Stock",
             "breadcrumb": {"department": {"name": "Fresh"}, "aisle": {"name": "Dairy"}},
         }
     )
     assert record["sku"] == "705692"
     assert record["sale_price"] == 3.9
-    assert record["is_special"] is True and record["in_stock"] is True
+    assert record["is_special"] is True
     assert record["category"] == "Fresh / Dairy"
     print("[PASS] fixture Woolworths product normalisation")
     return True
 
 
 results.append(test("fixture product parser", test_product_fixture))
+
+
+def load_graphql_api():
+    import importlib.util
+
+    path = SKILL_DIR / "scripts" / "graphql_api.py"
+    name = f"woolworths_nz_graphql_{len(sys.modules)}"
+    spec = importlib.util.spec_from_file_location(name, path)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_graphql_product_contract():
+    module = load_graphql_api()
+    fixture = json.loads(
+        (SKILL_DIR / "tests" / "fixtures" / "graphql-products.json").read_text()
+    )
+    request = module.product_search_request(
+        mode="keyword", value="milk", page=1, limit=24
+    )
+    assert request["operationName"] == "ProductSearch"
+    assert request["variables"]["searchInput"]["byKeyword"]["pageIndex"] == 0
+    parsed = module.parse_product_search(fixture)
+    assert parsed["count"] == 1
+    assert parsed["total"] == 1
+    assert parsed["products"][0]["sku"] == "705692"
+    assert parsed["products"][0]["variant_key"] == "705692-EA"
+    assert parsed["products"][0]["sale_price"] == 3.9
+    assert parsed["products"][0]["category"] == "Fresh / Dairy / Milk"
+    return True
+
+
+results.append(
+    test("GraphQL product request and parser", test_graphql_product_contract)
+)
+
+
+def test_specials_overfetch_before_filter():
+    cli = load_cli()
+    requests = []
+    emitted = []
+    products = [
+        {"sku": f"regular-{index}", "is_special": False} for index in range(3)
+    ] + [{"sku": f"special-{index}", "is_special": True} for index in range(3)]
+    cli.graphql_json = lambda request: requests.append(request) or {}
+    cli.parse_graphql = lambda *_args, **_kwargs: {
+        "products": products,
+        "total": 6,
+        "page": 1,
+        "page_size": 24,
+        "total_pages": 1,
+    }
+    cli.emit = lambda data, _as_json: emitted.append(data)
+    args = cli.argparse.Namespace(query="cheese", page=1, limit=3, json=True)
+    cli.cmd_specials(args)
+    search_input = requests[0]["variables"]["searchInput"]["byKeyword"]
+    assert search_input["pageSize"] > args.limit
+    assert emitted[0]["count"] == 3
+    assert all(item["is_special"] for item in emitted[0]["products"])
+    return True
+
+
+results.append(
+    test("specials overfetch before filtering", test_specials_overfetch_before_filter)
+)
+
+
+def test_trolley_unit_resolution():
+    graph = load_graphql_api()
+    cli = load_cli()
+    detail_request = graph.product_detail_request("424242")
+    assert (
+        "... on GroceryVariant {\n          key sku richDescription name"
+        in detail_request["query"]
+    )
+    fixture = json.loads(
+        (SKILL_DIR / "tests" / "fixtures" / "graphql-product-detail.json").read_text()
+    )
+    product = graph.parse_product_detail(fixture)
+    assert product["variants"] == [
+        {
+            "variant_key": "424242-EA",
+            "variant_sku": "424242-EA",
+            "unit": "EA",
+            "name": "Synthetic Produce Each",
+        },
+        {
+            "variant_key": "424242-KG",
+            "variant_sku": "424242-KG",
+            "unit": "KG",
+            "name": "Synthetic Produce By Weight",
+        },
+    ]
+    detail_requests = []
+
+    def fixture_detail(request):
+        detail_requests.append(request)
+        return fixture
+
+    cli.graphql_json = fixture_detail
+    empty = {"items": []}
+    assert cli.resolve_variant_key("424242", empty, "Each") == "424242-EA"
+    assert cli.resolve_variant_key("424242", empty, "Kg") == "424242-KG"
+    existing_each = {
+        "items": [
+            {
+                "sku": "424242",
+                "variant_key": "424242-EA",
+                "unit": "EA",
+            }
+        ]
+    }
+    assert cli.resolve_variant_key("424242", existing_each, "Kg") == "424242-KG"
+    ambiguous = {
+        "items": [
+            {"sku": "424242", "variant_key": "424242-EA", "unit": "EA"},
+            {"sku": "424242", "variant_key": "424242-KG", "unit": "KG"},
+        ]
+    }
+    try:
+        cli.resolve_variant_key("424242", ambiguous)
+    except SystemExit:
+        pass
+    else:
+        raise AssertionError("ambiguous trolley SKU must require an exact variant key")
+    return True
+
+
+results.append(
+    test("trolley unit resolves exact variant", test_trolley_unit_resolution)
+)
+
+
+def test_graphql_cart_contract():
+    module = load_graphql_api()
+    cart_request = module.customer_cart_request()
+    assert "product {\n        name\n        slug" in cart_request["query"]
+    fixture = json.loads(
+        (SKILL_DIR / "tests" / "fixtures" / "graphql-cart.json").read_text()
+    )
+    parsed = module.parse_customer_cart(fixture)
+    assert parsed["cart_key"] == "synthetic-cart"
+    assert parsed["item_count"] == 2
+    assert parsed["items"][0]["variant_key"] == "705692-EA"
+    assert parsed["items"][0]["unit"] == "EA"
+    assert parsed["items"][0]["quantity"] == 2
+    update = module.cart_quantity_request("705692-EA", 3)
+    assert update["operationName"] == "SetCartLineItemQuantity"
+    assert update["variables"]["input"]["cartLineItemQuantityUpdates"] == [
+        {"variantKey": "705692-EA", "quantity": 3}
+    ]
+    clear = module.clear_cart_request()
+    assert clear["operationName"] == "ClearCart"
+    return True
+
+
+results.append(test("GraphQL trolley request and parser", test_graphql_cart_contract))
+
+
+def test_graphql_errors_fail_closed():
+    module = load_graphql_api()
+    try:
+        module.parse_customer_cart(
+            {"data": {"customerCart": {}}, "errors": [{"message": "fixture error"}]}
+        )
+    except module.GraphQLContractError as exc:
+        assert "fixture error" in str(exc)
+    else:
+        raise AssertionError("GraphQL errors must fail closed")
+    return True
+
+
+results.append(test("GraphQL errors fail closed", test_graphql_errors_fail_closed))
 
 
 def test_account_command_gating():
@@ -84,14 +263,19 @@ def test_account_command_gating():
     assert module.account_commands_enabled({}) is False
     assert (
         module.account_commands_enabled(
-            {"WOOLWORTHS_EMAIL": "fixture@example.test", "WOOLWORTHS_PASSWORD": "fixture"}
+            {
+                "WOOLWORTHS_EMAIL": "fixture@example.test",
+                "WOOLWORTHS_PASSWORD": "fixture",
+            }
         )
         is True
     )
     return True
 
 
-results.append(test("account commands are credential-gated", test_account_command_gating))
+results.append(
+    test("account commands are credential-gated", test_account_command_gating)
+)
 
 
 def test_session_cache_is_bound_to_account():
@@ -144,7 +328,12 @@ def test_session_cache_is_bound_to_account():
     return True
 
 
-results.append(test("session cache is bound to supplied account", test_session_cache_is_bound_to_account))
+results.append(
+    test(
+        "session cache is bound to supplied account",
+        test_session_cache_is_bound_to_account,
+    )
+)
 
 
 def test_cookie_cache_is_created_private():
@@ -169,13 +358,17 @@ def test_cookie_cache_is_created_private():
         payload = json.loads(path.read_text())
         assert stat.S_IMODE(path.stat().st_mode) == 0o600
         assert stat.S_IMODE(parent.stat().st_mode) == 0o700
-        assert payload["account_hash"] == module.account_cache_key("fixture@example.test")
+        assert payload["account_hash"] == module.account_cache_key(
+            "fixture@example.test"
+        )
         assert "fixture@example.test" not in path.read_text()
         assert not list(parent.glob("*.tmp"))
     return True
 
 
-results.append(test("cookie cache is atomically private", test_cookie_cache_is_created_private))
+results.append(
+    test("cookie cache is atomically private", test_cookie_cache_is_created_private)
+)
 
 
 def test_custom_cache_parent_permissions_are_preserved():
@@ -203,7 +396,12 @@ def test_custom_cache_parent_permissions_are_preserved():
     return True
 
 
-results.append(test("custom cache parent permissions are preserved", test_custom_cache_parent_permissions_are_preserved))
+results.append(
+    test(
+        "custom cache parent permissions are preserved",
+        test_custom_cache_parent_permissions_are_preserved,
+    )
+)
 
 
 def test_response_cookie_merge_is_domain_scoped():
@@ -242,7 +440,12 @@ def test_response_cookie_merge_is_domain_scoped():
     return True
 
 
-results.append(test("response cookie refresh stays domain-scoped", test_response_cookie_merge_is_domain_scoped))
+results.append(
+    test(
+        "response cookie refresh stays domain-scoped",
+        test_response_cookie_merge_is_domain_scoped,
+    )
+)
 
 
 def test_account_request_contract():
@@ -307,7 +510,9 @@ def test_account_request_contract():
     headers = {key.lower(): value for key, value in request.header_items()}
     assert result == {"ok": True}
     assert refresh_request.method == "GET"
-    assert refresh_request.full_url == "https://www.woolworths.co.nz/api/v1/bff/get-user"
+    assert (
+        refresh_request.full_url == "https://www.woolworths.co.nz/api/v1/bff/get-user"
+    )
     assert request.method == "POST"
     assert request.full_url == "https://www.woolworths.co.nz/api/v1/trolleys/my/items"
     assert headers["x-xsrf-token"] == "fixture token"
@@ -324,7 +529,171 @@ def test_account_request_contract():
     return True
 
 
-results.append(test("authenticated request headers and payload", test_account_request_contract))
+results.append(
+    test("authenticated request headers and payload", test_account_request_contract)
+)
+
+
+def test_account_graphql_contract():
+    module = load_cli()
+    graph = load_graphql_api()
+    captured = []
+    cookies = [
+        {"name": "XSRF-TOKEN", "value": "fixture-token", "domain": ".woolworths.co.nz"},
+        {"name": "session", "value": "fixture", "domain": ".woolworths.co.nz"},
+    ]
+
+    class FakeResponse:
+        headers = None
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self):
+            return b'{"data":{"customerCart":{"lineItems":[]}}}'
+
+    module.ensure_account_session = lambda **_kwargs: cookies
+    module.refresh_account_cookies = lambda value, **_kwargs: value
+    module.update_session_from_response = lambda *_args, **_kwargs: None
+
+    def fake_urlopen(request, timeout):
+        captured.append((request, timeout))
+        return FakeResponse()
+
+    module.urllib.request.urlopen = fake_urlopen
+    module.account_graphql(graph.customer_cart_request())
+    module.account_graphql(graph.cart_quantity_request("705692-EA", 2), mutation=True)
+    assert len(captured) == 2
+    assert captured[0][0].get_header("Wnzx-operation-name") == "CustomerCart"
+    assert captured[1][0].get_header("Wnzx-operation-name") == "SetCartLineItemQuantity"
+    assert captured[1][0].get_header("X-xsrf-token") == "fixture-token"
+    request_payload = json.loads(captured[1][0].data)
+    assert request_payload["variables"]["input"]["cartLineItemQuantityUpdates"] == [
+        {"variantKey": "705692-EA", "quantity": 2}
+    ]
+    try:
+        module.account_graphql(
+            {"operationName": "PlaceOrder", "query": "mutation PlaceOrder { x }"},
+            mutation=True,
+        )
+    except SystemExit:
+        pass
+    else:
+        raise AssertionError("unapproved account mutations must be blocked")
+    return True
+
+
+results.append(test("current GraphQL trolley transport", test_account_graphql_contract))
+
+
+def test_account_graphql_refresh_retry():
+    module = load_cli()
+    graph = load_graphql_api()
+    cookies = [
+        {
+            "name": "XSRF-TOKEN",
+            "value": "fixture-token",
+            "domain": ".woolworths.co.nz",
+        }
+    ]
+    session_calls = []
+    request_calls = []
+
+    def fake_session(**kwargs):
+        session_calls.append(kwargs)
+        return cookies
+
+    class FakeResponse:
+        headers = None
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self):
+            return b'{"data":{"setCartLineItemQuantity":{"lineItems":[]}}}'
+
+    def fake_urlopen(request, timeout):
+        request_calls.append((request, timeout))
+        if len(request_calls) == 1:
+            raise module.urllib.error.HTTPError(
+                request.full_url, 401, "Unauthorized", {}, None
+            )
+        return FakeResponse()
+
+    module.ensure_account_session = fake_session
+    module.refresh_account_cookies = lambda value, **_kwargs: value
+    module.update_session_from_response = lambda *_args, **_kwargs: None
+    module.urllib.request.urlopen = fake_urlopen
+    result = module.account_graphql(
+        graph.cart_quantity_request("705692-EA", 2), mutation=True
+    )
+    assert result["data"]["setCartLineItemQuantity"]["lineItems"] == []
+    assert len(request_calls) == 2
+    assert sum(call.get("force") is True for call in session_calls) == 1
+    return True
+
+
+results.append(
+    test("GraphQL 401 refreshes and retries once", test_account_graphql_refresh_retry)
+)
+
+
+def test_account_graphql_xsrf_refresh():
+    module = load_cli()
+    graph = load_graphql_api()
+    state = {"fresh": False}
+    requests = []
+    stale = [{"name": "session", "value": "stale", "domain": ".woolworths.co.nz"}]
+    fresh = [
+        {
+            "name": "XSRF-TOKEN",
+            "value": "fresh-token",
+            "domain": ".woolworths.co.nz",
+        }
+    ]
+
+    def fake_session(**kwargs):
+        if kwargs.get("force"):
+            state["fresh"] = True
+        return fresh if state["fresh"] else stale
+
+    class FakeResponse:
+        headers = None
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self):
+            return b'{"data":{"clearCart":{"lineItems":[]}}}'
+
+    def fake_urlopen(request, timeout):
+        requests.append((request, timeout))
+        return FakeResponse()
+
+    module.ensure_account_session = fake_session
+    module.refresh_account_cookies = lambda value, **_kwargs: value
+    module.update_session_from_response = lambda *_args, **_kwargs: None
+    module.urllib.request.urlopen = fake_urlopen
+    module.account_graphql(graph.clear_cart_request(), mutation=True)
+    assert len(requests) == 1
+    assert requests[0][0].get_header("X-xsrf-token") == "fresh-token"
+    return True
+
+
+results.append(
+    test(
+        "GraphQL refreshes missing XSRF before send", test_account_graphql_xsrf_refresh
+    )
+)
 
 
 def test_account_request_refresh_retry():
@@ -353,7 +722,9 @@ def test_account_request_refresh_retry():
     def fake_urlopen(request, timeout):
         request_calls.append((request, timeout))
         if len(request_calls) == 1:
-            raise module.urllib.error.HTTPError(request.full_url, 401, "expired", {}, None)
+            raise module.urllib.error.HTTPError(
+                request.full_url, 401, "expired", {}, None
+            )
         return FakeResponse()
 
     module.ensure_account_session = fake_session
@@ -364,7 +735,9 @@ def test_account_request_refresh_retry():
     return True
 
 
-results.append(test("401 refreshes and retries once", test_account_request_refresh_retry))
+results.append(
+    test("401 refreshes and retries once", test_account_request_refresh_retry)
+)
 
 
 def test_non_json_mutation_is_never_replayed():
@@ -428,7 +801,12 @@ def test_non_json_mutation_is_never_replayed():
     return True
 
 
-results.append(test("non-JSON mutations are never replayed", test_non_json_mutation_is_never_replayed))
+results.append(
+    test(
+        "non-JSON mutations are never replayed",
+        test_non_json_mutation_is_never_replayed,
+    )
+)
 
 
 def test_text_auth_status_rejects_anonymous_response():
@@ -450,7 +828,12 @@ def test_text_auth_status_rejects_anonymous_response():
     return True
 
 
-results.append(test("text auth status rejects anonymous response", test_text_auth_status_rejects_anonymous_response))
+results.append(
+    test(
+        "text auth status rejects anonymous response",
+        test_text_auth_status_rejects_anonymous_response,
+    )
+)
 
 
 def test_past_order_item_pagination():
@@ -461,9 +844,7 @@ def test_past_order_item_pagination():
         calls.append((method, path, params))
         page = params["page"]
         items = (
-            [{"sku": "111111"}, {"sku": "222222"}]
-            if page == 1
-            else [{"sku": "333333"}]
+            [{"sku": "111111"}, {"sku": "222222"}] if page == 1 else [{"sku": "333333"}]
         )
         return {"products": {"items": items, "totalItems": 3}}
 
@@ -478,19 +859,51 @@ def test_past_order_item_pagination():
     return True
 
 
-results.append(test("past-order items paginate for large invoices", test_past_order_item_pagination))
+results.append(
+    test(
+        "past-order items paginate for large invoices", test_past_order_item_pagination
+    )
+)
 
 
 def test_list_and_cart_payloads():
     module = load_cli()
+    parser = module.build_parser(include_account=True)
+    assert (
+        parser.parse_args(["list-add", "fixture-list", "705692"]).func
+        is module.cmd_list_add
+    )
+    assert (
+        parser.parse_args(
+            ["list-update", "fixture-list", "705692", "--quantity", "3"]
+        ).func
+        is module.cmd_list_update
+    )
     list_args = module.argparse.Namespace(sku="705692", quantity=3)
     assert module.list_item_payload(list_args) == {
         "itemsToAdd": [{"sku": "705692", "quantity": 3}]
     }
-    assert module.cart_payload("705692", 2, "Each") == {
-        "sku": "705692",
-        "quantity": 2,
-        "pricingUnit": "Each",
+    calls = []
+    module.account_api = lambda method, path, payload=None: (
+        calls.append((method, path, payload)) or {"ok": True}
+    )
+    module.emit_json_or_summary = lambda *_args, **_kwargs: None
+    module.cmd_list_update(
+        module.argparse.Namespace(
+            list_id="fixture-list", sku="705692", quantity=3, json=True
+        )
+    )
+    assert calls == [
+        (
+            "POST",
+            "/shoppers/my/saved-lists/fixture-list/items/705692",
+            {"itemsToAdd": [{"sku": "705692", "quantity": 3}]},
+        )
+    ]
+    trolley_request = module.cart_payload("705692-EA", 2, "Each")
+    assert trolley_request["operationName"] == "SetCartLineItemQuantity"
+    assert trolley_request["variables"]["input"] == {
+        "cartLineItemQuantityUpdates": [{"variantKey": "705692-EA", "quantity": 2}]
     }
     cart = {
         "items": [
@@ -520,10 +933,9 @@ def test_list_and_cart_payloads():
 
     def empty_trolley_account_api(method, path, data=None, **_kwargs):
         calls.append((method, path, data))
-        if method == "GET":
-            return {"items": []}
         return {"ok": True}
 
+    module.read_cart = lambda: {"items": []}
     module.account_api = empty_trolley_account_api
     module.cmd_list_create(
         module.argparse.Namespace(
@@ -534,7 +946,6 @@ def test_list_and_cart_payloads():
         )
     )
     assert calls == [
-        ("GET", "/trolleys/my", None),
         (
             "POST",
             "/shoppers/my/saved-lists",
@@ -542,8 +953,8 @@ def test_list_and_cart_payloads():
         ),
     ]
 
-    module.account_api = lambda *_args, **_kwargs: {
-        "items": [{"products": [{"sku": "705692", "quantity": {"value": 1}}]}]
+    module.read_cart = lambda: {
+        "items": [{"sku": "705692", "variant_key": "705692-EA", "quantity": 1}]
     }
     try:
         module.cmd_list_create(
@@ -573,7 +984,9 @@ def test_list_and_cart_payloads():
     return True
 
 
-results.append(test("saved-list and trolley payload contracts", test_list_and_cart_payloads))
+results.append(
+    test("saved-list and trolley payload contracts", test_list_and_cart_payloads)
+)
 
 
 def test_invoice_mismatch_fails_before_account_fetch():
@@ -609,7 +1022,12 @@ def test_invoice_mismatch_fails_before_account_fetch():
     return True
 
 
-results.append(test("invoice mismatch fails before account fetch", test_invoice_mismatch_fails_before_account_fetch))
+results.append(
+    test(
+        "invoice mismatch fails before account fetch",
+        test_invoice_mismatch_fails_before_account_fetch,
+    )
+)
 
 
 def test_invoice_row_parser_and_sku_join():
@@ -706,7 +1124,12 @@ def test_invoice_row_parser_and_sku_join():
     return True
 
 
-results.append(test("invoice rows join deterministically to SKUs", test_invoice_row_parser_and_sku_join))
+results.append(
+    test(
+        "invoice rows join deterministically to SKUs",
+        test_invoice_row_parser_and_sku_join,
+    )
+)
 
 
 def test_help():
@@ -737,6 +1160,32 @@ def test_search():
 
 
 results.append(test("search milk returns products[]", test_search))
+
+
+_category_key = ""
+
+
+def test_categories_and_browse():
+    global _category_key
+    result = run(["categories", "--json"])
+    if result.returncode != 0:
+        print(f"  stderr: {result.stderr[:200]}")
+        return False
+    categories = json.loads(result.stdout)
+    children = categories.get("children") or []
+    if not children or not children[0].get("key"):
+        print("  Expected Woolworths categories JSON to include children[].key")
+        return False
+    _category_key = str(children[0]["key"])
+    result = run(["browse", _category_key, "--limit", "2", "--json"])
+    if result.returncode != 0:
+        print(f"  stderr: {result.stderr[:200]}")
+        return False
+    browse = json.loads(result.stdout)
+    return isinstance(browse.get("products"), list) and bool(browse["products"])
+
+
+results.append(test("categories feed browse keys", test_categories_and_browse))
 
 
 def test_product():

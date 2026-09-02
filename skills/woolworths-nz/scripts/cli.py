@@ -5,6 +5,7 @@ Public product lookup is stdlib-only. Account commands are registered only when
 the caller supplies Woolworths credentials; browser-assisted login is isolated
 to ``browser_auth.py`` and persists cookies, never the password.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -20,10 +21,11 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from typing import Any
+from typing import Any, NoReturn
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
 import nzfetch  # noqa: E402
+import graphql_api  # noqa: E402
 
 BASE_WEB = "https://www.woolworths.co.nz"
 BASE_API = BASE_WEB + "/api/v1"
@@ -34,7 +36,11 @@ UA = os.environ.get(
 UI_VER = os.environ.get("WOOLWORTHS_NZ_UI_VER", "7.76.44")
 ACCOUNT_USER_KEYS = ("WOOLWORTHS_USERNAME", "WOOLWORTHS_EMAIL")
 ACCOUNT_SIGNIN_ENV = "WOOLWORTHS_PASSWORD"
-SESSION_COOKIE_DOMAINS = {"woolworths.co.nz", ".woolworths.co.nz", "www.woolworths.co.nz"}
+SESSION_COOKIE_DOMAINS = {
+    "woolworths.co.nz",
+    ".woolworths.co.nz",
+    "www.woolworths.co.nz",
+}
 
 
 def credential_value(keys: tuple[str, ...]) -> str | None:
@@ -81,16 +87,20 @@ def session_file() -> pathlib.Path:
     override = os.environ.get("WOOLWORTHS_SESSION_FILE")
     if override:
         return pathlib.Path(override).expanduser()
-    state_home = pathlib.Path(os.environ.get("XDG_STATE_HOME", pathlib.Path.home() / ".local/state"))
+    state_home = pathlib.Path(
+        os.environ.get("XDG_STATE_HOME", pathlib.Path.home() / ".local/state")
+    )
     return state_home / "woolworths-nz" / "cookies.json"
 
 
-def die(message: str, code: int = 1) -> None:
+def die(message: str, code: int = 1) -> NoReturn:
     print(f"woolworths-nz: {message}", file=sys.stderr)
     raise SystemExit(code)
 
 
-def request_json(path: str, params: dict[str, Any] | None = None, timeout: int = 20) -> Any:
+def request_json(
+    path: str, params: dict[str, Any] | None = None, timeout: int = 20
+) -> Any:
     url = BASE_API + path
     if params:
         clean = {k: str(v) for k, v in params.items() if v is not None}
@@ -103,7 +113,10 @@ def request_json(path: str, params: dict[str, Any] | None = None, timeout: int =
     }
     try:
         body, _ct, _final = nzfetch.fetch_bytes(
-            url, timeout=timeout, headers=headers, accept="application/json, text/plain, */*"
+            url,
+            timeout=timeout,
+            headers=headers,
+            accept="application/json, text/plain, */*",
         )
         raw = body.decode("utf-8", "replace")
         return json.loads(raw) if raw else None
@@ -113,6 +126,33 @@ def request_json(path: str, params: dict[str, Any] | None = None, timeout: int =
         die(str(e))
     except json.JSONDecodeError as e:
         die(f"invalid JSON from {url}: {e}")
+
+
+def graphql_json(payload: dict[str, Any], timeout: int = 20) -> Any:
+    operation = payload.get("operationName")
+    if operation not in graphql_api.PUBLIC_OPERATIONS:
+        die("unsafe public GraphQL operation")
+    url = BASE_WEB + graphql_api.GRAPHQL_PATH
+    url += "?" + urllib.parse.urlencode({"op-name": operation})
+    headers = {
+        "Content-Type": "application/json",
+        "Origin": BASE_WEB,
+        "Referer": BASE_WEB + "/",
+        "WNZX-Operation-Name": str(operation),
+    }
+    try:
+        return nzfetch.fetch_json(
+            url,
+            timeout=timeout,
+            headers=headers,
+            data=json.dumps(payload).encode("utf-8"),
+            method="POST",
+            allowed_hosts={"www.woolworths.co.nz"},
+        )
+    except nzfetch.Blocked as exc:
+        die(f"network error: {exc}")
+    except nzfetch.FetchError as exc:
+        die(str(exc))
 
 
 def load_session_cookies() -> list[dict[str, Any]]:
@@ -267,7 +307,9 @@ def update_session_from_response(
     return updated
 
 
-def account_headers(cookies: list[dict[str, Any]], *, mutation: bool = False) -> dict[str, str]:
+def account_headers(
+    cookies: list[dict[str, Any]], *, mutation: bool = False
+) -> dict[str, str]:
     headers = {
         "Accept": "application/json, text/plain, */*",
         "Content-Type": "application/json",
@@ -300,7 +342,9 @@ def refresh_account_cookies(
     )
     try:
         with urllib.request.urlopen(request, timeout=25) as response:
-            refreshed = update_session_from_response(cookies, getattr(response, "headers", None))
+            refreshed = update_session_from_response(
+                cookies, getattr(response, "headers", None)
+            )
             raw = response.read().decode("utf-8", "replace")
     except urllib.error.HTTPError as exc:
         update_session_from_response(cookies, getattr(exc, "headers", None))
@@ -353,7 +397,9 @@ def browser_login(*, headed: bool = False) -> dict[str, Any]:
         die(str(exc))
 
 
-def ensure_account_session(*, force: bool = False, headed: bool = False) -> list[dict[str, Any]]:
+def ensure_account_session(
+    *, force: bool = False, headed: bool = False
+) -> list[dict[str, Any]]:
     cookies = [] if force else load_session_cookies()
     if cookies:
         return cookies
@@ -401,7 +447,9 @@ def account_api(
                 ensure_account_session(force=True)
                 return account_api(method, path, data, params=params, retry_auth=False)
             die("authenticated session is missing the XSRF token; run `auth login`")
-    request = urllib.request.Request(url, data=body, headers=headers, method=request_method)
+    request = urllib.request.Request(
+        url, data=body, headers=headers, method=request_method
+    )
     try:
         with urllib.request.urlopen(request, timeout=25) as response:
             update_session_from_response(cookies, getattr(response, "headers", None))
@@ -413,7 +461,9 @@ def account_api(
             except json.JSONDecodeError:
                 if request_method == "GET" and retry_auth:
                     ensure_account_session(force=True)
-                    return account_api(method, path, data, params=params, retry_auth=False)
+                    return account_api(
+                        method, path, data, params=params, retry_auth=False
+                    )
                 if request_method != "GET":
                     die(
                         "Woolworths returned a non-JSON response after an account "
@@ -444,13 +494,81 @@ def account_api(
         die(f"network error: {exc.reason}")
 
 
+def account_graphql(
+    payload: dict[str, Any], *, mutation: bool = False, retry_auth: bool = True
+) -> Any:
+    operation = payload.get("operationName")
+    allowed = (
+        graphql_api.ACCOUNT_MUTATION_OPERATIONS
+        if mutation
+        else graphql_api.ACCOUNT_QUERY_OPERATIONS
+    )
+    if operation not in allowed:
+        die("unsafe account GraphQL operation")
+    cookies = ensure_account_session()
+    if mutation:
+        cookies = refresh_account_cookies(cookies)
+        if not xsrf_token(cookies):
+            if retry_auth:
+                ensure_account_session(force=True)
+                return account_graphql(payload, mutation=True, retry_auth=False)
+            die("authenticated session is missing the XSRF token; run `auth login`")
+    headers = account_headers(cookies, mutation=mutation)
+    headers["WNZX-Operation-Name"] = str(operation)
+    url = BASE_WEB + graphql_api.GRAPHQL_PATH
+    url += "?" + urllib.parse.urlencode({"op-name": operation})
+    request = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers=headers,
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=25) as response:
+            update_session_from_response(cookies, getattr(response, "headers", None))
+            raw = response.read().decode("utf-8", "replace")
+            if not raw:
+                if mutation:
+                    die(
+                        "Woolworths returned an empty response after a trolley "
+                        "mutation; inspect the trolley before retrying."
+                    )
+                die("Woolworths returned an empty trolley response")
+            try:
+                return json.loads(raw)
+            except json.JSONDecodeError:
+                if mutation:
+                    die(
+                        "Woolworths returned a non-JSON response after a trolley "
+                        "mutation; inspect the trolley before retrying."
+                    )
+                die("Woolworths returned a non-JSON trolley response; run `auth login`")
+    except urllib.error.HTTPError as exc:
+        update_session_from_response(cookies, getattr(exc, "headers", None))
+        if exc.code in (401, 403) and retry_auth:
+            ensure_account_session(force=True)
+            return account_graphql(payload, mutation=mutation, retry_auth=False)
+        if exc.code in (401, 403):
+            die("Woolworths rejected the session after refresh; run `auth login`")
+        die(f"Woolworths GraphQL request failed (HTTP {exc.code})")
+    except urllib.error.URLError as exc:
+        die(f"network error: {exc.reason}")
+
+
+def parse_graphql(call, payload: Any, **kwargs: Any) -> Any:
+    try:
+        return call(payload, **kwargs)
+    except graphql_api.GraphQLContractError as exc:
+        die(f"Woolworths GraphQL contract error: {exc}")
+
+
 def positive_quantity(value: str) -> float:
     try:
         quantity = float(value)
     except ValueError:
         raise argparse.ArgumentTypeError("quantity must be numeric")
-    if not math.isfinite(quantity) or quantity <= 0 or quantity > 999:
-        raise argparse.ArgumentTypeError("quantity must be greater than 0 and at most 999")
+    if not math.isfinite(quantity) or quantity <= 0:
+        raise argparse.ArgumentTypeError("quantity must be finite and greater than 0")
     return int(quantity) if quantity.is_integer() else quantity
 
 
@@ -509,13 +627,16 @@ def category_from(item: dict[str, Any]) -> str:
 def parse_product(item: dict[str, Any]) -> dict[str, Any]:
     price = item.get("price") or {}
     size = item.get("size") or {}
-    quantity = item.get("quantity") or {}
     images_raw = item.get("images") or {}
     if isinstance(images_raw, dict):
         image = images_raw.get("big") or images_raw.get("small")
     elif isinstance(images_raw, list) and images_raw:
         first_image = images_raw[0]
-        image = first_image.get("url") if isinstance(first_image, dict) else str(first_image)
+        image = (
+            first_image.get("url")
+            if isinstance(first_image, dict)
+            else str(first_image)
+        )
     else:
         image = None
     sale_price = price.get("salePrice")
@@ -539,18 +660,17 @@ def parse_product(item: dict[str, Any]) -> dict[str, Any]:
         "package_type": size.get("packageType"),
         "cup_price": size.get("cupPrice"),
         "cup_measure": size.get("cupMeasure"),
-        "availability": item.get("availabilityStatus") or "Unknown",
-        "in_stock": item.get("availabilityStatus") == "In Stock",
         "category": category_from(item),
         "supports_dual_pricing": bool(item.get("supportsBothEachAndKgPricing")),
         "average_weight_per_unit": item.get("averageWeightPerUnit"),
         "average_price_per_each": price.get("averagePricePerSingleUnit"),
         "purchasing_unit_price": price.get("purchasingUnitPrice"),
-        "minimum_quantity": quantity.get("min"),
-        "maximum_quantity": quantity.get("max"),
-        "quantity_increment": quantity.get("increment"),
         "image": image or item.get("imageUrl") or item.get("bigImageUrl"),
-        "source_url": BASE_WEB + "/shop/productdetails/" + str(item.get("sku") or "") + "/" + str(item.get("slug") or ""),
+        "source_url": BASE_WEB
+        + "/shop/productdetails/"
+        + str(item.get("sku") or "")
+        + "/"
+        + str(item.get("slug") or ""),
     }
 
 
@@ -565,21 +685,31 @@ def product_items(payload: Any) -> list[dict[str, Any]]:
     return out
 
 
-def products_query(target: str, *, search: str | None = None, category_id: str | None = None, limit: int = 10, page: int = 1, in_stock_only: bool = False) -> dict[str, Any]:
-    size = min(max(1, limit), 48)
-    params: dict[str, Any] = {
-        "target": target,
-        "size": size,
-        "page": max(1, page),
-        "inStockProductsOnly": str(bool(in_stock_only)).lower(),
-    }
-    if search:
-        params["search"] = search
-    if category_id:
-        params["categoryId"] = category_id
+def products_query(
+    target: str,
+    *,
+    search: str | None = None,
+    category_id: str | None = None,
+    limit: int = 10,
+    page: int = 1,
+) -> dict[str, Any]:
+    mode = {
+        "search": "keyword",
+        "browse": "category",
+        "specials": "specials",
+    }.get(target)
+    if not mode:
+        die(f"unsupported product query target: {target}")
+    value = category_id if mode == "category" else search
     started = time.perf_counter()
-    payload = request_json("/products", params=params)
-    products = product_items(payload)[:limit]
+    request = graphql_api.product_search_request(
+        mode=mode,
+        value=value,
+        page=max(1, page),
+        limit=min(max(1, limit), 48),
+    )
+    parsed = parse_graphql(graphql_api.parse_product_search, graphql_json(request))
+    products = parsed["products"][:limit]
     elapsed_ms = round((time.perf_counter() - started) * 1000)
     return {
         "target": target,
@@ -588,37 +718,70 @@ def products_query(target: str, *, search: str | None = None, category_id: str |
         "count": len(products),
         "elapsed_ms": elapsed_ms,
         "products": products,
-        "raw_total": nested(payload or {}, "products", "totalRecordCount"),
+        "raw_total": parsed.get("total"),
+        "page": parsed.get("page"),
+        "page_size": parsed.get("page_size"),
+        "total_pages": parsed.get("total_pages"),
     }
 
 
 def cmd_search(args: argparse.Namespace) -> None:
-    data = products_query("search", search=args.query, limit=args.limit, page=args.page, in_stock_only=args.in_stock_only)
+    data = products_query(
+        "search",
+        search=args.query,
+        limit=args.limit,
+        page=args.page,
+    )
     if args.size:
         needle = args.size.lower()
-        data["products"] = [p for p in data["products"] if needle in (p.get("size") or "").lower()]
+        data["products"] = [
+            p for p in data["products"] if needle in (p.get("size") or "").lower()
+        ]
         data["count"] = len(data["products"])
     emit(data, args.json)
 
 
 def cmd_specials(args: argparse.Namespace) -> None:
     if args.query:
-        # The upstream specials endpoint ignores the search parameter, so when the
-        # user supplies a query we use the search target and filter to specials
-        # client-side. Fetch up to the API max so the filter has enough to work with.
-        fetch_size = max(args.limit * 4, 24)
-        data = products_query("search", search=args.query, limit=fetch_size, page=args.page, in_stock_only=args.in_stock_only)
-        specials_only = [p for p in data["products"] if p.get("is_special")]
-        data["products"] = specials_only[:args.limit]
-        data["count"] = len(data["products"])
-        data["target"] = "specials"
+        fetch_size = min(48, max(24, args.limit * 4))
+        request = graphql_api.product_search_request(
+            mode="keyword-specials",
+            value=args.query,
+            page=args.page,
+            limit=fetch_size,
+        )
+        started = time.perf_counter()
+        parsed = parse_graphql(graphql_api.parse_product_search, graphql_json(request))
+        products = [
+            product for product in parsed["products"] if product.get("is_special")
+        ][: args.limit]
+        data = {
+            "target": "specials",
+            "query": args.query,
+            "count": len(products),
+            "elapsed_ms": round((time.perf_counter() - started) * 1000),
+            "products": products,
+            "raw_total": parsed.get("total"),
+            "page": parsed.get("page"),
+            "page_size": parsed.get("page_size"),
+            "total_pages": parsed.get("total_pages"),
+        }
     else:
-        data = products_query("specials", limit=args.limit, page=args.page, in_stock_only=args.in_stock_only)
+        data = products_query(
+            "specials",
+            limit=args.limit,
+            page=args.page,
+        )
     emit(data, args.json)
 
 
 def cmd_browse(args: argparse.Namespace) -> None:
-    data = products_query("browse", category_id=args.category_id, limit=args.limit, page=args.page, in_stock_only=args.in_stock_only)
+    data = products_query(
+        "browse",
+        category_id=args.category_id,
+        limit=args.limit,
+        page=args.page,
+    )
     emit(data, args.json)
 
 
@@ -626,11 +789,28 @@ def cmd_product(args: argparse.Namespace) -> None:
     products = []
     started = time.perf_counter()
     for sku in args.skus:
-        payload = request_json(f"/products/{urllib.parse.quote(str(sku))}")
-        if isinstance(payload, dict):
-            products.append(parse_product(payload))
-    data = {"count": len(products), "elapsed_ms": round((time.perf_counter() - started) * 1000), "products": products}
+        request = graphql_api.product_detail_request(str(sku))
+        payload = graphql_json(request)
+        products.append(parse_graphql(graphql_api.parse_product_detail, payload))
+    data = {
+        "count": len(products),
+        "elapsed_ms": round((time.perf_counter() - started) * 1000),
+        "products": products,
+    }
     emit(data, args.json)
+
+
+def cmd_categories(args: argparse.Namespace) -> None:
+    request = graphql_api.categories_request(args.category_key)
+    payload = graphql_json(request)
+    data = parse_graphql(graphql_api.parse_categories, payload)
+    if args.json:
+        print(json.dumps(data, indent=2, ensure_ascii=False))
+        return
+    children = data.get("children") if isinstance(data, dict) else None
+    for category in children or []:
+        if isinstance(category, dict):
+            print(f"{category.get('key')}  {category.get('name')}")
 
 
 def price_label(p: dict[str, Any]) -> str:
@@ -651,7 +831,7 @@ def print_products(data: dict[str, Any]) -> None:
     print(f"{label}: {data.get('count', 0)} products ({data.get('elapsed_ms')} ms)")
     total = data.get("raw_total")
     if total is not None:
-        print(f"Total available from source: {total}")
+        print(f"Total products from source: {total}")
     print()
     for p in data.get("products") or []:
         bits = []
@@ -661,17 +841,23 @@ def print_products(data: dict[str, Any]) -> None:
         if p.get("package_type"):
             bits.append(str(p["package_type"]))
         bits.append(price_label(p))
-        stock = "in stock" if p.get("in_stock") else p.get("availability", "unknown")
-        bits.append(str(stock).lower())
-        print(f"{p.get('sku'):>8}  {p.get('brand', '').title()} {p.get('name', '').title()}".strip())
+
+        print(
+            f"{p.get('sku'):>8}  {p.get('brand', '').title()} {p.get('name', '').title()}".strip()
+        )
         print("          " + " | ".join(x for x in bits if x))
         if p.get("cup_price") and p.get("cup_measure"):
-            print(f"          unit: {money(p.get('cup_price'))} per {p.get('cup_measure')}")
+            print(
+                f"          unit: {money(p.get('cup_price'))} per {p.get('cup_measure')}"
+            )
         if p.get("category"):
             print(f"          category: {p.get('category')}")
         if p.get("supports_dual_pricing"):
             avg = p.get("average_weight_per_unit")
-            print(f"          purchase options: Each or Kg" + (f"; avg wt {avg}kg" if avg else ""))
+            print(
+                "          purchase options: Each or Kg"
+                + (f"; avg wt {avg}kg" if avg else "")
+            )
         print()
 
 
@@ -693,13 +879,17 @@ def emit_json_or_summary(data: Any, as_json: bool, label: str) -> None:
                 ident = first_value(item, "id", "listId", "orderId", "sku")
                 name = first_value(item, "name", "listName", "title", "productName")
                 count = first_value(item, "itemCount", "totalItems", "count")
-                values = [value for value in (ident, name, count) if value not in (None, "")]
+                values = [
+                    value for value in (ident, name, count) if value not in (None, "")
+                ]
                 print("  " + "  ".join(str(value) for value in values))
             else:
                 print(f"  {item}")
         return
     if isinstance(data, dict):
-        records = records_from(data, "savedLists", "items", "orders", "products", "results")
+        records = records_from(
+            data, "savedLists", "items", "orders", "products", "results"
+        )
         if records:
             emit_json_or_summary(records, False, label)
             return
@@ -896,7 +1086,6 @@ def cmd_favourites(args: argparse.Namespace) -> None:
             "page": args.page,
             "size": args.limit,
             "sort": args.sort,
-            "inStockProductsOnly": str(bool(args.in_stock_only)).lower(),
         },
     )
     emit_json_or_summary(data, args.json, "favourites")
@@ -943,10 +1132,8 @@ def list_create_payload(args: argparse.Namespace) -> dict[str, Any]:
 
 def cmd_list_create(args: argparse.Namespace) -> None:
     if args.source == "empty":
-        trolley = account_api("GET", "/trolleys/my")
-        if not isinstance(trolley, dict):
-            die("could not verify an empty trolley before creating the list")
-        if cart_products(trolley):
+        trolley = read_cart()
+        if trolley.get("items"):
             die(
                 "empty list creation requires an empty trolley; remove its items "
                 "first or explicitly use --source trolley to copy them",
@@ -968,7 +1155,7 @@ def list_item_payload(args: argparse.Namespace) -> dict[str, Any]:
     return {"itemsToAdd": [{"sku": str(args.sku), "quantity": args.quantity}]}
 
 
-def cmd_list_add(args: argparse.Namespace) -> None:
+def write_list_item(args: argparse.Namespace, summary: str) -> None:
     list_id = urllib.parse.quote(args.list_id, safe="")
     sku = urllib.parse.quote(args.sku, safe="")
     data = account_api(
@@ -976,7 +1163,15 @@ def cmd_list_add(args: argparse.Namespace) -> None:
         f"/shoppers/my/saved-lists/{list_id}/items/{sku}",
         list_item_payload(args),
     )
-    emit_json_or_summary(data, args.json, "list item saved")
+    emit_json_or_summary(data, args.json, summary)
+
+
+def cmd_list_add(args: argparse.Namespace) -> None:
+    write_list_item(args, "list item added")
+
+
+def cmd_list_update(args: argparse.Namespace) -> None:
+    write_list_item(args, "list item quantity updated")
 
 
 def cmd_list_remove(args: argparse.Namespace) -> None:
@@ -1023,75 +1218,177 @@ def cart_item_quantity(item: dict[str, Any]) -> float:
         return 0
 
 
-def cart_payload(sku: str, quantity: int | float, unit: str) -> dict[str, Any]:
+def cart_payload(identifier: str, quantity: int | float, unit: str) -> dict[str, Any]:
     try:
         numeric_quantity = float(quantity)
     except (TypeError, ValueError):
         die("trolley quantity must be numeric", 2)
-    if not math.isfinite(numeric_quantity) or numeric_quantity < 0 or numeric_quantity > 999:
-        die("trolley quantity must be between 0 and 999", 2)
+    if not math.isfinite(numeric_quantity) or numeric_quantity < 0:
+        die("trolley quantity must be finite and non-negative", 2)
     if unit == "Each" and numeric_quantity != int(numeric_quantity):
         die("Each quantities must be whole numbers; use --unit Kg for a weight", 2)
-    return {"sku": str(sku), "quantity": quantity, "pricingUnit": unit}
+    value: int | float = (
+        int(numeric_quantity) if numeric_quantity.is_integer() else numeric_quantity
+    )
+    return graphql_api.cart_quantity_request(str(identifier), value)
+
+
+def read_cart() -> dict[str, Any]:
+    payload = account_graphql(graphql_api.customer_cart_request())
+    return parse_graphql(graphql_api.parse_customer_cart, payload)
+
+
+def unit_family(value: Any) -> str | None:
+    normalized = str(value or "").strip().lower().replace(" ", "")
+    if normalized in {"ea", "each", "quantity"}:
+        return "each"
+    if normalized in {"kg", "kilogram", "kilograms", "weight"}:
+        return "kg"
+    return normalized or None
+
+
+def choose_variant_key(
+    options: list[dict[str, Any]], *, requested_unit: str | None, identifier: str
+) -> str:
+    requested_family = unit_family(requested_unit)
+    candidates = options
+    if requested_family:
+        candidates = [
+            option
+            for option in options
+            if unit_family(option.get("unit")) == requested_family
+        ]
+    keys = {
+        str(option.get("variant_key"))
+        for option in candidates
+        if option.get("variant_key")
+    }
+    if len(keys) == 1:
+        return keys.pop()
+    if not keys and requested_family:
+        die(f"product {identifier} has no {requested_unit} purchasing variant")
+    die(
+        f"product {identifier} has multiple purchasing variants; pass the exact "
+        "variant key"
+    )
+    raise AssertionError("unreachable")
+
+
+def trolley_variant_key(
+    options: list[dict[str, Any]], requested_unit: str | None
+) -> str | None:
+    family = unit_family(requested_unit)
+    candidates = options
+    if family:
+        candidates = [
+            item for item in options if unit_family(item.get("unit")) == family
+        ]
+    keys = {str(item["variant_key"]) for item in candidates if item.get("variant_key")}
+    return keys.pop() if len(keys) == 1 else None
+
+
+def resolve_variant_key(
+    identifier: str, cart: dict[str, Any], unit: str | None = None
+) -> str:
+    value = str(identifier).strip()
+    items = [item for item in cart.get("items") or [] if isinstance(item, dict)]
+    exact = [item for item in items if str(item.get("variant_key") or "") == value]
+    if exact:
+        return value
+    trolley_options = [item for item in items if str(item.get("sku") or "") == value]
+    if trolley_options:
+        existing_key = trolley_variant_key(trolley_options, unit)
+        if existing_key:
+            return existing_key
+    if "-" in value:
+        return value
+    payload = graphql_json(graphql_api.product_detail_request(value))
+    product = parse_graphql(graphql_api.parse_product_detail, payload)
+    return choose_variant_key(
+        product.get("variants") or [], requested_unit=unit, identifier=value
+    )
+
+
+def emit_cart(cart: dict[str, Any], as_json: bool) -> None:
+    if as_json:
+        print(json.dumps(cart, indent=2, ensure_ascii=False))
+        return
+    print(
+        f"{cart.get('unique_products', 0)} trolley product(s); "
+        f"{cart.get('item_count', 0)} item(s)"
+    )
+    for item in cart.get("items") or []:
+        print(
+            f"  {item.get('sku')}  {item.get('name') or ''}  "
+            f"qty {item.get('quantity')}  {money(item.get('line_total'))}"
+        )
+    if cart.get("order_subtotal") is not None:
+        print(f"Order subtotal: {money(cart['order_subtotal'])}")
 
 
 def cmd_cart(args: argparse.Namespace) -> None:
-    data = account_api("GET", "/trolleys/my")
-    if args.json:
-        print(json.dumps(data, indent=2, ensure_ascii=False))
-        return
-    products = cart_products(data)
-    print(f"{len(products)} trolley product(s)")
-    for item in products:
-        name = first_value(item, "name", "productName")
-        if not name and isinstance(item.get("item"), dict):
-            name = first_value(item["item"], "name", "productName")
-        print(f"  {item.get('sku')}  {name or ''}  qty {cart_item_quantity(item):g}".rstrip())
+    emit_cart(read_cart(), args.json)
 
 
 def cmd_cart_add(args: argparse.Namespace) -> None:
-    current = account_api("GET", "/trolleys/my")
+    current = read_cart()
+    variant_key = resolve_variant_key(args.sku, current, args.unit)
     existing = 0.0
-    for item in cart_products(current):
-        if str(item.get("sku")) == str(args.sku):
-            existing = cart_item_quantity(item)
+    for item in current.get("items") or []:
+        if str(item.get("variant_key")) == variant_key:
+            existing = float(item.get("quantity") or 0)
             break
     target = existing + float(args.quantity)
-    if target.is_integer():
-        target = int(target)
-    data = account_api(
-        "POST",
-        "/trolleys/my/items",
-        cart_payload(args.sku, target, args.unit),
+    request = cart_payload(variant_key, target, args.unit)
+    payload = account_graphql(request, mutation=True)
+    cart = parse_graphql(
+        graphql_api.parse_customer_cart,
+        payload,
+        mutation_field="setCartLineItemQuantity",
     )
-    emit_json_or_summary(data, args.json, "trolley item added")
+    emit_cart(cart, args.json)
 
 
 def cmd_cart_update(args: argparse.Namespace) -> None:
-    data = account_api(
-        "POST",
-        "/trolleys/my/items",
-        cart_payload(args.sku, args.quantity, args.unit),
+    current = read_cart()
+    variant_key = resolve_variant_key(args.sku, current, args.unit)
+    request = cart_payload(variant_key, args.quantity, args.unit)
+    payload = account_graphql(request, mutation=True)
+    cart = parse_graphql(
+        graphql_api.parse_customer_cart,
+        payload,
+        mutation_field="setCartLineItemQuantity",
     )
-    emit_json_or_summary(data, args.json, "trolley item updated")
+    emit_cart(cart, args.json)
 
 
 def cmd_cart_remove(args: argparse.Namespace) -> None:
     if not args.yes:
         die("cart-remove is destructive; repeat with --yes to confirm", 2)
-    data = account_api(
-        "POST",
-        "/trolleys/my/items",
-        cart_payload(args.sku, 0, args.unit),
+    current = read_cart()
+    variant_key = resolve_variant_key(args.sku, current, args.unit)
+    payload = account_graphql(
+        graphql_api.cart_quantity_request(variant_key, 0),
+        mutation=True,
     )
-    emit_json_or_summary(data, args.json, "trolley item removed")
+    cart = parse_graphql(
+        graphql_api.parse_customer_cart,
+        payload,
+        mutation_field="setCartLineItemQuantity",
+    )
+    emit_cart(cart, args.json)
 
 
 def cmd_cart_clear(args: argparse.Namespace) -> None:
     if not args.yes:
         die("cart-clear is destructive; repeat with --yes to confirm", 2)
-    data = account_api("DELETE", "/trolleys/my/items")
-    emit_json_or_summary(data, args.json, "trolley cleared")
+    payload = account_graphql(graphql_api.clear_cart_request(), mutation=True)
+    cart = parse_graphql(
+        graphql_api.parse_customer_cart,
+        payload,
+        mutation_field="clearCart",
+    )
+    emit_cart(cart, args.json)
 
 
 def build_parser(include_account: bool | None = None) -> argparse.ArgumentParser:
@@ -1110,7 +1407,6 @@ def build_parser(include_account: bool | None = None) -> argparse.ArgumentParser
     sp.add_argument("--limit", type=int, default=10)
     sp.add_argument("--page", type=int, default=1)
     sp.add_argument("--size", help="filter returned products by size text, e.g. 2L")
-    sp.add_argument("--in-stock-only", action="store_true")
     sp.add_argument("--json", action="store_true")
     sp.set_defaults(func=cmd_search)
 
@@ -1118,17 +1414,22 @@ def build_parser(include_account: bool | None = None) -> argparse.ArgumentParser
     sp.add_argument("query", nargs="?")
     sp.add_argument("--limit", type=int, default=10)
     sp.add_argument("--page", type=int, default=1)
-    sp.add_argument("--in-stock-only", action="store_true")
     sp.add_argument("--json", action="store_true")
     sp.set_defaults(func=cmd_specials)
 
-    sp = sub.add_parser("browse", help="browse a numeric Woolworths category id")
-    sp.add_argument("category_id", help="numeric category id from Woolworths breadcrumb/category data")
+    sp = sub.add_parser("browse", help="browse a Woolworths category key")
+    sp.add_argument(
+        "category_id", help="category key returned by the categories command"
+    )
     sp.add_argument("--limit", type=int, default=10)
     sp.add_argument("--page", type=int, default=1)
-    sp.add_argument("--in-stock-only", action="store_true")
     sp.add_argument("--json", action="store_true")
     sp.set_defaults(func=cmd_browse)
+
+    sp = sub.add_parser("categories", help="list Woolworths product categories")
+    sp.add_argument("category_key", nargs="?", help="optional parent category key")
+    sp.add_argument("--json", action="store_true")
+    sp.set_defaults(func=cmd_categories)
 
     sp = sub.add_parser("product", help="fetch one or more product SKUs")
     sp.add_argument("skus", nargs="+")
@@ -1140,13 +1441,19 @@ def build_parser(include_account: bool | None = None) -> argparse.ArgumentParser
 
     sp = sub.add_parser("auth", help="manage the local Woolworths browser session")
     auth_sub = sp.add_subparsers(dest="auth_command", required=True)
-    auth_login = auth_sub.add_parser("login", help="sign in and cache a reusable browser session")
-    auth_login.add_argument("--headed", action="store_true", help="show the login browser")
+    auth_login = auth_sub.add_parser(
+        "login", help="sign in and cache a reusable browser session"
+    )
+    auth_login.add_argument(
+        "--headed", action="store_true", help="show the login browser"
+    )
     auth_login.set_defaults(func=cmd_auth_login)
     auth_status = auth_sub.add_parser("status", help="validate the cached session")
     auth_status.add_argument("--json", action="store_true")
     auth_status.set_defaults(func=cmd_auth_status)
-    auth_logout = auth_sub.add_parser("logout", help="remove only the local session cache")
+    auth_logout = auth_sub.add_parser(
+        "logout", help="remove only the local session cache"
+    )
     auth_logout.set_defaults(func=cmd_auth_logout)
 
     sp = sub.add_parser("orders", help="list personal past orders")
@@ -1160,7 +1467,9 @@ def build_parser(include_account: bool | None = None) -> argparse.ArgumentParser
     sp.add_argument("--json", action="store_true")
     sp.set_defaults(func=cmd_order)
 
-    sp = sub.add_parser("order-items", help="list items from a past order, or all past orders")
+    sp = sub.add_parser(
+        "order-items", help="list items from a past order, or all past orders"
+    )
     sp.add_argument("order_id", help="order id or 'all'")
     sp.add_argument("--page", type=int, default=1)
     sp.add_argument("--limit", type=int, default=48)
@@ -1187,7 +1496,6 @@ def build_parser(include_account: bool | None = None) -> argparse.ArgumentParser
     sp.add_argument("--page", type=int, default=1)
     sp.add_argument("--limit", type=int, default=48)
     sp.add_argument("--sort")
-    sp.add_argument("--in-stock-only", action="store_true")
     sp.add_argument("--json", action="store_true")
     sp.set_defaults(func=cmd_favourites)
 
@@ -1206,7 +1514,9 @@ def build_parser(include_account: bool | None = None) -> argparse.ArgumentParser
     sp = sub.add_parser("list-create", help="create a personal saved list")
     sp.add_argument("name", type=nonempty_name)
     sp.add_argument("--source", choices=sorted(LIST_CREATE_SOURCES), default="empty")
-    sp.add_argument("--source-id", help="existing list or order id for the selected source")
+    sp.add_argument(
+        "--source-id", help="existing list or order id for the selected source"
+    )
     sp.add_argument("--json", action="store_true")
     sp.set_defaults(func=cmd_list_create)
 
@@ -1216,18 +1526,20 @@ def build_parser(include_account: bool | None = None) -> argparse.ArgumentParser
     sp.add_argument("--json", action="store_true")
     sp.set_defaults(func=cmd_list_delete)
 
-    for command, help_text in (
-        ("list-add", "add a product to a personal saved list"),
-        ("list-update", "set a saved-list product quantity"),
+    for command, help_text, handler in (
+        ("list-add", "add a product to a personal saved list", cmd_list_add),
+        ("list-update", "set a saved-list product quantity", cmd_list_update),
     ):
         sp = sub.add_parser(command, help=help_text)
         sp.add_argument("list_id")
         sp.add_argument("sku")
         sp.add_argument("--quantity", type=positive_quantity, default=1)
         sp.add_argument("--json", action="store_true")
-        sp.set_defaults(func=cmd_list_add)
+        sp.set_defaults(func=handler)
 
-    sp = sub.add_parser("list-remove", help="remove a product from a personal saved list")
+    sp = sub.add_parser(
+        "list-remove", help="remove a product from a personal saved list"
+    )
     sp.add_argument("list_id")
     sp.add_argument("sku")
     sp.add_argument("--yes", action="store_true", help="confirm item removal")

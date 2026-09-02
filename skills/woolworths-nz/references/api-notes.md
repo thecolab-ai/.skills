@@ -11,12 +11,21 @@ This is an unofficial wrapper around endpoints currently used by `woolworths.co.
 - Because the Auth0 identifier step can present a browser challenge, raw credential POSTs are not a supported login method. The optional Camoufox helper performs the normal browser flow.
 - Only resulting Woolworths cookies are persisted with mode `0600`; credentials remain in environment variables. The cache is atomically created and bound to a SHA-256 hash of the normalised username so it cannot be silently reused for different supplied credentials.
 
-## Public product endpoints
+## Current public product GraphQL
 
-- `GET /api/v1/products?target=search&search={query}&inStockProductsOnly=false&size={limit}`
-- `GET /api/v1/products?target=specials&size={limit}`
-- `GET /api/v1/products?target=browse&categoryId={id}&size={limit}`
-- `GET /api/v1/products/{sku}`
+All current product calls use `POST /api/graphql?op-name={operation}` with a JSON
+GraphQL envelope and the matching `WNZX-Operation-Name` header.
+
+- `ProductSearch` with `CompositeSearchInput`
+  - `byKeyword` for keyword search
+  - `byCategoryKey` for category browse
+  - `byProductPromotionSpecials` for specials
+- `GetAllCategories` with optional `categoryKey`
+- `GetProductDetails` with `key`
+
+The CLI selects catalogue identity, descriptions, imagery, category hierarchy,
+price and promotion fields, and purchase units. It does not send account cookies
+for these public calls.
 
 ## Personal read endpoints
 
@@ -62,14 +71,24 @@ the optional `pdfplumber` package.
 - `DELETE /api/v1/shoppers/my/saved-lists/{listId}`
 - `POST /api/v1/shoppers/my/saved-lists/{listId}/items/{sku}`
   - `{"itemsToAdd":[{"sku":"705692","quantity":1}]}`
+  - The same upsert endpoint backs both `list-add` and the explicit
+    `list-update` target-quantity command; they use separate CLI handlers.
 - `DELETE /api/v1/shoppers/my/saved-lists/{listId}/items/{sku}`
 
-## Trolley writes
+## Current trolley GraphQL
 
-- `POST /api/v1/trolleys/my/items`
-  - `{"sku":"705692","quantity":2,"pricingUnit":"Each"}`
-  - The same endpoint sets a target quantity; quantity zero removes a product.
-- `DELETE /api/v1/trolleys/my/items` — clear the trolley.
+- `CustomerCart` reads the signed-in user's trolley.
+- `SetCartLineItemQuantity` accepts
+  `{"input":{"cartLineItemQuantityUpdates":[{"variantKey":"705692-EA","quantity":2}]}}`.
+  The quantity is a target quantity. The CLI reserves zero for the guarded
+  `cart-remove --yes` path; `cart-update` accepts positive quantities only.
+- `ClearCart` removes all products and still requires the CLI's `--yes` guard.
+
+The CLI accepts either a catalogue SKU or the returned `variant_key`. If a plain
+SKU is supplied, it resolves `GetProductDetails` and selects the variant matching
+`--unit Each|Kg` before writing. An exact variant key is required when unit data
+cannot disambiguate the product. Mutation responses are parsed as authoritative
+trolley snapshots and GraphQL `errors` fail closed.
 
 `Each` values should be whole counts. `Kg` supports weights. The skill does not expose checkout, place-order, payment, delivery-slot, active-order, account/profile, or loyalty mutation endpoints.
 

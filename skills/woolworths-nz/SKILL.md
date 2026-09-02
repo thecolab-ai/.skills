@@ -18,15 +18,15 @@ metadata:
   thecolab.skill_type: "authenticated-personal"
   thecolab.pack: "nz-personal-data"
   thecolab.public_pack: "nz-commercial-web"
-  thecolab.public_commands: "search,specials,browse,product"
-  thecolab.public_description: "Query Woolworths NZ public product search, specials, category browsing, and SKU details without an account."
-  thecolab.public_access_mode: "html-readonly"
+  thecolab.public_commands: "search,specials,categories,browse,product"
+  thecolab.public_description: "Query Woolworths NZ public product search, specials, categories, browsing, and SKU details without an account."
+  thecolab.public_access_mode: "public-api"
   thecolab.public_health: "healthy"
   thecolab.public_risk: "medium"
   thecolab.public_allowed_domains: "www.woolworths.co.nz"
   thecolab.source_url: "https://www.woolworths.co.nz"
   thecolab.allowed_domains: "auth.woolworths.co.nz,iam.woolworths.co.nz,www.woolworths.co.nz"
-  thecolab.last_verified: "2026-07-24"
+  thecolab.last_verified: "2026-09-02"
   thecolab.health: "gated"
   thecolab.maintainer: "@adam91holt"
   thecolab.mutations: "authenticated-api-post,authenticated-api-delete"
@@ -58,7 +58,7 @@ Query live Woolworths NZ product data, optionally retrieve the authenticated use
 ## Preferred workflow
 
 1. Run `scripts/cli.py` with the narrowest command that answers the task
-2. Use public `search`, `specials`, `browse`, and `product` commands without credentials
+2. Use public `search`, `specials`, `categories`, `browse`, and `product` commands without credentials
 3. Use account commands only after the user supplies their own credentials as environment variables
 4. Run saved-list or trolley mutations only for the exact change the user requested
 5. Preserve every `--yes` deletion/removal guard
@@ -99,9 +99,10 @@ python3 skills/woolworths-nz/scripts/cli.py <command> [flags]
 
 Public commands are always available:
 
-- `search <query> [--limit N] [--page N] [--size text] [--in-stock-only] [--json]`
-- `specials [query] [--limit N] [--page N] [--in-stock-only] [--json]`
-- `browse <category-id> [--limit N] [--page N] [--in-stock-only] [--json]`
+- `search <query> [--limit N] [--page N] [--size text] [--json]`
+- `specials [query] [--limit N] [--page N] [--json]`
+- `categories [parent-category-key] [--json]`
+- `browse <category-key> [--limit N] [--page N] [--json]`
 - `product <sku...> [--json]`
 
 The following appear only when the credential environment variables are set:
@@ -113,7 +114,7 @@ The following appear only when the credential environment variables are set:
 - `order <order-id> [--json]`
 - `order-items <order-id|all> [--page N] [--limit N] [--sort value] [--json]`
 - `invoice-items <order-id> <invoice.pdf> [--min-confidence 0..1] [--json]`
-- `favourites [--page N] [--limit N] [--sort value] [--in-stock-only] [--json]`
+- `favourites [--page N] [--limit N] [--sort value] [--json]`
 - `lists [--json]`
 - `list <list-id> [--page N] [--limit N] [--sort value] [--json]`
 - `list-create <name> [--source empty|trolley|favourites|list|order|all-orders] [--source-id id] [--json]`
@@ -131,6 +132,7 @@ Examples:
 
 ```bash
 python3 skills/woolworths-nz/scripts/cli.py search milk --limit 10
+python3 skills/woolworths-nz/scripts/cli.py categories
 python3 skills/woolworths-nz/scripts/cli.py product 705692 --json
 woolworths auth login
 woolworths orders --json
@@ -141,6 +143,10 @@ woolworths list-add <list-id> 705692 --quantity 2
 woolworths cart-add 705692 --quantity 2
 ```
 
+Trolley SKU commands resolve `--unit Each|Kg` to the exact purchasing variant
+before mutating. Pass the exact variant key when a product has other ambiguous
+purchasing variants.
+
 `list-create` defaults to `--source empty`. Woolworths currently implements
 that safely by saving the current trolley as a list, so the CLI first reads the
 trolley and refuses to create the list unless it is empty. Use
@@ -150,6 +156,7 @@ copied into the new list.
 ## Resources
 
 - CLI entrypoint: `scripts/cli.py`
+- Current GraphQL documents and parsers: `scripts/graphql_api.py`
 - Browser login helper: `scripts/browser_auth.py`
 - Invoice parser and SKU matcher: `scripts/invoice_parser.py`
 - Live and deterministic smoke tests: `scripts/smoke_test.py`
@@ -157,14 +164,14 @@ copied into the new list.
 
 ## Notes
 
-- Public commands remain stdlib-only and do not launch a browser.
+- Public commands use Woolworths' current GraphQL product service, remain stdlib-only, and do not launch a browser.
 - Account reads/writes use the saved Woolworths session directly; a 401/403 triggers one browser refresh and retry.
 - `invoice-items` parses supplied/paid invoice rows from a text-based Woolworths tax-invoice PDF, verifies its Order Confirmation/Invoice Number against the requested order ID, fetches the matching past-order product list, and performs a one-to-one confidence-scored name join to SKUs.
 - Invoice parsing has one additional optional dependency: `python3 -m pip install pdfplumber`. It is imported only by `invoice-items`; public product commands remain standard-library-only.
 - A match below `--min-confidence` is left unmatched. Close runner-up candidates are marked ambiguous rather than silently accepted.
 - Safe reads may refresh an expired session once. Mutations are never replayed after an indeterminate non-JSON response; inspect the current list or trolley state before retrying.
 - Saved-list item writes use Woolworths' current `{itemsToAdd: [{sku, quantity}]}` request.
-- Trolley writes use target quantities. `cart-add` reads then increments; `cart-update` sets the target.
+- Trolley reads and writes use the current `CustomerCart`, `SetCartLineItemQuantity`, and `ClearCart` GraphQL operations. Woolworths writes target a product variant key; callers may still pass a catalogue SKU and the CLI resolves its current variant key first. `cart-add` reads then increments; `cart-update` sets the target.
 - `Each` quantities must be whole numbers. Use `--unit Kg` for explicit weights.
 - List deletion, list item removal, trolley item removal, and trolley clearing require `--yes`.
 - Endpoint shapes can change; retry with a fresh session before assuming account data is unavailable.
