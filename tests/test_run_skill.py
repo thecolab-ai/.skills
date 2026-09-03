@@ -563,6 +563,17 @@ class RunSkillIntegrationTests(unittest.TestCase):
         self.assertEqual(payload["error"]["type"], "invalid_input")
         self.assertIn("--timeout must be greater than zero", payload["error"]["message"])
 
+    def test_canonical_school_terms_oversized_timeout_is_concise_invalid_input(self) -> None:
+        completed = self.run_skill("school-terms-nz", "years", "--timeout", "9" * 72)
+        self.assertEqual(completed.returncode, 2, completed.stdout)
+        self.assertEqual(completed.stderr, "")
+        self.assertNotIn("Traceback", completed.stdout)
+        payload = json.loads(completed.stdout)
+        self.assertFalse(payload["ok"])
+        self.assertEqual(payload["error"]["code"], 2)
+        self.assertEqual(payload["error"]["type"], "invalid_input")
+        self.assertEqual(payload["error"]["message"], "--timeout must be between 1 and 120 seconds")
+
     def test_canonical_school_terms_argument_error_is_preserved(self) -> None:
         completed = self.run_skill("school-terms-nz", "date")
         self.assertEqual(completed.returncode, 2, completed.stdout)

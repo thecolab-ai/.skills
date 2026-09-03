@@ -18,6 +18,7 @@ import nzfetch
 SOURCE_URL = "https://www.education.govt.nz/school/school-terms-and-holidays"
 ALLOWED_HOSTS = {"www.education.govt.nz"}
 DEFAULT_TIMEOUT = 10
+MAX_TIMEOUT = 120
 SOURCE_OWNER = "New Zealand Ministry of Education"
 SOURCE_CONTENT_NOTICE = (
     "Fetched source content remains subject to the Ministry's source terms, including "
@@ -726,7 +727,12 @@ def payload_base(source_url: str, retrieved: str) -> dict[str, Any]:
 
 
 def add_common_flags(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT, help="network timeout in seconds (default: 10)")
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=DEFAULT_TIMEOUT,
+        help="network timeout in seconds, 1-120 (default: 10)",
+    )
     parser.add_argument("--json", action="store_true", help="emit machine-readable JSON")
 
 
@@ -801,6 +807,8 @@ def emit(payload: dict[str, Any], as_json: bool) -> None:
 def run(args: argparse.Namespace) -> dict[str, Any]:
     if args.timeout <= 0:
         raise SkillError("--timeout must be greater than zero", exit_code=2, error_type="invalid_input")
+    if args.timeout > MAX_TIMEOUT:
+        raise SkillError("--timeout must be between 1 and 120 seconds", exit_code=2, error_type="invalid_input")
     if args.command in {"date", "next-break"}:
         parse_query_date(args.date)
     years, source_url, retrieved = fetch_years(args.timeout)

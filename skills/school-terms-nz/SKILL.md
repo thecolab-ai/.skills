@@ -72,7 +72,7 @@ Query the Ministry of Education's current public school terms and holidays page 
 
 5. Preserve `source_url`, `fetched_at` and `provenance` in any answer. Report `certainty` and `caveat` whenever school dates vary.
 
-All data commands accept `--timeout SECONDS` (default 10) and `--json`.
+All data commands accept `--timeout SECONDS` (integer range 1–120; default 10) and `--json`.
 
 ## Interpretation Rules
 
@@ -86,7 +86,7 @@ All data commands accept `--timeout SECONDS` (default 10) and `--json`.
 
 ## Errors
 
-- Exit 2: invalid ISO date, invalid timeout option/value or unpublished year.
+- Exit 2: invalid ISO date, timeout outside the documented 1–120 second range, invalid timeout option/value or unpublished year.
 - Exit 4: source access blocked or rate-limited.
 - Exit 5: upstream source unavailable, including an upstream request timeout.
 - Exit 6: Ministry page schema changed or published sections are incomplete.

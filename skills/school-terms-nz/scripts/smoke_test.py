@@ -591,6 +591,7 @@ def invalid_dates_do_not_fetch() -> None:
             (["date", "not-a-date", "--json"], "invalid_input"),
             (["next-break", "not-a-date", "--json"], "invalid_input"),
             (["years", "--timeout", "0", "--json"], "invalid_input"),
+            (["years", "--timeout", "121", "--json"], "invalid_input"),
         )
         for arguments, error_type in cases:
             sys.argv = [str(CLI), *arguments]
@@ -609,6 +610,22 @@ def invalid_dates_do_not_fetch() -> None:
 
 
 results.append(check("invalid date commands return structured exit 2 without fetching", invalid_dates_do_not_fetch))
+
+
+def oversized_timeout_is_safe() -> None:
+    oversized = "9" * 72
+    completed = run(["years", "--timeout", oversized, "--json"])
+    assert completed.returncode == 2
+    assert completed.stderr == ""
+    assert "Traceback" not in completed.stdout
+    payload = json.loads(completed.stdout)
+    assert payload["status"] == "error"
+    assert payload["code"] == 2
+    assert payload["error"] == "invalid_input"
+    assert payload["message"] == "--timeout must be between 1 and 120 seconds"
+
+
+results.append(check("oversized timeout returns concise structured exit 2", oversized_timeout_is_safe))
 
 
 if not all(results):
