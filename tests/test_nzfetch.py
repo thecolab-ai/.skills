@@ -109,6 +109,64 @@ class NzfetchTests(unittest.TestCase):
                 self.assertEqual(body, b"decoded")
 
     @mock.patch("nzfetch.urllib.request.urlopen")
+    def test_plaintext_advertised_as_gzip_raises_typed_failure(self, urlopen):
+        urlopen.return_value = FakeResponse(
+            body=b"<html><body>valid-looking source page</body></html>",
+            content_encoding="gzip",
+        )
+
+        with self.assertRaisesRegex(nzfetch.FetchError, "invalid gzip response body"):
+            nzfetch.fetch_bytes("https://example.test/data")
+
+    @mock.patch("nzfetch.urllib.request.urlopen")
+    def test_plaintext_advertised_as_deflate_raises_typed_failure(self, urlopen):
+        urlopen.return_value = FakeResponse(
+            body=b"<html><body>valid-looking source page</body></html>",
+            content_encoding="deflate",
+        )
+
+        with self.assertRaisesRegex(nzfetch.FetchError, "invalid deflate response body"):
+            nzfetch.fetch_bytes("https://example.test/data")
+
+    @mock.patch("nzfetch.urllib.request.urlopen")
+    def test_empty_advertised_compressed_body_raises_typed_failure(self, urlopen):
+        for encoding in ("gzip", "deflate"):
+            with self.subTest(encoding=encoding):
+                urlopen.return_value = FakeResponse(body=b"", content_encoding=encoding)
+                with self.assertRaisesRegex(
+                    nzfetch.FetchError, f"invalid {encoding} response body"
+                ):
+                    nzfetch.fetch_bytes("https://example.test/data")
+
+    @mock.patch("nzfetch.urllib.request.urlopen")
+    def test_trailing_garbage_in_advertised_compressed_body_raises_typed_failure(
+        self, urlopen
+    ):
+        for encoding, encoded in (
+            ("gzip", gzip.compress(b"decoded") + b"trailing garbage"),
+            ("deflate", zlib.compress(b"decoded") + b"trailing garbage"),
+        ):
+            with self.subTest(encoding=encoding):
+                urlopen.return_value = FakeResponse(
+                    body=encoded,
+                    content_encoding=encoding,
+                )
+                with self.assertRaisesRegex(
+                    nzfetch.FetchError, f"invalid {encoding} response body"
+                ):
+                    nzfetch.fetch_bytes("https://example.test/data")
+
+    @mock.patch("nzfetch.urllib.request.urlopen")
+    def test_valid_raw_deflate_fallback_is_retained(self, urlopen):
+        compressor = zlib.compressobj(wbits=-zlib.MAX_WBITS)
+        encoded = compressor.compress(b"decoded raw stream") + compressor.flush()
+        urlopen.return_value = FakeResponse(body=encoded, content_encoding="deflate")
+
+        body, _content_type, _final_url = nzfetch.fetch_bytes("https://example.test/data")
+
+        self.assertEqual(body, b"decoded raw stream")
+
+    @mock.patch("nzfetch.urllib.request.urlopen")
     def test_concatenated_gzip_members_are_decoded(self, urlopen):
         urlopen.return_value = FakeResponse(
             body=gzip.compress(b"first") + gzip.compress(b"second"),

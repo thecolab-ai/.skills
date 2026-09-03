@@ -320,6 +320,60 @@ def error_contract() -> None:
 results.append(check("fixture errors map schema, blocked and unavailable failures to exits 6, 4 and 5", error_contract))
 
 
+def malformed_advertised_gzip_fails_closed_end_to_end() -> None:
+    original_build_opener = module.nzfetch.urllib.request.build_opener
+    original_argv = sys.argv
+
+    class PlaintextGzipResponse:
+        def __init__(self) -> None:
+            self.body = fixture_text.encode("utf-8")
+            self.headers = {
+                "Content-Type": "text/html; charset=utf-8",
+                "Content-Encoding": "gzip",
+            }
+
+        def read(self, size: int = -1) -> bytes:
+            result, self.body = self.body[:size], self.body[size:]
+            return result
+
+        def geturl(self) -> str:
+            return SOURCE_URL
+
+    class PlaintextGzipOpener:
+        def open(self, *args, **kwargs):
+            return PlaintextGzipResponse()
+
+    try:
+        setattr(
+            module.nzfetch.urllib.request,
+            "build_opener",
+            lambda *args, **kwargs: PlaintextGzipOpener(),
+        )
+        sys.argv = [str(CLI), "years", "--json"]
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = module.main()
+        payload = json.loads(output.getvalue())
+    finally:
+        setattr(module.nzfetch.urllib.request, "build_opener", original_build_opener)
+        sys.argv = original_argv
+
+    assert exit_code == 5
+    assert payload["status"] == "error"
+    assert payload["code"] == 5
+    assert payload["error"] == "upstream_unavailable"
+    assert "invalid gzip response body" in payload["message"]
+    assert "years" not in payload
+
+
+results.append(
+    check(
+        "plaintext Ministry HTML advertised as gzip cannot return successful years",
+        malformed_advertised_gzip_fails_closed_end_to_end,
+    )
+)
+
+
 def source_drift_mutations() -> None:
     def assert_schema_error(mutated: str) -> None:
         try:

@@ -193,6 +193,8 @@ def _read_response_limited(response) -> bytes:
 
 def _zlib_decompress_limited(body: bytes, wbits: int, *, concatenated: bool = False) -> bytes:
     """Decompress with a hard output ceiling, including concatenated gzip members."""
+    if not body:
+        raise zlib.error("empty compressed response")
     output = bytearray()
     pending = body
     member_count = 0
@@ -217,27 +219,33 @@ def _zlib_decompress_limited(body: bytes, wbits: int, *, concatenated: bool = Fa
             )
         if not decompressor.eof:
             raise zlib.error("incomplete compressed response")
+        if not concatenated and decompressor.unused_data:
+            raise zlib.error("trailing data after compressed response")
         pending = decompressor.unused_data if concatenated else b""
     return bytes(output)
 
 
 def _decompress(body: bytes, content_encoding: str | None) -> bytes:
-    """Decode gzip/deflate within the output ceiling.
+    """Decode advertised gzip/deflate bodies within the output ceiling.
 
-    Malformed content retains the historical raw-byte fallback so challenge
-    detection can still inspect it; resource-limit failures always propagate.
+    Invalid advertised compression fails closed. The only compatibility fallback
+    retained is decoding a valid raw DEFLATE stream after zlib-wrapped decoding
+    fails; malformed input never falls back to unverified response bytes.
     """
     enc = (content_encoding or "").lower()
-    try:
-        if "gzip" in enc:
+    if "gzip" in enc:
+        try:
             return _zlib_decompress_limited(body, 16 + zlib.MAX_WBITS, concatenated=True)
-        if "deflate" in enc:
+        except zlib.error as exc:
+            raise FetchError("invalid gzip response body") from exc
+    if "deflate" in enc:
+        try:
+            return _zlib_decompress_limited(body, zlib.MAX_WBITS)
+        except zlib.error:
             try:
-                return _zlib_decompress_limited(body, zlib.MAX_WBITS)
-            except zlib.error:
-                return _zlib_decompress_limited(body, -zlib.MAX_WBITS)  # raw deflate stream
-    except zlib.error:
-        return body
+                return _zlib_decompress_limited(body, -zlib.MAX_WBITS)
+            except zlib.error as exc:
+                raise FetchError("invalid deflate response body") from exc
     return body
 
 
