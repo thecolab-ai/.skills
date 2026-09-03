@@ -88,6 +88,56 @@ class CliTests(unittest.TestCase):
             check=False,
         )
 
+    def run_cli_with_read_failure(self, exception_name: str) -> subprocess.CompletedProcess[str]:
+        script = f"""
+import importlib.util
+import sys
+from http.client import IncompleteRead
+
+spec = importlib.util.spec_from_file_location("nzta_cli_subprocess", {str(CLI)!r})
+module = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = module
+spec.loader.exec_module(module)
+
+class FakeResponse:
+    headers = {{}}
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        return False
+
+    def read(self, size):
+        if {exception_name!r} == "reset":
+            raise ConnectionResetError("connection reset by peer")
+        raise IncompleteRead(b'{{"response":', 20)
+
+class FakeOpener:
+    def open(self, request, timeout):
+        return FakeResponse()
+
+module.build_opener = lambda *handlers: FakeOpener()
+raise SystemExit(module.main(["cameras", "--json"]))
+"""
+        return subprocess.run(
+            [sys.executable, "-c", script],
+            cwd=SKILL_DIR,
+            text=True,
+            capture_output=True,
+            timeout=10,
+            check=False,
+        )
+
+    def assert_json_error(self, result: subprocess.CompletedProcess[str], expected_code: int) -> None:
+        self.assertEqual(result.returncode, expected_code)
+        payload = json.loads(result.stdout)
+        self.assertFalse(payload["ok"])
+        self.assertEqual(payload["error"]["code"], expected_code)
+        self.assertIsInstance(payload["source"], dict)
+        self.assertIsInstance(payload["query"], dict)
+        self.assertNotIn("Traceback", result.stderr + result.stdout)
+
     def test_help_lists_bounded_read_commands(self) -> None:
         result = self.run_cli("--help")
         self.assertEqual(result.returncode, 0)
@@ -99,8 +149,36 @@ class CliTests(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertNotIn("Traceback", result.stderr + result.stdout)
 
+    def test_invalid_integer_emits_json_error_envelope(self) -> None:
+        result = self.run_cli("cameras", "--limit", "not-an-integer", "--json")
+        self.assert_json_error(result, 2)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["kind"], "cameras")
+        self.assertEqual(payload["source"]["url"], module.API_ROOT + "cameras/all")
+        self.assertIsNone(payload["query"]["limit"])
+
+    def test_connection_reset_during_read_emits_upstream_json_error(self) -> None:
+        self.assert_json_error(self.run_cli_with_read_failure("reset"), 5)
+
+    def test_incomplete_read_emits_upstream_json_error(self) -> None:
+        self.assert_json_error(self.run_cli_with_read_failure("incomplete"), 5)
+
 
 class NetworkBoundaryTests(unittest.TestCase):
+    def test_blocked_http_status_remains_distinct(self) -> None:
+        opener = mock.Mock()
+        opener.open.side_effect = module.HTTPError(module.API_ROOT, 403, "Forbidden", {}, None)
+        with mock.patch.object(module, "build_opener", return_value=opener):
+            with self.assertRaises(module.BlockedError):
+                module.fetch_json(module.API_ROOT + "cameras/all")
+
+    def test_other_http_status_remains_upstream_error(self) -> None:
+        opener = mock.Mock()
+        opener.open.side_effect = module.HTTPError(module.API_ROOT, 503, "Unavailable", {}, None)
+        with mock.patch.object(module, "build_opener", return_value=opener):
+            with self.assertRaises(module.UpstreamError):
+                module.fetch_json(module.API_ROOT + "cameras/all")
+
     def test_off_host_redirect_is_rejected_before_follow_up(self) -> None:
         foreign_contacted = False
 

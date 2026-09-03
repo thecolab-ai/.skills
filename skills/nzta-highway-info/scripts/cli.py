@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import argparse
+import http.client
 import json
 import re
 import socket
 import sys
 from datetime import datetime, timezone
-from typing import Any, Callable
+from typing import Any, Callable, NoReturn
 from urllib.error import HTTPError, URLError
 from urllib.parse import urljoin, urlparse
 from urllib.request import HTTPRedirectHandler, Request, build_opener
@@ -53,6 +54,13 @@ class UpstreamError(CliError):
 
 class SchemaError(CliError):
     exit_code = 6
+
+
+class CliArgumentParser(argparse.ArgumentParser):
+    """Route expected argument errors through the stable CLI error envelope."""
+
+    def error(self, message: str) -> NoReturn:
+        raise InputError(message)
 
 
 def utc_now() -> str:
@@ -299,7 +307,10 @@ def fetch_json(url: str) -> Any:
                     raise SchemaError("upstream returned an invalid Content-Length header")
                 if declared_length > MAX_RESPONSE_BYTES:
                     raise UpstreamError("upstream response exceeds the 4 MB safety cap")
-            body = response.read(MAX_RESPONSE_BYTES + 1)
+            try:
+                body = response.read(MAX_RESPONSE_BYTES + 1)
+            except (OSError, http.client.HTTPException) as exc:
+                raise UpstreamError(f"upstream response interrupted: {exc}") from exc
             if len(body) > MAX_RESPONSE_BYTES:
                 raise UpstreamError("upstream response exceeds the 4 MB safety cap")
     except HTTPError as exc:
@@ -424,7 +435,7 @@ def add_common(parser: argparse.ArgumentParser, *, region: bool = True) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Bounded, read-only NZTA highway information lookups")
+    parser = CliArgumentParser(description="Bounded, read-only NZTA highway information lookups")
     sub = parser.add_subparsers(dest="command", required=True)
 
     events = sub.add_parser("events", help="current state-highway events and incidents")
@@ -479,10 +490,12 @@ def wants_json(argv: list[str]) -> bool:
 
 def main(argv: list[str] | None = None) -> int:
     actual = list(sys.argv[1:] if argv is None else argv)
-    parser = build_parser()
-    args = parser.parse_args(actual)
-    json_mode = bool(getattr(args, "json", False))
+    args: argparse.Namespace | None = None
+    requested_command = actual[0] if actual and actual[0] in ENDPOINTS else None
+    json_mode = wants_json(actual)
     try:
+        args = build_parser().parse_args(actual)
+        json_mode = bool(getattr(args, "json", False)) or json_mode
         if not 1 <= args.limit <= MAX_LIMIT:
             raise InputError(f"--limit must be between 1 and {MAX_LIMIT}")
         payload = execute(args.command, args)
@@ -490,12 +503,30 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     except CliError as exc:
         if json_mode or wants_json(actual):
+            command = getattr(args, "command", requested_command)
+            endpoint = urljoin(API_ROOT, ENDPOINTS[command][0]) if command in ENDPOINTS else API_ROOT
+            query = {
+                "region": getattr(args, "region", None),
+                "text": getattr(args, "query", None),
+                "event_type": getattr(args, "event_type", None),
+                "active_only": getattr(args, "active_only", False),
+                "limit": getattr(args, "limit", None),
+            }
             print(
                 json.dumps(
                     {
                         "schema_version": "1",
                         "ok": False,
-                        "kind": getattr(args, "command", None),
+                        "kind": command,
+                        "source": {
+                            "name": "NZ Transport Agency Waka Kotahi Traffic and Travel API",
+                            "url": endpoint,
+                            "catalogue_url": CATALOGUE_URL,
+                            "contract_url": WADL_URL,
+                            "retrieved_at": utc_now(),
+                            "latest_item_update_at": None,
+                        },
+                        "query": query,
                         "error": {"code": exc.exit_code, "message": str(exc)},
                         "data": None,
                         "warnings": [],

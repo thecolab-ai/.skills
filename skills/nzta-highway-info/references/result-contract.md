@@ -101,12 +101,30 @@ Expected failures return one stable exit code and no Python traceback:
   "schema_version": "1",
   "ok": false,
   "kind": "events",
-  "error": {"code": 5, "message": "upstream unavailable or timed out: ..."},
+  "source": {
+    "name": "NZ Transport Agency Waka Kotahi Traffic and Travel API",
+    "url": "https://trafficnz.info/service/traffic/rest/4/events/all/10",
+    "catalogue_url": "https://catalogue.data.govt.nz/dataset/nzta-highway-information1",
+    "contract_url": "https://trafficnz.info/service/traffic/rest/4?_wadl",
+    "retrieved_at": "2026-09-03T10:00:00Z",
+    "latest_item_update_at": null
+  },
+  "query": {
+    "region": null,
+    "text": null,
+    "event_type": null,
+    "active_only": false,
+    "limit": 20
+  },
+  "error": {"code": 5, "message": "upstream response interrupted: ..."},
   "data": null,
   "warnings": [],
   "blocked": false
 }
 ```
+
+Argument parse failures requested with `--json` use the same envelope; typed
+query fields that were not successfully parsed are null.
 
 Exit codes follow `docs/contracts.md`: 2 invalid input, 4 blocked/rate-limited,
 5 upstream unavailable, and 6 source schema/parser failure.
