@@ -189,8 +189,8 @@ def direct_result_envelope(
     envelope is never silently treated as legacy data when it is malformed.
     """
     streams = (stdout, stderr) if returncode == 0 else (stderr, stdout)
-    candidates: list[tuple[dict[str, object], list[str]]] = []
-    for stream in streams:
+    candidates: list[tuple[int, dict[str, object], list[str]]] = []
+    for stream_index, stream in enumerate(streams):
         payload = json_object(stream)
         if payload is None or not looks_like_result_envelope(payload):
             continue
@@ -205,17 +205,26 @@ def direct_result_envelope(
                     errors.append("non-zero exit status must emit a failed result")
                 if error_code != returncode:
                     errors.append("result error.code must match the command exit status")
-        candidates.append((payload, errors))
+        candidates.append((stream_index, payload, errors))
 
     if not candidates:
         return None, []
 
-    combined_errors = [error for _payload, errors in candidates for error in errors]
+    combined_errors = [error for _index, _payload, errors in candidates for error in errors]
     if len(candidates) > 1:
         combined_errors.append("multiple result envelopes emitted across stdout and stderr")
+    else:
+        selected_index = candidates[0][0]
+        opposing_stream = streams[1 - selected_index].strip()
+        if opposing_stream and (
+            json_objects(opposing_stream) or opposing_stream[:1] in {"{", "["}
+        ):
+            combined_errors.append(
+                "direct result envelope accompanied by structured or malformed JSON on the opposing stream"
+            )
     if combined_errors:
-        return candidates[0][0], combined_errors
-    return candidates[0][0], []
+        return candidates[0][1], combined_errors
+    return candidates[0][1], []
 
 
 def structured_legacy_error(text: str) -> dict[str, object] | None:

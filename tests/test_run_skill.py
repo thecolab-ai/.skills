@@ -50,6 +50,8 @@ class RunSkillIntegrationTests(unittest.TestCase):
         *,
         failure_stream: bool = False,
         stderr_payload: dict[str, object] | tuple[dict[str, object], ...] | None = None,
+        stdout_text: str | None = None,
+        stderr_text: str | None = None,
     ) -> tuple[int, dict[str, object], str]:
         encoded = json.dumps(direct_payload)
         if isinstance(stderr_payload, tuple):
@@ -61,8 +63,8 @@ class RunSkillIntegrationTests(unittest.TestCase):
         completed = subprocess.CompletedProcess(
             args=[],
             returncode=returncode,
-            stdout="" if failure_stream else encoded,
-            stderr=encoded_stderr,
+            stdout=stdout_text if stdout_text is not None else "" if failure_stream else encoded,
+            stderr=stderr_text if stderr_text is not None else encoded_stderr,
         )
         stdout = io.StringIO()
         stderr = io.StringIO()
@@ -239,6 +241,45 @@ class RunSkillIntegrationTests(unittest.TestCase):
                 self.assertIsInstance(error, dict)
                 assert isinstance(error, dict)
                 self.assertEqual(error["code"], 6)
+
+    def test_direct_success_rejects_json_looking_opposing_stream(self) -> None:
+        success: dict[str, object] = {
+            "schema_version": "1",
+            "ok": True,
+            "source": {
+                "name": "Ministry of Education",
+                "url": "https://www.education.govt.nz/school/school-terms-and-holidays",
+                "retrieved_at": "2026-09-03T00:00:00Z",
+            },
+            "query": {"command": "years"},
+            "data": {"years": [2026]},
+            "warnings": [],
+            "blocked": False,
+            "error": None,
+        }
+        opposing_streams = (
+            '{"status":"error"',
+            json.dumps({"ok": True}),
+            json.dumps({"blocked": False}),
+            json.dumps({"success": True}),
+            json.dumps({"status": "ok"}),
+            json.dumps({"rows": [1]}),
+        )
+        for opposing in opposing_streams:
+            for success_on_stderr in (False, True):
+                with self.subTest(opposing=opposing, success_on_stderr=success_on_stderr):
+                    exit_code, payload, stderr = self.run_mocked_direct_cli(
+                        "school-terms-nz",
+                        ["years"],
+                        success,
+                        0,
+                        failure_stream=success_on_stderr,
+                        stdout_text=opposing if success_on_stderr else None,
+                        stderr_text=None if success_on_stderr else opposing,
+                    )
+                    self.assertEqual(exit_code, 6)
+                    self.assertEqual(stderr, "")
+                    self.assertFalse(payload["ok"])
 
     def test_zero_exit_partial_result_failure_cannot_be_wrapped_as_success(self) -> None:
         exit_code, payload, stderr = self.run_mocked_direct_cli(
