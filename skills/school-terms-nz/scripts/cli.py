@@ -45,6 +45,12 @@ OPENING_REQUIREMENT_LABELS = (
     ("primary", "Primary, intermediate and specialist schools"),
     ("secondary", "Secondary and composite schools"),
 )
+EXPECTED_OPENING_HALF_DAYS = {
+    2025: {"primary": 382, "secondary": 376},
+    2026: {"primary": 378, "secondary": 376},
+    2027: {"primary": 376, "secondary": 376},
+    2028: {"primary": 382, "secondary": 380},
+}
 
 
 class SkillError(RuntimeError):
@@ -165,10 +171,13 @@ def has_precision(value: Any, expected: str) -> bool:
 
 def opening_requirement_label(text: str, year: int) -> str | None:
     """Recognise only the two complete Ministry opening-requirement sentences."""
+    expected_counts = EXPECTED_OPENING_HALF_DAYS.get(year)
+    if expected_counts is None:
+        return None
     for label, school_group in OPENING_REQUIREMENT_LABELS:
         pattern = (
             rf"{re.escape(school_group)} (?:must|are required to) be open for instruction "
-            rf"for (?:a )?minimum of \d{{3}} half days in {year}\."
+            rf"for (?:a )?minimum of {expected_counts[label]} half days in {year}\."
         )
         if re.fullmatch(pattern, text):
             return label

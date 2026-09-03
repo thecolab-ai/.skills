@@ -31,6 +31,7 @@ SENSITIVE_ARGUMENT_NAME = re.compile(
     r"(?:^|[-_])(?:api[-_]?key|token|password|secret|credential|username|login|proxy)(?:$|[-_])",
     re.I,
 )
+_MISSING = object()
 
 
 def redact_secrets(text: str) -> str:
@@ -156,17 +157,18 @@ def structured_legacy_error(text: str) -> dict[str, object] | None:
         return None
     raw_error = payload.get("error")
     message = payload.get("message")
-    code = payload.get("code")
+    code = payload["code"] if "code" in payload else _MISSING
     if isinstance(raw_error, dict):
         message = message or raw_error.get("message")
         error_type = raw_error.get("type")
-        code = raw_error.get("code", code)
+        if "code" in raw_error:
+            code = raw_error["code"]
     else:
         error_type = raw_error
     if not isinstance(message, str) or not message.strip():
         return None
     extracted: dict[str, object] = {"message": message}
-    if code is not None:
+    if code is not _MISSING:
         extracted["code"] = code
     if isinstance(error_type, str) and error_type.strip():
         extracted["type"] = error_type

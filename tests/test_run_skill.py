@@ -128,7 +128,7 @@ class RunSkillIntegrationTests(unittest.TestCase):
         self.assertEqual(payload, direct)
 
     def test_invalid_legacy_error_codes_fail_closed_without_crashing(self) -> None:
-        for invalid_code in (0, 99, True):
+        for invalid_code in (None, 0, 99, True):
             with self.subTest(code=invalid_code):
                 exit_code, payload, stderr = self.run_mocked_direct_cli(
                     "school-terms-nz",
@@ -150,6 +150,32 @@ class RunSkillIntegrationTests(unittest.TestCase):
                 assert isinstance(error, dict)
                 self.assertEqual(error["code"], 6)
                 self.assertIn("invalid legacy error code", error["message"])
+
+    def test_explicit_nested_null_legacy_error_code_overrides_valid_top_level_code(self) -> None:
+        exit_code, payload, stderr = self.run_mocked_direct_cli(
+            "school-terms-nz",
+            ["years"],
+            {
+                "status": "error",
+                "code": 7,
+                "error": {
+                    "code": None,
+                    "type": "unsupported_operation",
+                    "message": "synthetic guarded operation",
+                },
+            },
+            7,
+            failure_stream=True,
+        )
+
+        self.assertEqual(exit_code, 6)
+        self.assertEqual(stderr, "")
+        self.assertFalse(payload["ok"])
+        error = payload["error"]
+        self.assertIsInstance(error, dict)
+        assert isinstance(error, dict)
+        self.assertEqual(error["code"], 6)
+        self.assertIn("invalid legacy error code None", error["message"])
 
     def test_mismatched_stable_legacy_error_code_fails_closed(self) -> None:
         exit_code, payload, stderr = self.run_mocked_direct_cli(

@@ -406,6 +406,20 @@ def source_drift_mutations() -> None:
     )
     assert_schema_error(spoofed_opening_requirement)
 
+    zero_opening_requirement = fixture_text.replace(
+        "Primary, intermediate and specialist schools must be open for instruction for a minimum of 378 half days in 2026.",
+        "Primary, intermediate and specialist schools must be open for instruction for a minimum of 000 half days in 2026.",
+        1,
+    )
+    assert_schema_error(zero_opening_requirement)
+
+    impossible_opening_requirement = fixture_text.replace(
+        "Primary, intermediate and specialist schools must be open for instruction for a minimum of 378 half days in 2026.",
+        "Primary, intermediate and specialist schools must be open for instruction for a minimum of 999 half days in 2026.",
+        1,
+    )
+    assert_schema_error(impossible_opening_requirement)
+
 
 results.append(check("semantic source drift fails closed with source_schema", source_drift_mutations))
 

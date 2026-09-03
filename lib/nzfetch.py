@@ -48,8 +48,9 @@ Environment (all optional):
 
 Resource limits:
     Responses are read in bounded chunks and capped at 32 MiB of wire/compressed
-    bytes. gzip/deflate output is capped independently at 64 MiB. Exceeding either
-    ceiling raises ``ResponseTooLarge``, a typed ``FetchError``.
+    bytes. gzip/deflate output is capped independently at 64 MiB, and concatenated
+    gzip streams are capped at 100 members. Exceeding a ceiling raises
+    ``ResponseTooLarge``, a typed ``FetchError``.
 
 No proxy set → nzfetch just does the single direct request (same as before), so a
 skill that imports it keeps working unchanged when no proxy is configured.
@@ -79,7 +80,11 @@ DEFAULT_UA = (
 SEC_CH_UA = f'"Google Chrome";v="{CHROME_VERSION}", "Chromium";v="{CHROME_VERSION}", "Not)A;Brand";v="24"'
 MAX_COMPRESSED_RESPONSE_BYTES = 32 * 1024 * 1024
 MAX_DECOMPRESSED_RESPONSE_BYTES = 64 * 1024 * 1024
+MAX_GZIP_MEMBERS = 100
 READ_CHUNK_BYTES = 64 * 1024
+SENSITIVE_REDIRECT_HEADERS = frozenset(
+    {"authorization", "proxy-authorization", "cookie", "cookie2"}
+)
 
 
 class FetchError(Exception):
@@ -190,7 +195,13 @@ def _zlib_decompress_limited(body: bytes, wbits: int, *, concatenated: bool = Fa
     """Decompress with a hard output ceiling, including concatenated gzip members."""
     output = bytearray()
     pending = body
+    member_count = 0
     while pending:
+        member_count += 1
+        if concatenated and member_count > MAX_GZIP_MEMBERS:
+            raise ResponseTooLarge(
+                f"compressed response exceeded the {MAX_GZIP_MEMBERS}-member gzip member limit"
+            )
         decompressor = zlib.decompressobj(wbits)
         remaining = MAX_DECOMPRESSED_RESPONSE_BYTES - len(output)
         output.extend(decompressor.decompress(pending, remaining + 1))
@@ -255,6 +266,15 @@ def _validate_outbound_url(url: str, allowed_hosts: frozenset[str]) -> None:
         raise FetchError(f"outbound URL host is not in the declared allowlist: {hostname or url!r}")
 
 
+def _url_origin(parsed: urllib.parse.ParseResult) -> tuple[str, str, int | None]:
+    """Return an RFC-style origin with default ports normalised."""
+    scheme = parsed.scheme.lower()
+    port = parsed.port
+    if port is None:
+        port = 443 if scheme == "https" else 80 if scheme == "http" else None
+    return scheme, (parsed.hostname or "").lower().rstrip("."), port
+
+
 class _AllowlistRedirectHandler(urllib.request.HTTPRedirectHandler):
     def __init__(self, allowed_hosts: frozenset[str]):
         super().__init__()
@@ -262,7 +282,22 @@ class _AllowlistRedirectHandler(urllib.request.HTTPRedirectHandler):
 
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         _validate_outbound_url(newurl, self.allowed_hosts)
-        return super().redirect_request(req, fp, code, msg, headers, newurl)
+        old = urllib.parse.urlparse(req.full_url)
+        new = urllib.parse.urlparse(newurl)
+        old_scheme = old.scheme.lower()
+        new_scheme = new.scheme.lower()
+        if old_scheme == "https" and new_scheme == "http":
+            raise FetchError("HTTPS redirect downgrade is not allowed")
+
+        redirected = super().redirect_request(req, fp, code, msg, headers, newurl)
+        old_origin = _url_origin(old)
+        new_origin = _url_origin(new)
+        if redirected is not None and old_origin != new_origin:
+            for header_map in (redirected.headers, redirected.unredirected_hdrs):
+                for name in list(header_map):
+                    if name.lower() in SENSITIVE_REDIRECT_HEADERS:
+                        del header_map[name]
+        return redirected
 
 
 def proxy_url() -> str:

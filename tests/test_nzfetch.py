@@ -4,6 +4,7 @@ import pathlib
 import sys
 import unittest
 import urllib.error
+import urllib.request
 import zlib
 from unittest import mock
 
@@ -106,6 +107,28 @@ class NzfetchTests(unittest.TestCase):
                 urlopen.return_value = FakeResponse(body=encoded, content_encoding=encoding)
                 body, _content_type, _final_url = nzfetch.fetch_bytes("https://example.test/data")
                 self.assertEqual(body, b"decoded")
+
+    @mock.patch("nzfetch.urllib.request.urlopen")
+    def test_concatenated_gzip_members_are_decoded(self, urlopen):
+        urlopen.return_value = FakeResponse(
+            body=gzip.compress(b"first") + gzip.compress(b"second"),
+            content_encoding="gzip",
+        )
+
+        body, _content_type, _final_url = nzfetch.fetch_bytes("https://example.test/data")
+
+        self.assertEqual(body, b"firstsecond")
+
+    @mock.patch("nzfetch.urllib.request.urlopen")
+    def test_concatenated_gzip_member_limit_raises_typed_failure(self, urlopen):
+        urlopen.return_value = FakeResponse(
+            body=b"".join(gzip.compress(value) for value in (b"one", b"two", b"three")),
+            content_encoding="gzip",
+        )
+
+        with mock.patch.object(nzfetch, "MAX_GZIP_MEMBERS", 2):
+            with self.assertRaisesRegex(nzfetch.ResponseTooLarge, "gzip member limit"):
+                nzfetch.fetch_bytes("https://example.test/data")
 
     @mock.patch("nzfetch.urllib.request.urlopen")
     def test_wire_response_limit_raises_typed_failure_without_unbounded_read(self, urlopen):
@@ -336,6 +359,94 @@ class NzfetchTests(unittest.TestCase):
         with self.assertRaisesRegex(nzfetch.FetchError, "declared allowlist"):
             handler.redirect_request(
                 object(), None, 302, "Found", {}, "https://attacker.example/collect"
+            )
+
+    def test_allowlist_redirect_handler_strips_credentials_on_origin_change(self):
+        handler = nzfetch._AllowlistRedirectHandler(
+            frozenset({"example.test", "redirect.example.test"})
+        )
+        request = urllib.request.Request(
+            "https://example.test/data",
+            headers={
+                "Authorization": "Bearer secret",
+                "Proxy-Authorization": "Basic proxy-secret",
+                "Cookie": "session=secret",
+                "Cookie2": "legacy=secret",
+                "X-Request-ID": "safe",
+            },
+        )
+
+        redirected = handler.redirect_request(
+            request,
+            None,
+            302,
+            "Found",
+            {},
+            "https://redirect.example.test/data",
+        )
+
+        self.assertIsNotNone(redirected)
+        assert redirected is not None
+        for header in ("Authorization", "Proxy-Authorization", "Cookie", "Cookie2"):
+            self.assertFalse(redirected.has_header(header))
+        self.assertEqual(redirected.get_header("X-request-id"), "safe")
+
+    def test_allowlist_redirect_handler_preserves_credentials_on_same_origin(self):
+        handler = nzfetch._AllowlistRedirectHandler(frozenset({"example.test"}))
+        request = urllib.request.Request(
+            "https://example.test/data",
+            headers={"Authorization": "Bearer secret", "Cookie": "session=secret"},
+        )
+
+        redirected = handler.redirect_request(
+            request, None, 302, "Found", {}, "https://example.test/other"
+        )
+
+        self.assertIsNotNone(redirected)
+        assert redirected is not None
+        self.assertEqual(redirected.get_header("Authorization"), "Bearer secret")
+        self.assertEqual(redirected.get_header("Cookie"), "session=secret")
+
+    def test_allowlist_redirect_handler_normalises_default_port_for_same_origin(self):
+        handler = nzfetch._AllowlistRedirectHandler(frozenset({"example.test"}))
+        request = urllib.request.Request(
+            "https://example.test/data",
+            headers={"Authorization": "Bearer secret"},
+        )
+
+        redirected = handler.redirect_request(
+            request, None, 302, "Found", {}, "https://example.test:443/other"
+        )
+
+        self.assertIsNotNone(redirected)
+        assert redirected is not None
+        self.assertEqual(redirected.get_header("Authorization"), "Bearer secret")
+
+    def test_allowlist_redirect_handler_strips_credentials_on_scheme_upgrade(self):
+        handler = nzfetch._AllowlistRedirectHandler(frozenset({"example.test"}))
+        request = urllib.request.Request(
+            "http://example.test/data",
+            headers={"Authorization": "Bearer secret"},
+        )
+
+        redirected = handler.redirect_request(
+            request, None, 302, "Found", {}, "https://example.test/other"
+        )
+
+        self.assertIsNotNone(redirected)
+        assert redirected is not None
+        self.assertFalse(redirected.has_header("Authorization"))
+
+    def test_allowlist_redirect_handler_rejects_https_downgrade(self):
+        handler = nzfetch._AllowlistRedirectHandler(frozenset({"example.test"}))
+        request = urllib.request.Request(
+            "https://example.test/data",
+            headers={"Authorization": "Bearer secret"},
+        )
+
+        with self.assertRaisesRegex(nzfetch.FetchError, "HTTPS redirect downgrade"):
+            handler.redirect_request(
+                request, None, 302, "Found", {}, "http://example.test/collect"
             )
 
     @mock.patch("nzfetch.urllib.request.build_opener")
