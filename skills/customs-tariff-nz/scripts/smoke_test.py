@@ -58,6 +58,28 @@ def run_json_formula_probe(archive, *argv_tail: str):
     return exit_code, json.loads(captured.getvalue())
 
 
+def run_json_error_probe(*argv_tail: str):
+    original_fetch = customs_cli.fetch_archive
+    original_argv = sys.argv
+    captured = io.StringIO()
+    fetch_called = False
+
+    def forbidden_fetch(timeout):
+        nonlocal fetch_called
+        fetch_called = True
+        raise AssertionError("invalid input reached the network fetch")
+
+    try:
+        customs_cli.fetch_archive = forbidden_fetch
+        sys.argv = [str(SKILL / "scripts" / "cli.py"), *argv_tail, "--json"]
+        with redirect_stdout(captured):
+            exit_code = customs_cli.main()
+    finally:
+        customs_cli.fetch_archive = original_fetch
+        sys.argv = original_argv
+    return exit_code, json.loads(captured.getvalue()), fetch_called
+
+
 def main() -> int:
     fixture = SKILL / "tests" / "fixtures" / "tariff-synthetic.tar.gz"
     fixture_bytes = fixture.read_bytes()
@@ -140,6 +162,32 @@ def main() -> int:
     else:
         raise AssertionError("excessive archive member count was accepted")
     print("[PASS] fixture archive member-count bound rejects metadata exhaustion")
+
+    redirect_handler = customs_tariff.ArchiveRedirectHandler()
+    try:
+        redirect_handler.redirect_request(
+            customs_tariff.urllib.request.Request(customs_tariff.ARCHIVE_URL),
+            None,
+            302,
+            "Found",
+            {},
+            "https://attacker.example/tariff.tar.gz",
+        )
+    except SkillError as exc:
+        assert exc.exit_code == 7 and exc.kind == "unsafe_redirect"
+    else:
+        raise AssertionError("off-host archive redirect reached urllib redirect handling")
+    print("[PASS] off-host archive redirect is rejected before a follow-up request")
+
+    for argv_tail in (
+        ("lookup", "٠٩٠١٢١٠٠٠٠"),
+        ("search", "٠٩٠١"),
+        ("formula", "2", "--limit", "101"),
+    ):
+        invalid_exit, invalid_json, fetch_called = run_json_error_probe(*argv_tail)
+        assert invalid_exit == 2 and invalid_json["error"]["kind"] == "invalid_input"
+        assert fetch_called is False
+    print("[PASS] Unicode numeric lookalikes and parser bounds fail as JSON before fetch")
 
     invalid_command = [sys.executable, str(SKILL / "scripts" / "cli.py"), "formula", "abc", "--json"]
     invalid = subprocess.run(invalid_command, capture_output=True, text=True, timeout=10, check=False)

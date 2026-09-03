@@ -118,7 +118,9 @@ def normalise_code(value: str, *, exact: bool) -> str:
     compact = re.sub(r"[.\s-]+", "", value.strip()).upper()
     if len(compact) == 11 and compact[-1].isalpha():
         compact = compact[:-1]
-    if not compact.isdigit() or not (len(compact) == 10 if exact else 1 <= len(compact) <= 10):
+    if re.fullmatch(r"[0-9]+", compact) is None or not (
+        len(compact) == 10 if exact else 1 <= len(compact) <= 10
+    ):
         requirement = "a 10-digit tariff item" if exact else "a 1-to-10 digit tariff-code prefix"
         raise SkillError(f"expected {requirement}", exit_code=2, kind="invalid_input")
     return compact
@@ -309,6 +311,30 @@ def parse_archive(
     return TariffArchive(blob, source_url, retrieved_at, source_timestamp, http_last_modified)
 
 
+def _validate_archive_url(url: str) -> None:
+    try:
+        parsed = urllib.parse.urlparse(url)
+        port = parsed.port
+    except ValueError as exc:
+        raise SkillError("archive redirect URL is invalid", exit_code=7, kind="unsafe_redirect") from exc
+    if (
+        parsed.scheme != "https"
+        or parsed.hostname != ALLOWED_HOST
+        or parsed.username is not None
+        or parsed.password is not None
+        or port not in {None, 443}
+    ):
+        raise SkillError("archive redirected outside the declared Customs host", exit_code=7, kind="unsafe_redirect")
+
+
+class ArchiveRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Reject off-host redirects before urllib can issue the next request."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        _validate_archive_url(newurl)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
 def fetch_archive(timeout: int = DEFAULT_TIMEOUT) -> TariffArchive:
     if not 1 <= timeout <= DEFAULT_TIMEOUT:
         raise SkillError("timeout must be between 1 and 10 seconds", exit_code=2, kind="invalid_input")
@@ -317,11 +343,10 @@ def fetch_archive(timeout: int = DEFAULT_TIMEOUT) -> TariffArchive:
         headers={"Accept": "application/gzip, application/octet-stream;q=0.9", "User-Agent": "customs-tariff-nz/1.0"},
     )
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        opener = urllib.request.build_opener(ArchiveRedirectHandler())
+        with opener.open(request, timeout=timeout) as response:
             final_url = response.geturl()
-            parsed = urllib.parse.urlparse(final_url)
-            if parsed.scheme != "https" or parsed.hostname != ALLOWED_HOST:
-                raise SkillError("archive redirected outside the declared Customs host", exit_code=7, kind="unsafe_redirect")
+            _validate_archive_url(final_url)
             content_length = response.headers.get("Content-Length")
             if content_length and int(content_length) > MAX_DOWNLOAD_BYTES:
                 raise SkillError("tariff archive exceeds the 16 MiB download limit", exit_code=6, kind="source_schema")
@@ -345,7 +370,7 @@ def _public(record: dict[str, object]) -> dict[str, object]:
 def search_records(archive: TariffArchive, query: str, as_of_value: str, limit: int) -> list[dict[str, object]]:
     query = validate_search_query(query)
     as_of = parse_as_of(as_of_value)
-    numeric = re.fullmatch(r"[\d.\s-]+", query) is not None
+    numeric = re.fullmatch(r"[0-9.\s-]+", query) is not None
     code_prefix = normalise_code(query, exact=False) if numeric else None
     words = query.casefold().split()
     matches: list[dict[str, object]] = []

@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from typing import Any
+from typing import Any, NoReturn
 
 from customs_tariff import (
     ARCHIVE_URL,
@@ -28,6 +28,13 @@ COMMON_WARNINGS = [
     "Do not treat these fields as a definitive duty, levy, GST or landed-cost calculation.",
     "Confirm consequential classifications and charges with New Zealand Customs or a qualified customs broker.",
 ]
+
+
+class CliArgumentParser(argparse.ArgumentParser):
+    """Raise a typed error so JSON callers receive the normal envelope."""
+
+    def error(self, message: str) -> NoReturn:
+        raise SkillError(message, exit_code=2, kind="invalid_input")
 
 
 def positive_limit(value: str) -> int:
@@ -114,7 +121,7 @@ def add_common(parser: argparse.ArgumentParser, *, as_of: bool = False, limit: b
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = CliArgumentParser(description=__doc__)
     subcommands = parser.add_subparsers(dest="command", required=True)
 
     search = subcommands.add_parser("search", help="search active classifications by text or tariff-code prefix")
@@ -182,12 +189,12 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def main() -> int:
-    parser = build_parser()
-    args = parser.parse_args()
     try:
+        parser = build_parser()
+        args = parser.parse_args()
         payload = run(args)
     except SkillError as exc:
-        if getattr(args, "json", False):
+        if "--json" in sys.argv[1:]:
             error_payload = {
                 "schema_version": "1",
                 "ok": False,
