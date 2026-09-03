@@ -59,6 +59,8 @@ DUTY_FORMULA_SUMMARIES = {
     "5": "Value-based Factor A component plus quantity-based Factor B component",
 }
 
+ASCII_DIGITS_RE = re.compile(r"[0-9]+")
+
 
 class SkillError(RuntimeError):
     """Expected CLI failure with a stable repository exit code."""
@@ -232,7 +234,7 @@ class TariffArchive:
         for row in self._iter_csv(FORMULAS):
             formula_code = _clean(row["Lfc Levy Formula Codes"])
             formula_rate = _clean(row["Lfc Levy Formula Rate"])
-            if not formula_code.isdigit():
+            if ASCII_DIGITS_RE.fullmatch(formula_code) is None:
                 raise SkillError(
                     f"invalid formula code in {FORMULAS}: {formula_code!r}",
                     exit_code=6,
@@ -404,7 +406,7 @@ def lookup_records(archive: TariffArchive, code_value: str, as_of_value: str) ->
 
 def validate_formula_code(code_value: str) -> str:
     query = code_value.strip()
-    if query and not query.isdigit():
+    if query and ASCII_DIGITS_RE.fullmatch(query) is None:
         raise SkillError("formula code must contain digits only", exit_code=2, kind="invalid_input")
     return query
 
