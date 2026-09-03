@@ -1,8 +1,10 @@
+import gzip
 import os
 import pathlib
 import sys
 import unittest
 import urllib.error
+import zlib
 from unittest import mock
 
 
@@ -26,13 +28,22 @@ class FakeResponse:
         body=b"ok",
         content_type="text/plain",
         final_url="https://example.test/data",
+        content_encoding=None,
     ):
         self._body = body
         self.headers = {"Content-Type": content_type}
+        if content_encoding is not None:
+            self.headers["Content-Encoding"] = content_encoding
         self._final_url = final_url
+        self.read_sizes = []
 
-    def read(self):
-        return self._body
+    def read(self, size=-1):
+        self.read_sizes.append(size)
+        if size is None or size < 0:
+            result, self._body = self._body, b""
+            return result
+        result, self._body = self._body[:size], self._body[size:]
+        return result
 
     def geturl(self):
         return self._final_url
@@ -73,6 +84,62 @@ class NzfetchTests(unittest.TestCase):
             (b"payload", "application/octet-stream", "https://example.test/final"),
         )
         urlopen.assert_called_once()
+
+    @mock.patch("nzfetch.urllib.request.urlopen")
+    def test_wire_response_exactly_at_limit_is_accepted(self, urlopen):
+        response = FakeResponse(body=b"12345678")
+        urlopen.return_value = response
+
+        with mock.patch.object(nzfetch, "MAX_COMPRESSED_RESPONSE_BYTES", 8):
+            body, _content_type, _final_url = nzfetch.fetch_bytes("https://example.test/data")
+
+        self.assertEqual(body, b"12345678")
+        self.assertTrue(all(isinstance(size, int) and size > 0 for size in response.read_sizes))
+
+    @mock.patch("nzfetch.urllib.request.urlopen")
+    def test_bounded_gzip_and_deflate_responses_are_decoded(self, urlopen):
+        for encoding, encoded in (
+            ("gzip", gzip.compress(b"decoded")),
+            ("deflate", zlib.compress(b"decoded")),
+        ):
+            with self.subTest(encoding=encoding):
+                urlopen.return_value = FakeResponse(body=encoded, content_encoding=encoding)
+                body, _content_type, _final_url = nzfetch.fetch_bytes("https://example.test/data")
+                self.assertEqual(body, b"decoded")
+
+    @mock.patch("nzfetch.urllib.request.urlopen")
+    def test_wire_response_limit_raises_typed_failure_without_unbounded_read(self, urlopen):
+        response = FakeResponse(body=b"x" * 9)
+        urlopen.return_value = response
+
+        with mock.patch.object(nzfetch, "MAX_COMPRESSED_RESPONSE_BYTES", 8):
+            with self.assertRaises(nzfetch.ResponseTooLarge):
+                nzfetch.fetch_bytes("https://example.test/data")
+
+        self.assertTrue(response.read_sizes)
+        self.assertTrue(all(isinstance(size, int) and size > 0 for size in response.read_sizes))
+
+    @mock.patch("nzfetch.urllib.request.urlopen")
+    def test_gzip_decompressed_limit_raises_typed_failure(self, urlopen):
+        urlopen.return_value = FakeResponse(
+            body=gzip.compress(b"expanded!"),
+            content_encoding="gzip",
+        )
+
+        with mock.patch.object(nzfetch, "MAX_DECOMPRESSED_RESPONSE_BYTES", 8):
+            with self.assertRaises(nzfetch.ResponseTooLarge):
+                nzfetch.fetch_bytes("https://example.test/data")
+
+    @mock.patch("nzfetch.urllib.request.urlopen")
+    def test_deflate_decompressed_limit_raises_typed_failure(self, urlopen):
+        urlopen.return_value = FakeResponse(
+            body=zlib.compress(b"expanded!"),
+            content_encoding="deflate",
+        )
+
+        with mock.patch.object(nzfetch, "MAX_DECOMPRESSED_RESPONSE_BYTES", 8):
+            with self.assertRaises(nzfetch.ResponseTooLarge):
+                nzfetch.fetch_bytes("https://example.test/data")
 
     @mock.patch("nzfetch.urllib.request.urlopen")
     def test_blocked_direct_request_without_proxy_raises_blocked(self, urlopen):

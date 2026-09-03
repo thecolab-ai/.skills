@@ -99,6 +99,13 @@ def date_queries() -> None:
     assert previous_summer["kind"] == "school_break"
     assert previous_summer["name"] == "Summer holidays"
 
+    earliest_year_summer = module.classify_date(years, "2025-01-15")
+    assert earliest_year_summer["kind"] == "school_break"
+    assert earliest_year_summer["name"] == "Summer holidays"
+    assert earliest_year_summer["certainty"] == "published"
+    assert earliest_year_summer["description"] == years[0]["terms"][0]["description"]
+    assert earliest_year_summer["end"] == years[0]["terms"][0]["start"]
+
     fixed_term = module.classify_date(years, "2026-05-11")
     assert fixed_term["kind"] == "school_term"
     assert fixed_term["name"] == "Term 2"
@@ -182,6 +189,13 @@ results.append(check("next-break preserves its JSON envelope and provenance", op
 
 
 def certain_next_break_queries() -> None:
+    earliest_year_summer = module.next_break(years, "2025-01-15")
+    assert earliest_year_summer["name"] == "Summer holidays"
+    assert earliest_year_summer["days_until"] == 0
+    assert earliest_year_summer["certainty"] == "published"
+    assert earliest_year_summer["description"] == years[0]["terms"][0]["description"]
+    assert earliest_year_summer["end"] == years[0]["terms"][0]["start"]
+
     before_opening = module.next_break(years, "2026-01-25")
     assert before_opening["name"] == "Summer holidays"
     assert before_opening["days_until"] == 0
@@ -363,6 +377,20 @@ def source_drift_mutations() -> None:
         1,
     )
     assert_schema_error(wrong_break_shape)
+
+    term_break_gap = fixture_text.replace(
+        "ends Thursday 2 April 2026",
+        "ends Wednesday 1 April 2026",
+        1,
+    )
+    assert_schema_error(term_break_gap)
+
+    closing_summer_gap = fixture_text.replace(
+        "no later than Friday 18 December 2026",
+        "no later than Thursday 17 December 2026",
+        1,
+    )
+    assert_schema_error(closing_summer_gap)
 
     missing_opening_requirements = fixture_text.replace(
         "Half-day opening requirement 2026",

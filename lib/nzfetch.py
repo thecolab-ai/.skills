@@ -46,12 +46,16 @@ Environment (all optional):
                                per retry; a single-IP proxy uses the same route.
     NZFETCH_UA                 override the User-Agent if a source needs a specific one.
 
+Resource limits:
+    Responses are read in bounded chunks and capped at 32 MiB of wire/compressed
+    bytes. gzip/deflate output is capped independently at 64 MiB. Exceeding either
+    ceiling raises ``ResponseTooLarge``, a typed ``FetchError``.
+
 No proxy set → nzfetch just does the single direct request (same as before), so a
 skill that imports it keeps working unchanged when no proxy is configured.
 """
 from __future__ import annotations
 
-import gzip
 import http.client
 import json
 import os
@@ -73,6 +77,38 @@ DEFAULT_UA = (
 # The GREASE-style brand list Chrome 149 emits (order + the "Not)A;Brand" token
 # match the real header exactly).
 SEC_CH_UA = f'"Google Chrome";v="{CHROME_VERSION}", "Chromium";v="{CHROME_VERSION}", "Not)A;Brand";v="24"'
+MAX_COMPRESSED_RESPONSE_BYTES = 32 * 1024 * 1024
+MAX_DECOMPRESSED_RESPONSE_BYTES = 64 * 1024 * 1024
+READ_CHUNK_BYTES = 64 * 1024
+
+
+class FetchError(Exception):
+    """A non-recoverable fetch failure (a real HTTP error, bad URL, bad body)."""
+
+
+class ResponseTooLarge(FetchError):
+    """The upstream response exceeded a documented in-memory safety ceiling."""
+
+
+class Blocked(FetchError):
+    """Bounded attempts ended at a block or challenge, not a dead source.
+
+    Callers should return an explicit blocked state or soft-fail rather than
+    treating it as a citation defect. ``RateLimited`` is the compatible subtype
+    for a terminal HTTP 429.
+    """
+
+
+class RateLimited(Blocked):
+    """Bounded attempts ended with HTTP 429.
+
+    ``retry_after`` preserves the raw upstream header because it may be either
+    delta-seconds or an HTTP date.
+    """
+
+    def __init__(self, message: str, *, retry_after: str | None = None):
+        super().__init__(message)
+        self.retry_after = retry_after
 
 
 def _browser_headers(url: str, accept: str) -> dict:
@@ -134,46 +170,64 @@ def _minimal_headers(accept: str) -> dict:
     }
 
 
+def _read_response_limited(response) -> bytes:
+    """Read at most the documented wire/compressed ceiling, never unbounded."""
+    chunks: list[bytes] = []
+    total = 0
+    while True:
+        chunk = response.read(min(READ_CHUNK_BYTES, MAX_COMPRESSED_RESPONSE_BYTES + 1 - total))
+        if not chunk:
+            return b"".join(chunks)
+        chunks.append(chunk)
+        total += len(chunk)
+        if total > MAX_COMPRESSED_RESPONSE_BYTES:
+            raise ResponseTooLarge(
+                f"response exceeded the {MAX_COMPRESSED_RESPONSE_BYTES}-byte wire/compressed limit"
+            )
+
+
+def _zlib_decompress_limited(body: bytes, wbits: int, *, concatenated: bool = False) -> bytes:
+    """Decompress with a hard output ceiling, including concatenated gzip members."""
+    output = bytearray()
+    pending = body
+    while pending:
+        decompressor = zlib.decompressobj(wbits)
+        remaining = MAX_DECOMPRESSED_RESPONSE_BYTES - len(output)
+        output.extend(decompressor.decompress(pending, remaining + 1))
+        if len(output) > MAX_DECOMPRESSED_RESPONSE_BYTES or decompressor.unconsumed_tail:
+            raise ResponseTooLarge(
+                f"decompressed response exceeded the {MAX_DECOMPRESSED_RESPONSE_BYTES}-byte limit"
+            )
+        remaining = MAX_DECOMPRESSED_RESPONSE_BYTES - len(output)
+        output.extend(decompressor.flush(remaining + 1))
+        if len(output) > MAX_DECOMPRESSED_RESPONSE_BYTES:
+            raise ResponseTooLarge(
+                f"decompressed response exceeded the {MAX_DECOMPRESSED_RESPONSE_BYTES}-byte limit"
+            )
+        if not decompressor.eof:
+            raise zlib.error("incomplete compressed response")
+        pending = decompressor.unused_data if concatenated else b""
+    return bytes(output)
+
+
 def _decompress(body: bytes, content_encoding: str | None) -> bytes:
-    """Decode gzip/deflate we asked for in Accept-Encoding. On any decode error,
-    return the bytes unchanged (challenge detection still works on raw bytes)."""
+    """Decode gzip/deflate within the output ceiling.
+
+    Malformed content retains the historical raw-byte fallback so challenge
+    detection can still inspect it; resource-limit failures always propagate.
+    """
     enc = (content_encoding or "").lower()
     try:
         if "gzip" in enc:
-            return gzip.decompress(body)
+            return _zlib_decompress_limited(body, 16 + zlib.MAX_WBITS, concatenated=True)
         if "deflate" in enc:
             try:
-                return zlib.decompress(body)
+                return _zlib_decompress_limited(body, zlib.MAX_WBITS)
             except zlib.error:
-                return zlib.decompress(body, -zlib.MAX_WBITS)  # raw deflate stream
-    except Exception:
+                return _zlib_decompress_limited(body, -zlib.MAX_WBITS)  # raw deflate stream
+    except zlib.error:
         return body
     return body
-
-
-class FetchError(Exception):
-    """A non-recoverable fetch failure (a real HTTP error, bad URL, bad body)."""
-
-
-class Blocked(FetchError):
-    """Bounded attempts ended at a block or challenge, not a dead source.
-
-    Callers should return an explicit blocked state or soft-fail rather than
-    treating it as a citation defect. ``RateLimited`` is the compatible subtype
-    for a terminal HTTP 429.
-    """
-
-
-class RateLimited(Blocked):
-    """Bounded attempts ended with HTTP 429.
-
-    ``retry_after`` preserves the raw upstream header because it may be either
-    delta-seconds or an HTTP date.
-    """
-
-    def __init__(self, message: str, *, retry_after: str | None = None):
-        super().__init__(message)
-        self.retry_after = retry_after
 
 
 def _normalise_allowed_hosts(allowed_hosts: Iterable[str] | None) -> frozenset[str] | None:
@@ -366,7 +420,7 @@ def fetch_bytes(
             final_url = resp.geturl()
             if allowed is not None:
                 _validate_outbound_url(final_url, allowed)
-            body = _decompress(resp.read(), resp.headers.get("Content-Encoding"))
+            body = _decompress(_read_response_limited(resp), resp.headers.get("Content-Encoding"))
             content_type = (resp.headers.get("Content-Type") or "").lower()
         except urllib.error.HTTPError as e:
             # WAF bot-walls: 403/429 classic, 406 is Akamai's "Not Acceptable"

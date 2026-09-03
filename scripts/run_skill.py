@@ -14,7 +14,12 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "lib"))
 
-from result_contract import classify_legacy_error, result_envelope, validate_result_envelope  # noqa: E402
+from result_contract import (  # noqa: E402
+    VALID_EXIT_CODES,
+    classify_legacy_error,
+    result_envelope,
+    validate_result_envelope,
+)
 from skill_metadata import load_skill  # noqa: E402
 
 
@@ -161,7 +166,7 @@ def structured_legacy_error(text: str) -> dict[str, object] | None:
     if not isinstance(message, str) or not message.strip():
         return None
     extracted: dict[str, object] = {"message": message}
-    if isinstance(code, int):
+    if code is not None:
         extracted["code"] = code
     if isinstance(error_type, str) and error_type.strip():
         extracted["type"] = error_type
@@ -315,7 +320,15 @@ def main() -> int:
     combined = "\n".join(part for part in (stderr, stdout) if part)
     structured_error = structured_legacy_error(stderr) or structured_legacy_error(stdout)
     structured_code = structured_error.get("code") if structured_error is not None else None
-    if isinstance(structured_code, int):
+    structured_code_present = structured_error is not None and "code" in structured_error
+    invalid_structured_code = structured_code_present and (
+        type(structured_code) is not int
+        or structured_code not in VALID_EXIT_CODES - {0}
+        or structured_code != completed.returncode
+    )
+    if invalid_structured_code:
+        exit_code = 6
+    elif type(structured_code) is int:
         exit_code = structured_code
     else:
         exit_code = classify_legacy_error(completed.returncode, combined)
@@ -323,13 +336,16 @@ def main() -> int:
     error: dict[str, object] = {
         "code": exit_code,
         "message": (
-            str(structured_error["message"])
+            f"CLI emitted an invalid legacy error code {structured_code!r}; "
+            f"expected a stable non-zero code matching exit status {completed.returncode}"
+            if invalid_structured_code
+            else str(structured_error["message"])
             if structured_error is not None
             else combined or "skill command failed"
         ),
     }
     if structured_error is not None:
-        error.update({key: value for key, value in structured_error.items() if key != "message"})
+        error.update({key: value for key, value in structured_error.items() if key not in {"code", "message"}})
     payload = result_envelope(
         ok=False,
         source_name=metadata["thecolab.source_owner"],

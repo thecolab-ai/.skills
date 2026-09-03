@@ -127,6 +127,72 @@ class RunSkillIntegrationTests(unittest.TestCase):
         self.assertEqual(stderr, "")
         self.assertEqual(payload, direct)
 
+    def test_invalid_legacy_error_codes_fail_closed_without_crashing(self) -> None:
+        for invalid_code in (0, 99, True):
+            with self.subTest(code=invalid_code):
+                exit_code, payload, stderr = self.run_mocked_direct_cli(
+                    "school-terms-nz",
+                    ["years"],
+                    {
+                        "status": "error",
+                        "code": invalid_code,
+                        "error": "synthetic_failure",
+                        "message": "synthetic legacy failure",
+                    },
+                    1,
+                    failure_stream=True,
+                )
+                self.assertEqual(exit_code, 6)
+                self.assertEqual(stderr, "")
+                self.assertFalse(payload["ok"])
+                error = payload["error"]
+                self.assertIsInstance(error, dict)
+                assert isinstance(error, dict)
+                self.assertEqual(error["code"], 6)
+                self.assertIn("invalid legacy error code", error["message"])
+
+    def test_mismatched_stable_legacy_error_code_fails_closed(self) -> None:
+        exit_code, payload, stderr = self.run_mocked_direct_cli(
+            "school-terms-nz",
+            ["years"],
+            {
+                "status": "error",
+                "code": 7,
+                "error": "unsupported_operation",
+                "message": "synthetic guarded operation",
+            },
+            1,
+            failure_stream=True,
+        )
+        self.assertEqual(exit_code, 6)
+        self.assertEqual(stderr, "")
+        error = payload["error"]
+        self.assertIsInstance(error, dict)
+        assert isinstance(error, dict)
+        self.assertEqual(error["code"], 6)
+        self.assertIn("matching exit status 1", error["message"])
+
+    def test_coherent_stable_legacy_error_code_is_preserved(self) -> None:
+        exit_code, payload, stderr = self.run_mocked_direct_cli(
+            "school-terms-nz",
+            ["years"],
+            {
+                "status": "error",
+                "code": 7,
+                "error": "unsupported_operation",
+                "message": "synthetic guarded operation",
+            },
+            7,
+            failure_stream=True,
+        )
+        self.assertEqual(exit_code, 7)
+        self.assertEqual(stderr, "")
+        error = payload["error"]
+        self.assertIsInstance(error, dict)
+        assert isinstance(error, dict)
+        self.assertEqual(error["code"], 7)
+        self.assertEqual(error["type"], "unsupported_operation")
+
     def test_new_skill_legacy_structured_failure_is_normalised(self) -> None:
         completed = self.run_skill("nz-police-data", "area", "Atlantis")
         self.assertEqual(completed.returncode, 7, completed.stderr)

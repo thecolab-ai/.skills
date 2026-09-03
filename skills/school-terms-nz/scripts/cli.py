@@ -218,7 +218,21 @@ def year_semantics_valid(item: dict[str, Any]) -> bool:
         breaks[3]["start"]["latest"],
     ]
     ordered_dates = [dt.date.fromisoformat(value) for value in ordered_values]
-    return ordered_dates == sorted(set(ordered_dates))
+    if ordered_dates != sorted(set(ordered_dates)):
+        return False
+    adjacent_boundaries = (
+        (terms[0]["end"]["date"], breaks[0]["start"]),
+        (breaks[0]["end"], terms[1]["start"]),
+        (terms[1]["end"], breaks[1]["start"]),
+        (breaks[1]["end"], terms[2]["start"]),
+        (terms[2]["end"], breaks[2]["start"]),
+        (breaks[2]["end"], terms[3]["start"]),
+        (terms[3]["end"]["latest"], breaks[3]["start"]["latest"]),
+    )
+    return all(
+        dt.date.fromisoformat(right) - dt.date.fromisoformat(left) == dt.timedelta(days=1)
+        for left, right in adjacent_boundaries
+    )
 
 
 def parse_term_dates(text: str, year: int) -> tuple[str | dict[str, str], str | dict[str, str]]:
@@ -421,21 +435,30 @@ def classification(entry: dict[str, Any], kind: str, certainty: str, caveat: str
     return result
 
 
-def previous_summer_holiday(years: list[dict[str, Any]], query: dt.date) -> dict[str, Any] | None:
-    """Return the prior year's summer break before the earliest Term 1 opening."""
+def pre_opening_summer_holiday(years: list[dict[str, Any]], query: dt.date) -> dict[str, Any] | None:
+    """Return the summer break before the earliest published Term 1 opening."""
     current = next((item for item in years if item["year"] == query.year), None)
     previous = next((item for item in years if item["year"] == query.year - 1), None)
-    if current is None or previous is None:
+    if current is None:
         return None
     term_one = current["terms"][0]
     if term_one["name"] != "Term 1" or not isinstance(term_one["start"], dict):
         return None
     if query >= parse_query_date(term_one["start"]["earliest"]):
         return None
-    summer = next((item for item in previous["breaks"] if item["name"] == "Summer holidays"), None)
-    if summer is None:
+    if previous is not None:
+        summer = next((item for item in previous["breaks"] if item["name"] == "Summer holidays"), None)
+        if summer is not None:
+            return summer
+    source_summer = next((item for item in current["breaks"] if item["name"] == "Summer holidays"), None)
+    if source_summer is None:
         return None
-    return summer
+    return {
+        **source_summer,
+        "start": None,
+        "end": term_one["start"],
+        "description": term_one["description"],
+    }
 
 
 def classify_date(years: list[dict[str, Any]], value: str) -> dict[str, Any]:
@@ -450,7 +473,7 @@ def classify_date(years: list[dict[str, Any]], value: str) -> dict[str, Any]:
             "caveat": "The Ministry page does not publish a complete year covering this date.",
         }
 
-    prior_summer = previous_summer_holiday(years, query)
+    prior_summer = pre_opening_summer_holiday(years, query)
     if prior_summer is not None:
         return classification(
             prior_summer,
@@ -512,7 +535,7 @@ def classify_date(years: list[dict[str, Any]], value: str) -> dict[str, Any]:
 
 def next_break(years: list[dict[str, Any]], value: str) -> dict[str, Any]:
     query = parse_query_date(value)
-    prior_summer = previous_summer_holiday(years, query)
+    prior_summer = pre_opening_summer_holiday(years, query)
     if prior_summer is not None:
         return {
             "name": prior_summer["name"],
