@@ -43,6 +43,45 @@ def build_archive(source_bytes: bytes, replacements: list[tuple[str, bytes, byte
     return output.getvalue()
 
 
+def build_header_only_archive(source_bytes: bytes, member_name: str) -> bytes:
+    output = io.BytesIO()
+    with tarfile.open(fileobj=io.BytesIO(source_bytes), mode="r:gz") as source, tarfile.open(
+        fileobj=output,
+        mode="w:gz",
+    ) as target:
+        for member in source:
+            source_file = source.extractfile(member) if member.isfile() else None
+            data = source_file.read() if source_file is not None else None
+            if data is not None and member.name == member_name:
+                data = data.splitlines(keepends=True)[0]
+                member.size = len(data)
+            target.addfile(member, io.BytesIO(data) if data is not None else None)
+    return output.getvalue()
+
+
+def run_json_header_only_probe(source_bytes: bytes, member_name: str):
+    original_fetch = customs_cli.fetch_archive
+    original_argv = sys.argv
+    captured = io.StringIO()
+
+    def fetch_header_only(timeout):
+        return parse_archive(
+            build_header_only_archive(source_bytes, member_name),
+            f"fixture://header-only-{member_name}",
+            "2026-09-02T00:00:00Z",
+        )
+
+    try:
+        customs_cli.fetch_archive = fetch_header_only
+        sys.argv = [str(SKILL / "scripts" / "cli.py"), "lookup", "0901210000", "--json"]
+        with redirect_stdout(captured):
+            exit_code = customs_cli.main()
+    finally:
+        customs_cli.fetch_archive = original_fetch
+        sys.argv = original_argv
+    return exit_code, json.loads(captured.getvalue())
+
+
 def run_json_formula_probe(archive, *argv_tail: str):
     original_fetch = customs_cli.fetch_archive
     original_argv = sys.argv
@@ -107,6 +146,17 @@ def main() -> int:
     prefixed_formulas = formula_records(dataset, "2", 20, prefix=True)
     assert [record["formula_code"] for record in prefixed_formulas] == ["2", "20"]
     print("[PASS] fixture formula lookup distinguishes exact and explicit prefix matching")
+
+    for member_name in customs_tariff.HEADERS:
+        empty_exit, empty_payload = run_json_header_only_probe(fixture_bytes, member_name)
+        assert empty_exit == 6
+        assert empty_payload["ok"] is False
+        assert empty_payload["blocked"] is False
+        assert empty_payload["data"] is None
+        assert empty_payload["error"]["code"] == 6
+        assert empty_payload["error"]["kind"] == "source_schema"
+        assert member_name in empty_payload["error"]["message"]
+    print("[PASS] header-only required tables return the JSON source-schema error envelope")
 
     malformed_a = parse_archive(
         build_archive(fixture_bytes, [("Tariff_Levy_Formulas.csv", b"2~0.050000", b"A~0.050000")]),
