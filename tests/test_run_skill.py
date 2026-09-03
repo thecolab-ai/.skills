@@ -157,17 +157,26 @@ class RunSkillIntegrationTests(unittest.TestCase):
         self.assertFalse(payload["ok"])
         self.assertEqual(payload["error"]["code"], 7)
 
-    def test_unknown_skill_uses_json_invalid_input_contract(self) -> None:
-        completed = self.run_skill("does-not-exist", "status")
-        self.assertEqual(completed.returncode, 2)
+    def test_canonical_school_terms_timeout_zero_remains_invalid_input(self) -> None:
+        completed = self.run_skill("school-terms-nz", "years", "--timeout", "0")
+        self.assertEqual(completed.returncode, 2, completed.stdout)
         payload = json.loads(completed.stdout)
         self.assertFalse(payload["ok"])
         self.assertEqual(payload["error"]["code"], 2)
+        self.assertEqual(payload["error"]["type"], "invalid_input")
+        self.assertIn("--timeout must be greater than zero", payload["error"]["message"])
 
     def test_skill_name_cannot_escape_catalogue(self) -> None:
         completed = self.run_skill("../lib", "--help")
         payload = json.loads(completed.stdout)
         self.assertEqual(completed.returncode, 2)
+        self.assertFalse(payload["ok"])
+        self.assertEqual(payload["error"]["code"], 2)
+
+    def test_unknown_skill_uses_json_invalid_input_contract(self) -> None:
+        completed = self.run_skill("does-not-exist", "status")
+        self.assertEqual(completed.returncode, 2)
+        payload = json.loads(completed.stdout)
         self.assertFalse(payload["ok"])
         self.assertEqual(payload["error"]["code"], 2)
 

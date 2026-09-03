@@ -151,14 +151,18 @@ def structured_legacy_error(text: str) -> dict[str, object] | None:
         return None
     raw_error = payload.get("error")
     message = payload.get("message")
+    code = payload.get("code")
     if isinstance(raw_error, dict):
         message = message or raw_error.get("message")
         error_type = raw_error.get("type")
+        code = raw_error.get("code", code)
     else:
         error_type = raw_error
     if not isinstance(message, str) or not message.strip():
         return None
     extracted: dict[str, object] = {"message": message}
+    if isinstance(code, int):
+        extracted["code"] = code
     if isinstance(error_type, str) and error_type.strip():
         extracted["type"] = error_type
     details = {
@@ -309,9 +313,13 @@ def main() -> int:
         return 0
 
     combined = "\n".join(part for part in (stderr, stdout) if part)
-    exit_code = classify_legacy_error(completed.returncode, combined)
-    blocked = exit_code == 4
     structured_error = structured_legacy_error(stderr) or structured_legacy_error(stdout)
+    structured_code = structured_error.get("code") if structured_error is not None else None
+    if isinstance(structured_code, int):
+        exit_code = structured_code
+    else:
+        exit_code = classify_legacy_error(completed.returncode, combined)
+    blocked = exit_code == 4
     error: dict[str, object] = {
         "code": exit_code,
         "message": (
