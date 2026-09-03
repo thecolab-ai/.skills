@@ -149,7 +149,7 @@ def json_objects(text: str) -> list[dict[str, object]]:
             offset = end
             while offset < len(stripped) and stripped[offset].isspace():
                 offset += 1
-    except (json.JSONDecodeError, TypeError, NonstandardJsonConstant):
+    except (ValueError, TypeError):
         return []
     return objects
 
@@ -232,13 +232,13 @@ def advertised_failure(text: str) -> bool:
         return False
     try:
         value = strict_json_loads(stripped)
-    except (json.JSONDecodeError, TypeError, NonstandardJsonConstant):
+    except (ValueError, TypeError):
         if json_like(text):
             return True
         for line in text.splitlines()[1:]:
             try:
                 line_value = strict_json_loads(line)
-            except (json.JSONDecodeError, TypeError, NonstandardJsonConstant):
+            except (ValueError, TypeError):
                 # Plain diagnostics may contain JSON-like fragments (for
                 # example argparse metavars). Only complete JSON values on a
                 # later line are eligible for structured-failure inspection.
@@ -462,7 +462,7 @@ def main() -> int:
         else:
             try:
                 data = strict_json_loads(stdout) if stdout else None
-            except (json.JSONDecodeError, NonstandardJsonConstant) as exc:
+            except ValueError as exc:
                 message = exc.msg if isinstance(exc, json.JSONDecodeError) else str(exc)
                 payload = result_envelope(
                     ok=False,

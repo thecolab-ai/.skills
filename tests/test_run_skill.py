@@ -455,6 +455,70 @@ class RunSkillIntegrationTests(unittest.TestCase):
                 self.assertFalse(payload["ok"])
                 self.assertIsNone(payload["data"])
 
+    def test_zero_exit_oversized_json_integers_fail_closed_without_traceback(self) -> None:
+        oversized = "9" * 5_000
+        documents = (
+            oversized,
+            f"-{oversized}",
+            f'{{"rows":[{{"value":{oversized}}}]}}',
+            f"[[-{oversized}]]",
+            f'diagnostic\n{{"value":{oversized}}}',
+        )
+        for stdout_text in documents:
+            with self.subTest(shape=stdout_text[:20]):
+                exit_code, payload, stderr = self.run_mocked_direct_cli(
+                    "school-terms-nz",
+                    ["years"],
+                    {},
+                    0,
+                    stdout_text=stdout_text,
+                )
+
+                self.assertEqual(exit_code, 6)
+                self.assertEqual(stderr, "")
+                self.assertFalse(payload["ok"])
+                self.assertIsNone(payload["data"])
+                error = payload["error"]
+                self.assertIsInstance(error, dict)
+                assert isinstance(error, dict)
+                self.assertEqual(error["code"], 6)
+
+    def test_json_objects_rejects_oversized_json_integers(self) -> None:
+        oversized = "9" * 5_000
+        documents = (
+            oversized,
+            f"-{oversized}",
+            f'{{"value":{oversized}}}',
+            f'{{"value":-{oversized}}}',
+        )
+        for document in documents:
+            with self.subTest(shape=document[:20]):
+                self.assertEqual(RUN_SKILL_MODULE.json_objects(document), [])
+
+    def test_data_parse_normalises_oversized_json_integer(self) -> None:
+        oversized = "9" * 5_000
+        with (
+            mock.patch.object(RUN_SKILL_MODULE, "advertised_failure", return_value=False),
+            mock.patch.object(RUN_SKILL_MODULE, "direct_result_envelope", return_value=(None, [])),
+        ):
+            exit_code, payload, stderr = self.run_mocked_direct_cli(
+                "school-terms-nz",
+                ["years"],
+                {},
+                0,
+                stdout_text=oversized,
+            )
+
+        self.assertEqual(exit_code, 6)
+        self.assertEqual(stderr, "")
+        self.assertFalse(payload["ok"])
+        self.assertIsNone(payload["data"])
+        error = payload["error"]
+        self.assertIsInstance(error, dict)
+        assert isinstance(error, dict)
+        self.assertEqual(error["code"], 6)
+        self.assertIn("valid JSON", error["message"])
+
     def test_direct_envelope_with_trailing_non_json_fails_closed(self) -> None:
         success: dict[str, object] = {
             "schema_version": "1",
