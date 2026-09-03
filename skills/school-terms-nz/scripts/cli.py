@@ -41,6 +41,10 @@ DATE_FRAGMENT = re.compile(
 YEAR_FRAGMENT = re.compile(r"\b20\d{2}\b")
 EXPECTED_TERM_NAMES = [f"Term {number}" for number in range(1, 5)]
 EXPECTED_BREAK_NAMES = ["Term 1 break", "Term 2 break", "Term 3 break", "Summer holidays"]
+OPENING_REQUIREMENT_LABELS = (
+    ("primary", "Primary, intermediate and specialist schools"),
+    ("secondary", "Secondary and composite schools"),
+)
 
 
 class SkillError(RuntimeError):
@@ -157,6 +161,23 @@ def semantic_dates(text: str, year: int, *, expected: int, description: str) -> 
 
 def has_precision(value: Any, expected: str) -> bool:
     return isinstance(value, dict) and value.get("precision") == expected
+
+
+def opening_requirement_label(text: str, year: int) -> str | None:
+    """Recognise only the two complete Ministry opening-requirement sentences."""
+    for label, school_group in OPENING_REQUIREMENT_LABELS:
+        pattern = (
+            rf"{re.escape(school_group)} (?:must|are required to) be open for instruction "
+            rf"for (?:a )?minimum of \d{{3}} half days in {year}\."
+        )
+        if re.fullmatch(pattern, text):
+            return label
+    return None
+
+
+def opening_requirements_valid(item: dict[str, Any]) -> bool:
+    labels = [opening_requirement_label(text, item["year"]) for text in item["opening_requirements"]]
+    return labels == [label for label, _school_group in OPENING_REQUIREMENT_LABELS]
 
 
 def year_semantics_valid(item: dict[str, Any]) -> bool:
@@ -311,7 +332,7 @@ def parse_school_terms(source_html: str, source_url: str = SOURCE_URL) -> list[d
                 current_break["public_holidays"].append(text)
         elif mode == "terms" and subsection == "requirements":
             lowered = text.lower()
-            if "half days" in lowered and ("primary" in lowered or "secondary" in lowered):
+            if opening_requirement_label(text, year) is not None:
                 record["opening_requirements"].append(text)
             if "flexibility" in lowered:
                 record["caveats"].append(text)
@@ -323,6 +344,7 @@ def parse_school_terms(source_html: str, source_url: str = SOURCE_URL) -> list[d
         if (
             term_names != EXPECTED_TERM_NAMES
             or break_names != EXPECTED_BREAK_NAMES
+            or not opening_requirements_valid(item)
             or not year_semantics_valid(item)
             or any("start" not in entry or "end" not in entry for entry in item["terms"])
             or any("start" not in entry or "end" not in entry for entry in item["breaks"])
@@ -447,7 +469,7 @@ def classify_date(years: list[dict[str, Any]], value: str) -> dict[str, Any]:
                 item,
                 "school_break",
                 "published",
-                "The summer holiday starts on each school's closing date, no later than the published date, and runs for 5 or 6 weeks.",
+                "The summer holiday starts on each school's closing date, no later than the published date.",
             )
 
     for item in published["terms"]:

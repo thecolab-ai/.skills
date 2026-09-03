@@ -219,6 +219,20 @@ def certain_next_break_queries() -> None:
 results.append(check("next-break preserves certain current and future break cases", certain_next_break_queries))
 
 
+def summer_duration_stays_source_derived() -> None:
+    mutated = fixture_text.replace("run for 5 or 6 weeks", "run for 12 weeks", 1)
+    mutated_years = module.parse_school_terms(mutated, SOURCE_URL)
+
+    classified = module.classify_date(mutated_years, "2026-12-20")
+    next_result = module.next_break(mutated_years, "2026-12-20")
+    assert "12 weeks" in classified["description"]
+    assert "12 weeks" in next_result["description"]
+    assert "5 or 6 weeks" not in json.dumps([classified, next_result])
+
+
+results.append(check("summer duration claims stay source-derived", summer_duration_stays_source_derived))
+
+
 def cli_surface() -> None:
     expected = {"years", "year", "date", "next-break"}
     help_result = run(["--help"])
@@ -349,6 +363,20 @@ def source_drift_mutations() -> None:
         1,
     )
     assert_schema_error(wrong_break_shape)
+
+    missing_opening_requirements = fixture_text.replace(
+        "Half-day opening requirement 2026",
+        "Unrecognised opening section 2026",
+        1,
+    )
+    assert_schema_error(missing_opening_requirements)
+
+    spoofed_opening_requirement = fixture_text.replace(
+        "Primary, intermediate and specialist schools must be open for instruction for a minimum of 378 half days in 2026.",
+        "Primary planning note: model 378 half days before secondary review in 2026.",
+        1,
+    )
+    assert_schema_error(spoofed_opening_requirement)
 
 
 results.append(check("semantic source drift fails closed with source_schema", source_drift_mutations))
