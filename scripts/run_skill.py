@@ -14,13 +14,13 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "lib"))
 
-from result_contract import (
+from result_contract import (  # noqa: E402
     VALID_EXIT_CODES,
     classify_legacy_error,
     result_envelope,
     validate_result_envelope,
 )
-from skill_metadata import load_skill
+from skill_metadata import load_skill  # noqa: E402
 
 SENSITIVE_ENV_NAME = re.compile(
     r"(?:^|_)(?:API_?KEY|TOKEN|PASSWORD|SECRET|CREDENTIALS?|USERNAME|LOGIN|FETCH_PROXY|HTTPS_PROXY)$",
