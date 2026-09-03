@@ -276,6 +276,11 @@ class RunSkillIntegrationTests(unittest.TestCase):
             "NULL",
             "True",
             "False",
+            "true trailing",
+            "truefalse",
+            'true {"status":"error"}',
+            "null junk",
+            "undefined junk",
             "~",
         )
         for opposing in opposing_streams:
@@ -293,6 +298,51 @@ class RunSkillIntegrationTests(unittest.TestCase):
                     self.assertEqual(exit_code, 6)
                     self.assertEqual(stderr, "")
                     self.assertFalse(payload["ok"])
+
+    def test_direct_success_preserves_normal_plain_diagnostics(self) -> None:
+        success: dict[str, object] = {
+            "schema_version": "1",
+            "ok": True,
+            "source": {
+                "name": "Ministry of Education",
+                "url": "https://www.education.govt.nz/school/school-terms-and-holidays",
+                "retrieved_at": "2026-09-03T00:00:00Z",
+            },
+            "query": {"command": "years"},
+            "data": {"years": [2026]},
+            "warnings": [],
+            "blocked": False,
+            "error": None,
+        }
+        for success_on_stderr in (False, True):
+            with self.subTest(success_on_stderr=success_on_stderr):
+                exit_code, payload, stderr = self.run_mocked_direct_cli(
+                    "school-terms-nz",
+                    ["years"],
+                    success,
+                    0,
+                    failure_stream=success_on_stderr,
+                    stdout_text="cache diagnostic" if success_on_stderr else None,
+                    stderr_text=None if success_on_stderr else "cache diagnostic",
+                )
+                self.assertEqual(exit_code, 0)
+                self.assertEqual(stderr, "")
+                self.assertEqual(payload, success)
+
+    def test_ordinary_legacy_json_data_is_wrapped_as_success(self) -> None:
+        legacy_data: dict[str, object] = {"rows": [1], "message": "ordinary data"}
+        exit_code, payload, stderr = self.run_mocked_direct_cli(
+            "school-terms-nz",
+            ["years"],
+            legacy_data,
+            0,
+            stderr_text="cache diagnostic",
+        )
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(stderr, "")
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["data"], legacy_data)
+        self.assertEqual(payload["warnings"], ["cache diagnostic"])
 
     def test_direct_envelope_with_trailing_non_json_fails_closed(self) -> None:
         success: dict[str, object] = {

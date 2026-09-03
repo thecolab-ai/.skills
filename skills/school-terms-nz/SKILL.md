@@ -86,9 +86,9 @@ All data commands accept `--timeout SECONDS` (default 10) and `--json`.
 
 ## Errors
 
-- Exit 2: invalid ISO date, timeout or unpublished year.
+- Exit 2: invalid ISO date, invalid timeout option/value or unpublished year.
 - Exit 4: source access blocked or rate-limited.
-- Exit 5: upstream source unavailable.
+- Exit 5: upstream source unavailable, including an upstream request timeout.
 - Exit 6: Ministry page schema changed or published sections are incomplete.
 
 Errors are concise and emit structured JSON when `--json` is supplied. Date inputs are validated before any network request. The CLI never writes to the source or local user files.

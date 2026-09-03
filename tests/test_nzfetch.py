@@ -11,7 +11,7 @@ from unittest import mock
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "lib"))
 
-import nzfetch
+import nzfetch  # noqa: E402
 
 PROXY_ENV_VARS = (
     "FETCH_PROXY",
