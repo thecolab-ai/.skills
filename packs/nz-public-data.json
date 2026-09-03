@@ -3,7 +3,7 @@
   "name": "nz-public-data",
   "description": "Public, read-only New Zealand data and public-interest sources.",
   "default": true,
-  "skill_count": 94,
+  "skill_count": 95,
   "skills": [
     "at-transport",
     "auckland-bin-schedule",
@@ -16,6 +16,7 @@
     "class4-grants-nz",
     "comcom-connectivity-map",
     "companies-office-nz",
+    "customs-tariff-nz",
     "data-govt-nz",
     "deprivation-nz",
     "doc-nz",

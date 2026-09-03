@@ -2,7 +2,7 @@
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
   "last_verified": "2026-09-02",
-  "skill_count": 141,
+  "skill_count": 142,
   "skills": [
     {
       "name": "airnz-flights",
@@ -642,6 +642,31 @@
         "app.companiesoffice.govt.nz"
       ],
       "last_verified": "2026-07-19",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "customs-tariff-nz",
+      "description": "Search and look up official New Zealand Customs tariff classifications, rates, levies and formula records. Use for source-backed tariff research, not definitive landed-cost calculations or legal advice.",
+      "path": "skills/customs-tariff-nz",
+      "category": "trade",
+      "source_owner": "New Zealand Customs Service",
+      "source_type": "official",
+      "source_url": "https://www.customs.govt.nz/business/tariffs/tariff-classifications-and-rates/",
+      "auth": "none",
+      "access_mode": "public-download",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "medium",
+      "cache_ttl": "none",
+      "schema_version": "1",
+      "skill_type": "public-download",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "www.customs.govt.nz"
+      ],
+      "last_verified": "2026-09-02",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
