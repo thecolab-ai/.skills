@@ -129,7 +129,7 @@ def build_parser() -> argparse.ArgumentParser:
     add_common(search, as_of=True, limit=True)
 
     lookup = subcommands.add_parser("lookup", help="join active classification, rate, levy and formula records")
-    lookup.add_argument("tariff_code", help="10-digit tariff item, with optional separators or check letter")
+    lookup.add_argument("tariff_code", help="10-digit tariff item, with optional separators")
     add_common(lookup, as_of=True)
 
     formula = subcommands.add_parser("formula", help="inspect raw levy-formula coefficients")

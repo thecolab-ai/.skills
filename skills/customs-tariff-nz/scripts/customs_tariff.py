@@ -4,6 +4,7 @@ from __future__ import annotations
 import csv
 import datetime as dt
 import decimal
+import functools
 import io
 import re
 import tarfile
@@ -79,6 +80,7 @@ def _clean(value: str | None) -> str:
     return re.sub(r"\s+", " ", value or "").strip()
 
 
+@functools.lru_cache(maxsize=512)
 def parse_date(value: str) -> dt.date | None:
     text = _clean(value)
     if not text:
@@ -116,8 +118,6 @@ def parse_source_timestamp(value: str) -> str:
 
 def normalise_code(value: str, *, exact: bool) -> str:
     compact = re.sub(r"[.\s-]+", "", value.strip()).upper()
-    if len(compact) == 11 and compact[-1].isalpha():
-        compact = compact[:-1]
     if re.fullmatch(r"[0-9]+", compact) is None or not (
         len(compact) == 10 if exact else 1 <= len(compact) <= 10
     ):
@@ -167,7 +167,14 @@ class TariffArchive:
                                 exit_code=6,
                                 kind="source_schema",
                             )
-                        yield {key: _clean(value) for key, value in row.items()}
+                        cleaned = {key: _clean(value) for key, value in row.items()}
+                        if not any(cleaned.values()):
+                            raise SkillError(
+                                f"empty record in {name} line {line_number}",
+                                exit_code=6,
+                                kind="source_schema",
+                            )
+                        yield cleaned
         except SkillError:
             raise
         except (KeyError, UnicodeDecodeError, csv.Error, tarfile.TarError, OSError) as exc:
@@ -296,26 +303,24 @@ def parse_archive(
             if stamp_file is None:
                 raise SkillError("archive timestamp is unreadable", exit_code=6, kind="source_schema")
             source_timestamp = parse_source_timestamp(stamp_file.read(256).decode("ascii"))
-            for name, expected in HEADERS.items():
-                source = archive.extractfile(name)
-                if source is None:
-                    raise SkillError(f"archive member is unreadable: {name}", exit_code=6, kind="source_schema")
-                with io.TextIOWrapper(source, encoding="cp1252", newline="") as text:
-                    reader = csv.DictReader(text, delimiter="~")
-                    if tuple(reader.fieldnames or ()) != expected:
-                        raise SkillError(f"unexpected header in {name}", exit_code=6, kind="source_schema")
-                    first_row = next(reader, None)
-                    if first_row is None:
-                        raise SkillError(f"required table has no data rows: {name}", exit_code=6, kind="source_schema")
-                    if None in first_row or any(not isinstance(value, str) for value in first_row.values()):
-                        raise SkillError(f"unexpected field count in {name} line 2", exit_code=6, kind="source_schema")
-                    if not any(_clean(value) for value in first_row.values()):
-                        raise SkillError(f"required table has no data rows: {name}", exit_code=6, kind="source_schema")
     except SkillError:
         raise
     except (tarfile.TarError, UnicodeDecodeError, csv.Error, OSError) as exc:
         raise SkillError(f"invalid tariff archive: {exc}", exit_code=6, kind="source_schema") from exc
-    return TariffArchive(blob, source_url, retrieved_at, source_timestamp, http_last_modified)
+    result = TariffArchive(blob, source_url, retrieved_at, source_timestamp, http_last_modified)
+    tables = (
+        (DETAILS, result.iter_details()),
+        (RATES, result.iter_rates()),
+        (LEVIES, result.iter_levies()),
+        (FORMULAS, result.iter_formulas()),
+    )
+    for name, records in tables:
+        has_records = False
+        for _record in records:
+            has_records = True
+        if not has_records:
+            raise SkillError(f"required table has no data rows: {name}", exit_code=6, kind="source_schema")
+    return result
 
 
 def _validate_archive_url(url: str) -> None:

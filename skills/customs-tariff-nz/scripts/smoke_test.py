@@ -108,13 +108,24 @@ def run_json_malformed_first_row_probe(source_bytes: bytes):
     return exit_code, json.loads(captured.getvalue())
 
 
-def run_json_formula_probe(archive, *argv_tail: str):
+def run_json_malformed_later_row_probe(source_bytes: bytes):
     original_fetch = customs_cli.fetch_archive
     original_argv = sys.argv
     captured = io.StringIO()
+
+    def fetch_malformed(timeout):
+        return parse_archive(
+            build_archive(
+                source_bytes,
+                [("Tariff_Details.csv", b"ROASTED COFFEE \x97 SYNTHETIC", b"ROASTED COFFEE \x97 SYNTHETIC~overflow")],
+            ),
+            "fixture://malformed-later-row.tar.gz",
+            "2026-09-02T00:00:00Z",
+        )
+
     try:
-        customs_cli.fetch_archive = lambda timeout: archive
-        sys.argv = [str(SKILL / "scripts" / "cli.py"), "formula", *argv_tail, "--json"]
+        customs_cli.fetch_archive = fetch_malformed
+        sys.argv = [str(SKILL / "scripts" / "cli.py"), "search", "horses", "--limit", "1", "--json"]
         with redirect_stdout(captured):
             exit_code = customs_cli.main()
     finally:
@@ -193,42 +204,34 @@ def main() -> int:
     assert malformed_row_payload["error"]["kind"] == "source_schema"
     print("[PASS] malformed first CSV row returns the JSON source-schema error envelope")
 
-    malformed_a = parse_archive(
-        build_archive(fixture_bytes, [("Tariff_Levy_Formulas.csv", b"2~0.050000", b"A~0.050000")]),
-        "fixture://malformed-formula-a.tar.gz",
-        "2026-09-02T00:00:00Z",
-    )
-    malformed_exit, malformed_payload = run_json_formula_probe(malformed_a)
-    assert malformed_exit == 6
-    assert malformed_payload["ok"] is False
-    assert malformed_payload["error"]["kind"] == "source_schema"
-    assert "invalid formula code" in malformed_payload["error"]["message"]
-    print("[PASS] malformed source formula A returns the JSON schema-error envelope")
+    malformed_later_exit, malformed_later_payload = run_json_malformed_later_row_probe(fixture_bytes)
+    assert malformed_later_exit == 6
+    assert malformed_later_payload["ok"] is False
+    assert malformed_later_payload["blocked"] is False
+    assert malformed_later_payload["data"] is None
+    assert malformed_later_payload["error"]["code"] == 6
+    assert malformed_later_payload["error"]["kind"] == "source_schema"
+    assert "Tariff_Details.csv line 3" in malformed_later_payload["error"]["message"]
+    print("[PASS] malformed later CSV row cannot hide behind an early search limit")
 
-    malformed_superscript = parse_archive(
-        build_archive(fixture_bytes, [("Tariff_Levy_Formulas.csv", b"2~0.050000", b"\xb2~0.050000")]),
-        "fixture://malformed-formula-cp1252.tar.gz",
-        "2026-09-02T00:00:00Z",
+    malformed_formulas = (
+        (b"2~0.050000", b"A~0.050000", "invalid formula code"),
+        (b"2~0.050000", b"\xb2~0.050000", "invalid formula code"),
+        (b"2~0.050000", b"2~NaN", "invalid formula rate"),
     )
-    superscript_exit, superscript_payload = run_json_formula_probe(malformed_superscript)
-    assert superscript_exit == 6
-    assert superscript_payload["ok"] is False
-    assert superscript_payload["error"]["kind"] == "source_schema"
-    assert "invalid formula code" in superscript_payload["error"]["message"]
-    print("[PASS] malformed CP1252 0xb2 source formula returns the JSON schema-error envelope")
-
-    malformed_rate = parse_archive(
-        build_archive(fixture_bytes, [("Tariff_Levy_Formulas.csv", b"2~0.050000", b"2~NaN")]),
-        "fixture://malformed-formula-rate.tar.gz",
-        "2026-09-02T00:00:00Z",
-    )
-    try:
-        formula_records(malformed_rate, "", 20)
-    except SkillError as exc:
-        assert exc.exit_code == 6 and "invalid formula rate" in str(exc)
-    else:
-        raise AssertionError("invalid formula rate was accepted")
-    print("[PASS] malformed source formula rate remains fail-closed")
+    for old, new, expected_message in malformed_formulas:
+        try:
+            parse_archive(
+                build_archive(fixture_bytes, [("Tariff_Levy_Formulas.csv", old, new)]),
+                "fixture://malformed-formula.tar.gz",
+                "2026-09-02T00:00:00Z",
+            )
+        except SkillError as exc:
+            assert exc.exit_code == 6 and exc.kind == "source_schema"
+            assert expected_message in str(exc)
+        else:
+            raise AssertionError("malformed source formula was accepted during archive validation")
+    print("[PASS] malformed formula types fail during complete archive validation")
 
     tar_buffer = io.BytesIO()
     with tarfile.open(fileobj=tar_buffer, mode="w") as excessive:
@@ -266,6 +269,7 @@ def main() -> int:
 
     for argv_tail in (
         ("lookup", "٠٩٠١٢١٠٠٠٠"),
+        ("lookup", "09.01.21.00.00Z"),
         ("search", "٠٩٠١"),
         ("formula", "2", "--limit", "101"),
     ):
@@ -274,23 +278,29 @@ def main() -> int:
         assert fetch_called is False
     print("[PASS] Unicode numeric lookalikes and parser bounds fail as JSON before fetch")
 
-    invalid_command = [sys.executable, str(SKILL / "scripts" / "cli.py"), "formula", "abc", "--json"]
-    invalid = subprocess.run(invalid_command, capture_output=True, text=True, timeout=10, check=False)
-    invalid_payload = json.loads(invalid.stdout)
     required = {"schema_version", "ok", "blocked", "source", "query", "data", "warnings", "error"}
-    assert invalid.returncode == 2 and required <= invalid_payload.keys()
-    assert invalid_payload["source"]["retrieved_at"] and invalid_payload["error"]["code"] == 2
     runner = SKILL.parents[1] / "scripts" / "run_skill.py"
-    canonical = subprocess.run(
-        [sys.executable, str(runner), SKILL.name, "formula", "abc"],
-        capture_output=True,
-        text=True,
-        timeout=10,
-        check=False,
-    )
-    canonical_payload = json.loads(canonical.stdout)
-    assert canonical.returncode == 2 and canonical_payload["error"]["code"] == 2
-    print("[PASS] invalid-input envelope preserves exit code through canonical runner")
+    for argv_tail in (("formula", "abc"), ("lookup", "09.01.21.00.00Z")):
+        invalid = subprocess.run(
+            [sys.executable, str(SKILL / "scripts" / "cli.py"), *argv_tail, "--json"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+        invalid_payload = json.loads(invalid.stdout)
+        assert invalid.returncode == 2 and required <= invalid_payload.keys()
+        assert invalid_payload["source"]["retrieved_at"] and invalid_payload["error"]["code"] == 2
+        canonical = subprocess.run(
+            [sys.executable, str(runner), SKILL.name, *argv_tail],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+        canonical_payload = json.loads(canonical.stdout)
+        assert canonical.returncode == 2 and canonical_payload["error"]["code"] == 2
+    print("[PASS] invalid input and unsupported check letters fail in direct and canonical JSON")
 
     command = [sys.executable, str(SKILL / "scripts" / "cli.py"), "formula", "2", "--json"]
     completed = subprocess.run(command, capture_output=True, text=True, timeout=30, check=False)
