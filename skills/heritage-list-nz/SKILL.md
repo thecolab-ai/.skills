@@ -17,7 +17,7 @@ metadata:
   thecolab.schema_version: "1"
   thecolab.skill_type: "public-download"
   thecolab.pack: "nz-public-data"
-  thecolab.source_url: "https://www.heritage.org.nz/list-details"
+  thecolab.source_url: "https://www.heritage.org.nz/places"
   thecolab.allowed_domains: "www.heritage.org.nz,hnzpt-prod-web.azurewebsites.net"
   thecolab.last_verified: "2026-09-03"
   thecolab.health: "healthy"

@@ -15,7 +15,7 @@ from typing import Any
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
 nzfetch = importlib.import_module("nzfetch")
 
-LANDING_URL = "https://www.heritage.org.nz/list-details"
+LANDING_URL = "https://www.heritage.org.nz/places"
 CSV_URL = "https://hnzpt-prod-web.azurewebsites.net/api/report/GetPlaceListCsv"
 ALLOWED_HOSTS = {"hnzpt-prod-web.azurewebsites.net"}
 SOURCE_NAME = "Heritage New Zealand Pouhere Taonga"

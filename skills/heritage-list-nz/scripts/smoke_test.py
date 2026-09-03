@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Deterministic parser checks plus one bounded live Heritage List probe."""
+"""Deterministic parser checks plus bounded live Heritage List probes."""
 from __future__ import annotations
 
 import argparse
 import importlib.util
 import io
 import json
+import re
 import subprocess
 import sys
 from contextlib import redirect_stdout
@@ -32,6 +33,18 @@ def check(name: str, fn) -> bool:
     except Exception as exc:  # noqa: BLE001 - aggregate fixture failures
         print(f"[FAIL] fixture {name}: {exc}")
         return False
+
+
+def landing_page_is_valid(html_text: str) -> bool:
+    """Require List-specific content and reject the site's HTTP-200 soft 404."""
+    normalised = re.sub(r"\s+", " ", html_text).casefold()
+    title_match = re.search(r"<title(?:\s[^>]*)?>(.*?)</title>", normalised, flags=re.DOTALL)
+    if title_match is None:
+        return False
+    title = re.sub(r"<[^>]+>", " ", title_match.group(1))
+    if "404 page not found" in title or "new zealand heritage list" not in title:
+        return False
+    return any(marker in normalised for marker in ("official national record", "search for historic places"))
 
 
 def main() -> int:
@@ -91,6 +104,19 @@ def main() -> int:
         else:
             raise AssertionError("unbounded result limits must be rejected")
 
+    def landing_page_contract() -> None:
+        assert cli.LANDING_URL == "https://www.heritage.org.nz/places"
+        assert cli.CSV_URL == "https://hnzpt-prod-web.azurewebsites.net/api/report/GetPlaceListCsv"
+        assert cli.ALLOWED_HOSTS == {"hnzpt-prod-web.azurewebsites.net"}
+        assert not landing_page_is_valid(
+            "<title>404 page not found</title>"
+            "<script>New Zealand Heritage List official national record</script>"
+        )
+        assert landing_page_is_valid(
+            "<title>Search the New Zealand Heritage List/Rārangi Kōrero</title>"
+            '<meta name="description" content="Aotearoa New Zealand’s official national record">'
+        )
+
     def response_cap_is_pre_downloaded() -> None:
         captured: dict[str, int] = {}
 
@@ -106,6 +132,7 @@ def main() -> int:
             cli.nzfetch.fetch_bytes = original
         assert len(records) == 4
         assert source["url"] == cli.CSV_URL
+        assert source["landing_page"] == cli.LANDING_URL
         assert columns == cli.REQUIRED_COLUMNS
         assert captured["max_bytes"] == cli.MAX_DOWNLOAD_BYTES
 
@@ -166,6 +193,7 @@ def main() -> int:
         check("exact lookup and minimised search projection", exact_lookup_and_projection),
         check("source schema drift fails closed", schema_failure),
         check("timeouts, response caps, limits, and exit codes", operational_contracts),
+        check("landing page URL and semantic soft-404 guard", landing_page_contract),
         check("response cap is passed before decompression", response_cap_is_pre_downloaded),
         check("malformed CSV row shape returns CLI schema error", malformed_row_is_cli_schema_error),
         check("short CSV row shape returns CLI schema error", short_row_is_cli_schema_error),
@@ -178,6 +206,31 @@ def main() -> int:
     ]
     if not all(results):
         return 1
+
+    try:
+        landing_body, landing_content_type, landing_final_url = cli.nzfetch.fetch_bytes(
+            cli.LANDING_URL,
+            timeout=cli.TIMEOUT_SECONDS,
+            accept="text/html,*/*;q=0.8",
+            allowed_hosts={"www.heritage.org.nz"},
+            max_bytes=2 * 1024 * 1024,
+        )
+    except cli.nzfetch.Blocked as exc:
+        print(f"[SKIP] live Heritage NZ landing-page probe: upstream unavailable or blocked: {exc}")
+    except (cli.nzfetch.ResponseTooLarge, cli.nzfetch.InvalidCompressedBody) as exc:
+        print(f"[FAIL] live Heritage NZ landing-page probe: invalid bounded response: {exc}")
+        return 1
+    except cli.nzfetch.FetchError as exc:
+        print(f"[SKIP] live Heritage NZ landing-page probe: upstream unavailable: {exc}")
+    else:
+        try:
+            assert "html" in landing_content_type.casefold()
+            assert landing_final_url.rstrip("/") == cli.LANDING_URL
+            assert landing_page_is_valid(landing_body.decode("utf-8", errors="replace"))
+        except AssertionError:
+            print("[FAIL] live Heritage NZ landing-page probe: missing List semantics or unexpected response")
+            return 1
+        print("[PASS] live Heritage NZ landing page semantics")
 
     completed = subprocess.run(
         [sys.executable, str(CLI), "status", "--json"],

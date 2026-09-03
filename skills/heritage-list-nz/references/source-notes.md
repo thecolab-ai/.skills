@@ -4,24 +4,24 @@ Last verified: 2026-09-03
 
 ## Primary surfaces
 
-- Canonical List landing page: <https://www.heritage.org.nz/list-details>
+- Canonical List landing page: <https://www.heritage.org.nz/places>
 - Full List CSV export: <https://hnzpt-prod-web.azurewebsites.net/api/report/GetPlaceListCsv>
 - Source owner: Heritage New Zealand Pouhere Taonga
 - Authentication: none
 - Access: read-only HTTPS GET
 
-The landing page is the canonical source URL. Its deployed Next.js chunk (`/_next/static/chunks/332-6c747a831ed918bd.js` when verified) builds the unfiltered download URL as `/api/report/GetPlaceListCsv` against the `hnzpt-prod-web.azurewebsites.net` API origin. The chunk filename is deployment-specific and is evidence, not a stable interface.
+The landing page is the canonical source URL. The unfiltered CSV remains a separate direct download from the `hnzpt-prod-web.azurewebsites.net` API origin.
 
 ## Live verification
 
 Verified 2026-09-03 before scaffolding:
 
-- `https://www.heritage.org.nz/list-details` returned HTTP 200 and `text/html; charset=utf-8`.
+- `https://www.heritage.org.nz/places` returned HTTP 200 and `text/html; charset=utf-8`; its title and description identified the New Zealand Heritage List and its search, rather than merely relying on the status code.
 - `https://hnzpt-prod-web.azurewebsites.net/api/report/GetPlaceListCsv` returned HTTP 200, `text/csv`, and `attachment; filename=place-list.csv`.
 - The export was 2,368,448 bytes and contained 7,361 data rows at verification time.
 - The first observed data row had List number `9997`, name `Tait House`, type `Historic Place Category 2`, status `Listed`, and council `Christchurch City`.
 
-Row counts, ordering, deployment chunk names, and entries are observations rather than permanent invariants. The smoke test therefore asserts a conservative non-empty scale and the required schema, not an exact live count or sample entry.
+Row counts, ordering, and entries are observations rather than permanent invariants. The smoke test therefore asserts a conservative non-empty scale and the required schema, not an exact live count or sample entry.
 
 ## Required CSV schema
 

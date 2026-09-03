@@ -16,7 +16,7 @@ This skill therefore:
 - omits `LegalDescription` and `ExtentOfListEntry` from user-facing output;
 - does not bundle, cache, mirror, or republish the full export;
 - uses a wholly synthetic deterministic fixture; and
-- links users back to the official source for primary-detail review.
+- links users back to the official List source at <https://www.heritage.org.nz/places> for primary-detail review.
 
 Do not use this tool to create a public mirror or bulk commercial republication. Seek permission from Heritage New Zealand Pouhere Taonga where the intended reuse is outside a lawful exception or the source's stated permissions.
 

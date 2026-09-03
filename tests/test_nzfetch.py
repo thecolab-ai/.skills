@@ -1,5 +1,6 @@
 import gzip
 import http.server
+import importlib
 import os
 import pathlib
 import sys
@@ -14,7 +15,7 @@ from unittest import mock
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "lib"))
 
-import nzfetch  # noqa: E402
+nzfetch = importlib.import_module("nzfetch")
 
 PROXY_ENV_VARS = (
     "FETCH_PROXY",
@@ -166,11 +167,12 @@ class NzfetchTests(unittest.TestCase):
     @mock.patch("nzfetch.urllib.request.urlopen")
     def test_invalid_caller_limit_is_rejected_before_network(self, urlopen):
         for max_bytes in (0, -1, True, 1.5, "8"):
-            with self.subTest(max_bytes=max_bytes):
-                with self.assertRaisesRegex(ValueError, "positive integer"):
-                    nzfetch.fetch_bytes(
-                        "https://example.test/data", max_bytes=max_bytes
-                    )
+            with self.subTest(max_bytes=max_bytes), self.assertRaisesRegex(
+                ValueError, "positive integer"
+            ):
+                nzfetch.fetch_bytes(
+                    "https://example.test/data", max_bytes=max_bytes
+                )
         urlopen.assert_not_called()
 
     @mock.patch("nzfetch.urllib.request.urlopen")
