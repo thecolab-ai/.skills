@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any, NoReturn
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "lib"))
-import nzfetch  # noqa: E402
+import nzfetch
 
 SOURCE_URL = "https://www.education.govt.nz/school/school-terms-and-holidays"
 ALLOWED_HOSTS = {"www.education.govt.nz"}
@@ -36,7 +36,7 @@ DATE_FRAGMENT = re.compile(
     r"(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)?\s*"
     r"(?P<day>\d{1,2})\s+"
     r"(?P<month>January|February|March|April|May|June|July|August|September|October|November|December)",
-    re.I,
+    re.IGNORECASE,
 )
 YEAR_FRAGMENT = re.compile(r"\b20\d{2}\b")
 EXPECTED_TERM_NAMES = [f"Term {number}" for number in range(1, 5)]
@@ -288,7 +288,7 @@ def parse_school_terms(source_html: str, source_url: str = SOURCE_URL) -> list[d
 
     for tag, text in parser.nodes:
         if tag in {"h2", "h3", "h4"}:
-            section = re.fullmatch(r"(20\d{2}) school (terms|holidays)", text, re.I)
+            section = re.fullmatch(r"(20\d{2}) school (terms|holidays)", text, re.IGNORECASE)
             if section:
                 year = int(section.group(1))
                 mode = "terms" if section.group(2).lower() == "terms" else "breaks"
@@ -317,7 +317,7 @@ def parse_school_terms(source_html: str, source_url: str = SOURCE_URL) -> list[d
         record = by_year[year]
 
         if tag in {"h3", "h4"}:
-            term_heading = re.match(r"Term\s+([1-4])\b", text, re.I)
+            term_heading = re.match(r"Term\s+([1-4])\b", text, re.IGNORECASE)
             if mode == "terms" and term_heading:
                 current_term = {
                     "name": f"Term {term_heading.group(1)}",

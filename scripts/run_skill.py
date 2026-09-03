@@ -14,22 +14,21 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "lib"))
 
-from result_contract import (  # noqa: E402
+from result_contract import (
     VALID_EXIT_CODES,
     classify_legacy_error,
     result_envelope,
     validate_result_envelope,
 )
-from skill_metadata import load_skill  # noqa: E402
-
+from skill_metadata import load_skill
 
 SENSITIVE_ENV_NAME = re.compile(
     r"(?:^|_)(?:API_?KEY|TOKEN|PASSWORD|SECRET|CREDENTIALS?|USERNAME|LOGIN|FETCH_PROXY|HTTPS_PROXY)$",
-    re.I,
+    re.IGNORECASE,
 )
 SENSITIVE_ARGUMENT_NAME = re.compile(
     r"(?:^|[-_])(?:api[-_]?key|token|password|secret|credential|username|login|proxy)(?:$|[-_])",
-    re.I,
+    re.IGNORECASE,
 )
 _MISSING = object()
 
@@ -124,13 +123,28 @@ def json_objects(text: str) -> list[dict[str, object]]:
 
 
 def json_like(text: str) -> bool:
-    """Return whether a stream begins like JSON, including malformed JSON."""
-    stripped = text.strip().lstrip("\ufeff").lstrip()
-    if not stripped:
+    """Return whether a stream begins like JSON or a common JSON-like token."""
+    raw = text.strip()
+    if not raw:
         return False
-    if stripped[:1] in {"{", "[", '"', "-"} or stripped[:1].isdigit():
+    if raw.startswith("\ufeff"):
         return True
-    return any(stripped.startswith(token) for token in ("true", "false", "null"))
+    stripped = raw.lstrip()
+    if stripped[:1] in {"{", "[", '"', "-", "~"} or stripped[:1].isdigit():
+        return True
+    token = stripped.casefold()
+    return token in {
+        "true",
+        "false",
+        "null",
+        "none",
+        "nil",
+        "undefined",
+        "nan",
+        "infinity",
+        "+infinity",
+        "-infinity",
+    }
 
 
 def json_object(text: str) -> dict[str, object] | None:
@@ -181,9 +195,7 @@ def advertised_failure(text: str) -> bool:
     # A top-level numeric/status code paired with a message is an incomplete
     # failure envelope, not ordinary command data. Fail closed rather than
     # nesting it under an apparently successful wrapper envelope.
-    if "code" in payload and "message" in payload:
-        return True
-    return False
+    return "code" in payload and "message" in payload
 
 
 def direct_result_envelope(
@@ -242,7 +254,7 @@ def structured_legacy_error(text: str) -> dict[str, object] | None:
         return None
     raw_error = payload.get("error")
     message = payload.get("message")
-    code = payload["code"] if "code" in payload else _MISSING
+    code = payload.get("code", _MISSING)
     if isinstance(raw_error, dict):
         message = message or raw_error.get("message")
         error_type = raw_error.get("type")

@@ -131,7 +131,7 @@ def _browser_headers(url: str, accept: str) -> dict:
     try:
         p = urllib.parse.urlparse(url)
         origin = f"{p.scheme}://{p.netloc}" if p.scheme and p.netloc else ""
-    except Exception:
+    except (ValueError, UnicodeError):
         origin = ""
     is_doc = "text/html" in accept or accept in ("*/*", "")
     h = {

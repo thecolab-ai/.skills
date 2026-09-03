@@ -1,6 +1,6 @@
-import json
 import importlib.util
 import io
+import json
 import os
 import subprocess
 import sys
@@ -8,7 +8,6 @@ import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest import mock
-
 
 ROOT = Path(__file__).resolve().parents[1]
 RUNNER = ROOT / "scripts" / "run_skill.py"
@@ -268,6 +267,16 @@ class RunSkillIntegrationTests(unittest.TestCase):
             '"diagnostic"',
             "0",
             '\ufeff{"status":"error"',
+            "\ufeff",
+            "undefined",
+            "NaN",
+            "Infinity",
+            "None",
+            "nil",
+            "NULL",
+            "True",
+            "False",
+            "~",
         )
         for opposing in opposing_streams:
             for success_on_stderr in (False, True):

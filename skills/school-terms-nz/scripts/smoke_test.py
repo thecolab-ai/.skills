@@ -171,11 +171,11 @@ results.append(check("next-break marks the inclusive Term 1 opening window as sc
 def opening_window_response_envelope() -> None:
     original = module.fetch_years
     try:
-        setattr(module, "fetch_years", lambda timeout: (years, SOURCE_URL, "2026-09-03T00:00:00Z"))
+        module.fetch_years = lambda timeout: (years, SOURCE_URL, "2026-09-03T00:00:00Z")
         args = module.build_parser().parse_args(["next-break", "2026-02-01", "--json"])
         payload = module.run(args)
     finally:
-        setattr(module, "fetch_years", original)
+        module.fetch_years = original
 
     assert set(payload) == {"status", "source_url", "fetched_at", "kind", "date", "break"}
     assert payload["status"] == "ok"
@@ -320,7 +320,7 @@ def error_contract() -> None:
         else:
             raise AssertionError("blocked fetch did not map to exit 4")
 
-        setattr(module.nzfetch, "fetch_bytes", lambda *args, **kwargs: (_ for _ in ()).throw(module.nzfetch.FetchError("synthetic outage")))
+        module.nzfetch.fetch_bytes = lambda *args, **kwargs: (_ for _ in ()).throw(module.nzfetch.FetchError("synthetic outage"))
         try:
             module.fetch_years(1)
         except module.SkillError as exc:
@@ -328,7 +328,7 @@ def error_contract() -> None:
         else:
             raise AssertionError("failed fetch did not map to exit 5")
 
-        setattr(module.nzfetch, "fetch_bytes", original)
+        module.nzfetch.fetch_bytes = original
         original_build_opener = module.nzfetch.urllib.request.build_opener
 
         class TimeoutOpener:
@@ -336,7 +336,7 @@ def error_contract() -> None:
                 raise TimeoutError("synthetic raw timeout")
 
         try:
-            setattr(module.nzfetch.urllib.request, "build_opener", lambda *args, **kwargs: TimeoutOpener())
+            module.nzfetch.urllib.request.build_opener = lambda *args, **kwargs: TimeoutOpener()
             try:
                 module.fetch_years(1)
             except module.SkillError as exc:
@@ -345,9 +345,9 @@ def error_contract() -> None:
             else:
                 raise AssertionError("raw timeout did not map to exit 5")
         finally:
-            setattr(module.nzfetch.urllib.request, "build_opener", original_build_opener)
+            module.nzfetch.urllib.request.build_opener = original_build_opener
     finally:
-        setattr(module.nzfetch, "fetch_bytes", original)
+        module.nzfetch.fetch_bytes = original
 
 
 results.append(check("fixture errors map schema, blocked and unavailable failures to exits 6, 4 and 5", error_contract))
@@ -385,13 +385,7 @@ def malformed_content_encodings_fail_closed_end_to_end() -> None:
             ("deflate", "invalid deflate response body"),
             ("br", "unsupported Content-Encoding"),
         ):
-            setattr(
-                module.nzfetch.urllib.request,
-                "build_opener",
-                lambda *args, encoding=content_encoding, **kwargs: MalformedEncodingOpener(
-                    encoding
-                ),
-            )
+            module.nzfetch.urllib.request.build_opener = lambda *args, encoding=content_encoding, **kwargs: MalformedEncodingOpener(encoding)
             sys.argv = [str(CLI), "years", "--json"]
             output = io.StringIO()
             with redirect_stdout(output):
@@ -404,7 +398,7 @@ def malformed_content_encodings_fail_closed_end_to_end() -> None:
             assert message in payload["message"]
             assert "years" not in payload
     finally:
-        setattr(module.nzfetch.urllib.request, "build_opener", original_build_opener)
+        module.nzfetch.urllib.request.build_opener = original_build_opener
         sys.argv = original_argv
 
 
@@ -542,7 +536,7 @@ def invalid_dates_do_not_fetch() -> None:
         raise AssertionError(f"fetch_years({timeout}) called for invalid local input")
 
     try:
-        setattr(module, "fetch_years", fail_if_fetched)
+        module.fetch_years = fail_if_fetched
         cases = (
             (["date", "not-a-date", "--json"], "invalid_input"),
             (["next-break", "not-a-date", "--json"], "invalid_input"),
@@ -560,7 +554,7 @@ def invalid_dates_do_not_fetch() -> None:
             assert payload["error"] == error_type
         assert fetch_calls == 0
     finally:
-        setattr(module, "fetch_years", original_fetch)
+        module.fetch_years = original_fetch
         sys.argv = original_argv
 
 

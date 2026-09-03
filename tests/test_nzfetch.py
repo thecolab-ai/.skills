@@ -8,12 +8,10 @@ import urllib.request
 import zlib
 from unittest import mock
 
-
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "lib"))
 
-import nzfetch  # noqa: E402
-
+import nzfetch
 
 PROXY_ENV_VARS = (
     "FETCH_PROXY",
@@ -212,18 +210,22 @@ class NzfetchTests(unittest.TestCase):
             content_encoding="gzip",
         )
 
-        with mock.patch.object(nzfetch, "MAX_GZIP_MEMBERS", 2):
-            with self.assertRaisesRegex(nzfetch.ResponseTooLarge, "gzip member limit"):
-                nzfetch.fetch_bytes("https://example.test/data")
+        with (
+            mock.patch.object(nzfetch, "MAX_GZIP_MEMBERS", 2),
+            self.assertRaisesRegex(nzfetch.ResponseTooLarge, "gzip member limit"),
+        ):
+            nzfetch.fetch_bytes("https://example.test/data")
 
     @mock.patch("nzfetch.urllib.request.urlopen")
     def test_wire_response_limit_raises_typed_failure_without_unbounded_read(self, urlopen):
         response = FakeResponse(body=b"x" * 9)
         urlopen.return_value = response
 
-        with mock.patch.object(nzfetch, "MAX_COMPRESSED_RESPONSE_BYTES", 8):
-            with self.assertRaises(nzfetch.ResponseTooLarge):
-                nzfetch.fetch_bytes("https://example.test/data")
+        with (
+            mock.patch.object(nzfetch, "MAX_COMPRESSED_RESPONSE_BYTES", 8),
+            self.assertRaises(nzfetch.ResponseTooLarge),
+        ):
+            nzfetch.fetch_bytes("https://example.test/data")
 
         self.assertTrue(response.read_sizes)
         self.assertTrue(all(isinstance(size, int) and size > 0 for size in response.read_sizes))
@@ -235,9 +237,11 @@ class NzfetchTests(unittest.TestCase):
             content_encoding="gzip",
         )
 
-        with mock.patch.object(nzfetch, "MAX_DECOMPRESSED_RESPONSE_BYTES", 8):
-            with self.assertRaises(nzfetch.ResponseTooLarge):
-                nzfetch.fetch_bytes("https://example.test/data")
+        with (
+            mock.patch.object(nzfetch, "MAX_DECOMPRESSED_RESPONSE_BYTES", 8),
+            self.assertRaises(nzfetch.ResponseTooLarge),
+        ):
+            nzfetch.fetch_bytes("https://example.test/data")
 
     @mock.patch("nzfetch.urllib.request.urlopen")
     def test_deflate_decompressed_limit_raises_typed_failure(self, urlopen):
@@ -246,9 +250,11 @@ class NzfetchTests(unittest.TestCase):
             content_encoding="deflate",
         )
 
-        with mock.patch.object(nzfetch, "MAX_DECOMPRESSED_RESPONSE_BYTES", 8):
-            with self.assertRaises(nzfetch.ResponseTooLarge):
-                nzfetch.fetch_bytes("https://example.test/data")
+        with (
+            mock.patch.object(nzfetch, "MAX_DECOMPRESSED_RESPONSE_BYTES", 8),
+            self.assertRaises(nzfetch.ResponseTooLarge),
+        ):
+            nzfetch.fetch_bytes("https://example.test/data")
 
     @mock.patch("nzfetch.urllib.request.urlopen")
     def test_blocked_direct_request_without_proxy_raises_blocked(self, urlopen):
