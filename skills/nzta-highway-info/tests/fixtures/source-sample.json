@@ -1,0 +1,97 @@
+{
+  "fixture": "synthetic-trafficnz-response-sample",
+  "contains_live_credentials": false,
+  "contains_personal_data": false,
+  "responses": {
+    "events": {
+      "response": {
+        "roadevent": [
+          {
+            "id": 9001,
+            "eventType": "Road Hazard",
+            "eventDescription": "Synthetic fallen tree",
+            "eventComments": "One lane affected",
+            "locationArea": "SH1 Example Pass",
+            "impact": "Caution",
+            "status": "Active",
+            "planned": false,
+            "eventModified": "2026-09-03T08:15:00+12:00",
+            "startDate": "2026-09-03T08:00:00+12:00",
+            "endDate": null,
+            "expectedResolution": "2026-09-03T10:00:00+12:00",
+            "alternativeRoute": "None supplied",
+            "geometry": "POINT (174.0 -41.0)",
+            "region": {"id": 9, "name": "Wellington"},
+            "way": {"id": "001", "name": "SH1"}
+          }
+        ]
+      }
+    },
+    "cameras": {
+      "response": {
+        "camera": [
+          {
+            "id": 7001,
+            "name": "Synthetic SH1 camera",
+            "description": "Northbound synthetic view",
+            "direction": "Northbound",
+            "highway": "SH1",
+            "imageUrl": "/camera/7001.jpg",
+            "thumbUrl": "/camera/thumb/7001.jpg",
+            "viewUrl": "/camera/view/7001",
+            "latitude": -41.1,
+            "longitude": 174.8,
+            "offline": false,
+            "underMaintenance": true,
+            "region": {"id": 9, "name": "Wellington"},
+            "way": {"id": "001", "name": "SH1"}
+          }
+        ]
+      }
+    },
+    "vms": {
+      "response": {
+        "vms": [
+          {
+            "id": 8001,
+            "name": "Synthetic variable sign",
+            "description": "Southbound synthetic sign",
+            "direction": "Southbound",
+            "currentMessage": "ROAD WORKS[nl]EXPECT DELAYS[np]THANK YOU",
+            "lastMessageUpdate": "2026-09-03T08:20:00+12:00",
+            "lastUpdate": "2026-09-03T08:21:00+12:00",
+            "latitude": -41.2,
+            "longitude": 174.9,
+            "region": {"id": 9, "name": "Wellington"},
+            "way": {"id": "001", "name": "SH1"}
+          }
+        ]
+      }
+    },
+    "travel_times": {
+      "response": {
+        "tim": [
+          {
+            "id": 6001,
+            "enabled": 1,
+            "latitude": -41.25,
+            "longitude": 174.85,
+            "mode": "AUTOMATIC",
+            "name": "Synthetic SH1 travel-time sign",
+            "timeStamp": "2026-09-03T08:22:00+12:00",
+            "virtual": false,
+            "way": {"id": "001", "name": "SH1"},
+            "region": {"id": 9, "name": "Wellington"},
+            "page": {
+              "line": [
+                {"center": "VIA SH1"},
+                {"left": "CITY", "right": 12},
+                {"left": "AIRPORT", "right": 24}
+              ]
+            }
+          }
+        ]
+      }
+    }
+  }
+}
