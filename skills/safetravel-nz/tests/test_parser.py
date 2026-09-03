@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Deterministic parser assertions for synthetic SafeTravel source fixtures."""
 from __future__ import annotations
 
@@ -20,9 +19,23 @@ def load_cli():
     return module
 
 
+def read_fixture(name: str) -> str:
+    return (FIXTURES / name).read_text(encoding="utf-8")
+
+
+def assert_schema_error(cli, *, source: str, slug: str, message_fragment: str) -> None:
+    try:
+        cli.parse_destination_page(source, slug=slug, url=f"https://www.safetravel.govt.nz/destinations/{slug}")
+    except cli.SchemaError as exc:
+        assert message_fragment in str(exc)
+    else:
+        raise AssertionError(f"expected SchemaError containing {message_fragment!r}")
+
+
 def main() -> int:
     cli = load_cli()
-    destinations = cli.parse_sitemap((FIXTURES / "sitemap.xml").read_text(encoding="utf-8"))
+
+    destinations = cli.parse_sitemap(read_fixture("sitemap.xml"))
     assert destinations == [
         {
             "name": "Another Place",
@@ -40,7 +53,7 @@ def main() -> int:
     print("[PASS] fixture sitemap destination catalogue parser")
 
     detail = cli.parse_destination_page(
-        (FIXTURES / "destination-page.html").read_text(encoding="utf-8"),
+        read_fixture("destination-page.html"),
         slug="exampleland",
         url="https://www.safetravel.govt.nz/destinations/exampleland",
     )
@@ -78,6 +91,30 @@ def main() -> int:
     assert cli.normalise_destination("Exampleland") == "exampleland"
     assert cli.normalise_destination("https://www.safetravel.govt.nz/destinations/another-place") == "another-place"
     print("[PASS] fixture destination input normalisation")
+
+    assert_schema_error(
+        cli,
+        source=read_fixture("destination-page-regional-only.html"),
+        slug="regional-only",
+        message_fragment="exactly one non-regional primary item",
+    )
+    print("[PASS] regional-only advice data is rejected")
+
+    assert_schema_error(
+        cli,
+        source=read_fixture("destination-page-multiple-primary.html"),
+        slug="multiple-primary",
+        message_fragment="exactly one non-regional primary item",
+    )
+    print("[PASS] multiple primary advice data is rejected")
+
+    assert_schema_error(
+        cli,
+        source=read_fixture("destination-page-contradictory-level.html"),
+        slug="contradictory-level",
+        message_fragment="advice-level data disagreed",
+    )
+    print("[PASS] contradictory advice level data is rejected")
     return 0
 
 

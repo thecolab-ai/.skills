@@ -15,7 +15,7 @@ from urllib.parse import urljoin, urlparse
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO_ROOT / "lib"))
-import nzfetch  # noqa: E402
+import nzfetch
 
 SKILL = "safetravel-nz"
 SOURCE_NAME = "MFAT SafeTravel"
@@ -26,6 +26,14 @@ DESTINATION_PREFIX = urljoin(BASE_URL, "destinations/")
 ALLOWED_HOSTS = ("www.safetravel.govt.nz",)
 TIMEOUT_SECONDS = 10
 CHANGE_WARNING = "Travel advice can change. Consult the official SafeTravel page before travelling or making safety-critical decisions."
+ADVICE_LEVEL_NUMBERS = {
+    "low": 1,
+    "moderate": 2,
+    "medium": 2,
+    "high": 3,
+    "avoid": 4,
+    "extreme": 4,
+}
 
 
 class SkillError(Exception):
@@ -228,16 +236,18 @@ def parse_advice_item(item: Any) -> dict[str, Any]:
     body = html_to_text(str(item.get("body", "")))
     raw_level = clean_text(str(item.get("level", ""))).casefold()
     level_number_match = re.search(r"\blevel\s+([1-4])\s+of\s+4\b", body, re.IGNORECASE)
-    level_number = int(level_number_match.group(1)) if level_number_match else {
-        "low": 1,
-        "moderate": 2,
-        "medium": 2,
-        "high": 3,
-        "avoid": 4,
-        "extreme": 4,
-    }.get(raw_level)
-    if not title or not body or not raw_level or level_number is None:
+    if not title or not body or not raw_level:
         raise SchemaError("advice-level data is missing a title, level, or advice body")
+    expected_level_number = ADVICE_LEVEL_NUMBERS.get(raw_level)
+    if expected_level_number is None:
+        raise SchemaError(f"advice-level data used an unsupported level value: {raw_level!r}")
+    if level_number_match is None:
+        raise SchemaError(f"advice body did not contain a recognised level marker for {title!r}")
+    level_number = int(level_number_match.group(1))
+    if level_number != expected_level_number:
+        raise SchemaError(
+            f"advice-level data disagreed: {title!r} had level {raw_level!r} but body level {level_number}"
+        )
     return {
         "title": title,
         "subtitle": clean_text(str(item.get("subtitle", ""))),
@@ -303,10 +313,10 @@ def parse_destination_page(source: str, *, slug: str, url: str) -> dict[str, Any
     if not isinstance(raw_items, list) or not raw_items:
         raise SchemaError("destination advice-level data was empty")
     advice_items = [parse_advice_item(item) for item in raw_items]
-    primary = next(
-        (item for index, item in enumerate(advice_items) if not bool(raw_items[index].get("regional"))),
-        advice_items[0],
-    )
+    primary_items = [item for index, item in enumerate(advice_items) if not bool(raw_items[index].get("regional"))]
+    if len(primary_items) != 1:
+        raise SchemaError("destination advice-level data must contain exactly one non-regional primary item")
+    primary = primary_items[0]
     regional = [
         item for index, item in enumerate(advice_items) if bool(raw_items[index].get("regional"))
     ]
