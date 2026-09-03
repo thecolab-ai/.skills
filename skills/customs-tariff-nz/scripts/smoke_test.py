@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import gzip
+import importlib
 import io
 import json
 import subprocess
@@ -14,15 +15,14 @@ from pathlib import Path
 SKILL = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SKILL / "scripts"))
 
-import cli as customs_cli
-from customs_tariff import (
-    MAX_ARCHIVE_MEMBERS,
-    SkillError,
-    formula_records,
-    lookup_records,
-    parse_archive,
-    search_records,
-)
+customs_cli = importlib.import_module("cli")
+customs_tariff = importlib.import_module("customs_tariff")
+MAX_ARCHIVE_MEMBERS = customs_tariff.MAX_ARCHIVE_MEMBERS
+SkillError = customs_tariff.SkillError
+formula_records = customs_tariff.formula_records
+lookup_records = customs_tariff.lookup_records
+parse_archive = customs_tariff.parse_archive
+search_records = customs_tariff.search_records
 
 
 def build_archive(source_bytes: bytes, replacements: list[tuple[str, bytes, bytes]]) -> bytes:
