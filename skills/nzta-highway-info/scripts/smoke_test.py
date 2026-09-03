@@ -6,8 +6,8 @@ import importlib.util
 import json
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 SKILL_DIR = Path(__file__).resolve().parents[1]
 CLI = SKILL_DIR / "scripts" / "cli.py"
@@ -35,7 +35,7 @@ def report(kind: str, name: str, status: str, detail: str = "") -> bool | None:
 def fixture_check(name: str, check: Callable[[], None]) -> None:
     try:
         check()
-    except Exception as exc:
+    except (AssertionError, IndexError, KeyError, TypeError, ValueError, module.CliError) as exc:
         report("fixture", name, "FAIL", str(exc))
     else:
         report("fixture", name, "PASS")

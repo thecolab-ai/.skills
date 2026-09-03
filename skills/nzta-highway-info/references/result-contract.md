@@ -45,6 +45,10 @@ complete operational or safety coverage.
 Dates are preserved as source strings. The client does not guess a timezone or
 rewrite fuzzy expected-resolution text.
 
+Event, camera, VMS, and travel-time sign `id` values must be non-empty strings or
+integers. Missing, boolean, fractional, object, list, or blank identifiers are
+source-schema failures rather than normalised nulls.
+
 ## Camera items
 
 - `id`, `name`, `description`, `direction`, `region`, `highway`
@@ -59,6 +63,11 @@ Relative image paths are resolved only against `trafficnz.info`. An unexpected
 host is a schema failure rather than an open redirect. `online` means the source
 flags neither offline nor under maintenance; it does not prove the image is
 recent, visible, or accurate.
+
+Both `offline` and `under_maintenance` are required source states. Their accepted
+source representations are booleans, integer `0`/`1`, or strings `false`/`true`
+and `0`/`1`. Missing, null, or malformed states fail closed; they never default
+to `online`.
 
 ## VMS items
 
@@ -84,6 +93,10 @@ clear route.
 
 A numeric right-hand sign value is treated as displayed minutes. No comparison to
 normal/free-flow time is made.
+
+The source `enabled` field is required and accepts the same strict boolean forms
+as camera state. Missing, null, or malformed values fail closed rather than
+defaulting to `false`.
 
 ## Region items
 
@@ -116,7 +129,11 @@ Expected failures return one stable exit code and no Python traceback:
     "active_only": false,
     "limit": 20
   },
-  "error": {"code": 5, "message": "upstream response interrupted: ..."},
+  "error": {
+    "code": 5,
+    "category": "upstream_unavailable",
+    "message": "upstream response interrupted: ..."
+  },
   "data": null,
   "warnings": [],
   "blocked": false
@@ -126,5 +143,12 @@ Expected failures return one stable exit code and no Python traceback:
 Argument parse failures requested with `--json` use the same envelope; typed
 query fields that were not successfully parsed are null.
 
+`error.category` is `invalid_input`, `blocked`, `upstream_unavailable`, or
+`source_schema`, matching exit codes 2, 4, 5, and 6 respectively.
+
 Exit codes follow `docs/contracts.md`: 2 invalid input, 4 blocked/rate-limited,
 5 upstream unavailable, and 6 source schema/parser failure.
+
+Source JSON is decoded strictly: `NaN`, `Infinity`, `-Infinity`, and non-finite
+numbers at any nested depth are exit-6 schema failures. Successful and failure
+envelopes are serialised with `allow_nan=false`, so emitted JSON is RFC-compatible.

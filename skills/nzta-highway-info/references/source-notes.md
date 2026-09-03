@@ -30,6 +30,16 @@ traffic feed is documented separately through the live WADL below.
 The catalogue web page may present an anti-bot interstitial. The CKAN API is the
 machine-readable discovery surface and does not require a key.
 
+## Source licence status
+
+On 2026-09-03 the live CKAN package returned `isopen: false` and null values for
+`license_id`, `license_title`, and `license_url`. No open-data licence may be
+inferred from catalogue publication or public API access. The MIT licence in
+`SKILL.md` applies only to this skill's code and documentation, not to NZTA's
+source data. This client confines itself to bounded, read-only current queries;
+reuse, redistribution, or republication of returned source data requires separate
+due diligence and, where necessary, permission from NZTA.
+
 ## Traffic and Travel API v4
 
 The authoritative first-party traffic feed is the live WADL contract at:

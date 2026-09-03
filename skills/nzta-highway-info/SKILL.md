@@ -37,6 +37,12 @@ Conditions can change after retrieval. For a critical journey, confirm against
 the official NZTA Journey Planner, roadside signs, closures, emergency services,
 and relevant local council sources.
 
+The frontmatter's MIT licence covers this skill's code and documentation only.
+The source catalogue currently marks the NZTA dataset non-open and supplies no
+licence id, title, or URL. Read-only current queries remain bounded here, but
+reuse or republication of source data requires separate due diligence and, where
+needed, permission from NZTA.
+
 ## Use this when
 
 - A user asks about current NZ state-highway incidents, hazards, closures, or works
@@ -123,6 +129,11 @@ also support human-readable output when `--json` is omitted.
 - Filtering and limits are local after one bounded nationwide endpoint fetch.
 - Exit `2`: invalid input; `4`: blocked/rate-limited; `5`: upstream unavailable;
   `6`: schema/parser failure.
+- JSON decoding rejects `NaN`, positive/negative infinity, and non-finite numeric
+  values at any depth; JSON output is standards-compliant and uses `allow_nan=false`.
+- Event, camera, VMS, and TIM ids must be non-empty string or integer identifiers.
+  Camera operational flags and TIM `enabled` state are required booleans; malformed
+  or absent state fails closed instead of being labelled online or disabled.
 - The JSON envelope always exposes the exact endpoint, catalogue/WADL links,
   retrieval time, counts, truncation state, completeness disclaimer, and warnings.
 

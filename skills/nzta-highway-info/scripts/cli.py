@@ -5,11 +5,12 @@ from __future__ import annotations
 import argparse
 import http.client
 import json
+import math
 import re
-import socket
 import sys
+from collections.abc import Callable
 from datetime import datetime, timezone
-from typing import Any, Callable, NoReturn
+from typing import Any, NoReturn
 from urllib.error import HTTPError, URLError
 from urllib.parse import urljoin, urlparse
 from urllib.request import HTTPRedirectHandler, Request, build_opener
@@ -31,6 +32,13 @@ ENDPOINTS = {
     "cameras": ("cameras/all", "camera"),
     "vms": ("signs/vms/all", "vms"),
     "regions": ("regions/all/10", "region"),
+}
+
+ERROR_CATEGORIES = {
+    2: "invalid_input",
+    4: "blocked",
+    5: "upstream_unavailable",
+    6: "source_schema",
 }
 
 
@@ -68,7 +76,53 @@ def utc_now() -> str:
 
 
 def scalar(value: Any) -> Any:
+    if isinstance(value, float) and not math.isfinite(value):
+        raise SchemaError("upstream response contained a non-finite number")
     return value if isinstance(value, (str, int, float, bool)) or value is None else None
+
+
+def validate_json_value(value: Any) -> None:
+    """Reject values that cannot occur in standards-compliant JSON."""
+    if isinstance(value, float) and not math.isfinite(value):
+        raise SchemaError("upstream response contained a non-finite number")
+    if isinstance(value, list):
+        for item in value:
+            validate_json_value(item)
+    elif isinstance(value, dict):
+        for key, item in value.items():
+            if not isinstance(key, str):
+                raise SchemaError("upstream response contained a non-string object key")
+            validate_json_value(item)
+
+
+def required_identifier(item: dict[str, Any], item_name: str) -> str | int:
+    value = item.get("id")
+    if isinstance(value, bool) or not isinstance(value, (str, int)):
+        raise SchemaError(f"{item_name} item has an invalid id")
+    if isinstance(value, str) and not value.strip():
+        raise SchemaError(f"{item_name} item has an invalid id")
+    return value
+
+
+def required_bool(item: dict[str, Any], field: str, item_name: str) -> bool:
+    if field not in item:
+        raise SchemaError(f"{item_name} item is missing {field}")
+    value = item[field]
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int) and value in {0, 1}:
+        return bool(value)
+    if isinstance(value, str):
+        normalised = value.strip().lower()
+        if normalised in {"true", "1"}:
+            return True
+        if normalised in {"false", "0"}:
+            return False
+    raise SchemaError(f"{item_name} item has invalid {field}")
+
+
+def reject_json_constant(value: str) -> NoReturn:
+    raise ValueError(f"non-standard JSON constant: {value}")
 
 
 def nested_name(value: Any) -> str | None:
@@ -109,11 +163,10 @@ def bool_value(value: Any) -> bool:
 
 
 def normalise_event(item: dict[str, Any]) -> dict[str, Any]:
-    if item.get("id") in (None, ""):
-        raise SchemaError("road-event item is missing id")
+    item_id = required_identifier(item, "road-event")
     way = nested_name(item.get("way")) or nested_name(item.get("journey"))
     return {
-        "id": scalar(item.get("id")),
+        "id": item_id,
         "type": scalar(item.get("eventType")),
         "description": scalar(item.get("eventDescription")),
         "comments": scalar(item.get("eventComments")),
@@ -133,14 +186,13 @@ def normalise_event(item: dict[str, Any]) -> dict[str, Any]:
 
 
 def normalise_camera(item: dict[str, Any]) -> dict[str, Any]:
-    if item.get("id") in (None, ""):
-        raise SchemaError("camera item is missing id")
-    offline = bool_value(item.get("offline"))
-    maintenance = bool_value(item.get("underMaintenance"))
+    item_id = required_identifier(item, "camera")
+    offline = required_bool(item, "offline", "camera")
+    maintenance = required_bool(item, "underMaintenance", "camera")
     status = "offline" if offline else "maintenance" if maintenance else "online"
     highway = item.get("highway") or nested_name(item.get("way")) or nested_name(item.get("journey"))
     return {
-        "id": scalar(item.get("id")),
+        "id": item_id,
         "name": scalar(item.get("name")),
         "description": scalar(item.get("description")),
         "direction": scalar(item.get("direction")),
@@ -165,12 +217,11 @@ def message_lines(value: Any) -> list[str]:
 
 
 def normalise_vms(item: dict[str, Any]) -> dict[str, Any]:
-    if item.get("id") in (None, ""):
-        raise SchemaError("VMS item is missing id")
+    item_id = required_identifier(item, "VMS")
     lines = message_lines(item.get("currentMessage"))
     highway = nested_name(item.get("way")) or nested_name(item.get("journey"))
     return {
-        "id": scalar(item.get("id")),
+        "id": item_id,
         "name": scalar(item.get("name")),
         "description": scalar(item.get("description")),
         "direction": scalar(item.get("direction")),
@@ -212,17 +263,17 @@ def parse_tim_pages(value: Any) -> tuple[list[list[dict[str, Any]]], list[dict[s
 
 
 def normalise_tim(item: dict[str, Any]) -> dict[str, Any]:
-    if item.get("id") in (None, ""):
-        raise SchemaError("travel-time sign item is missing id")
+    item_id = required_identifier(item, "travel-time sign")
+    enabled = required_bool(item, "enabled", "travel-time sign")
     pages, destinations = parse_tim_pages(item.get("page"))
     return {
-        "id": scalar(item.get("id")),
+        "id": item_id,
         "name": scalar(item.get("name")),
         "region": nested_name(item.get("region")),
         "highway": normalise_highway(nested_name(item.get("way"))),
         "latitude": scalar(item.get("latitude")),
         "longitude": scalar(item.get("longitude")),
-        "enabled": bool_value(item.get("enabled")),
+        "enabled": enabled,
         "mode": scalar(item.get("mode")),
         "virtual": bool_value(item.get("virtual")),
         "pages": pages,
@@ -249,6 +300,7 @@ NORMALISERS: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {
 
 
 def parse_response(payload: Any, item_key: str, parser: Callable[[dict[str, Any]], dict[str, Any]]) -> list[dict[str, Any]]:
+    validate_json_value(payload)
     if not isinstance(payload, dict) or not isinstance(payload.get("response"), dict):
         raise SchemaError("upstream response is missing response object")
     response = payload["response"]
@@ -317,12 +369,12 @@ def fetch_json(url: str) -> Any:
         if exc.code in {401, 403, 429}:
             raise BlockedError(f"upstream access blocked or rate-limited (HTTP {exc.code})") from exc
         raise UpstreamError(f"upstream unavailable (HTTP {exc.code})") from exc
-    except (URLError, TimeoutError, socket.timeout) as exc:
+    except (URLError, TimeoutError) as exc:
         reason = getattr(exc, "reason", exc)
         raise UpstreamError(f"upstream unavailable or timed out: {reason}") from exc
     try:
-        return json.loads(body.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        return json.loads(body.decode("utf-8"), parse_constant=reject_json_constant)
+    except (UnicodeDecodeError, ValueError) as exc:
         raise SchemaError("upstream returned invalid JSON") from exc
 
 
@@ -474,7 +526,12 @@ def human_value(item: dict[str, Any], command: str) -> str:
 
 def emit(payload: dict[str, Any], json_mode: bool) -> None:
     if json_mode:
-        print(json.dumps(payload, indent=2, ensure_ascii=False))
+        try:
+            validate_json_value(payload)
+            serialised = json.dumps(payload, indent=2, ensure_ascii=False, allow_nan=False)
+        except (TypeError, ValueError) as exc:
+            raise SchemaError("normalised result is not standards-compliant JSON") from exc
+        print(serialised)
         return
     source = payload["source"]
     print(f"NZTA {payload['kind']} — {payload['returned']} result(s) (fetched {source['retrieved_at']})")
@@ -527,12 +584,17 @@ def main(argv: list[str] | None = None) -> int:
                             "latest_item_update_at": None,
                         },
                         "query": query,
-                        "error": {"code": exc.exit_code, "message": str(exc)},
+                        "error": {
+                            "code": exc.exit_code,
+                            "category": ERROR_CATEGORIES[exc.exit_code],
+                            "message": str(exc),
+                        },
                         "data": None,
                         "warnings": [],
                         "blocked": exc.exit_code == 4,
                     },
                     ensure_ascii=False,
+                    allow_nan=False,
                 )
             )
         else:

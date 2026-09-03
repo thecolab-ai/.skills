@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
 import subprocess
 import sys
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
+from typing import Any
 from unittest import mock
 
 SKILL_DIR = Path(__file__).resolve().parents[1]
@@ -66,6 +69,42 @@ class ParserTests(unittest.TestCase):
 
     def test_empty_collection_is_preserved(self) -> None:
         self.assertEqual(module.parse_response({"response": {"camera": []}}, "camera", module.normalise_camera), [])
+
+    def test_non_finite_number_at_ignored_nested_depth_is_schema_error(self) -> None:
+        payload = {"response": {"camera": []}, "metadata": {"ignored": [float("nan")]}}
+        with self.assertRaises(module.SchemaError):
+            module.parse_response(payload, "camera", module.normalise_camera)
+
+    def test_required_item_ids_reject_non_identifier_values(self) -> None:
+        normalisers = (
+            module.normalise_event,
+            module.normalise_camera,
+            module.normalise_vms,
+            module.normalise_tim,
+        )
+        for normaliser in normalisers:
+            for invalid_id in ({"nested": 1}, [1], True, 1.5, "  "):
+                with (
+                    self.subTest(normaliser=normaliser.__name__, invalid_id=invalid_id),
+                    self.assertRaises(module.SchemaError),
+                ):
+                    normaliser({"id": invalid_id})
+
+    def test_camera_operational_flags_are_required_booleans(self) -> None:
+        valid = {"id": 1, "offline": False, "underMaintenance": False}
+        for field in ("offline", "underMaintenance"):
+            missing = dict(valid)
+            missing.pop(field)
+            with self.subTest(field=field, state="missing"), self.assertRaises(module.SchemaError):
+                module.normalise_camera(missing)
+            malformed = {**valid, field: {"not": "boolean"}}
+            with self.subTest(field=field, state="malformed"), self.assertRaises(module.SchemaError):
+                module.normalise_camera(malformed)
+
+    def test_tim_enabled_is_a_required_boolean(self) -> None:
+        for item in ({"id": 1}, {"id": 1, "enabled": [False]}):
+            with self.subTest(item=item), self.assertRaises(module.SchemaError):
+                module.normalise_tim(item)
 
     def test_filter_is_case_insensitive_and_bounded(self) -> None:
         items = [
@@ -138,6 +177,23 @@ raise SystemExit(module.main(["cameras", "--json"]))
         self.assertIsInstance(payload["query"], dict)
         self.assertNotIn("Traceback", result.stderr + result.stdout)
 
+    def assert_in_process_source_schema_error(self, command: str, source_payload: dict[str, Any]) -> None:
+        stdout = io.StringIO()
+        with mock.patch.object(module, "fetch_json", return_value=source_payload), redirect_stdout(stdout):
+            exit_code = module.main([command, "--json"])
+        self.assertEqual(exit_code, 6)
+        payload = self.strict_json_loads(stdout.getvalue())
+        error = payload["error"]
+        self.assertIsInstance(error, dict)
+        self.assertEqual(error["code"], 6)
+        self.assertEqual(error["category"], "source_schema")
+
+    def strict_json_loads(self, text: str) -> dict[str, Any]:
+        def reject_constant(value: str) -> None:
+            raise ValueError(f"non-standard JSON constant: {value}")
+
+        return json.loads(text, parse_constant=reject_constant)
+
     def test_help_lists_bounded_read_commands(self) -> None:
         result = self.run_cli("--help")
         self.assertEqual(result.returncode, 0)
@@ -163,21 +219,98 @@ raise SystemExit(module.main(["cameras", "--json"]))
     def test_incomplete_read_emits_upstream_json_error(self) -> None:
         self.assert_json_error(self.run_cli_with_read_failure("incomplete"), 5)
 
+    def test_non_finite_normalised_output_emits_schema_error_as_standard_json(self) -> None:
+        success_payload = {
+            "schema_version": "1",
+            "ok": True,
+            "kind": "cameras",
+            "source": {},
+            "query": {},
+            "data": [{"latitude": float("nan")}],
+            "warnings": [],
+        }
+        stdout = io.StringIO()
+        with mock.patch.object(module, "execute", return_value=success_payload), redirect_stdout(stdout):
+            exit_code = module.main(["cameras", "--json"])
+        self.assertEqual(exit_code, 6)
+        payload = self.strict_json_loads(stdout.getvalue())
+        self.assertIsInstance(payload, dict)
+        error = payload["error"]
+        self.assertIsInstance(error, dict)
+        self.assertEqual(error["code"], 6)
+        self.assertEqual(error["category"], "source_schema")
+
+    def test_malformed_source_items_emit_structured_source_schema_exit(self) -> None:
+        cases = (
+            ("events", {"response": {"roadevent": [{"id": {"nested": 1}}]}}),
+            ("cameras", {"response": {"camera": [{"id": 1, "underMaintenance": False}]}}),
+            ("travel-times", {"response": {"tim": [{"id": 1, "enabled": [False]}]}}),
+        )
+        for command, source_payload in cases:
+            with self.subTest(command=command):
+                self.assert_in_process_source_schema_error(command, source_payload)
+
+    def test_success_output_is_strict_standard_json(self) -> None:
+        success_payload = {
+            "schema_version": "1",
+            "ok": True,
+            "kind": "cameras",
+            "source": {"retrieved_at": "2026-09-03T00:00:00Z"},
+            "query": {},
+            "data": [{"latitude": -41.0}],
+            "warnings": [],
+        }
+        stdout = io.StringIO()
+        with mock.patch.object(module, "execute", return_value=success_payload), redirect_stdout(stdout):
+            exit_code = module.main(["cameras", "--json"])
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(self.strict_json_loads(stdout.getvalue()), success_payload)
+
 
 class NetworkBoundaryTests(unittest.TestCase):
+    def test_non_standard_json_constants_are_rejected_at_every_depth(self) -> None:
+        class FakeResponse:
+            def __init__(self, body: bytes) -> None:
+                self.body = body
+                self.headers: dict[str, str] = {}
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, traceback):
+                return False
+
+            def read(self, size):
+                return self.body
+
+        for constant in (b"NaN", b"Infinity", b"-Infinity"):
+            body = b'{"response":{"camera":[]},"metadata":{"deep":[' + constant + b"]}}"
+            opener = mock.Mock()
+            opener.open.return_value = FakeResponse(body)
+            with (
+                self.subTest(constant=constant),
+                mock.patch.object(module, "build_opener", return_value=opener),
+                self.assertRaises(module.SchemaError),
+            ):
+                module.fetch_json(module.API_ROOT + "cameras/all")
+
     def test_blocked_http_status_remains_distinct(self) -> None:
         opener = mock.Mock()
         opener.open.side_effect = module.HTTPError(module.API_ROOT, 403, "Forbidden", {}, None)
-        with mock.patch.object(module, "build_opener", return_value=opener):
-            with self.assertRaises(module.BlockedError):
-                module.fetch_json(module.API_ROOT + "cameras/all")
+        with (
+            mock.patch.object(module, "build_opener", return_value=opener),
+            self.assertRaises(module.BlockedError),
+        ):
+            module.fetch_json(module.API_ROOT + "cameras/all")
 
     def test_other_http_status_remains_upstream_error(self) -> None:
         opener = mock.Mock()
         opener.open.side_effect = module.HTTPError(module.API_ROOT, 503, "Unavailable", {}, None)
-        with mock.patch.object(module, "build_opener", return_value=opener):
-            with self.assertRaises(module.UpstreamError):
-                module.fetch_json(module.API_ROOT + "cameras/all")
+        with (
+            mock.patch.object(module, "build_opener", return_value=opener),
+            self.assertRaises(module.UpstreamError),
+        ):
+            module.fetch_json(module.API_ROOT + "cameras/all")
 
     def test_off_host_redirect_is_rejected_before_follow_up(self) -> None:
         foreign_contacted = False
@@ -196,14 +329,17 @@ class NetworkBoundaryTests(unittest.TestCase):
                 nonlocal foreign_contacted
                 foreign_contacted = True
 
-        with mock.patch.object(module, "build_opener", return_value=RedirectingOpener()):
-            with self.assertRaises(module.SchemaError):
-                module.fetch_json(module.API_ROOT + "cameras/all")
+        with (
+            mock.patch.object(module, "build_opener", return_value=RedirectingOpener()),
+            self.assertRaises(module.SchemaError),
+        ):
+            module.fetch_json(module.API_ROOT + "cameras/all")
         self.assertFalse(foreign_contacted)
 
     def test_malformed_content_length_is_schema_error(self) -> None:
         class FakeResponse:
-            headers = {"Content-Length": "not-a-number"}
+            def __init__(self) -> None:
+                self.headers = {"Content-Length": "not-a-number"}
 
             def __enter__(self):
                 return self
@@ -216,9 +352,11 @@ class NetworkBoundaryTests(unittest.TestCase):
 
         opener = mock.Mock()
         opener.open.return_value = FakeResponse()
-        with mock.patch.object(module, "build_opener", return_value=opener):
-            with self.assertRaises(module.SchemaError):
-                module.fetch_json(module.API_ROOT + "cameras/all")
+        with (
+            mock.patch.object(module, "build_opener", return_value=opener),
+            self.assertRaises(module.SchemaError),
+        ):
+            module.fetch_json(module.API_ROOT + "cameras/all")
 
 
 if __name__ == "__main__":
