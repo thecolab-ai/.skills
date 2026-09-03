@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Deterministic repository contract test for this skill."""
+
 import importlib
 import sys
 from pathlib import Path

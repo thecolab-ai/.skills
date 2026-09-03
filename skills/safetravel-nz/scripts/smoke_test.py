@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Bounded, outage-aware smoke checks for the SafeTravel NZ skill."""
+
 from __future__ import annotations
 
 import json
@@ -44,7 +45,10 @@ def main() -> int:
         print("[SKIP] live advice unavailable: network timed out")
         return 0
     if advice.returncode in {4, 5}:
-        print("[SKIP] live advice unavailable: " + (advice.stderr.strip() or "upstream unavailable"))
+        print(
+            "[SKIP] live advice unavailable: "
+            + (advice.stderr.strip() or "upstream unavailable")
+        )
         return 0
     if advice.returncode != 0:
         print("[FAIL] live advice command")
@@ -54,16 +58,22 @@ def main() -> int:
         payload = json.loads(advice.stdout)
         assert payload["schema_version"] == "1"
         assert payload["ok"] is True
-        assert payload["source"]["url"].startswith("https://www.safetravel.govt.nz/destinations/australia")
+        assert payload["source"]["url"].startswith(
+            "https://www.safetravel.govt.nz/destinations/australia"
+        )
         assert payload["source"]["retrieved_at"].endswith("Z")
         assert payload["source"]["page_updated"]
         assert payload["data"]["advice_level"]["number"] in {1, 2, 3, 4}
         assert payload["data"]["advice_level"]["title"]
-        assert any("advice can change" in warning.casefold() for warning in payload["warnings"])
+        assert any(
+            "advice can change" in warning.casefold() for warning in payload["warnings"]
+        )
     except (AssertionError, KeyError, TypeError, ValueError) as exc:
         print(f"[FAIL] live advice schema assertion: {exc}")
         return 1
-    print("[PASS] live Australia advice includes source, timestamps, level, and warning")
+    print(
+        "[PASS] live Australia advice includes source, timestamps, level, and warning"
+    )
 
     try:
         search = run([str(CLI), "search", "australia", "--limit", "5", "--json"])
@@ -71,7 +81,10 @@ def main() -> int:
         print("[SKIP] live search unavailable: network timed out")
         return 0
     if search.returncode in {4, 5}:
-        print("[SKIP] live search unavailable: " + (search.stderr.strip() or "upstream unavailable"))
+        print(
+            "[SKIP] live search unavailable: "
+            + (search.stderr.strip() or "upstream unavailable")
+        )
         return 0
     if search.returncode != 0:
         print("[FAIL] live search command")
@@ -80,7 +93,10 @@ def main() -> int:
     try:
         search_payload = json.loads(search.stdout)
         assert search_payload["data"]["kind"] == "destination_search"
-        assert any(item["slug"] == "australia" for item in search_payload["data"]["destinations"])
+        assert any(
+            item["slug"] == "australia"
+            for item in search_payload["data"]["destinations"]
+        )
         assert search_payload["source"]["retrieved_at"].endswith("Z")
     except (AssertionError, KeyError, TypeError, ValueError) as exc:
         print(f"[FAIL] live search schema assertion: {exc}")

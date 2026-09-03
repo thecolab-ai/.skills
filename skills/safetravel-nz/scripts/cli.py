@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Read-only SafeTravel NZ destination-advice lookup CLI."""
+
 from __future__ import annotations
 
 import argparse
@@ -56,7 +57,10 @@ class SkillError(Exception):
         }.get(self.code, "error")
 
     def error_payload(self) -> dict[str, Any]:
-        return {"error": self.error_name or self._default_error_name(), "message": str(self)}
+        return {
+            "error": self.error_name or self._default_error_name(),
+            "message": str(self),
+        }
 
 
 class RateLimitedError(SkillError):
@@ -149,7 +153,10 @@ class DestinationPageParser(HTMLParser):
         if tag == "meta" and attrs_dict.get("name", "").lower() == "description":
             self.description = clean_text(attrs_dict.get("content", "")) or None
         element_id = attrs_dict.get("id", "")
-        if element_id in {"js-advice-level-accordion", "js-accordion"} and "data-content" in attrs_dict:
+        if (
+            element_id in {"js-advice-level-accordion", "js-accordion"}
+            and "data-content" in attrs_dict
+        ):
             self.data_content[element_id] = attrs_dict["data-content"]
         if tag == "h1":
             self.h1_depth += 1
@@ -213,8 +220,7 @@ def parse_sitemap(source: str) -> list[dict[str, str | None]]:
         if node.tag.rsplit("}", 1)[-1] != "url":
             continue
         fields = {
-            child.tag.rsplit("}", 1)[-1]: clean_text(child.text or "")
-            for child in node
+            child.tag.rsplit("}", 1)[-1]: clean_text(child.text or "") for child in node
         }
         url = fields.get("loc", "")
         parsed = urlparse(url)
@@ -239,7 +245,9 @@ def parse_sitemap(source: str) -> list[dict[str, str | None]]:
         )
     if not destinations:
         raise SchemaError("official sitemap contained no destination pages")
-    return sorted(destinations, key=lambda item: (str(item["name"]).casefold(), str(item["slug"])))
+    return sorted(
+        destinations, key=lambda item: (str(item["name"]).casefold(), str(item["slug"]))
+    )
 
 
 def normalise_destination(value: str) -> str:
@@ -255,14 +263,21 @@ def normalise_destination(value: str) -> str:
             or parsed.query
             or parsed.fragment
         ):
-            raise SkillError("destination URL must be a canonical www.safetravel.govt.nz destination URL", 2)
+            raise SkillError(
+                "destination URL must be a canonical www.safetravel.govt.nz destination URL",
+                2,
+            )
         parts = [part for part in parsed.path.split("/") if part]
         if len(parts) != 2 or parts[0] != "destinations":
-            raise SkillError("destination URL must have the form /destinations/<slug>", 2)
+            raise SkillError(
+                "destination URL must have the form /destinations/<slug>", 2
+            )
         candidate = parts[1]
     candidate = re.sub(r"\s+", "-", candidate.strip().casefold())
     if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", candidate):
-        raise SkillError("destination must be a SafeTravel destination name or hyphenated slug", 2)
+        raise SkillError(
+            "destination must be a SafeTravel destination name or hyphenated slug", 2
+        )
     return candidate
 
 
@@ -277,9 +292,13 @@ def parse_advice_item(item: Any) -> dict[str, Any]:
         raise SchemaError("advice-level data is missing a title, level, or advice body")
     expected_level_number = ADVICE_LEVEL_NUMBERS.get(raw_level)
     if expected_level_number is None:
-        raise SchemaError(f"advice-level data used an unsupported level value: {raw_level!r}")
+        raise SchemaError(
+            f"advice-level data used an unsupported level value: {raw_level!r}"
+        )
     if level_number_match is None:
-        raise SchemaError(f"advice body did not contain a recognised level marker for {title!r}")
+        raise SchemaError(
+            f"advice body did not contain a recognised level marker for {title!r}"
+        )
     level_number = int(level_number_match.group(1))
     if level_number != expected_level_number:
         raise SchemaError(
@@ -296,7 +315,9 @@ def parse_advice_item(item: Any) -> dict[str, Any]:
     }
 
 
-def parse_related_news(parser: DestinationPageParser, page_url: str) -> list[dict[str, str | None]]:
+def parse_related_news(
+    parser: DestinationPageParser, page_url: str
+) -> list[dict[str, str | None]]:
     results: list[dict[str, str | None]] = []
     seen_urls: set[str] = set()
     for anchor in parser.news_links:
@@ -306,20 +327,30 @@ def parse_related_news(parser: DestinationPageParser, page_url: str) -> list[dic
         text = clean_text(" ".join(anchor["parts"]))
         headings = clean_text(" ".join(anchor["heading_parts"]))
         title = headings or str(anchor["aria"]) or text
-        title = re.sub(r"\bUpdated\s+\d{1,2}\s+[A-Za-z]+\s+\d{4}\b", "", title, flags=re.IGNORECASE)
+        title = re.sub(
+            r"\bUpdated\s+\d{1,2}\s+[A-Za-z]+\s+\d{4}\b", "", title, flags=re.IGNORECASE
+        )
         title = clean_text(title).replace("read article", "").strip()
-        updated_match = re.search(r"\bUpdated\s+(\d{1,2}\s+[A-Za-z]+\s+\d{4})\b", text, re.IGNORECASE)
+        updated_match = re.search(
+            r"\bUpdated\s+(\d{1,2}\s+[A-Za-z]+\s+\d{4})\b", text, re.IGNORECASE
+        )
         summary = text
         if updated_match:
             summary = summary.replace(updated_match.group(0), "")
         if title:
             summary = summary.replace(title, "", 1)
-        summary = clean_text(re.sub(r"\bread article\b", "", summary, flags=re.IGNORECASE)) or None
+        summary = (
+            clean_text(re.sub(r"\bread article\b", "", summary, flags=re.IGNORECASE))
+            or None
+        )
         if not title:
             continue
         # Footer registration material uses a /news/ instructional URL but is not
         # destination-related news; this skill intentionally excludes registration workflows.
-        if title.casefold() == "register your travel" or "registering-on-safetravel" in url.casefold():
+        if (
+            title.casefold() == "register your travel"
+            or "registering-on-safetravel" in url.casefold()
+        ):
             continue
         seen_urls.add(url)
         results.append(
@@ -338,27 +369,43 @@ def parse_destination_page(source: str, *, slug: str, url: str) -> dict[str, Any
     try:
         parser.feed(source)
         parser.close()
-    except Exception as exc:  # HTMLParser is permissive, but retain a clean parser failure.
+    except (
+        Exception
+    ) as exc:  # HTMLParser is permissive, but retain a clean parser failure.
         raise SchemaError(f"destination page HTML could not be parsed: {exc}") from exc
     raw_advice = parser.data_content.get("js-advice-level-accordion")
     if not raw_advice:
-        raise SchemaError("destination page did not contain SafeTravel advice-level data")
+        raise SchemaError(
+            "destination page did not contain SafeTravel advice-level data"
+        )
     try:
         raw_items = json.loads(html.unescape(raw_advice))
     except json.JSONDecodeError as exc:
-        raise SchemaError(f"destination advice-level data was not valid JSON: {exc}") from exc
+        raise SchemaError(
+            f"destination advice-level data was not valid JSON: {exc}"
+        ) from exc
     if not isinstance(raw_items, list) or not raw_items:
         raise SchemaError("destination advice-level data was empty")
     advice_items = [parse_advice_item(item) for item in raw_items]
-    primary_items = [item for index, item in enumerate(advice_items) if not bool(raw_items[index].get("regional"))]
+    primary_items = [
+        item
+        for index, item in enumerate(advice_items)
+        if not bool(raw_items[index].get("regional"))
+    ]
     if len(primary_items) != 1:
-        raise SchemaError("destination advice-level data must contain exactly one non-regional primary item")
+        raise SchemaError(
+            "destination advice-level data must contain exactly one non-regional primary item"
+        )
     primary = primary_items[0]
     regional = [
-        item for index, item in enumerate(advice_items) if bool(raw_items[index].get("regional"))
+        item
+        for index, item in enumerate(advice_items)
+        if bool(raw_items[index].get("regional"))
     ]
     page_text = clean_text(" ".join(parser.visible_parts))
-    page_updated_match = re.search(r"\bPage updated\s+(\d{1,2}\s+[A-Za-z]+\s+\d{4})\b", page_text, re.IGNORECASE)
+    page_updated_match = re.search(
+        r"\bPage updated\s+(\d{1,2}\s+[A-Za-z]+\s+\d{4})\b", page_text, re.IGNORECASE
+    )
     name = clean_text(" ".join(parser.h1_parts)) or slug.replace("-", " ").title()
     return {
         "destination": {
@@ -386,7 +433,9 @@ def fetch_text(url: str, *, accept: str) -> tuple[str, str]:
     except nzfetch.RateLimited as exc:
         retry_after = exc.retry_after
         retry_hint = f"; retry after {retry_after}" if retry_after else ""
-        raise RateLimitedError(f"source rate-limited: {exc}{retry_hint}", retry_after=retry_after) from exc
+        raise RateLimitedError(
+            f"source rate-limited: {exc}{retry_hint}", retry_after=retry_after
+        ) from exc
     except nzfetch.Blocked as exc:
         raise BlockedError(f"source blocked: {exc}") from exc
     except nzfetch.FetchError as exc:
@@ -397,7 +446,9 @@ def fetch_text(url: str, *, accept: str) -> tuple[str, str]:
         raise SchemaError(f"official source returned non-UTF-8 content: {exc}") from exc
 
 
-def source_metadata(url: str, retrieved_at: str, *, page_updated: str | None = None) -> dict[str, str | None]:
+def source_metadata(
+    url: str, retrieved_at: str, *, page_updated: str | None = None
+) -> dict[str, str | None]:
     return {
         "name": SOURCE_NAME,
         "owner": SOURCE_OWNER,
@@ -407,7 +458,9 @@ def source_metadata(url: str, retrieved_at: str, *, page_updated: str | None = N
     }
 
 
-def result_envelope(*, source: dict[str, str | None], query: dict[str, Any], data: dict[str, Any]) -> dict[str, Any]:
+def result_envelope(
+    *, source: dict[str, str | None], query: dict[str, Any], data: dict[str, Any]
+) -> dict[str, Any]:
     return {
         "schema_version": "1",
         "ok": True,
@@ -421,7 +474,9 @@ def result_envelope(*, source: dict[str, str | None], query: dict[str, Any], dat
 
 def get_destinations() -> tuple[list[dict[str, str | None]], str, str]:
     retrieved_at = utc_now()
-    text, final_url = fetch_text(SITEMAP_URL, accept="application/xml,text/xml;q=0.9,*/*;q=0.8")
+    text, final_url = fetch_text(
+        SITEMAP_URL, accept="application/xml,text/xml;q=0.9,*/*;q=0.8"
+    )
     return parse_sitemap(text), final_url, retrieved_at
 
 
@@ -453,14 +508,26 @@ def cmd_advice(args: argparse.Namespace) -> dict[str, Any]:
     destinations, sitemap_url, sitemap_retrieved_at = get_destinations()
     destination = next((item for item in destinations if item["slug"] == slug), None)
     if destination is None:
-        raise SkillError(f"destination '{slug}' was not found in the official SafeTravel sitemap; use search first", 2)
+        raise SkillError(
+            f"destination '{slug}' was not found in the official SafeTravel sitemap; use search first",
+            2,
+        )
     page_url = str(destination["url"])
     retrieved_at = utc_now()
-    source, final_url = fetch_text(page_url, accept="text/html,application/xhtml+xml;q=0.9,*/*;q=0.8")
+    source, final_url = fetch_text(
+        page_url, accept="text/html,application/xhtml+xml;q=0.9,*/*;q=0.8"
+    )
     data = parse_destination_page(source, slug=slug, url=final_url)
     return result_envelope(
-        source=source_metadata(final_url, retrieved_at, page_updated=data["destination"]["page_updated"]),
-        query={"command": "advice", "destination": slug, "sitemap_url": sitemap_url, "sitemap_retrieved_at": sitemap_retrieved_at},
+        source=source_metadata(
+            final_url, retrieved_at, page_updated=data["destination"]["page_updated"]
+        ),
+        query={
+            "command": "advice",
+            "destination": slug,
+            "sitemap_url": sitemap_url,
+            "sitemap_retrieved_at": sitemap_retrieved_at,
+        },
         data={"kind": "destination_advice", **data},
     )
 
@@ -481,15 +548,31 @@ def build_parser() -> argparse.ArgumentParser:
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    search = subparsers.add_parser("search", help="search official SafeTravel destination pages")
+    search = subparsers.add_parser(
+        "search", help="search official SafeTravel destination pages"
+    )
     search.add_argument("query", help="destination name or words")
-    search.add_argument("--limit", type=positive_limit, default=20, help="maximum matches, 1-100 (default: 20)")
-    search.add_argument("--json", action="store_true", help="emit the result envelope as JSON")
+    search.add_argument(
+        "--limit",
+        type=positive_limit,
+        default=20,
+        help="maximum matches, 1-100 (default: 20)",
+    )
+    search.add_argument(
+        "--json", action="store_true", help="emit the result envelope as JSON"
+    )
     search.set_defaults(handler=cmd_search)
 
-    advice = subparsers.add_parser("advice", help="fetch current advice for one official destination")
-    advice.add_argument("destination", help="destination name, slug, or canonical SafeTravel destination URL")
-    advice.add_argument("--json", action="store_true", help="emit the result envelope as JSON")
+    advice = subparsers.add_parser(
+        "advice", help="fetch current advice for one official destination"
+    )
+    advice.add_argument(
+        "destination",
+        help="destination name, slug, or canonical SafeTravel destination URL",
+    )
+    advice.add_argument(
+        "--json", action="store_true", help="emit the result envelope as JSON"
+    )
     advice.set_defaults(handler=cmd_advice)
     return parser
 
@@ -503,20 +586,26 @@ def print_human(result: dict[str, Any]) -> None:
         for item in data["destinations"]:
             print(f"- {item['name']} ({item['slug']}): {item['url']}")
         if not data["destinations"]:
-            print("No official destination pages matched. Try fewer or different words.")
+            print(
+                "No official destination pages matched. Try fewer or different words."
+            )
         print(f"Sitemap retrieved: {source['retrieved_at']} — {source['url']}")
     else:
         destination = data["destination"]
         level = data["advice_level"]
         print(destination["name"])
-        print(f"Advice level {level['number']} of 4 ({level['level']}): {level['title']}")
+        print(
+            f"Advice level {level['number']} of 4 ({level['level']}): {level['title']}"
+        )
         print(level["body"])
         if destination.get("page_updated"):
             print(f"Page updated: {destination['page_updated']}")
         if data["regional_cautions"]:
             print("Regional cautions:")
             for item in data["regional_cautions"]:
-                print(f"- Level {item['number']} ({item['level']}): {item['title']} {item['subtitle']}")
+                print(
+                    f"- Level {item['number']} ({item['level']}): {item['title']} {item['subtitle']}"
+                )
         if data["related_alerts_news"]:
             print("Related alerts/news:")
             for item in data["related_alerts_news"]:
@@ -534,22 +623,33 @@ def main(argv: list[str] | None = None) -> int:
     except nzfetch.RateLimited as exc:
         retry_after = exc.retry_after
         retry_hint = f"; retry after {retry_after}" if retry_after else ""
-        error = RateLimitedError(f"source rate-limited: {exc}{retry_hint}", retry_after=retry_after)
+        error = RateLimitedError(
+            f"source rate-limited: {exc}{retry_hint}", retry_after=retry_after
+        )
         if args.json:
-            print(json.dumps(error.error_payload(), indent=2, ensure_ascii=False), file=sys.stderr)
+            print(
+                json.dumps(error.error_payload(), indent=2, ensure_ascii=False),
+                file=sys.stderr,
+            )
         else:
             print(f"{SKILL}: {error}", file=sys.stderr)
         return error.code
     except nzfetch.Blocked as exc:
         error = BlockedError(f"source blocked: {exc}")
         if args.json:
-            print(json.dumps(error.error_payload(), indent=2, ensure_ascii=False), file=sys.stderr)
+            print(
+                json.dumps(error.error_payload(), indent=2, ensure_ascii=False),
+                file=sys.stderr,
+            )
         else:
             print(f"{SKILL}: {error}", file=sys.stderr)
         return error.code
     except SkillError as exc:
         if args.json:
-            print(json.dumps(exc.error_payload(), indent=2, ensure_ascii=False), file=sys.stderr)
+            print(
+                json.dumps(exc.error_payload(), indent=2, ensure_ascii=False),
+                file=sys.stderr,
+            )
         else:
             print(f"{SKILL}: {exc}", file=sys.stderr)
         return exc.code

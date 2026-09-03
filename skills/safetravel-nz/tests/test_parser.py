@@ -1,4 +1,5 @@
 """Deterministic parser assertions for synthetic SafeTravel source fixtures."""
+
 from __future__ import annotations
 
 import contextlib
@@ -29,7 +30,9 @@ def read_fixture(name: str) -> str:
 
 def assert_schema_error(cli, *, source: str, slug: str, message_fragment: str) -> None:
     try:
-        cli.parse_destination_page(source, slug=slug, url=f"https://www.safetravel.govt.nz/destinations/{slug}")
+        cli.parse_destination_page(
+            source, slug=slug, url=f"https://www.safetravel.govt.nz/destinations/{slug}"
+        )
     except cli.SchemaError as exc:
         assert message_fragment in str(exc)
     else:
@@ -90,10 +93,17 @@ def main() -> int:
             "summary": "Official update for travellers.",
         }
     ]
-    print("[PASS] fixture destination advice, regional caution, and related-news parser")
+    print(
+        "[PASS] fixture destination advice, regional caution, and related-news parser"
+    )
 
     assert cli.normalise_destination("Exampleland") == "exampleland"
-    assert cli.normalise_destination("https://www.safetravel.govt.nz/destinations/another-place") == "another-place"
+    assert (
+        cli.normalise_destination(
+            "https://www.safetravel.govt.nz/destinations/another-place"
+        )
+        == "another-place"
+    )
     print("[PASS] fixture destination input normalisation")
 
     assert_schema_error(
@@ -122,7 +132,11 @@ def main() -> int:
 
     stderr = io.StringIO()
     with (
-        mock.patch.object(cli, "fetch_text", side_effect=cli.nzfetch.RateLimited("synthetic 429", retry_after="120")),
+        mock.patch.object(
+            cli,
+            "fetch_text",
+            side_effect=cli.nzfetch.RateLimited("synthetic 429", retry_after="120"),
+        ),
         contextlib.redirect_stderr(stderr),
     ):
         exit_code = cli.main(["search", "exampleland", "--json"])
@@ -137,7 +151,11 @@ def main() -> int:
 
     stderr = io.StringIO()
     with (
-        mock.patch.object(cli, "fetch_text", side_effect=cli.nzfetch.RateLimited("synthetic 429", retry_after="120")),
+        mock.patch.object(
+            cli,
+            "fetch_text",
+            side_effect=cli.nzfetch.RateLimited("synthetic 429", retry_after="120"),
+        ),
         contextlib.redirect_stderr(stderr),
     ):
         exit_code = cli.main(["search", "exampleland"])
