@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import html
+import importlib
 import json
 import re
 import sys
@@ -15,7 +16,7 @@ from urllib.parse import urljoin, urlparse
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO_ROOT / "lib"))
-import nzfetch
+nzfetch = importlib.import_module("nzfetch")
 
 SKILL = "safetravel-nz"
 SOURCE_NAME = "MFAT SafeTravel"
