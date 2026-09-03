@@ -32,6 +32,7 @@ SENSITIVE_ARGUMENT_NAME = re.compile(
     re.IGNORECASE,
 )
 _MISSING = object()
+MAX_JSON_INTEGER_DIGITS = 4_300
 
 
 class NonstandardJsonConstant(ValueError):
@@ -51,18 +52,28 @@ def parse_finite_json_float(number: str) -> float:
     return value
 
 
+def parse_bounded_json_int(number: str) -> int:
+    """Decode a JSON integer with an implementation-independent digit bound."""
+    digits = number.removeprefix("-")
+    if len(digits) > MAX_JSON_INTEGER_DIGITS:
+        raise ValueError(f"JSON integer exceeds {MAX_JSON_INTEGER_DIGITS} digits")
+    return int(number)
+
+
 STRICT_JSON_DECODER = json.JSONDecoder(
     parse_constant=reject_nonstandard_json_constant,
     parse_float=parse_finite_json_float,
+    parse_int=parse_bounded_json_int,
 )
 
 
 def strict_json_loads(text: str) -> object:
-    """Decode standards-compliant JSON without accepting non-finite numbers."""
+    """Decode standards-compliant JSON with finite, bounded numbers."""
     return json.loads(
         text,
         parse_constant=reject_nonstandard_json_constant,
         parse_float=parse_finite_json_float,
+        parse_int=parse_bounded_json_int,
     )
 
 
