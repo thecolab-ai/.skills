@@ -130,6 +130,71 @@ def main() -> int:
     )
     print("[PASS] contradictory advice level data is rejected")
 
+    sitemap_source = read_fixture("sitemap.xml")
+    destination_source = read_fixture("destination-page.html")
+    requested_url = "https://www.safetravel.govt.nz/destinations/exampleland"
+
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    with (
+        mock.patch.object(
+            cli,
+            "fetch_text",
+            side_effect=[
+                (sitemap_source, cli.SITEMAP_URL),
+                (
+                    destination_source,
+                    "https://www.safetravel.govt.nz/destinations/another-place",
+                ),
+            ],
+        ),
+        contextlib.redirect_stdout(stdout),
+        contextlib.redirect_stderr(stderr),
+    ):
+        exit_code = cli.main(["advice", "exampleland", "--json"])
+    assert exit_code == 6
+    assert stdout.getvalue() == ""
+    assert '"ok": true' not in stderr.getvalue().casefold()
+    assert json.loads(stderr.getvalue()) == {
+        "error": "source_schema_failure",
+        "message": (
+            "destination fetch resolved to a different canonical destination: "
+            "requested 'exampleland', received 'another-place'"
+        ),
+    }
+    print(
+        "[PASS] cross-destination redirects fail closed without a mixed success response"
+    )
+
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    with (
+        mock.patch.object(
+            cli,
+            "fetch_text",
+            side_effect=[
+                (sitemap_source, cli.SITEMAP_URL),
+                (destination_source, requested_url),
+            ],
+        ),
+        contextlib.redirect_stdout(stdout),
+        contextlib.redirect_stderr(stderr),
+    ):
+        exit_code = cli.main(["advice", "exampleland", "--json"])
+    assert exit_code == 0
+    assert stderr.getvalue() == ""
+    payload = json.loads(stdout.getvalue())
+    assert payload["ok"] is True
+    assert payload["query"]["destination"] == "exampleland"
+    assert payload["source"]["url"] == requested_url
+    assert payload["data"]["destination"]["slug"] == "exampleland"
+    assert payload["data"]["destination"]["url"] == requested_url
+    assert payload["data"]["advice_level"]["number"] == 2
+    assert payload["data"]["advice_level"]["level"] == "moderate"
+    print(
+        "[PASS] exact canonical destination keeps coherent advice and safety semantics"
+    )
+
     stderr = io.StringIO()
     with (
         mock.patch.object(

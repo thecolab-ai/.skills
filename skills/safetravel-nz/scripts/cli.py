@@ -250,6 +250,21 @@ def parse_sitemap(source: str) -> list[dict[str, str | None]]:
     )
 
 
+def canonical_destination_slug(url: str) -> str | None:
+    """Return the slug only for an exact canonical SafeTravel destination URL."""
+    parsed = urlparse(url)
+    if (
+        parsed.scheme != "https"
+        or parsed.netloc.lower() not in ALLOWED_HOSTS
+        or parsed.params
+        or parsed.query
+        or parsed.fragment
+    ):
+        return None
+    match = re.fullmatch(r"/destinations/([a-z0-9]+(?:-[a-z0-9]+)*)", parsed.path)
+    return match.group(1) if match else None
+
+
 def normalise_destination(value: str) -> str:
     """Accept a destination slug, friendly name, or canonical SafeTravel URL."""
     candidate = value.strip()
@@ -517,6 +532,16 @@ def cmd_advice(args: argparse.Namespace) -> dict[str, Any]:
     source, final_url = fetch_text(
         page_url, accept="text/html,application/xhtml+xml;q=0.9,*/*;q=0.8"
     )
+    final_slug = canonical_destination_slug(final_url)
+    if final_slug is None:
+        raise SchemaError(
+            "destination fetch did not resolve to a canonical SafeTravel destination URL"
+        )
+    if final_slug != slug:
+        raise SchemaError(
+            "destination fetch resolved to a different canonical destination: "
+            f"requested {slug!r}, received {final_slug!r}"
+        )
     data = parse_destination_page(source, slug=slug, url=final_url)
     return result_envelope(
         source=source_metadata(
