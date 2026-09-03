@@ -132,6 +132,10 @@ class ResponseTooLarge(FetchError):
     """The upstream response exceeded a documented in-memory safety ceiling."""
 
 
+class InvalidCompressedBody(FetchError):
+    """The advertised compressed response body was corrupt or incomplete."""
+
+
 class Blocked(FetchError):
     """Bounded attempts ended at a block or challenge, not a dead source.
 
@@ -214,30 +218,34 @@ def _minimal_headers(accept: str) -> dict:
     }
 
 
-def _read_response_limited(response) -> bytes:
+def _read_response_limited(response, max_bytes: int | None = None) -> bytes:
     """Read at most the documented wire/compressed ceiling, never unbounded."""
+    limit = MAX_COMPRESSED_RESPONSE_BYTES if max_bytes is None else max_bytes
     chunks: list[bytes] = []
     total = 0
     while True:
-        chunk = response.read(
-            min(READ_CHUNK_BYTES, MAX_COMPRESSED_RESPONSE_BYTES + 1 - total)
-        )
+        chunk = response.read(min(READ_CHUNK_BYTES, limit + 1 - total))
         if not chunk:
             return b"".join(chunks)
         chunks.append(chunk)
         total += len(chunk)
-        if total > MAX_COMPRESSED_RESPONSE_BYTES:
+        if total > limit:
             raise ResponseTooLarge(
-                f"response exceeded the {MAX_COMPRESSED_RESPONSE_BYTES}-byte wire/compressed limit"
+                f"response exceeded the {limit}-byte wire/compressed limit"
             )
 
 
 def _zlib_decompress_limited(
-    body: bytes, wbits: int, *, concatenated: bool = False
+    body: bytes,
+    wbits: int,
+    *,
+    concatenated: bool = False,
+    max_bytes: int | None = None,
 ) -> bytes:
     """Decompress with a hard output ceiling, including concatenated gzip members."""
     if not body:
         raise zlib.error("empty compressed response")
+    limit = MAX_DECOMPRESSED_RESPONSE_BYTES if max_bytes is None else max_bytes
     output = bytearray()
     pending = body
     member_count = 0
@@ -248,20 +256,17 @@ def _zlib_decompress_limited(
                 f"compressed response exceeded the {MAX_GZIP_MEMBERS}-member gzip member limit"
             )
         decompressor = zlib.decompressobj(wbits)
-        remaining = MAX_DECOMPRESSED_RESPONSE_BYTES - len(output)
+        remaining = limit - len(output)
         output.extend(decompressor.decompress(pending, remaining + 1))
-        if (
-            len(output) > MAX_DECOMPRESSED_RESPONSE_BYTES
-            or decompressor.unconsumed_tail
-        ):
+        if len(output) > limit or decompressor.unconsumed_tail:
             raise ResponseTooLarge(
-                f"decompressed response exceeded the {MAX_DECOMPRESSED_RESPONSE_BYTES}-byte limit"
+                f"decompressed response exceeded the {limit}-byte limit"
             )
-        remaining = MAX_DECOMPRESSED_RESPONSE_BYTES - len(output)
+        remaining = limit - len(output)
         output.extend(decompressor.flush(remaining + 1))
-        if len(output) > MAX_DECOMPRESSED_RESPONSE_BYTES:
+        if len(output) > limit:
             raise ResponseTooLarge(
-                f"decompressed response exceeded the {MAX_DECOMPRESSED_RESPONSE_BYTES}-byte limit"
+                f"decompressed response exceeded the {limit}-byte limit"
             )
         if not decompressor.eof:
             raise zlib.error("incomplete compressed response")
@@ -288,7 +293,9 @@ def _content_encoding_tokens(content_encoding: str | None) -> list[str]:
     return tokens
 
 
-def _decompress(body: bytes, content_encoding: str | None) -> bytes:
+def _decompress(
+    body: bytes, content_encoding: str | None, max_bytes: int | None = None
+) -> bytes:
     """Decode supported codings in reverse application order within hard limits.
 
     Invalid advertised compression fails closed. The only compatibility fallback
@@ -303,17 +310,22 @@ def _decompress(body: bytes, content_encoding: str | None) -> bytes:
                     decoded,
                     16 + zlib.MAX_WBITS,
                     concatenated=True,
+                    max_bytes=max_bytes,
                 )
             except zlib.error as exc:
-                raise FetchError("invalid gzip response body") from exc
+                raise InvalidCompressedBody("invalid gzip response body") from exc
             continue
         try:
-            decoded = _zlib_decompress_limited(decoded, zlib.MAX_WBITS)
+            decoded = _zlib_decompress_limited(
+                decoded, zlib.MAX_WBITS, max_bytes=max_bytes
+            )
         except zlib.error:
             try:
-                decoded = _zlib_decompress_limited(decoded, -zlib.MAX_WBITS)
+                decoded = _zlib_decompress_limited(
+                    decoded, -zlib.MAX_WBITS, max_bytes=max_bytes
+                )
             except zlib.error as exc:
-                raise FetchError("invalid deflate response body") from exc
+                raise InvalidCompressedBody("invalid deflate response body") from exc
     return decoded
 
 
@@ -488,6 +500,7 @@ def fetch_bytes(
     browser_headers: bool = True,
     allowed_hosts: Iterable[str] | None = None,
     sensitive_headers: Iterable[str] | None = None,
+    max_bytes: int | None = None,
 ) -> tuple[bytes, str, str]:
     """Fetch *url* → (body, content_type, final_url). GET by default; pass
     ``data`` (bytes) for a POST. A full drop-in for a skill's own
@@ -522,11 +535,28 @@ def fetch_bytes(
       redirect carrying a protected header is rejected, while same-origin
       redirects preserve it. Use this option to mark an otherwise-safe name as
       source-specific credential material.
+    - ``max_bytes`` — optional positive per-call cap for both wire/compressed and
+      decoded bytes. It can only tighten, never relax, the global safety ceilings.
 
     Tries a DIRECT request first; on HTTP 403/406/429/451 or a recognised HTML
     challenge, runs the configured bounded proxy attempts. Raises ``RateLimited``
     if the final attempt is HTTP 429, ``Blocked`` for other exhausted block or
     challenge outcomes, and ``FetchError`` for other HTTP/URL failures."""
+    if max_bytes is not None and (
+        isinstance(max_bytes, bool) or not isinstance(max_bytes, int) or max_bytes <= 0
+    ):
+        raise ValueError("max_bytes must be a positive integer")
+    wire_limit = (
+        min(max_bytes, MAX_COMPRESSED_RESPONSE_BYTES)
+        if max_bytes
+        else MAX_COMPRESSED_RESPONSE_BYTES
+    )
+    decoded_limit = (
+        min(max_bytes, MAX_DECOMPRESSED_RESPONSE_BYTES)
+        if max_bytes
+        else MAX_DECOMPRESSED_RESPONSE_BYTES
+    )
+
     allowed = _normalise_allowed_hosts(allowed_hosts)
     if allowed is not None:
         _validate_outbound_url(url, allowed)
@@ -595,7 +625,9 @@ def fetch_bytes(
             if allowed is not None:
                 _validate_outbound_url(final_url, allowed)
             body = _decompress(
-                _read_response_limited(resp), resp.headers.get("Content-Encoding")
+                _read_response_limited(resp, wire_limit),
+                resp.headers.get("Content-Encoding"),
+                decoded_limit,
             )
             content_type = (resp.headers.get("Content-Type") or "").lower()
         except urllib.error.HTTPError as e:
