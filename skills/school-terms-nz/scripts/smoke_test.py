@@ -76,8 +76,14 @@ def parser_shape() -> None:
         "precision": "no_later_than",
         "latest": "2026-12-19",
     }
-    assert "378 half days" in current["opening_requirements"][0]
-    assert any("flexibility" in note.lower() for note in current["caveats"])
+    assert current["opening_requirements"] == [
+        {"school_group": "primary_intermediate_specialist", "minimum_half_days": 378},
+        {"school_group": "secondary_composite", "minimum_half_days": 376},
+    ]
+    assert current["caveats"] == [
+        "Each school selects its own opening and closing dates within the published boundaries."
+    ]
+    assert "Public holiday" not in json.dumps(current)
 
 
 results.append(check("HTML parser extracts ranges, breaks, requirements and caveats", parser_shape))
@@ -177,7 +183,7 @@ def opening_window_response_envelope() -> None:
     finally:
         module.fetch_years = original
 
-    assert set(payload) == {"status", "source_url", "fetched_at", "kind", "date", "break"}
+    assert set(payload) == {"status", "source_url", "fetched_at", "provenance", "kind", "date", "break"}
     assert payload["status"] == "ok"
     assert payload["source_url"] == SOURCE_URL
     assert payload["fetched_at"] == "2026-09-03T00:00:00Z"
@@ -185,6 +191,9 @@ def opening_window_response_envelope() -> None:
     assert payload["date"] == "2026-02-01"
     assert payload["break"]["certainty"] == "school_dependent"
     assert payload["break"]["days_until"] is None
+    assert payload["provenance"]["source_owner"] == "New Zealand Ministry of Education"
+    assert "CC BY-NC 4.0" in payload["provenance"]["source_content_notice"]
+    assert "does not relicense source content" in payload["provenance"]["source_content_notice"]
 
 
 results.append(check("next-break preserves its JSON envelope and provenance", opening_window_response_envelope))
@@ -237,18 +246,55 @@ def certain_next_break_queries() -> None:
 results.append(check("next-break preserves certain current and future break cases", certain_next_break_queries))
 
 
-def summer_duration_stays_source_derived() -> None:
-    mutated = fixture_text.replace("run for 5 or 6 weeks", "run for 12 weeks", 1)
+def source_prose_is_not_redistributed() -> None:
+    markers = {
+        "term": "TERM_SOURCE_PROSE_MUST_NOT_ESCAPE",
+        "break": "BREAK_SOURCE_PROSE_MUST_NOT_ESCAPE",
+        "holiday": "HOLIDAY_SOURCE_PROSE_MUST_NOT_ESCAPE",
+        "caveat": "CAVEAT_SOURCE_PROSE_MUST_NOT_ESCAPE",
+    }
+    mutated = fixture_text.replace(
+        "Primary, intermediate and specialist schools: at least 378 instructional half-days during 2026.",
+        "Primary, intermediate and specialist schools must be open for instruction for a minimum of 378 half days in 2026.",
+        1,
+    ).replace(
+        "Instructional total: 78 to 96 half-days.",
+        f"Instructional total: 78 to 96 half-days. {markers['term']}",
+        1,
+    ).replace(
+        "Break interval: Friday 3 April through Sunday 19 April 2026.",
+        f"Break interval: Friday 3 April through Sunday 19 April 2026. {markers['break']}",
+        1,
+    ).replace(
+        "Instructional total: 106 half-days.</p>",
+        f"Instructional total: 106 half-days.</p><p>Public holiday test note. {markers['holiday']}</p>",
+        1,
+    ).replace(
+        "Calendar flexibility is local: each school picks dates within the stated limits.",
+        f"Calendar flexibility is local: each school picks dates within the stated limits. {markers['caveat']}",
+        1,
+    )
     mutated_years = module.parse_school_terms(mutated, SOURCE_URL)
+    serialised = json.dumps(mutated_years)
 
-    classified = module.classify_date(mutated_years, "2026-12-20")
-    next_result = module.next_break(mutated_years, "2026-12-20")
-    assert "12 weeks" in classified["description"]
-    assert "12 weeks" in next_result["description"]
-    assert "5 or 6 weeks" not in json.dumps([classified, next_result])
+    assert not any(marker in serialised for marker in markers.values())
+    assert mutated_years[1]["terms"][0]["description"] == (
+        "Term 1 opens between 2026-01-26 and 2026-02-09 and ends on 2026-04-02."
+    )
+    assert mutated_years[1]["breaks"][0]["description"] == (
+        "Term 1 break runs from 2026-04-03 through 2026-04-19."
+    )
+    assert mutated_years[1]["breaks"][3]["description"] == (
+        "Summer holidays start by 2026-12-19; the end date depends on the school's next opening date."
+    )
+    assert mutated_years[1]["opening_requirements"][0] == {
+        "school_group": "primary_intermediate_specialist",
+        "minimum_half_days": 378,
+    }
+    assert "Primary, intermediate and specialist schools must be open" not in serialised
 
 
-results.append(check("summer duration claims stay source-derived", summer_duration_stays_source_derived))
+results.append(check("source prose is transformed rather than redistributed", source_prose_is_not_redistributed))
 
 
 def published_years_and_opening_counts_stay_dynamic() -> None:
@@ -265,11 +311,11 @@ def published_years_and_opening_counts_stay_dynamic() -> None:
     past_heading = fixture_text.index("    <h2>Past years")
     future_sections = fixture_text[future_start:past_heading]
     future_sections = future_sections.replace("2028", "2029")
-    future_sections = future_sections.replace("382 half days", "384 half days", 1)
+    future_sections = future_sections.replace("at least 382 instructional half-days", "at least 384 instructional half-days", 1)
     with_2029 = fixture_text[:past_heading] + future_sections + fixture_text[past_heading:]
     parsed = module.parse_school_terms(with_2029, SOURCE_URL)
     assert [item["year"] for item in parsed] == [2025, 2026, 2027, 2028, 2029]
-    assert "384 half days" in parsed[-1]["opening_requirements"][0]
+    assert parsed[-1]["opening_requirements"][0]["minimum_half_days"] == 384
 
 
 results.append(
@@ -421,63 +467,67 @@ def source_drift_mutations() -> None:
             raise AssertionError("semantic source drift did not fail closed")
 
     incomplete_opening_range = fixture_text.replace(
-        "Starts between Monday 26 January and Monday 9 February and ends Thursday 2 April 2026",
-        "Starts between Monday 26 January and ends Thursday 2 April 2026",
+        "Starts between Monday 26 January and Monday 9 February; the final day is Thursday 2 April 2026",
+        "Starts between Monday 26 January; the final day is Thursday 2 April 2026",
         1,
     )
     assert_schema_error(incomplete_opening_range)
 
     duplicate_date = fixture_text.replace(
-        "Starts between Monday 26 January and Monday 9 February and ends Thursday 2 April 2026",
-        "Starts between Monday 26 January and Monday 26 January and ends Thursday 2 April 2026",
+        "Starts between Monday 26 January and Monday 9 February; the final day is Thursday 2 April 2026",
+        "Starts between Monday 26 January and Monday 26 January; the final day is Thursday 2 April 2026",
         1,
     )
     assert_schema_error(duplicate_date)
 
-    duplicate_term = fixture_text.replace("Term 2 (11 weeks)", "Term 1 (11 weeks)", 1)
+    duplicate_term = fixture_text.replace(
+        '<h3>Term 2<a href="#term-2">#</a></h3>',
+        '<h3>Term 1<a href="#term-2">#</a></h3>',
+        1,
+    )
     assert_schema_error(duplicate_term)
 
     duplicate_break = fixture_text.replace(
-        "<h3>Term 2</h3><p>Saturday 4 July to Sunday 19 July 2026.</p>",
-        "<h3>Term 1</h3><p>Saturday 4 July to Sunday 19 July 2026.</p>",
+        "<h3>Term 2</h3><p>Break interval: Saturday 4 July through Sunday 19 July 2026.</p>",
+        "<h3>Term 1</h3><p>Break interval: Saturday 4 July through Sunday 19 July 2026.</p>",
         1,
     )
     assert_schema_error(duplicate_break)
 
     wrong_year = fixture_text.replace(
-        "ends Thursday 2 April 2026",
-        "ends Thursday 2 April 2027",
+        "final day is Thursday 2 April 2026",
+        "final day is Thursday 2 April 2027",
         1,
     )
     assert_schema_error(wrong_year)
 
-    missing_year = fixture_text.replace("ends Thursday 2 April 2026", "ends Thursday 2 April", 1)
+    missing_year = fixture_text.replace("final day is Thursday 2 April 2026", "final day is Thursday 2 April", 1)
     assert_schema_error(missing_year)
 
     wrong_term_shape = fixture_text.replace(
-        "Monday 20 April to Friday 3 July 2026",
-        "Monday 20 April to no later than Friday 3 July 2026",
+        "Date interval: Monday 20 April through Friday 3 July 2026",
+        "Scheduled from Monday 20 April to no later than Friday 3 July 2026",
         1,
     )
     assert_schema_error(wrong_term_shape)
 
     wrong_break_shape = fixture_text.replace(
-        "Start no later than Saturday 19 December 2026",
-        "Saturday 19 December to Sunday 20 December 2026",
+        "Start no later than Saturday 19 December 2026; the next school opening determines the finish",
+        "Break interval: Saturday 19 December through Sunday 20 December 2026",
         1,
     )
     assert_schema_error(wrong_break_shape)
 
     term_break_gap = fixture_text.replace(
-        "ends Thursday 2 April 2026",
-        "ends Wednesday 1 April 2026",
+        "final day is Thursday 2 April 2026",
+        "final day is Wednesday 1 April 2026",
         1,
     )
     assert_schema_error(term_break_gap)
 
     closing_summer_gap = fixture_text.replace(
-        "no later than Friday 18 December 2026",
-        "no later than Thursday 17 December 2026",
+        "to no later than Friday 18 December 2026",
+        "to no later than Thursday 17 December 2026",
         1,
     )
     assert_schema_error(closing_summer_gap)
@@ -490,33 +540,33 @@ def source_drift_mutations() -> None:
     assert_schema_error(missing_opening_requirements)
 
     spoofed_opening_requirement = fixture_text.replace(
-        "Primary, intermediate and specialist schools must be open for instruction for a minimum of 378 half days in 2026.",
+        "Primary, intermediate and specialist schools: at least 378 instructional half-days during 2026.",
         "Primary planning note: model 378 half days before secondary review in 2026.",
         1,
     )
     assert_schema_error(spoofed_opening_requirement)
 
     zero_opening_requirement = fixture_text.replace(
-        "Primary, intermediate and specialist schools must be open for instruction for a minimum of 378 half days in 2026.",
-        "Primary, intermediate and specialist schools must be open for instruction for a minimum of 000 half days in 2026.",
+        "Primary, intermediate and specialist schools: at least 378 instructional half-days during 2026.",
+        "Primary, intermediate and specialist schools: at least 000 instructional half-days during 2026.",
         1,
     )
     assert_schema_error(zero_opening_requirement)
 
     impossible_opening_requirement = fixture_text.replace(
-        "Primary, intermediate and specialist schools must be open for instruction for a minimum of 378 half days in 2026.",
-        "Primary, intermediate and specialist schools must be open for instruction for a minimum of 999 half days in 2026.",
+        "Primary, intermediate and specialist schools: at least 378 instructional half-days during 2026.",
+        "Primary, intermediate and specialist schools: at least 999 instructional half-days during 2026.",
         1,
     )
     assert_schema_error(impossible_opening_requirement)
 
     inconsistent_opening_requirements = fixture_text.replace(
-        "Primary, intermediate and specialist schools must be open for instruction for a minimum of 378 half days in 2026.",
-        "Primary, intermediate and specialist schools must be open for instruction for a minimum of 370 half days in 2026.",
+        "Primary, intermediate and specialist schools: at least 378 instructional half-days during 2026.",
+        "Primary, intermediate and specialist schools: at least 370 instructional half-days during 2026.",
         1,
     ).replace(
-        "Secondary and composite schools must be open for instruction for a minimum of 376 half days in 2026.",
-        "Secondary and composite schools must be open for instruction for a minimum of 380 half days in 2026.",
+        "Secondary and composite schools: at least 376 instructional half-days during 2026.",
+        "Secondary and composite schools: at least 380 instructional half-days during 2026.",
         1,
     )
     assert_schema_error(inconsistent_opening_requirements)
@@ -581,7 +631,20 @@ if live.returncode != 0:
 assert payload["status"] == "ok"
 assert payload["source_url"] == SOURCE_URL
 assert payload["fetched_at"].endswith("Z")
+assert payload["provenance"]["source_owner"] == "New Zealand Ministry of Education"
+assert "does not relicense source content" in payload["provenance"]["source_content_notice"]
 assert len(payload["years"]) >= 1
 assert all(len(item["terms"]) == 4 and len(item["breaks"]) == 4 for item in payload["years"])
+for published in payload["years"]:
+    assert all(
+        entry["description"] == module.independent_description(entry["name"], entry["start"], entry["end"])
+        for entry in [*published["terms"], *published["breaks"]]
+    )
+    assert all(
+        set(requirement) == {"school_group", "minimum_half_days"}
+        for requirement in published["opening_requirements"]
+    )
+assert "public_holidays" not in json.dumps(payload)
+assert '"label"' not in json.dumps(payload)
 print("[PASS] live Ministry page returned complete published school years with provenance")
 raise SystemExit(0)

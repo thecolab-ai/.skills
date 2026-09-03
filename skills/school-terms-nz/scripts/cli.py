@@ -18,6 +18,12 @@ import nzfetch
 SOURCE_URL = "https://www.education.govt.nz/school/school-terms-and-holidays"
 ALLOWED_HOSTS = {"www.education.govt.nz"}
 DEFAULT_TIMEOUT = 10
+SOURCE_OWNER = "New Zealand Ministry of Education"
+SOURCE_CONTENT_NOTICE = (
+    "Fetched source content remains subject to the Ministry's source terms, including "
+    "CC BY-NC 4.0 and Crown copyright notices. The MIT licence applies to this skill's "
+    "code only and does not relicense source content."
+)
 MONTHS = {
     "january": 1,
     "february": 2,
@@ -42,8 +48,8 @@ YEAR_FRAGMENT = re.compile(r"\b20\d{2}\b")
 EXPECTED_TERM_NAMES = [f"Term {number}" for number in range(1, 5)]
 EXPECTED_BREAK_NAMES = ["Term 1 break", "Term 2 break", "Term 3 break", "Summer holidays"]
 OPENING_REQUIREMENT_LABELS = (
-    ("primary", "Primary, intermediate and specialist schools"),
-    ("secondary", "Secondary and composite schools"),
+    ("primary_intermediate_specialist", "Primary, intermediate and specialist schools"),
+    ("secondary_composite", "Secondary and composite schools"),
 )
 # One school day contains two half-days. These broad bounds admit annual
 # Ministry changes while rejecting zero, truncated and calendar-impossible data.
@@ -167,32 +173,56 @@ def has_precision(value: Any, expected: str) -> bool:
     return isinstance(value, dict) and value.get("precision") == expected
 
 
-def opening_requirement(text: str, year: int) -> tuple[str, int] | None:
+def opening_requirement(text: str, year: int) -> dict[str, str | int] | None:
     """Parse a complete Ministry opening-requirement sentence semantically."""
     for label, school_group in OPENING_REQUIREMENT_LABELS:
-        pattern = (
-            rf"{re.escape(school_group)} (?:must|are required to) be open for instruction "
-            rf"for (?:a )?minimum of (?P<count>\d+) half days in {year}\."
+        patterns = (
+            (
+                rf"{re.escape(school_group)} (?:must|are required to) be open for instruction "
+                rf"for (?:a )?minimum of (?P<count>\d+) half days in {year}\."
+            ),
+            rf"{re.escape(school_group)}: at least (?P<count>\d+) instructional half-days during {year}\."
         )
-        match = re.fullmatch(pattern, text)
-        if match:
-            count = int(match.group("count"))
-            if MIN_OPENING_HALF_DAYS <= count <= MAX_OPENING_HALF_DAYS:
-                return label, count
+        for pattern in patterns:
+            match = re.fullmatch(pattern, text)
+            if match:
+                count = int(match.group("count"))
+                if MIN_OPENING_HALF_DAYS <= count <= MAX_OPENING_HALF_DAYS:
+                    return {"school_group": label, "minimum_half_days": count}
     return None
 
 
 def opening_requirements_valid(item: dict[str, Any]) -> bool:
-    parsed = [opening_requirement(text, item["year"]) for text in item["opening_requirements"]]
-    if any(requirement is None for requirement in parsed):
+    requirements = item["opening_requirements"]
+    if any(
+        not isinstance(requirement, dict)
+        or set(requirement) != {"school_group", "minimum_half_days"}
+        or not isinstance(requirement["minimum_half_days"], int)
+        or not MIN_OPENING_HALF_DAYS <= requirement["minimum_half_days"] <= MAX_OPENING_HALF_DAYS
+        for requirement in requirements
+    ):
         return False
-    requirements = [requirement for requirement in parsed if requirement is not None]
-    labels = [label for label, _count in requirements]
-    counts = {label: count for label, count in requirements}
+    labels = [requirement["school_group"] for requirement in requirements]
+    counts = {requirement["school_group"]: requirement["minimum_half_days"] for requirement in requirements}
     return (
         labels == [label for label, _school_group in OPENING_REQUIREMENT_LABELS]
-        and counts["primary"] >= counts["secondary"]
+        and counts["primary_intermediate_specialist"] >= counts["secondary_composite"]
     )
+
+
+def independent_description(
+    name: str,
+    start: str | dict[str, str],
+    end: str | dict[str, str] | None,
+) -> str:
+    """Summarise parsed facts without redistributing source prose."""
+    if isinstance(start, dict) and start.get("precision") == "range" and isinstance(end, dict):
+        return f"{name} opens between {start['earliest']} and {start['latest']} and ends on {end['date']}."
+    if isinstance(end, dict) and end.get("precision") == "no_later_than":
+        return f"{name} starts on {start} and closes by {end['latest']}."
+    if isinstance(start, dict) and start.get("precision") == "no_later_than":
+        return f"{name} start by {start['latest']}; the end date depends on the school's next opening date."
+    return f"{name} runs from {start} through {end}."
 
 
 def year_semantics_valid(item: dict[str, Any]) -> bool:
@@ -321,15 +351,13 @@ def parse_school_terms(source_html: str, source_url: str = SOURCE_URL) -> list[d
             if mode == "terms" and term_heading:
                 current_term = {
                     "name": f"Term {term_heading.group(1)}",
-                    "label": text,
-                    "public_holidays": [],
                 }
                 record["terms"].append(current_term)
                 current_break = None
                 subsection = "term"
             elif mode == "breaks" and (term_heading or text.lower().startswith("summer holidays")):
                 name = f"Term {term_heading.group(1)} break" if term_heading else "Summer holidays"
-                current_break = {"name": name, "label": text, "public_holidays": []}
+                current_break = {"name": name}
                 record["breaks"].append(current_break)
                 current_term = None
                 subsection = "break"
@@ -350,21 +378,32 @@ def parse_school_terms(source_html: str, source_url: str = SOURCE_URL) -> list[d
         if mode == "terms" and subsection == "term" and current_term is not None:
             if "start" not in current_term:
                 start, end = parse_term_dates(text, year)
-                current_term.update({"start": start, "end": end, "description": text})
-            elif text.lower().startswith("public holiday"):
-                current_term["public_holidays"].append(text)
+                current_term.update(
+                    {
+                        "start": start,
+                        "end": end,
+                        "description": independent_description(current_term["name"], start, end),
+                    }
+                )
         elif mode == "breaks" and subsection == "break" and current_break is not None:
             if "start" not in current_break:
                 start, end = parse_break_dates(text, year)
-                current_break.update({"start": start, "end": end, "description": text})
-            elif text.lower().startswith("public holiday"):
-                current_break["public_holidays"].append(text)
+                current_break.update(
+                    {
+                        "start": start,
+                        "end": end,
+                        "description": independent_description(current_break["name"], start, end),
+                    }
+                )
         elif mode == "terms" and subsection == "requirements":
             lowered = text.lower()
-            if opening_requirement(text, year) is not None:
-                record["opening_requirements"].append(text)
+            requirement = opening_requirement(text, year)
+            if requirement is not None:
+                record["opening_requirements"].append(requirement)
             if "flexibility" in lowered:
-                record["caveats"].append(text)
+                record["caveats"].append(
+                    "Each school selects its own opening and closing dates within the published boundaries."
+                )
     years = [by_year[key] for key in sorted(by_year)]
     invalid = []
     for item in years:
@@ -675,7 +714,15 @@ def next_break(years: list[dict[str, Any]], value: str) -> dict[str, Any]:
 
 
 def payload_base(source_url: str, retrieved: str) -> dict[str, Any]:
-    return {"status": "ok", "source_url": source_url, "fetched_at": retrieved}
+    return {
+        "status": "ok",
+        "source_url": source_url,
+        "fetched_at": retrieved,
+        "provenance": {
+            "source_owner": SOURCE_OWNER,
+            "source_content_notice": SOURCE_CONTENT_NOTICE,
+        },
+    }
 
 
 def add_common_flags(parser: argparse.ArgumentParser) -> None:
@@ -747,6 +794,8 @@ def emit(payload: dict[str, Any], as_json: bool) -> None:
             print(f"Caveat: {result['caveat']}")
     print(f"Source: {payload['source_url']}")
     print(f"Retrieved: {payload['fetched_at']}")
+    print(f"Source attribution: {payload['provenance']['source_owner']}")
+    print(f"Source content notice: {payload['provenance']['source_content_notice']}")
 
 
 def run(args: argparse.Namespace) -> dict[str, Any]:
