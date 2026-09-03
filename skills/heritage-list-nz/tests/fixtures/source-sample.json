@@ -1,0 +1,9 @@
+{
+  "fixture": "synthetic-heritage-place-list-csv",
+  "file": "place-list-sample.csv",
+  "schema_basis": "official Heritage New Zealand Pouhere Taonga CSV column names observed 2026-09-03",
+  "record_content": "wholly synthetic",
+  "contains_live_credentials": false,
+  "contains_personal_data": false,
+  "contains_copied_source_records": false
+}

@@ -2,7 +2,7 @@
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
   "last_verified": "2026-09-03",
-  "skill_count": 143,
+  "skill_count": 144,
   "skills": [
     {
       "name": "airnz-flights",
@@ -1339,6 +1339,32 @@
         "www.health.govt.nz"
       ],
       "last_verified": "2026-07-19",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "heritage-list-nz",
+      "description": "Search and inspect the official New Zealand Heritage List/Rārangi Kōrero CSV export by list number, name, address, council, entry type, and status. Use for heritage research, planning context, or an initial property due-diligence check. Keyless and read-only; not legal advice, a title search, a council plan check, or an archaeological authority check.",
+      "path": "skills/heritage-list-nz",
+      "category": "property",
+      "source_owner": "Heritage New Zealand Pouhere Taonga",
+      "source_type": "official",
+      "source_url": "https://www.heritage.org.nz/places",
+      "auth": "none",
+      "access_mode": "public-download",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "none",
+      "schema_version": "1",
+      "skill_type": "public-download",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "www.heritage.org.nz",
+        "hnzpt-prod-web.azurewebsites.net"
+      ],
+      "last_verified": "2026-09-03",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
