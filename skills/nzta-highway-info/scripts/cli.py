@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Bounded, read-only client for official NZTA highway information feeds."""
+
 from __future__ import annotations
 
 import argparse
@@ -72,13 +73,20 @@ class CliArgumentParser(argparse.ArgumentParser):
 
 
 def utc_now() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return (
+        datetime.now(timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
 
 
 def scalar(value: Any) -> Any:
     if isinstance(value, float) and not math.isfinite(value):
         raise SchemaError("upstream response contained a non-finite number")
-    return value if isinstance(value, (str, int, float, bool)) or value is None else None
+    return (
+        value if isinstance(value, (str, int, float, bool)) or value is None else None
+    )
 
 
 def validate_json_value(value: Any) -> None:
@@ -190,7 +198,11 @@ def normalise_camera(item: dict[str, Any]) -> dict[str, Any]:
     offline = required_bool(item, "offline", "camera")
     maintenance = required_bool(item, "underMaintenance", "camera")
     status = "offline" if offline else "maintenance" if maintenance else "online"
-    highway = item.get("highway") or nested_name(item.get("way")) or nested_name(item.get("journey"))
+    highway = (
+        item.get("highway")
+        or nested_name(item.get("way"))
+        or nested_name(item.get("journey"))
+    )
     return {
         "id": item_id,
         "name": scalar(item.get("name")),
@@ -213,7 +225,11 @@ def normalise_camera(item: dict[str, Any]) -> dict[str, Any]:
 def message_lines(value: Any) -> list[str]:
     if value in (None, ""):
         return []
-    return [part.strip() for part in re.split(r"\[(?:nl|np)\]", str(value), flags=re.IGNORECASE) if part.strip()]
+    return [
+        part.strip()
+        for part in re.split(r"\[(?:nl|np)\]", str(value), flags=re.IGNORECASE)
+        if part.strip()
+    ]
 
 
 def normalise_vms(item: dict[str, Any]) -> dict[str, Any]:
@@ -242,7 +258,9 @@ def as_list(value: Any) -> list[Any]:
     return value if isinstance(value, list) else [value]
 
 
-def parse_tim_pages(value: Any) -> tuple[list[list[dict[str, Any]]], list[dict[str, Any]]]:
+def parse_tim_pages(
+    value: Any,
+) -> tuple[list[list[dict[str, Any]]], list[dict[str, Any]]]:
     pages: list[list[dict[str, Any]]] = []
     destinations: list[dict[str, Any]] = []
     for page in as_list(value):
@@ -252,11 +270,19 @@ def parse_tim_pages(value: Any) -> tuple[list[list[dict[str, Any]]], list[dict[s
         for line in as_list(page.get("line")):
             if not isinstance(line, dict):
                 raise SchemaError("travel-time sign line is not an object")
-            cleaned = {str(key): scalar(val) for key, val in line.items() if scalar(val) is not None}
+            cleaned = {
+                str(key): scalar(val)
+                for key, val in line.items()
+                if scalar(val) is not None
+            }
             parsed_lines.append(cleaned)
             left = cleaned.get("left")
             right = cleaned.get("right")
-            if left not in (None, "") and isinstance(right, (int, float)) and not isinstance(right, bool):
+            if (
+                left not in (None, "")
+                and isinstance(right, (int, float))
+                and not isinstance(right, bool)
+            ):
                 destinations.append({"name": str(left), "minutes": right})
         pages.append(parsed_lines)
     return pages, destinations
@@ -299,7 +325,9 @@ NORMALISERS: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {
 }
 
 
-def parse_response(payload: Any, item_key: str, parser: Callable[[dict[str, Any]], dict[str, Any]]) -> list[dict[str, Any]]:
+def parse_response(
+    payload: Any, item_key: str, parser: Callable[[dict[str, Any]], dict[str, Any]]
+) -> list[dict[str, Any]]:
     validate_json_value(payload)
     if not isinstance(payload, dict) or not isinstance(payload.get("response"), dict):
         raise SchemaError("upstream response is missing response object")
@@ -345,7 +373,9 @@ class NZTARedirectHandler(HTTPRedirectHandler):
 
 def fetch_json(url: str) -> Any:
     validate_source_url(url)
-    request = Request(url, headers={"Accept": "application/json", "User-Agent": USER_AGENT})
+    request = Request(
+        url, headers={"Accept": "application/json", "User-Agent": USER_AGENT}
+    )
     try:
         opener = build_opener(NZTARedirectHandler())
         with opener.open(request, timeout=TIMEOUT_SECONDS) as response:
@@ -354,9 +384,13 @@ def fetch_json(url: str) -> Any:
                 try:
                     declared_length = int(length)
                 except ValueError as exc:
-                    raise SchemaError("upstream returned an invalid Content-Length header") from exc
+                    raise SchemaError(
+                        "upstream returned an invalid Content-Length header"
+                    ) from exc
                 if declared_length < 0:
-                    raise SchemaError("upstream returned an invalid Content-Length header")
+                    raise SchemaError(
+                        "upstream returned an invalid Content-Length header"
+                    )
                 if declared_length > MAX_RESPONSE_BYTES:
                     raise UpstreamError("upstream response exceeds the 4 MB safety cap")
             try:
@@ -367,7 +401,9 @@ def fetch_json(url: str) -> Any:
                 raise UpstreamError("upstream response exceeds the 4 MB safety cap")
     except HTTPError as exc:
         if exc.code in {401, 403, 429}:
-            raise BlockedError(f"upstream access blocked or rate-limited (HTTP {exc.code})") from exc
+            raise BlockedError(
+                f"upstream access blocked or rate-limited (HTTP {exc.code})"
+            ) from exc
         raise UpstreamError(f"upstream unavailable (HTTP {exc.code})") from exc
     except (URLError, TimeoutError) as exc:
         reason = getattr(exc, "reason", exc)
@@ -422,13 +458,26 @@ def latest_update(items: list[dict[str, Any]]) -> str | None:
 
 def warning_for(command: str) -> list[str]:
     warnings = [
-        "NZTA says operational conditions can change rapidly; verify critical travel decisions on the official Journey Planner and follow road signs and emergency directions.",
-        "This public feed is a current snapshot, not a guarantee of completeness, road safety, or route availability.",
+        (
+            "NZTA says operational conditions can change rapidly; verify critical "
+            "travel decisions on the official Journey Planner and follow road signs "
+            "and emergency directions."
+        ),
+        (
+            "This public feed is a current snapshot, not a guarantee of completeness, "
+            "road safety, or route availability."
+        ),
     ]
     if command in {"cameras", "travel-times"}:
-        warnings.append("The source may omit per-item update timestamps for this feed; retrieved_at only proves when this client fetched it.")
+        warnings.append(
+            "The source may omit per-item update timestamps for this feed; "
+            "retrieved_at only proves when this client fetched it."
+        )
     if command == "travel-times":
-        warnings.append("Travel-time sign minutes are displayed values without a free-flow baseline; no congestion classification is inferred.")
+        warnings.append(
+            "Travel-time sign minutes are displayed values without a free-flow "
+            "baseline; no congestion classification is inferred."
+        )
     return warnings
 
 
@@ -481,28 +530,48 @@ def execute(command: str, args: argparse.Namespace) -> dict[str, Any]:
 def add_common(parser: argparse.ArgumentParser, *, region: bool = True) -> None:
     if region:
         parser.add_argument("--region", help="case-insensitive region-name substring")
-    parser.add_argument("--query", help="case-insensitive text search across returned fields")
-    parser.add_argument("--limit", type=int, default=DEFAULT_LIMIT, help=f"maximum results (1-{MAX_LIMIT}; default {DEFAULT_LIMIT})")
-    parser.add_argument("--json", action="store_true", help="emit machine-readable JSON")
+    parser.add_argument(
+        "--query", help="case-insensitive text search across returned fields"
+    )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=DEFAULT_LIMIT,
+        help=f"maximum results (1-{MAX_LIMIT}; default {DEFAULT_LIMIT})",
+    )
+    parser.add_argument(
+        "--json", action="store_true", help="emit machine-readable JSON"
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = CliArgumentParser(description="Bounded, read-only NZTA highway information lookups")
+    parser = CliArgumentParser(
+        description="Bounded, read-only NZTA highway information lookups"
+    )
     sub = parser.add_subparsers(dest="command", required=True)
 
     events = sub.add_parser("events", help="current state-highway events and incidents")
     add_common(events)
     events.add_argument("--event-type", help="case-insensitive event-type substring")
 
-    travel = sub.add_parser("travel-times", help="current travel-time sign displays; does not infer congestion")
+    travel = sub.add_parser(
+        "travel-times",
+        help="current travel-time sign displays; does not infer congestion",
+    )
     add_common(travel)
 
-    cameras = sub.add_parser("cameras", help="traffic-camera metadata and current image URLs")
+    cameras = sub.add_parser(
+        "cameras", help="traffic-camera metadata and current image URLs"
+    )
     add_common(cameras)
 
     vms = sub.add_parser("vms", help="variable-message sign messages and metadata")
     add_common(vms)
-    vms.add_argument("--active-only", action="store_true", help="only signs with a non-empty current message")
+    vms.add_argument(
+        "--active-only",
+        action="store_true",
+        help="only signs with a non-empty current message",
+    )
 
     regions = sub.add_parser("regions", help="official Traffic and Travel API regions")
     add_common(regions, region=False)
@@ -512,14 +581,29 @@ def build_parser() -> argparse.ArgumentParser:
 def human_value(item: dict[str, Any], command: str) -> str:
     if command == "events":
         title = item.get("type") or item.get("description") or "Road event"
-        return f"{item.get('id')}: {title} — {item.get('location') or 'location not supplied'} [{item.get('region') or 'region not supplied'}]"
+        return (
+            f"{item.get('id')}: {title} — "
+            f"{item.get('location') or 'location not supplied'} "
+            f"[{item.get('region') or 'region not supplied'}]"
+        )
     if command == "cameras":
-        return f"{item.get('id')}: {item.get('name') or item.get('description') or 'Camera'} [{item.get('status')}] {item.get('image_url') or 'no image URL'}"
+        return (
+            f"{item.get('id')}: "
+            f"{item.get('name') or item.get('description') or 'Camera'} "
+            f"[{item.get('status')}] "
+            f"{item.get('image_url') or 'no image URL'}"
+        )
     if command == "vms":
         message = " / ".join(item.get("message_lines") or []) or "no current message"
         return f"{item.get('id')}: {item.get('name') or 'VMS'} — {message}"
     if command == "travel-times":
-        values = ", ".join(f"{entry['name']} {entry['minutes']} min" for entry in item.get("destinations") or []) or "no numeric destination times"
+        values = (
+            ", ".join(
+                f"{entry['name']} {entry['minutes']} min"
+                for entry in item.get("destinations") or []
+            )
+            or "no numeric destination times"
+        )
         return f"{item.get('id')}: {item.get('name') or 'travel-time sign'} — {values}"
     return f"{item.get('id')}: {item.get('name')}"
 
@@ -528,13 +612,20 @@ def emit(payload: dict[str, Any], json_mode: bool) -> None:
     if json_mode:
         try:
             validate_json_value(payload)
-            serialised = json.dumps(payload, indent=2, ensure_ascii=False, allow_nan=False)
+            serialised = json.dumps(
+                payload, indent=2, ensure_ascii=False, allow_nan=False
+            )
         except (TypeError, ValueError) as exc:
-            raise SchemaError("normalised result is not standards-compliant JSON") from exc
+            raise SchemaError(
+                "normalised result is not standards-compliant JSON"
+            ) from exc
         print(serialised)
         return
     source = payload["source"]
-    print(f"NZTA {payload['kind']} — {payload['returned']} result(s) (fetched {source['retrieved_at']})")
+    print(
+        f"NZTA {payload['kind']} — {payload['returned']} result(s) "
+        f"(fetched {source['retrieved_at']})"
+    )
     for item in payload["data"]:
         print(human_value(item, payload["kind"]))
     for warning in payload["warnings"]:
@@ -561,7 +652,11 @@ def main(argv: list[str] | None = None) -> int:
     except CliError as exc:
         if json_mode or wants_json(actual):
             command = getattr(args, "command", requested_command)
-            endpoint = urljoin(API_ROOT, ENDPOINTS[command][0]) if command in ENDPOINTS else API_ROOT
+            endpoint = (
+                urljoin(API_ROOT, ENDPOINTS[command][0])
+                if command in ENDPOINTS
+                else API_ROOT
+            )
             query = {
                 "region": getattr(args, "region", None),
                 "text": getattr(args, "query", None),
@@ -576,7 +671,10 @@ def main(argv: list[str] | None = None) -> int:
                         "ok": False,
                         "kind": command,
                         "source": {
-                            "name": "NZ Transport Agency Waka Kotahi Traffic and Travel API",
+                            "name": (
+                                "NZ Transport Agency Waka Kotahi Traffic and Travel "
+                                "API"
+                            ),
                             "url": endpoint,
                             "catalogue_url": CATALOGUE_URL,
                             "contract_url": WADL_URL,
