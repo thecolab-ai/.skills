@@ -316,6 +316,8 @@ def parse_school_terms(source_html: str, source_url: str = SOURCE_URL) -> list[d
     current_term: dict[str, Any] | None = None
     current_break: dict[str, Any] | None = None
     subsection: str | None = None
+    seen_sections: set[tuple[int, str]] = set()
+    seen_requirements_sections: set[int] = set()
 
     for tag, text in parser.nodes:
         if tag in {"h2", "h3", "h4"}:
@@ -323,6 +325,14 @@ def parse_school_terms(source_html: str, source_url: str = SOURCE_URL) -> list[d
             if section:
                 year = int(section.group(1))
                 mode = "terms" if section.group(2).lower() == "terms" else "breaks"
+                section_key = (year, mode)
+                if section_key in seen_sections:
+                    raise SkillError(
+                        f"Ministry page contains a duplicate {section.group(2).lower()} section for {year}",
+                        exit_code=6,
+                        error_type="source_schema",
+                    )
+                seen_sections.add(section_key)
                 by_year.setdefault(
                     year,
                     {
@@ -363,6 +373,13 @@ def parse_school_terms(source_html: str, source_url: str = SOURCE_URL) -> list[d
                 current_term = None
                 subsection = "break"
             elif mode == "terms" and text.lower().startswith("half-day opening requirement"):
+                if year in seen_requirements_sections:
+                    raise SkillError(
+                        f"Ministry page contains a duplicate opening requirements section for {year}",
+                        exit_code=6,
+                        error_type="source_schema",
+                    )
+                seen_requirements_sections.add(year)
                 current_term = None
                 subsection = "requirements"
             elif mode == "terms" and text.lower().startswith("unused curriculum half-days"):

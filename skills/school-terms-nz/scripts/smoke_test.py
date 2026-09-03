@@ -575,6 +575,45 @@ def source_drift_mutations() -> None:
 results.append(check("semantic source drift fails closed with source_schema", source_drift_mutations))
 
 
+def duplicate_section_headings_fail_closed() -> None:
+    mutations = {
+        "terms": fixture_text.replace(
+            '<h2 id="2026-school-holidays-1">2026 school holidays</h2>',
+            '<h2>2026 school terms</h2>\n    '
+            '<h2 id="2026-school-holidays-1">2026 school holidays</h2>',
+            1,
+        ),
+        "holidays": fixture_text.replace(
+            "  </main>",
+            "    <h2>2026 school holidays</h2>\n  </main>",
+            1,
+        ),
+        "opening requirements": fixture_text.replace(
+            '<h2 id="2026-school-holidays-1">2026 school holidays</h2>',
+            '<h3>Half-day opening requirement 2026</h3>\n    '
+            '<h2 id="2026-school-holidays-1">2026 school holidays</h2>',
+            1,
+        ),
+    }
+    for section_name, mutated in mutations.items():
+        try:
+            module.parse_school_terms(mutated, SOURCE_URL)
+        except module.SkillError as exc:
+            assert exc.exit_code == 6, section_name
+            assert exc.error_type == "source_schema", section_name
+            assert "duplicate" in str(exc).lower(), section_name
+        else:
+            raise AssertionError(f"duplicate empty {section_name} heading did not fail closed")
+
+
+results.append(
+    check(
+        "duplicate empty calendar and requirements headings fail closed",
+        duplicate_section_headings_fail_closed,
+    )
+)
+
+
 def invalid_dates_do_not_fetch() -> None:
     original_fetch = module.fetch_years
     original_argv = sys.argv
