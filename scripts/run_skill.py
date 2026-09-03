@@ -101,15 +101,32 @@ def emit_envelope(payload: dict[str, object]) -> None:
     print(json.dumps(payload, indent=2, ensure_ascii=False))
 
 
-def json_object(text: str) -> dict[str, object] | None:
-    """Return a JSON object from a command stream, or ``None`` for raw output."""
-    if not text:
-        return None
+def json_objects(text: str) -> list[dict[str, object]]:
+    """Parse a stream made only of one or more whitespace-separated JSON objects."""
+    stripped = text.strip()
+    if not stripped:
+        return []
+    decoder = json.JSONDecoder()
+    objects: list[dict[str, object]] = []
+    offset = 0
     try:
-        payload = json.loads(text)
-    except json.JSONDecodeError:
-        return None
-    return payload if isinstance(payload, dict) else None
+        while offset < len(stripped):
+            value, end = decoder.raw_decode(stripped, offset)
+            if not isinstance(value, dict):
+                return []
+            objects.append(value)
+            offset = end
+            while offset < len(stripped) and stripped[offset].isspace():
+                offset += 1
+    except (json.JSONDecodeError, TypeError):
+        return []
+    return objects
+
+
+def json_object(text: str) -> dict[str, object] | None:
+    """Parse exactly one top-level JSON object from a command stream."""
+    objects = json_objects(text)
+    return objects[0] if len(objects) == 1 else None
 
 
 def looks_like_result_envelope(payload: dict[str, object]) -> bool:
@@ -126,9 +143,12 @@ def advertised_failure(text: str) -> bool:
     or a partial ``{"ok": false, ...}`` result could be nested as successful
     legacy data.
     """
-    payload = json_object(text)
-    if payload is None:
+    payloads = json_objects(text)
+    if len(payloads) > 1:
+        return True
+    if not payloads:
         return False
+    payload = payloads[0]
 
     status = payload.get("status")
     for marker in ("ok", "blocked", "success"):

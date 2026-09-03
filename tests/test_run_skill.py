@@ -49,18 +49,20 @@ class RunSkillIntegrationTests(unittest.TestCase):
         returncode: int,
         *,
         failure_stream: bool = False,
-        stderr_payload: dict[str, object] | None = None,
+        stderr_payload: dict[str, object] | tuple[dict[str, object], ...] | None = None,
     ) -> tuple[int, dict[str, object], str]:
         encoded = json.dumps(direct_payload)
+        if isinstance(stderr_payload, tuple):
+            encoded_stderr = "\n".join(json.dumps(item) for item in stderr_payload)
+        elif stderr_payload is not None:
+            encoded_stderr = json.dumps(stderr_payload)
+        else:
+            encoded_stderr = encoded if failure_stream else ""
         completed = subprocess.CompletedProcess(
             args=[],
             returncode=returncode,
             stdout="" if failure_stream else encoded,
-            stderr=(
-                json.dumps(stderr_payload)
-                if stderr_payload is not None
-                else encoded if failure_stream else ""
-            ),
+            stderr=encoded_stderr,
         )
         stdout = io.StringIO()
         stderr = io.StringIO()
@@ -193,6 +195,43 @@ class RunSkillIntegrationTests(unittest.TestCase):
                     stderr_payload=stderr_failure,
                 )
 
+                self.assertEqual(exit_code, 6)
+                self.assertEqual(stderr, "")
+                self.assertFalse(payload["ok"])
+                error = payload["error"]
+                self.assertIsInstance(error, dict)
+                assert isinstance(error, dict)
+                self.assertEqual(error["code"], 6)
+
+    def test_zero_exit_multiple_structured_stderr_documents_fail_closed(self) -> None:
+        success: dict[str, object] = {
+            "schema_version": "1",
+            "ok": True,
+            "source": {
+                "name": "Ministry of Education",
+                "url": "https://www.education.govt.nz/school/school-terms-and-holidays",
+                "retrieved_at": "2026-09-03T00:00:00Z",
+            },
+            "query": {"command": "years"},
+            "data": {"years": [2026]},
+            "warnings": [],
+            "blocked": False,
+            "error": None,
+        }
+        failure: dict[str, object] = {
+            "success": False,
+            "message": "synthetic failure",
+        }
+        for documents in ((success, success), (failure, failure)):
+            with self.subTest(documents=documents):
+                exit_code, payload, stderr = self.run_mocked_direct_cli(
+                    "school-terms-nz",
+                    ["years"],
+                    {},
+                    0,
+                    failure_stream=True,
+                    stderr_payload=documents,
+                )
                 self.assertEqual(exit_code, 6)
                 self.assertEqual(stderr, "")
                 self.assertFalse(payload["ok"])
