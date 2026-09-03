@@ -88,12 +88,31 @@ def main() -> int:
         else:
             raise AssertionError("unbounded result limits must be rejected")
 
+    def response_cap_is_pre_downloaded() -> None:
+        captured: dict[str, int] = {}
+
+        def fake_fetch_bytes(url: str, **kwargs):
+            captured.update(kwargs)
+            return (text.encode("utf-8"), "text/csv", url)
+
+        original = cli.nzfetch.fetch_bytes
+        cli.nzfetch.fetch_bytes = fake_fetch_bytes
+        try:
+            records, source, columns = cli.fetch_records()
+        finally:
+            cli.nzfetch.fetch_bytes = original
+        assert len(records) == 4
+        assert source["url"] == cli.CSV_URL
+        assert columns == cli.REQUIRED_COLUMNS
+        assert captured["max_bytes"] == cli.MAX_DOWNLOAD_BYTES
+
     results = [
         check("CSV quoting, Unicode and multiline parsing", parse_fixture),
         check("name/address/number/council/type/status search", search_and_filters),
         check("exact lookup and minimised search projection", exact_lookup_and_projection),
         check("source schema drift fails closed", schema_failure),
         check("timeouts, response caps, limits, and exit codes", operational_contracts),
+        check("response cap is passed before decompression", response_cap_is_pre_downloaded),
     ]
     if not all(results):
         return 1

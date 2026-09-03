@@ -146,16 +146,14 @@ def fetch_records() -> tuple[list[dict[str, Any]], dict[str, Any], tuple[str, ..
             timeout=TIMEOUT_SECONDS,
             accept="text/csv,*/*;q=0.8",
             allowed_hosts=ALLOWED_HOSTS,
+            max_bytes=MAX_DOWNLOAD_BYTES,
         )
     except (nzfetch.Blocked, nzfetch.RateLimited) as exc:
         raise SourceBlockedError(str(exc)) from exc
+    except nzfetch.ResponseTooLarge as exc:
+        raise SourceSchemaError(str(exc)) from exc
     except nzfetch.FetchError as exc:
         raise SkillError(str(exc)) from exc
-
-    if len(body) > MAX_DOWNLOAD_BYTES:
-        raise SourceSchemaError(
-            f"source exceeded the {MAX_DOWNLOAD_BYTES // (1024 * 1024)} MB safety limit"
-        )
     if "csv" not in content_type.lower():
         raise SourceSchemaError(f"expected CSV but source returned {content_type or 'no content type'}")
     try:
