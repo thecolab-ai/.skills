@@ -13,6 +13,7 @@ import tarfile
 import urllib.error
 import urllib.parse
 import urllib.request
+import zlib
 from collections.abc import Iterator
 from dataclasses import dataclass
 
@@ -400,7 +401,7 @@ def parse_archive(
             source_timestamp = parse_source_timestamp(stamp_file.read(256).decode("ascii"))
     except SkillError:
         raise
-    except (tarfile.TarError, UnicodeDecodeError, csv.Error, EOFError, OSError) as exc:
+    except (tarfile.TarError, UnicodeDecodeError, csv.Error, EOFError, OSError, zlib.error) as exc:
         raise SkillError(f"invalid tariff archive: {exc}", exit_code=6, kind="source_schema") from exc
     result = TariffArchive(blob, source_url, retrieved_at, source_timestamp, http_last_modified)
     tables = (

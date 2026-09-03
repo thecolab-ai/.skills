@@ -454,6 +454,7 @@ def main() -> int:
     print("[PASS] fixture archive member-count bound rejects metadata exhaustion")
 
     corrupt_archives = {
+        "corrupt DEFLATE payload": fixture_bytes[:10] + bytes([fixture_bytes[10] ^ 0x80]) + fixture_bytes[11:],
         "missing gzip footer": fixture_bytes[:-8],
         "wrong gzip footer": fixture_bytes[:-8] + bytes([fixture_bytes[-8] ^ 1]) + fixture_bytes[-7:],
         "truncated archive EOF": fixture_bytes[:-64],
@@ -463,7 +464,7 @@ def main() -> int:
             return parse_archive(blob, f"fixture://{source}", "2026-09-02T00:00:00Z")
 
         assert_error_envelopes(fetch_corrupt, exit_code=6, kind="source_schema")
-    print("[PASS] corrupt gzip/footer failures return source-schema envelopes directly and canonically")
+    print("[PASS] corrupt DEFLATE, gzip footer and truncation failures return source-schema envelopes directly and canonically")
 
     for fetch in (
         short_transfer_fetch(),
