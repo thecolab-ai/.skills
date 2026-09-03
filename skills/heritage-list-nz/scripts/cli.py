@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import importlib
 import io
 import json
 import pathlib
@@ -12,7 +13,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
-import nzfetch  # noqa: E402
+nzfetch = importlib.import_module("nzfetch")
 
 LANDING_URL = "https://www.heritage.org.nz/list-details"
 CSV_URL = "https://hnzpt-prod-web.azurewebsites.net/api/report/GetPlaceListCsv"
@@ -120,20 +121,26 @@ def parse_csv_text(text: str) -> list[dict[str, Any]]:
 
     records: list[dict[str, Any]] = []
     seen: set[str] = set()
-    for line_number, raw in enumerate(reader, start=2):
-        if not any((value or "").strip() for value in raw.values()):
-            continue
-        record: dict[str, Any] = {}
-        for source_column, output_column in COLUMN_MAP.items():
-            value = (raw.get(source_column) or "").strip()
-            record[output_column] = parse_nzaa_numbers(value) if source_column == "NZAANumbers" else value
-        list_number = record["list_number"]
-        if not list_number or not record["name"]:
-            raise SourceSchemaError(f"row {line_number} has no list number or name")
-        if list_number in seen:
-            raise SourceSchemaError(f"duplicate list number in source: {list_number}")
-        seen.add(list_number)
-        records.append(record)
+    try:
+        rows = enumerate(reader, start=2)
+        for line_number, raw in rows:
+            if None in raw or any(value is None or not isinstance(value, str) for value in raw.values()):
+                raise SourceSchemaError(f"row {line_number} has an unexpected field count")
+            if not any(value.strip() for value in raw.values()):
+                continue
+            record: dict[str, Any] = {}
+            for source_column, output_column in COLUMN_MAP.items():
+                value = raw[source_column].strip()
+                record[output_column] = parse_nzaa_numbers(value) if source_column == "NZAANumbers" else value
+            list_number = record["list_number"]
+            if not list_number or not record["name"]:
+                raise SourceSchemaError(f"row {line_number} has no list number or name")
+            if list_number in seen:
+                raise SourceSchemaError(f"duplicate list number in source: {list_number}")
+            seen.add(list_number)
+            records.append(record)
+    except csv.Error as exc:
+        raise SourceSchemaError(f"invalid CSV source: {exc}") from exc
     if not records:
         raise SourceSchemaError("source contained no Heritage List records")
     return records
@@ -150,7 +157,7 @@ def fetch_records() -> tuple[list[dict[str, Any]], dict[str, Any], tuple[str, ..
         )
     except (nzfetch.Blocked, nzfetch.RateLimited) as exc:
         raise SourceBlockedError(str(exc)) from exc
-    except nzfetch.ResponseTooLarge as exc:
+    except (nzfetch.ResponseTooLarge, nzfetch.InvalidCompressedBody) as exc:
         raise SourceSchemaError(str(exc)) from exc
     except nzfetch.FetchError as exc:
         raise SkillError(str(exc)) from exc

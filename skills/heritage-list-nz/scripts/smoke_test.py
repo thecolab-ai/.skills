@@ -2,10 +2,13 @@
 """Deterministic parser checks plus one bounded live Heritage List probe."""
 from __future__ import annotations
 
+import argparse
 import importlib.util
+import io
 import json
 import subprocess
 import sys
+from contextlib import redirect_stdout
 from pathlib import Path
 
 CLI = Path(__file__).with_name("cli.py")
@@ -83,7 +86,7 @@ def main() -> int:
         assert cli.SourceSchemaError.exit_code == 6
         try:
             cli.bounded_limit("101")
-        except Exception as exc:  # argparse.ArgumentTypeError without importing argparse
+        except argparse.ArgumentTypeError as exc:
             assert "between 1 and 100" in str(exc)
         else:
             raise AssertionError("unbounded result limits must be rejected")
@@ -106,6 +109,40 @@ def main() -> int:
         assert columns == cli.REQUIRED_COLUMNS
         assert captured["max_bytes"] == cli.MAX_DOWNLOAD_BYTES
 
+    def malformed_row_is_cli_schema_error() -> None:
+        malformed = text.splitlines()[0] + "\n" + "," * len(cli.REQUIRED_COLUMNS) + "extra\n"
+
+        def fake_fetch_bytes(url: str, **kwargs):
+            return (malformed.encode("utf-8"), "text/csv", url)
+
+        original = cli.nzfetch.fetch_bytes
+        captured = io.StringIO()
+        cli.nzfetch.fetch_bytes = fake_fetch_bytes
+        try:
+            with redirect_stdout(captured):
+                exit_code = cli.main(["status", "--json"])
+        finally:
+            cli.nzfetch.fetch_bytes = original
+        payload = json.loads(captured.getvalue())
+        assert exit_code == 6
+        assert payload["error"] == "source_schema_error"
+
+    def truncated_compression_is_cli_schema_error() -> None:
+        def fake_fetch_bytes(url: str, **kwargs):
+            raise cli.nzfetch.InvalidCompressedBody("synthetic truncated deflate")
+
+        original = cli.nzfetch.fetch_bytes
+        captured = io.StringIO()
+        cli.nzfetch.fetch_bytes = fake_fetch_bytes
+        try:
+            with redirect_stdout(captured):
+                exit_code = cli.main(["status", "--json"])
+        finally:
+            cli.nzfetch.fetch_bytes = original
+        payload = json.loads(captured.getvalue())
+        assert exit_code == 6
+        assert payload["error"] == "source_schema_error"
+
     results = [
         check("CSV quoting, Unicode and multiline parsing", parse_fixture),
         check("name/address/number/council/type/status search", search_and_filters),
@@ -113,6 +150,8 @@ def main() -> int:
         check("source schema drift fails closed", schema_failure),
         check("timeouts, response caps, limits, and exit codes", operational_contracts),
         check("response cap is passed before decompression", response_cap_is_pre_downloaded),
+        check("malformed CSV row shape returns CLI schema error", malformed_row_is_cli_schema_error),
+        check("truncated compression returns CLI schema error", truncated_compression_is_cli_schema_error),
     ]
     if not all(results):
         return 1
