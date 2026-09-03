@@ -40,12 +40,48 @@ ADVICE_LEVEL_NUMBERS = {
 class SkillError(Exception):
     """A clean expected CLI error with a documented exit code."""
 
+    error_name: str | None = None
+
     def __init__(self, message: str, code: int) -> None:
         super().__init__(message)
         self.code = code
 
+    def _default_error_name(self) -> str:
+        return {
+            2: "invalid_input",
+            4: "blocked",
+            5: "upstream_unavailable",
+            6: "source_schema_failure",
+            7: "unsupported_operation",
+        }.get(self.code, "error")
+
+    def error_payload(self) -> dict[str, Any]:
+        return {"error": self.error_name or self._default_error_name(), "message": str(self)}
+
+
+class RateLimitedError(SkillError):
+    error_name = "rate_limited"
+
+    def __init__(self, message: str, *, retry_after: str | None = None) -> None:
+        super().__init__(message, 4)
+        self.retry_after = retry_after
+
+    def error_payload(self) -> dict[str, Any]:
+        payload = super().error_payload()
+        payload["retry_after"] = self.retry_after
+        return payload
+
+
+class BlockedError(SkillError):
+    error_name = "blocked"
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message, 4)
+
 
 class SchemaError(SkillError):
+    error_name = "source_schema_failure"
+
     def __init__(self, message: str) -> None:
         super().__init__(message, 6)
 
@@ -348,9 +384,11 @@ def fetch_text(url: str, *, accept: str) -> tuple[str, str]:
             allowed_hosts=ALLOWED_HOSTS,
         )
     except nzfetch.RateLimited as exc:
-        raise SkillError(f"source blocked or rate-limited: {exc}", 4) from exc
+        retry_after = exc.retry_after
+        retry_hint = f"; retry after {retry_after}" if retry_after else ""
+        raise RateLimitedError(f"source rate-limited: {exc}{retry_hint}", retry_after=retry_after) from exc
     except nzfetch.Blocked as exc:
-        raise SkillError(f"source blocked: {exc}", 4) from exc
+        raise BlockedError(f"source blocked: {exc}") from exc
     except nzfetch.FetchError as exc:
         raise SkillError(f"network error: upstream unavailable: {exc}", 5) from exc
     try:
@@ -493,8 +531,27 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         result = args.handler(args)
+    except nzfetch.RateLimited as exc:
+        retry_after = exc.retry_after
+        retry_hint = f"; retry after {retry_after}" if retry_after else ""
+        error = RateLimitedError(f"source rate-limited: {exc}{retry_hint}", retry_after=retry_after)
+        if args.json:
+            print(json.dumps(error.error_payload(), indent=2, ensure_ascii=False), file=sys.stderr)
+        else:
+            print(f"{SKILL}: {error}", file=sys.stderr)
+        return error.code
+    except nzfetch.Blocked as exc:
+        error = BlockedError(f"source blocked: {exc}")
+        if args.json:
+            print(json.dumps(error.error_payload(), indent=2, ensure_ascii=False), file=sys.stderr)
+        else:
+            print(f"{SKILL}: {error}", file=sys.stderr)
+        return error.code
     except SkillError as exc:
-        print(f"{SKILL}: {exc}", file=sys.stderr)
+        if args.json:
+            print(json.dumps(exc.error_payload(), indent=2, ensure_ascii=False), file=sys.stderr)
+        else:
+            print(f"{SKILL}: {exc}", file=sys.stderr)
         return exc.code
     if args.json:
         print(json.dumps(result, indent=2, ensure_ascii=False))

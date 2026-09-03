@@ -1,9 +1,13 @@
 """Deterministic parser assertions for synthetic SafeTravel source fixtures."""
 from __future__ import annotations
 
+import contextlib
 import importlib.util
+import io
+import json
 import sys
 from pathlib import Path
+from unittest import mock
 
 SKILL_DIR = Path(__file__).resolve().parents[1]
 CLI = SKILL_DIR / "scripts" / "cli.py"
@@ -115,6 +119,32 @@ def main() -> int:
         message_fragment="advice-level data disagreed",
     )
     print("[PASS] contradictory advice level data is rejected")
+
+    stderr = io.StringIO()
+    with (
+        mock.patch.object(cli, "fetch_text", side_effect=cli.nzfetch.RateLimited("synthetic 429", retry_after="120")),
+        contextlib.redirect_stderr(stderr),
+    ):
+        exit_code = cli.main(["search", "exampleland", "--json"])
+    assert exit_code == 4
+    error_payload = json.loads(stderr.getvalue())
+    assert error_payload == {
+        "error": "rate_limited",
+        "message": "source rate-limited: synthetic 429; retry after 120",
+        "retry_after": "120",
+    }
+    print("[PASS] rate-limited JSON errors preserve raw retry-after values")
+
+    stderr = io.StringIO()
+    with (
+        mock.patch.object(cli, "fetch_text", side_effect=cli.nzfetch.RateLimited("synthetic 429", retry_after="120")),
+        contextlib.redirect_stderr(stderr),
+    ):
+        exit_code = cli.main(["search", "exampleland"])
+    assert exit_code == 4
+    assert "retry after 120" in stderr.getvalue()
+    assert "rate_limited" not in stderr.getvalue()
+    print("[PASS] rate-limited human errors stay actionable")
     return 0
 
 
