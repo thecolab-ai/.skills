@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import csv
 import datetime as dt
+import decimal
 import io
 import re
 import tarfile
@@ -229,9 +230,31 @@ class TariffArchive:
 
     def iter_formulas(self) -> Iterator[dict[str, str]]:
         for row in self._iter_csv(FORMULAS):
+            formula_code = _clean(row["Lfc Levy Formula Codes"])
+            formula_rate = _clean(row["Lfc Levy Formula Rate"])
+            if not formula_code.isdigit():
+                raise SkillError(
+                    f"invalid formula code in {FORMULAS}: {formula_code!r}",
+                    exit_code=6,
+                    kind="source_schema",
+                )
+            try:
+                parsed_rate = decimal.Decimal(formula_rate)
+            except decimal.InvalidOperation as exc:
+                raise SkillError(
+                    f"invalid formula rate in {FORMULAS}: {formula_rate!r}",
+                    exit_code=6,
+                    kind="source_schema",
+                ) from exc
+            if not parsed_rate.is_finite():
+                raise SkillError(
+                    f"invalid formula rate in {FORMULAS}: {formula_rate!r}",
+                    exit_code=6,
+                    kind="source_schema",
+                )
             yield {
-                "formula_code": row["Lfc Levy Formula Codes"],
-                "formula_rate": row["Lfc Levy Formula Rate"],
+                "formula_code": formula_code,
+                "formula_rate": formula_rate,
             }
 
 

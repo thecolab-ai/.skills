@@ -8,12 +8,14 @@ import json
 import subprocess
 import sys
 import tarfile
+from contextlib import redirect_stdout
 from pathlib import Path
 
 SKILL = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SKILL / "scripts"))
 
-from customs_tariff import (
+import cli as customs_cli  # noqa: E402
+from customs_tariff import (  # noqa: E402
     MAX_ARCHIVE_MEMBERS,
     SkillError,
     formula_records,
@@ -49,6 +51,39 @@ def main() -> int:
     prefixed_formulas = formula_records(dataset, "2", 20, prefix=True)
     assert [record["formula_code"] for record in prefixed_formulas] == ["2", "20"]
     print("[PASS] fixture formula lookup distinguishes exact and explicit prefix matching")
+
+    malformed_buffer = io.BytesIO()
+    with tarfile.open(fileobj=io.BytesIO(fixture.read_bytes()), mode="r:gz") as source:
+        with tarfile.open(fileobj=malformed_buffer, mode="w:gz") as malformed:
+            for member in source:
+                source_file = source.extractfile(member) if member.isfile() else None
+                data = source_file.read() if source_file is not None else None
+                if member.name == "Tariff_Levy_Formulas.csv" and data is not None:
+                    data = data.replace(b"2~0.050000", b"A~0.050000")
+                    member.size = len(data)
+                malformed.addfile(member, io.BytesIO(data) if data is not None else None)
+    malformed_archive = parse_archive(
+        malformed_buffer.getvalue(),
+        "fixture://malformed-formula.tar.gz",
+        "2026-09-02T00:00:00Z",
+    )
+    original_fetch = customs_cli.fetch_archive
+    original_argv = sys.argv
+    captured = io.StringIO()
+    try:
+        customs_cli.fetch_archive = lambda timeout: malformed_archive
+        sys.argv = [str(SKILL / "scripts" / "cli.py"), "formula", "--json"]
+        with redirect_stdout(captured):
+            malformed_exit = customs_cli.main()
+    finally:
+        customs_cli.fetch_archive = original_fetch
+        sys.argv = original_argv
+    malformed_payload = json.loads(captured.getvalue())
+    assert malformed_exit == 6
+    assert malformed_payload["ok"] is False
+    assert malformed_payload["error"]["kind"] == "source_schema"
+    assert "invalid formula code" in malformed_payload["error"]["message"]
+    print("[PASS] malformed source formula returns the JSON schema-error envelope")
 
     tar_buffer = io.BytesIO()
     with tarfile.open(fileobj=tar_buffer, mode="w") as excessive:
