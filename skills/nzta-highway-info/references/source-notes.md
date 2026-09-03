@@ -21,21 +21,25 @@ The CKAN package API is:
 
 On 2026-09-03 it returned HTTP 200 and two official resources:
 
-1. `NZTA Traffic API Info`: `https://trafficnz.info/service/traffic/rest/4`
-2. `NZTA Highway Information - GIS Map Data`: an NZTA ArcGIS FeatureServer
+1. `ArcGIS Hub Dataset`: `https://opendata-nzta.opendata.arcgis.com/maps/NZTA::nzta-highway-information`
+2. `ArcGIS GeoService`: `https://services.arcgis.com/CXBb7LAjgIIdcsPt/arcgis/rest/services/NZTA_Highway_Information/FeatureServer`
+
+The CKAN package resources do not directly list `trafficnz.info`; the first-party
+traffic feed is documented separately through the live WADL below.
 
 The catalogue web page may present an anti-bot interstitial. The CKAN API is the
 machine-readable discovery surface and does not require a key.
 
 ## Traffic and Travel API v4
 
-The resource root itself returns HTTP 404 when requested without a method path.
-Its live WADL contract is exposed only with `_wadl`:
+The authoritative first-party traffic feed is the live WADL contract at:
 
 `https://trafficnz.info/service/traffic/rest/4?_wadl`
 
-On 2026-09-03 that URL returned HTTP 200 `application/xml`. Relevant GET
-resources declared by the WADL are:
+The resource root itself returns HTTP 404 when requested without a method path.
+On 2026-09-03 that WADL returned HTTP 200 `application/xml`.
+
+Relevant GET resources declared by the WADL are:
 
 | Data | Nationwide resource | Other declared shapes |
 |---|---|---|
@@ -104,8 +108,8 @@ The CKAN package's second resource resolved on 2026-09-03 to:
 
 The service reported:
 
-- layer 0: `Event Location`, point geometry, max record count 2,000
-- layer 1: `State Highway Route Lines`, polyline geometry, max record count 2,000
+- layer 0: `Road Events`, point geometry, max record count 2,000
+- layer 1: `Road Area Events`, polyline geometry, max record count 2,000
 - capabilities include Query; sync is disabled
 
 A bounded layer-0 `returnCountOnly=true` query returned 158 records during the

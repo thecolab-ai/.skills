@@ -55,6 +55,17 @@ class ParserTests(unittest.TestCase):
         with self.assertRaises(module.SchemaError):
             module.parse_response({"response": {}}, "camera", module.normalise_camera)
 
+    def test_null_collection_is_schema_error(self) -> None:
+        with self.assertRaises(module.SchemaError):
+            module.parse_response({"response": {"camera": None}}, "camera", module.normalise_camera)
+
+    def test_wrong_type_collection_is_schema_error(self) -> None:
+        with self.assertRaises(module.SchemaError):
+            module.parse_response({"response": {"camera": {}}}, "camera", module.normalise_camera)
+
+    def test_empty_collection_is_preserved(self) -> None:
+        self.assertEqual(module.parse_response({"response": {"camera": []}}, "camera", module.normalise_camera), [])
+
     def test_filter_is_case_insensitive_and_bounded(self) -> None:
         items = [
             {"id": 1, "region": "Wellington", "name": "SH1 Ngauranga", "description": "Northbound"},

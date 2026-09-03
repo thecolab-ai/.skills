@@ -247,9 +247,7 @@ def parse_response(payload: Any, item_key: str, parser: Callable[[dict[str, Any]
         raise SchemaError(f"upstream response is missing {item_key} list")
     raw_items = response[item_key]
     if raw_items is None:
-        raw_items = []
-    if isinstance(raw_items, dict):
-        raw_items = [raw_items]
+        raise SchemaError(f"upstream {item_key} value is null")
     if not isinstance(raw_items, list):
         raise SchemaError(f"upstream {item_key} value is not a list")
     parsed: list[dict[str, Any]] = []

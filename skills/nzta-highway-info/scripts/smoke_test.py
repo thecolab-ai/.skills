@@ -79,6 +79,18 @@ def check_schema_failure() -> None:
     raise AssertionError("missing source collection was accepted as an empty success")
 
 
+def check_null_collection_failure() -> None:
+    try:
+        module.parse_response({"response": {"camera": None}}, "camera", module.normalise_camera)
+    except module.SchemaError:
+        return
+    raise AssertionError("null source collection was accepted as an empty success")
+
+
+def check_empty_collection_is_preserved() -> None:
+    assert module.parse_response({"response": {"camera": []}}, "camera", module.normalise_camera) == []
+
+
 def check_wadl_contract_fixture() -> None:
     expected = {"cameras/all", "events/all/{zoomlevel}", "regions/all/{zoomlevel}", "signs/tim/all", "signs/vms/all"}
     assert wadl_fixture["version"] == "4"
@@ -91,6 +103,8 @@ for fixture_name, check in (
     ("VMS message parser and freshness", check_vms),
     ("travel-time parser without congestion inference", check_tim),
     ("schema drift fails closed", check_schema_failure),
+    ("null collection fails closed", check_null_collection_failure),
+    ("empty collection is preserved", check_empty_collection_is_preserved),
     ("WADL resource contract sentinel", check_wadl_contract_fixture),
 ):
     fixture_check(fixture_name, check)
