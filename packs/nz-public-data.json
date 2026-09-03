@@ -3,7 +3,7 @@
   "name": "nz-public-data",
   "description": "Public, read-only New Zealand data and public-interest sources.",
   "default": true,
-  "skill_count": 95,
+  "skill_count": 96,
   "skills": [
     "at-transport",
     "auckland-bin-schedule",
@@ -90,6 +90,7 @@
     "rbnz-data",
     "rental-bond-nz",
     "safeswim-nz",
+    "school-terms-nz",
     "searise-nz",
     "stats-nz",
     "statsnz-building-consents",

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import re
 import subprocess
@@ -14,18 +15,55 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "lib"))
 
-from result_contract import classify_legacy_error, result_envelope, validate_result_envelope  # noqa: E402
+from result_contract import (  # noqa: E402
+    VALID_EXIT_CODES,
+    classify_legacy_error,
+    result_envelope,
+    validate_result_envelope,
+)
 from skill_metadata import load_skill  # noqa: E402
-
 
 SENSITIVE_ENV_NAME = re.compile(
     r"(?:^|_)(?:API_?KEY|TOKEN|PASSWORD|SECRET|CREDENTIALS?|USERNAME|LOGIN|FETCH_PROXY|HTTPS_PROXY)$",
-    re.I,
+    re.IGNORECASE,
 )
 SENSITIVE_ARGUMENT_NAME = re.compile(
     r"(?:^|[-_])(?:api[-_]?key|token|password|secret|credential|username|login|proxy)(?:$|[-_])",
-    re.I,
+    re.IGNORECASE,
 )
+_MISSING = object()
+
+
+class NonstandardJsonConstant(ValueError):
+    """Raised when Python's JSON decoder encounters NaN or infinity."""
+
+
+def reject_nonstandard_json_constant(constant: str) -> object:
+    """Reject Python's non-standard NaN and infinity JSON extensions."""
+    raise NonstandardJsonConstant(f"non-standard JSON constant: {constant}")
+
+
+def parse_finite_json_float(number: str) -> float:
+    """Decode a JSON number only when it has a finite float representation."""
+    value = float(number)
+    if not math.isfinite(value):
+        raise NonstandardJsonConstant(f"non-finite JSON number: {number}")
+    return value
+
+
+STRICT_JSON_DECODER = json.JSONDecoder(
+    parse_constant=reject_nonstandard_json_constant,
+    parse_float=parse_finite_json_float,
+)
+
+
+def strict_json_loads(text: str) -> object:
+    """Decode standards-compliant JSON without accepting non-finite numbers."""
+    return json.loads(
+        text,
+        parse_constant=reject_nonstandard_json_constant,
+        parse_float=parse_finite_json_float,
+    )
 
 
 def redact_secrets(text: str) -> str:
@@ -92,24 +130,125 @@ def emit_envelope(payload: dict[str, object]) -> None:
     errors = validate_result_envelope(payload)
     if errors:
         raise RuntimeError("invalid common result envelope: " + "; ".join(errors))
-    print(json.dumps(payload, indent=2, ensure_ascii=False))
+    print(json.dumps(payload, indent=2, ensure_ascii=False, allow_nan=False))
+
+
+def json_objects(text: str) -> list[dict[str, object]]:
+    """Parse a stream made only of one or more whitespace-separated JSON objects."""
+    stripped = text.strip()
+    if not stripped:
+        return []
+    objects: list[dict[str, object]] = []
+    offset = 0
+    try:
+        while offset < len(stripped):
+            value, end = STRICT_JSON_DECODER.raw_decode(stripped, offset)
+            if not isinstance(value, dict):
+                return []
+            objects.append(value)
+            offset = end
+            while offset < len(stripped) and stripped[offset].isspace():
+                offset += 1
+    except (ValueError, TypeError):
+        return []
+    return objects
+
+
+def json_like(text: str) -> bool:
+    """Return whether a stream begins like JSON or a common JSON-like token."""
+    raw = text.strip()
+    if not raw:
+        return False
+    if raw.startswith("\ufeff"):
+        return True
+    stripped = raw.lstrip()
+    if stripped[:1] in {"{", "[", '"', "-", "~"} or stripped[:1].isdigit():
+        return True
+    token = stripped.casefold()
+    reserved_prefixes = (
+        "true",
+        "false",
+        "null",
+        "none",
+        "nil",
+        "undefined",
+        "nan",
+        "infinity",
+        "+infinity",
+        "-infinity",
+    )
+    return token.startswith(reserved_prefixes)
 
 
 def json_object(text: str) -> dict[str, object] | None:
-    """Return a JSON object from a command stream, or ``None`` for raw output."""
-    if not text:
-        return None
-    try:
-        payload = json.loads(text)
-    except json.JSONDecodeError:
-        return None
-    return payload if isinstance(payload, dict) else None
+    """Parse exactly one top-level JSON object from a command stream."""
+    objects = json_objects(text)
+    return objects[0] if len(objects) == 1 else None
 
 
 def looks_like_result_envelope(payload: dict[str, object]) -> bool:
     """Distinguish a direct result envelope from legacy JSON command data."""
     envelope_fields = {"schema_version", "ok", "source", "query", "data", "warnings", "blocked"}
     return "schema_version" in payload or len(envelope_fields.intersection(payload)) >= 4
+
+
+def payload_advertises_failure(payload: dict[str, object]) -> bool:
+    """Return whether one JSON object contains failure result markers."""
+    status = payload.get("status")
+    for marker in ("ok", "blocked", "success"):
+        if marker in payload and not isinstance(payload[marker], bool):
+            return True
+    if payload.get("ok") is False or payload.get("blocked") is True:
+        return True
+    if payload.get("success") is False:
+        return True
+    if "status" in payload:
+        if not isinstance(status, str):
+            return True
+        if status.strip().lower() not in {"ok", "success"}:
+            return True
+
+    error = payload.get("error")
+    if error not in (None, "", {}):
+        return True
+
+    # A top-level numeric/status code paired with a message is an incomplete
+    # failure envelope, not ordinary command data. Fail closed rather than
+    # nesting it under an apparently successful wrapper envelope.
+    return "code" in payload and "message" in payload
+
+
+def advertised_failure(text: str) -> bool:
+    """Return whether a JSON command stream advertises failure or contradicts success.
+
+    This check deliberately runs before direct-envelope forwarding. Otherwise a
+    valid success envelope on stdout could hide a structured failure on stderr,
+    or a partial ``{"ok": false, ...}`` result could be nested as successful
+    legacy data. Complete JSON arrays and scalar values are valid legacy data;
+    failure markers only have meaning on top-level objects.
+    """
+    stripped = text.strip()
+    if not stripped:
+        return False
+    try:
+        value = strict_json_loads(stripped)
+    except (ValueError, TypeError):
+        if json_like(text):
+            return True
+        for line in text.splitlines()[1:]:
+            try:
+                line_value = strict_json_loads(line)
+            except (ValueError, TypeError):
+                # Plain diagnostics may contain JSON-like fragments (for
+                # example argparse metavars). Only complete JSON values on a
+                # later line are eligible for structured-failure inspection.
+                if len(json_objects(line)) > 1:
+                    return True
+                continue
+            if isinstance(line_value, dict) and payload_advertises_failure(line_value):
+                return True
+        return False
+    return isinstance(value, dict) and payload_advertises_failure(value)
 
 
 def direct_result_envelope(
@@ -125,7 +264,8 @@ def direct_result_envelope(
     envelope is never silently treated as legacy data when it is malformed.
     """
     streams = (stdout, stderr) if returncode == 0 else (stderr, stdout)
-    for stream in streams:
+    candidates: list[tuple[int, dict[str, object], list[str]]] = []
+    for stream_index, stream in enumerate(streams):
         payload = json_object(stream)
         if payload is None or not looks_like_result_envelope(payload):
             continue
@@ -140,8 +280,24 @@ def direct_result_envelope(
                     errors.append("non-zero exit status must emit a failed result")
                 if error_code != returncode:
                     errors.append("result error.code must match the command exit status")
-        return payload, errors
-    return None, []
+        candidates.append((stream_index, payload, errors))
+
+    if not candidates:
+        return None, []
+
+    combined_errors = [error for _index, _payload, errors in candidates for error in errors]
+    if len(candidates) > 1:
+        combined_errors.append("multiple result envelopes emitted across stdout and stderr")
+    else:
+        selected_index = candidates[0][0]
+        opposing_stream = streams[1 - selected_index].strip()
+        if opposing_stream and (json_objects(opposing_stream) or json_like(opposing_stream)):
+            combined_errors.append(
+                "direct result envelope accompanied by structured or malformed JSON on the opposing stream"
+            )
+    if combined_errors:
+        return candidates[0][1], combined_errors
+    return candidates[0][1], []
 
 
 def structured_legacy_error(text: str) -> dict[str, object] | None:
@@ -151,14 +307,19 @@ def structured_legacy_error(text: str) -> dict[str, object] | None:
         return None
     raw_error = payload.get("error")
     message = payload.get("message")
+    code = payload.get("code", _MISSING)
     if isinstance(raw_error, dict):
         message = message or raw_error.get("message")
         error_type = raw_error.get("type")
+        if "code" in raw_error:
+            code = raw_error["code"]
     else:
         error_type = raw_error
     if not isinstance(message, str) or not message.strip():
         return None
     extracted: dict[str, object] = {"message": message}
+    if code is not _MISSING:
+        extracted["code"] = code
     if isinstance(error_type, str) and error_type.strip():
         extracted["type"] = error_type
     details = {
@@ -255,6 +416,22 @@ def main() -> int:
     stdout = redact_command_output(completed.stdout.strip(), cli_args)
     stderr = redact_command_output(completed.stderr.strip(), cli_args)
 
+    if completed.returncode == 0 and any(advertised_failure(stream) for stream in (stdout, stderr)):
+        payload = result_envelope(
+            ok=False,
+            source_name=metadata["thecolab.source_owner"],
+            source_url=metadata["thecolab.source_url"],
+            query={"argv": query_args},
+            data=None,
+            warnings=[],
+            error={
+                "code": 6,
+                "message": "CLI emitted a structured or contradictory failure with zero exit status",
+            },
+        )
+        emit_envelope(payload)
+        return 6
+
     direct_payload, direct_errors = direct_result_envelope(
         stdout=stdout,
         stderr=stderr,
@@ -284,8 +461,9 @@ def main() -> int:
             data = {"help": stdout}
         else:
             try:
-                data = json.loads(stdout) if stdout else None
-            except json.JSONDecodeError as exc:
+                data = strict_json_loads(stdout) if stdout else None
+            except ValueError as exc:
+                message = exc.msg if isinstance(exc, json.JSONDecodeError) else str(exc)
                 payload = result_envelope(
                     ok=False,
                     source_name=metadata["thecolab.source_owner"],
@@ -293,7 +471,7 @@ def main() -> int:
                     query={"argv": query_args},
                     data=None,
                     warnings=[stderr] if stderr else [],
-                    error={"code": 6, "message": f"CLI did not emit valid JSON: {exc.msg}"},
+                    error={"code": 6, "message": f"CLI did not emit valid JSON: {message}"},
                 )
                 emit_envelope(payload)
                 return 6
@@ -309,19 +487,34 @@ def main() -> int:
         return 0
 
     combined = "\n".join(part for part in (stderr, stdout) if part)
-    exit_code = classify_legacy_error(completed.returncode, combined)
-    blocked = exit_code == 4
     structured_error = structured_legacy_error(stderr) or structured_legacy_error(stdout)
+    structured_code = structured_error.get("code") if structured_error is not None else None
+    structured_code_present = structured_error is not None and "code" in structured_error
+    invalid_structured_code = structured_code_present and (
+        type(structured_code) is not int
+        or structured_code not in VALID_EXIT_CODES - {0}
+        or structured_code != completed.returncode
+    )
+    if invalid_structured_code:
+        exit_code = 6
+    elif type(structured_code) is int:
+        exit_code = structured_code
+    else:
+        exit_code = classify_legacy_error(completed.returncode, combined)
+    blocked = exit_code == 4
     error: dict[str, object] = {
         "code": exit_code,
         "message": (
-            str(structured_error["message"])
+            f"CLI emitted an invalid legacy error code {structured_code!r}; "
+            f"expected a stable non-zero code matching exit status {completed.returncode}"
+            if invalid_structured_code
+            else str(structured_error["message"])
             if structured_error is not None
             else combined or "skill command failed"
         ),
     }
     if structured_error is not None:
-        error.update({key: value for key, value in structured_error.items() if key != "message"})
+        error.update({key: value for key, value in structured_error.items() if key not in {"code", "message"}})
     payload = result_envelope(
         ok=False,
         source_name=metadata["thecolab.source_owner"],

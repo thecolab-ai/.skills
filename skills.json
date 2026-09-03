@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
-  "last_verified": "2026-09-02",
-  "skill_count": 142,
+  "last_verified": "2026-09-03",
+  "skill_count": 143,
   "skills": [
     {
       "name": "airnz-flights",
@@ -3484,6 +3484,31 @@
         "safeswim.org.nz"
       ],
       "last_verified": "2026-07-19",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "school-terms-nz",
+      "description": "Look up official New Zealand school term and holiday dates, identify the term or break covering a date, find the next school break, and summarise published school years with Ministry of Education caveats.",
+      "path": "skills/school-terms-nz",
+      "category": "education",
+      "source_owner": "Ministry of Education",
+      "source_type": "official",
+      "source_url": "https://www.education.govt.nz/school/school-terms-and-holidays",
+      "auth": "none",
+      "access_mode": "html-readonly",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "24h",
+      "schema_version": "1",
+      "skill_type": "html-readonly",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "www.education.govt.nz"
+      ],
+      "last_verified": "2026-09-03",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },

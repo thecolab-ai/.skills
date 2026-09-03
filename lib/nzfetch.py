@@ -46,12 +46,18 @@ Environment (all optional):
                                per retry; a single-IP proxy uses the same route.
     NZFETCH_UA                 override the User-Agent if a source needs a specific one.
 
+Resource limits:
+    Responses are read in bounded chunks and capped at 32 MiB of wire/compressed
+    bytes. gzip/deflate output is capped independently at 64 MiB, and concatenated
+    gzip streams are capped at 100 members. Exceeding a ceiling raises
+    ``ResponseTooLarge``, a typed ``FetchError``.
+
 No proxy set → nzfetch just does the single direct request (same as before), so a
 skill that imports it keeps working unchanged when no proxy is configured.
 """
+
 from __future__ import annotations
 
-import gzip
 import http.client
 import json
 import os
@@ -73,6 +79,78 @@ DEFAULT_UA = (
 # The GREASE-style brand list Chrome 149 emits (order + the "Not)A;Brand" token
 # match the real header exactly).
 SEC_CH_UA = f'"Google Chrome";v="{CHROME_VERSION}", "Chromium";v="{CHROME_VERSION}", "Not)A;Brand";v="24"'
+MAX_COMPRESSED_RESPONSE_BYTES = 32 * 1024 * 1024
+MAX_DECOMPRESSED_RESPONSE_BYTES = 64 * 1024 * 1024
+MAX_GZIP_MEMBERS = 100
+READ_CHUNK_BYTES = 64 * 1024
+SENSITIVE_REDIRECT_HEADERS = frozenset(
+    {
+        "access-token",
+        "api-key",
+        "apikey",
+        "authorization",
+        "cookie",
+        "cookie2",
+        "ocp-apim-subscription-key",
+        "proxy-authorization",
+        "subscription-key",
+        "x-access-token",
+        "x-api-key",
+        "x-auth-token",
+    }
+)
+SAFE_CALLER_REDIRECT_HEADERS = frozenset(
+    {
+        "accept",
+        "accept-encoding",
+        "accept-language",
+        "cache-control",
+        "content-type",
+        "origin",
+        "pragma",
+        "priority",
+        "referer",
+        "sec-ch-ua",
+        "sec-ch-ua-mobile",
+        "sec-ch-ua-platform",
+        "sec-fetch-dest",
+        "sec-fetch-mode",
+        "sec-fetch-site",
+        "upgrade-insecure-requests",
+        "user-agent",
+        "x-request-id",
+        "x-requested-with",
+    }
+)
+
+
+class FetchError(Exception):
+    """A non-recoverable fetch failure (a real HTTP error, bad URL, bad body)."""
+
+
+class ResponseTooLarge(FetchError):
+    """The upstream response exceeded a documented in-memory safety ceiling."""
+
+
+class Blocked(FetchError):
+    """Bounded attempts ended at a block or challenge, not a dead source.
+
+    Callers should return an explicit blocked state or soft-fail rather than
+    treating it as a citation defect. ``RateLimited`` is the compatible subtype
+    for a terminal HTTP 429.
+    """
+
+
+class RateLimited(Blocked):
+    """Bounded attempts ended with HTTP 429.
+
+    ``retry_after`` preserves the raw upstream header because it may be either
+    delta-seconds or an HTTP date.
+    """
+
+    def __init__(self, message: str, *, retry_after: str | None = None):
+        super().__init__(message)
+        self.retry_after = retry_after
 
 
 def _browser_headers(url: str, accept: str) -> dict:
@@ -90,12 +168,14 @@ def _browser_headers(url: str, accept: str) -> dict:
     try:
         p = urllib.parse.urlparse(url)
         origin = f"{p.scheme}://{p.netloc}" if p.scheme and p.netloc else ""
-    except Exception:
+    except (ValueError, UnicodeError):
         origin = ""
     is_doc = "text/html" in accept or accept in ("*/*", "")
     h = {
         "User-Agent": ua,
-        "Accept": accept if accept else "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept": accept
+        if accept
+        else "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "en-GB,en-US;q=0.9,en;q=0.8",
         "Accept-Encoding": "gzip, deflate",  # only what we can decode in stdlib
         "Cache-Control": "no-cache",
@@ -134,52 +214,119 @@ def _minimal_headers(accept: str) -> dict:
     }
 
 
+def _read_response_limited(response) -> bytes:
+    """Read at most the documented wire/compressed ceiling, never unbounded."""
+    chunks: list[bytes] = []
+    total = 0
+    while True:
+        chunk = response.read(
+            min(READ_CHUNK_BYTES, MAX_COMPRESSED_RESPONSE_BYTES + 1 - total)
+        )
+        if not chunk:
+            return b"".join(chunks)
+        chunks.append(chunk)
+        total += len(chunk)
+        if total > MAX_COMPRESSED_RESPONSE_BYTES:
+            raise ResponseTooLarge(
+                f"response exceeded the {MAX_COMPRESSED_RESPONSE_BYTES}-byte wire/compressed limit"
+            )
+
+
+def _zlib_decompress_limited(
+    body: bytes, wbits: int, *, concatenated: bool = False
+) -> bytes:
+    """Decompress with a hard output ceiling, including concatenated gzip members."""
+    if not body:
+        raise zlib.error("empty compressed response")
+    output = bytearray()
+    pending = body
+    member_count = 0
+    while pending:
+        member_count += 1
+        if concatenated and member_count > MAX_GZIP_MEMBERS:
+            raise ResponseTooLarge(
+                f"compressed response exceeded the {MAX_GZIP_MEMBERS}-member gzip member limit"
+            )
+        decompressor = zlib.decompressobj(wbits)
+        remaining = MAX_DECOMPRESSED_RESPONSE_BYTES - len(output)
+        output.extend(decompressor.decompress(pending, remaining + 1))
+        if (
+            len(output) > MAX_DECOMPRESSED_RESPONSE_BYTES
+            or decompressor.unconsumed_tail
+        ):
+            raise ResponseTooLarge(
+                f"decompressed response exceeded the {MAX_DECOMPRESSED_RESPONSE_BYTES}-byte limit"
+            )
+        remaining = MAX_DECOMPRESSED_RESPONSE_BYTES - len(output)
+        output.extend(decompressor.flush(remaining + 1))
+        if len(output) > MAX_DECOMPRESSED_RESPONSE_BYTES:
+            raise ResponseTooLarge(
+                f"decompressed response exceeded the {MAX_DECOMPRESSED_RESPONSE_BYTES}-byte limit"
+            )
+        if not decompressor.eof:
+            raise zlib.error("incomplete compressed response")
+        if not concatenated and decompressor.unused_data:
+            raise zlib.error("trailing data after compressed response")
+        pending = decompressor.unused_data if concatenated else b""
+    return bytes(output)
+
+
+def _content_encoding_tokens(content_encoding: str | None) -> list[str]:
+    """Parse the ordered HTTP Content-Encoding list and reject ambiguity."""
+    if content_encoding is None or not content_encoding.strip():
+        return []
+    tokens = [token.strip().lower() for token in content_encoding.split(",")]
+    if any(not token for token in tokens):
+        raise FetchError("malformed Content-Encoding header")
+    if tokens == ["identity"]:
+        return []
+    if "identity" in tokens:
+        raise FetchError("identity cannot be combined with another Content-Encoding")
+    unsupported = [token for token in tokens if token not in {"gzip", "deflate"}]
+    if unsupported:
+        raise FetchError(f"unsupported Content-Encoding: {unsupported[0]}")
+    return tokens
+
+
 def _decompress(body: bytes, content_encoding: str | None) -> bytes:
-    """Decode gzip/deflate we asked for in Accept-Encoding. On any decode error,
-    return the bytes unchanged (challenge detection still works on raw bytes)."""
-    enc = (content_encoding or "").lower()
-    try:
-        if "gzip" in enc:
-            return gzip.decompress(body)
-        if "deflate" in enc:
+    """Decode supported codings in reverse application order within hard limits.
+
+    Invalid advertised compression fails closed. The only compatibility fallback
+    retained is decoding a valid raw DEFLATE stream after zlib-wrapped decoding
+    fails; malformed input never falls back to unverified response bytes.
+    """
+    decoded = body
+    for encoding in reversed(_content_encoding_tokens(content_encoding)):
+        if encoding == "gzip":
             try:
-                return zlib.decompress(body)
-            except zlib.error:
-                return zlib.decompress(body, -zlib.MAX_WBITS)  # raw deflate stream
-    except Exception:
-        return body
-    return body
+                decoded = _zlib_decompress_limited(
+                    decoded,
+                    16 + zlib.MAX_WBITS,
+                    concatenated=True,
+                )
+            except zlib.error as exc:
+                raise FetchError("invalid gzip response body") from exc
+            continue
+        try:
+            decoded = _zlib_decompress_limited(decoded, zlib.MAX_WBITS)
+        except zlib.error:
+            try:
+                decoded = _zlib_decompress_limited(decoded, -zlib.MAX_WBITS)
+            except zlib.error as exc:
+                raise FetchError("invalid deflate response body") from exc
+    return decoded
 
 
-class FetchError(Exception):
-    """A non-recoverable fetch failure (a real HTTP error, bad URL, bad body)."""
-
-
-class Blocked(FetchError):
-    """Bounded attempts ended at a block or challenge, not a dead source.
-
-    Callers should return an explicit blocked state or soft-fail rather than
-    treating it as a citation defect. ``RateLimited`` is the compatible subtype
-    for a terminal HTTP 429.
-    """
-
-
-class RateLimited(Blocked):
-    """Bounded attempts ended with HTTP 429.
-
-    ``retry_after`` preserves the raw upstream header because it may be either
-    delta-seconds or an HTTP date.
-    """
-
-    def __init__(self, message: str, *, retry_after: str | None = None):
-        super().__init__(message)
-        self.retry_after = retry_after
-
-
-def _normalise_allowed_hosts(allowed_hosts: Iterable[str] | None) -> frozenset[str] | None:
+def _normalise_allowed_hosts(
+    allowed_hosts: Iterable[str] | None,
+) -> frozenset[str] | None:
     if allowed_hosts is None:
         return None
-    return frozenset(str(host).strip().lower().rstrip(".") for host in allowed_hosts if str(host).strip())
+    return frozenset(
+        str(host).strip().lower().rstrip(".")
+        for host in allowed_hosts
+        if str(host).strip()
+    )
 
 
 def _validate_outbound_url(url: str, allowed_hosts: frozenset[str]) -> None:
@@ -189,7 +336,9 @@ def _validate_outbound_url(url: str, allowed_hosts: frozenset[str]) -> None:
     except ValueError as exc:
         raise FetchError(f"invalid outbound URL: {url!r}") from exc
     hostname = (parsed.hostname or "").lower().rstrip(".")
-    default_port = 443 if parsed.scheme == "https" else 80 if parsed.scheme == "http" else None
+    default_port = (
+        443 if parsed.scheme == "https" else 80 if parsed.scheme == "http" else None
+    )
     if (
         parsed.scheme not in {"http", "https"}
         or not hostname
@@ -198,16 +347,58 @@ def _validate_outbound_url(url: str, allowed_hosts: frozenset[str]) -> None:
         or parsed.password is not None
         or port not in {None, default_port}
     ):
-        raise FetchError(f"outbound URL host is not in the declared allowlist: {hostname or url!r}")
+        raise FetchError(
+            f"outbound URL host is not in the declared allowlist: {hostname or url!r}"
+        )
+
+
+def _url_origin(parsed: urllib.parse.ParseResult) -> tuple[str, str, int | None]:
+    """Return an RFC-style origin with default ports normalised."""
+    scheme = parsed.scheme.lower()
+    port = parsed.port
+    if port is None:
+        port = 443 if scheme == "https" else 80 if scheme == "http" else None
+    return scheme, (parsed.hostname or "").lower().rstrip("."), port
 
 
 class _AllowlistRedirectHandler(urllib.request.HTTPRedirectHandler):
-    def __init__(self, allowed_hosts: frozenset[str]):
+    def __init__(
+        self,
+        allowed_hosts: frozenset[str] | None,
+        *,
+        sensitive_headers: Iterable[str] | None = None,
+    ):
         super().__init__()
         self.allowed_hosts = allowed_hosts
+        self.sensitive_headers = SENSITIVE_REDIRECT_HEADERS | frozenset(
+            str(name).strip().lower()
+            for name in sensitive_headers or ()
+            if str(name).strip()
+        )
+
+    def _has_sensitive_headers(self, request) -> bool:
+        return any(
+            name.lower() in self.sensitive_headers
+            for header_map in (request.headers, request.unredirected_hdrs)
+            for name in header_map
+        )
 
     def redirect_request(self, req, fp, code, msg, headers, newurl):
-        _validate_outbound_url(newurl, self.allowed_hosts)
+        if self.allowed_hosts is not None:
+            _validate_outbound_url(newurl, self.allowed_hosts)
+        old = urllib.parse.urlparse(req.full_url)
+        new = urllib.parse.urlparse(newurl)
+        old_scheme = old.scheme.lower()
+        new_scheme = new.scheme.lower()
+        if old_scheme == "https" and new_scheme == "http":
+            raise FetchError("HTTPS redirect downgrade is not allowed")
+
+        old_origin = _url_origin(old)
+        new_origin = _url_origin(new)
+        if old_origin != new_origin and self._has_sensitive_headers(req):
+            raise FetchError(
+                "cross-origin redirect with credential headers is not allowed"
+            )
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
@@ -259,7 +450,9 @@ _CHALLENGE_MARKERS = (
 )
 
 
-def _looks_like_challenge(body: str, content_type: str, *, expected_json: bool = False) -> bool:
+def _looks_like_challenge(
+    body: str, content_type: str, *, expected_json: bool = False
+) -> bool:
     """True if the response is a bot-wall interstitial rather than the real page.
 
     Two signals: (1) a reliable challenge fingerprint anywhere in the body — a
@@ -294,6 +487,7 @@ def fetch_bytes(
     expect_json: bool | None = None,
     browser_headers: bool = True,
     allowed_hosts: Iterable[str] | None = None,
+    sensitive_headers: Iterable[str] | None = None,
 ) -> tuple[bytes, str, str]:
     """Fetch *url* → (body, content_type, final_url). GET by default; pass
     ``data`` (bytes) for a POST. A full drop-in for a skill's own
@@ -318,7 +512,16 @@ def fetch_bytes(
       fallback without the headers that make it worse than plain urllib.
     - ``allowed_hosts`` — optional exact host allowlist. The initial URL and
       every redirect are rejected before a request can leave the declared host
-      set. Credential-bearing callers must provide this.
+      set. Credential-bearing callers should provide this defence in depth;
+      redirect credential protection is also enforced when it is omitted.
+    - ``sensitive_headers`` — optional additional caller credential-header names.
+      Known auth, cookie, API-key, subscription-key, and access-token names are
+      protected by default. Unknown caller-provided header names are treated as
+      sensitive too; the small explicit safe set contains only standard request
+      controls such as Accept, User-Agent, and X-Request-ID. Any cross-origin
+      redirect carrying a protected header is rejected, while same-origin
+      redirects preserve it. Use this option to mark an otherwise-safe name as
+      source-specific credential material.
 
     Tries a DIRECT request first; on HTTP 403/406/429/451 or a recognised HTML
     challenge, runs the configured bounded proxy attempts. Raises ``RateLimited``
@@ -327,17 +530,34 @@ def fetch_bytes(
     allowed = _normalise_allowed_hosts(allowed_hosts)
     if allowed is not None:
         _validate_outbound_url(url, allowed)
-    hdrs = _browser_headers(url, accept) if browser_headers else _minimal_headers(accept)
+    caller_header_names = frozenset(str(name).lower() for name in headers or {})
+    protected_headers = (
+        SENSITIVE_REDIRECT_HEADERS
+        | (caller_header_names - SAFE_CALLER_REDIRECT_HEADERS)
+        | frozenset(
+            str(name).strip().lower()
+            for name in sensitive_headers or ()
+            if str(name).strip()
+        )
+    )
+    caller_has_sensitive_headers = bool(caller_header_names & protected_headers)
+    hdrs = (
+        _browser_headers(url, accept) if browser_headers else _minimal_headers(accept)
+    )
     if headers:
         hdrs.update(headers)  # caller headers (API key, auth, custom UA/Accept) win
     # Whether an HTML body counts as a challenge. Explicit from the entrypoint
     # (fetch_text=False, fetch_json=True) when given; else inferred from accept.
-    expects_json = expect_json if expect_json is not None else ("json" in (accept or "").lower())
+    expects_json = (
+        expect_json if expect_json is not None else ("json" in (accept or "").lower())
+    )
     proxy = proxy_url()
-    if allowed is None:
+    if allowed is None and not caller_has_sensitive_headers:
         openers: list = [None]  # attempt 1 = direct urlopen for backwards compatibility
     else:
-        direct_handlers: list = [_AllowlistRedirectHandler(allowed)]
+        direct_handlers: list = [
+            _AllowlistRedirectHandler(allowed, sensitive_headers=protected_headers)
+        ]
         if context is not None:
             direct_handlers.append(urllib.request.HTTPSHandler(context=context))
         openers = [urllib.request.build_opener(*direct_handlers)]
@@ -346,7 +566,11 @@ def fetch_bytes(
         # A custom SSL context must be baked into an HTTPSHandler on the opener —
         # OpenerDirector.open() does NOT accept a context= kwarg (passing it raises
         # TypeError), so it can't be forwarded per-call like urlopen's.
-        extra = [_AllowlistRedirectHandler(allowed)] if allowed is not None else []
+        extra = (
+            [_AllowlistRedirectHandler(allowed, sensitive_headers=protected_headers)]
+            if allowed is not None or caller_has_sensitive_headers
+            else []
+        )
         if context is not None:
             extra.append(urllib.request.HTTPSHandler(context=context))
         retries = _proxy_retries()
@@ -358,14 +582,21 @@ def fetch_bytes(
     last = "no attempt made"
     last_status = None
     last_retry_after = None
+    last_was_block = False
     for opener in openers:
         req = urllib.request.Request(url, data=data, headers=hdrs, method=method)
         try:
-            resp = opener.open(req, timeout=timeout) if opener else urllib.request.urlopen(req, **direct_kw)
+            resp = (
+                opener.open(req, timeout=timeout)
+                if opener
+                else urllib.request.urlopen(req, **direct_kw)
+            )
             final_url = resp.geturl()
             if allowed is not None:
                 _validate_outbound_url(final_url, allowed)
-            body = _decompress(resp.read(), resp.headers.get("Content-Encoding"))
+            body = _decompress(
+                _read_response_limited(resp), resp.headers.get("Content-Encoding")
+            )
             content_type = (resp.headers.get("Content-Type") or "").lower()
         except urllib.error.HTTPError as e:
             # WAF bot-walls: 403/429 classic, 406 is Akamai's "Not Acceptable"
@@ -375,6 +606,7 @@ def fetch_bytes(
             if e.code in (403, 406, 429, 451):
                 last = f"HTTP {e.code}"
                 last_status = e.code
+                last_was_block = True
                 retry_after = (
                     e.headers.get("Retry-After")
                     if e.code == 429 and e.headers is not None
@@ -390,11 +622,13 @@ def fetch_bytes(
             last = f"network error: {e.reason}"
             last_status = None
             last_retry_after = None
+            last_was_block = False
             continue
         except (TimeoutError, OSError) as e:  # bare socket timeout / connection reset
             last = f"network error: {e}"
             last_status = None
             last_retry_after = None
+            last_was_block = False
             continue
         except http.client.HTTPException as e:
             # A truncated / malformed response body — most often
@@ -404,11 +638,15 @@ def fetch_bytes(
             last = f"network error: incomplete read ({type(e).__name__})"
             last_status = None
             last_retry_after = None
+            last_was_block = False
             continue
-        if _looks_like_challenge(body.decode("utf-8", "replace"), content_type, expected_json=expects_json):
+        if _looks_like_challenge(
+            body.decode("utf-8", "replace"), content_type, expected_json=expects_json
+        ):
             last = "bot-challenge interstitial"
             last_status = None
             last_retry_after = None
+            last_was_block = True
             continue  # rotate and retry
         return body, content_type, final_url
     if last_status == 429:
@@ -416,11 +654,13 @@ def fetch_bytes(
             f"{url} rate-limited after {len(openers)} attempt(s); retry later.",
             retry_after=last_retry_after,
         )
-    raise Blocked(
-        f"{url} blocked after {len(openers)} attempt(s) ({last}). The public source is "
-        f"blocking this network; use an official fallback or configure FETCH_PROXY "
-        f"for bounded proxy retries."
-    )
+    if last_was_block:
+        raise Blocked(
+            f"{url} blocked after {len(openers)} attempt(s) ({last}). The public source is "
+            f"blocking this network; use an official fallback or configure FETCH_PROXY "
+            f"for bounded proxy retries."
+        )
+    raise FetchError(f"{url} unavailable after {len(openers)} attempt(s) ({last})")
 
 
 def fetch_text(url: str, *, encoding: str = "utf-8", **kw) -> str:
@@ -441,5 +681,7 @@ def fetch_json(url: str, **kw):
         # A challenge that returned HTTP 200 + real-looking length can slip past
         # fetch_bytes; catch it here so it reads as a block, not malformed JSON.
         if _looks_like_challenge(raw, content_type, expected_json=True):
-            raise Blocked(f"{url} returned a non-JSON bot-challenge (blocked, not a dead source).") from e
+            raise Blocked(
+                f"{url} returned a non-JSON bot-challenge (blocked, not a dead source)."
+            ) from e
         raise FetchError(f"invalid JSON from {url}: {e}") from e
