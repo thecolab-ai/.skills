@@ -123,6 +123,16 @@ def json_objects(text: str) -> list[dict[str, object]]:
     return objects
 
 
+def json_like(text: str) -> bool:
+    """Return whether a stream begins like JSON, including malformed JSON."""
+    stripped = text.strip().lstrip("\ufeff").lstrip()
+    if not stripped:
+        return False
+    if stripped[:1] in {"{", "[", '"', "-"} or stripped[:1].isdigit():
+        return True
+    return any(stripped.startswith(token) for token in ("true", "false", "null"))
+
+
 def json_object(text: str) -> dict[str, object] | None:
     """Parse exactly one top-level JSON object from a command stream."""
     objects = json_objects(text)
@@ -147,7 +157,7 @@ def advertised_failure(text: str) -> bool:
     if len(payloads) > 1:
         return True
     if not payloads:
-        return False
+        return json_like(text)
     payload = payloads[0]
 
     status = payload.get("status")
@@ -216,9 +226,7 @@ def direct_result_envelope(
     else:
         selected_index = candidates[0][0]
         opposing_stream = streams[1 - selected_index].strip()
-        if opposing_stream and (
-            json_objects(opposing_stream) or opposing_stream[:1] in {"{", "["}
-        ):
+        if opposing_stream and (json_objects(opposing_stream) or json_like(opposing_stream)):
             combined_errors.append(
                 "direct result envelope accompanied by structured or malformed JSON on the opposing stream"
             )

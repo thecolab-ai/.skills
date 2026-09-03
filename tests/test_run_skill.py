@@ -264,6 +264,10 @@ class RunSkillIntegrationTests(unittest.TestCase):
             json.dumps({"success": True}),
             json.dumps({"status": "ok"}),
             json.dumps({"rows": [1]}),
+            "null",
+            '"diagnostic"',
+            "0",
+            '\ufeff{"status":"error"',
         )
         for opposing in opposing_streams:
             for success_on_stderr in (False, True):
@@ -280,6 +284,34 @@ class RunSkillIntegrationTests(unittest.TestCase):
                     self.assertEqual(exit_code, 6)
                     self.assertEqual(stderr, "")
                     self.assertFalse(payload["ok"])
+
+    def test_direct_envelope_with_trailing_non_json_fails_closed(self) -> None:
+        success: dict[str, object] = {
+            "schema_version": "1",
+            "ok": True,
+            "source": {
+                "name": "Ministry of Education",
+                "url": "https://www.education.govt.nz/school/school-terms-and-holidays",
+                "retrieved_at": "2026-09-03T00:00:00Z",
+            },
+            "query": {},
+            "data": {},
+            "warnings": [],
+            "blocked": False,
+            "error": None,
+        }
+        for suffix in ("diagnostic", '{"status":"error"'):
+            with self.subTest(suffix=suffix):
+                exit_code, payload, stderr = self.run_mocked_direct_cli(
+                    "school-terms-nz",
+                    ["years"],
+                    success,
+                    0,
+                    stdout_text=f"{json.dumps(success)}\n{suffix}",
+                )
+                self.assertEqual(exit_code, 6)
+                self.assertEqual(stderr, "")
+                self.assertFalse(payload["ok"])
 
     def test_zero_exit_partial_result_failure_cannot_be_wrapped_as_success(self) -> None:
         exit_code, payload, stderr = self.run_mocked_direct_cli(
