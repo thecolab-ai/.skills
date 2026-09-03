@@ -3,7 +3,7 @@
   "name": "nz-public-data",
   "description": "Public, read-only New Zealand data and public-interest sources.",
   "default": true,
-  "skill_count": 97,
+  "skill_count": 98,
   "skills": [
     "at-transport",
     "auckland-bin-schedule",
@@ -81,6 +81,7 @@
     "nzbn-register",
     "nzpost",
     "nzta-crash-data-nz",
+    "nzta-highway-info",
     "oia-statistics-nz",
     "ombudsman-nz",
     "osm-nz",
