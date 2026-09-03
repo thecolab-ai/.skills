@@ -281,6 +281,7 @@ class RunSkillIntegrationTests(unittest.TestCase):
             'true {"status":"error"}',
             "null junk",
             "undefined junk",
+            'diagnostic\n{"status":"error","message":"hidden"}',
             "~",
         )
         for opposing in opposing_streams:

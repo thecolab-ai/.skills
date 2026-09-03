@@ -14,13 +14,13 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "lib"))
 
-from result_contract import (  # noqa: E402
+from result_contract import (
     VALID_EXIT_CODES,
     classify_legacy_error,
     result_envelope,
     validate_result_envelope,
 )
-from skill_metadata import load_skill  # noqa: E402
+from skill_metadata import load_skill
 
 SENSITIVE_ENV_NAME = re.compile(
     r"(?:^|_)(?:API_?KEY|TOKEN|PASSWORD|SECRET|CREDENTIALS?|USERNAME|LOGIN|FETCH_PROXY|HTTPS_PROXY)$",
@@ -160,21 +160,8 @@ def looks_like_result_envelope(payload: dict[str, object]) -> bool:
     return "schema_version" in payload or len(envelope_fields.intersection(payload)) >= 4
 
 
-def advertised_failure(text: str) -> bool:
-    """Return whether a JSON command stream advertises failure or contradicts success.
-
-    This check deliberately runs before direct-envelope forwarding. Otherwise a
-    valid success envelope on stdout could hide a structured failure on stderr,
-    or a partial ``{"ok": false, ...}`` result could be nested as successful
-    legacy data.
-    """
-    payloads = json_objects(text)
-    if len(payloads) > 1:
-        return True
-    if not payloads:
-        return json_like(text)
-    payload = payloads[0]
-
+def payload_advertises_failure(payload: dict[str, object]) -> bool:
+    """Return whether one JSON object contains failure result markers."""
     status = payload.get("status")
     for marker in ("ok", "blocked", "success"):
         if marker in payload and not isinstance(payload[marker], bool):
@@ -197,6 +184,30 @@ def advertised_failure(text: str) -> bool:
     # failure envelope, not ordinary command data. Fail closed rather than
     # nesting it under an apparently successful wrapper envelope.
     return "code" in payload and "message" in payload
+
+
+def advertised_failure(text: str) -> bool:
+    """Return whether a JSON command stream advertises failure or contradicts success.
+
+    This check deliberately runs before direct-envelope forwarding. Otherwise a
+    valid success envelope on stdout could hide a structured failure on stderr,
+    or a partial ``{"ok": false, ...}`` result could be nested as successful
+    legacy data.
+    """
+    payloads = json_objects(text)
+    if len(payloads) > 1:
+        return True
+    if not payloads:
+        if json_like(text):
+            return True
+        for line in text.splitlines()[1:]:
+            line_payloads = json_objects(line)
+            if len(line_payloads) > 1:
+                return True
+            if line_payloads and payload_advertises_failure(line_payloads[0]):
+                return True
+        return False
+    return payload_advertises_failure(payloads[0])
 
 
 def direct_result_envelope(
