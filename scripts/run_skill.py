@@ -131,10 +131,18 @@ def advertised_failure(text: str) -> bool:
         return False
 
     status = payload.get("status")
-    if payload.get("ok") is False:
+    for marker in ("ok", "blocked", "success"):
+        if marker in payload and not isinstance(payload[marker], bool):
+            return True
+    if payload.get("ok") is False or payload.get("blocked") is True:
         return True
-    if isinstance(status, str) and status.strip().lower() not in {"ok", "success"}:
+    if payload.get("success") is False:
         return True
+    if "status" in payload:
+        if not isinstance(status, str):
+            return True
+        if status.strip().lower() not in {"ok", "success"}:
+            return True
 
     error = payload.get("error")
     if error not in (None, "", {}):
@@ -161,6 +169,7 @@ def direct_result_envelope(
     envelope is never silently treated as legacy data when it is malformed.
     """
     streams = (stdout, stderr) if returncode == 0 else (stderr, stdout)
+    candidates: list[tuple[dict[str, object], list[str]]] = []
     for stream in streams:
         payload = json_object(stream)
         if payload is None or not looks_like_result_envelope(payload):
@@ -176,8 +185,17 @@ def direct_result_envelope(
                     errors.append("non-zero exit status must emit a failed result")
                 if error_code != returncode:
                     errors.append("result error.code must match the command exit status")
-        return payload, errors
-    return None, []
+        candidates.append((payload, errors))
+
+    if not candidates:
+        return None, []
+
+    combined_errors = [error for _payload, errors in candidates for error in errors]
+    if len(candidates) > 1:
+        combined_errors.append("multiple result envelopes emitted across stdout and stderr")
+    if combined_errors:
+        return candidates[0][0], combined_errors
+    return candidates[0][0], []
 
 
 def structured_legacy_error(text: str) -> dict[str, object] | None:

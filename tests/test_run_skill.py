@@ -180,6 +180,8 @@ class RunSkillIntegrationTests(unittest.TestCase):
                 "message": "synthetic legacy failure",
             },
             {"code": 6, "message": "parser failed"},
+            {"schema_version": "1", "ok": None},
+            {"blocked": True, "message": "source access blocked"},
         )
         for stderr_failure in stderr_failures:
             with self.subTest(stderr_failure=stderr_failure):
@@ -235,6 +237,12 @@ class RunSkillIntegrationTests(unittest.TestCase):
             {"code": 5, "message": "upstream unavailable"},
             {"error": "upstream unavailable"},
             {"status": "failed", "message": "upstream unavailable"},
+            {"blocked": True, "message": "source access blocked"},
+            {"ok": True, "blocked": True, "message": "contradictory blocked result"},
+            {"status": "ok", "blocked": True, "message": "blocked result"},
+            {"status": False, "message": "malformed status"},
+            {"success": False, "message": "failed result"},
+            {"ok": 0, "message": "malformed ok marker"},
         )
         for direct in cases:
             with self.subTest(direct=direct):
