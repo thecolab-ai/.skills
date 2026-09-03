@@ -5,7 +5,7 @@ import os
 import subprocess
 import sys
 import unittest
-from contextlib import redirect_stderr, redirect_stdout
+from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest import mock
 
@@ -15,6 +15,22 @@ SPEC = importlib.util.spec_from_file_location("run_skill_module", RUNNER)
 assert SPEC and SPEC.loader
 RUN_SKILL_MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(RUN_SKILL_MODULE)
+
+
+@contextmanager
+def disabled_runtime_int_digit_limit():
+    """Disable CPython's ambient integer guard and restore it even on failure."""
+    get_limit = getattr(sys, "get_int_max_str_digits", None)
+    set_limit = getattr(sys, "set_int_max_str_digits", None)
+    if get_limit is None or set_limit is None:
+        yield
+        return
+    original_limit = get_limit()
+    try:
+        set_limit(0)
+        yield
+    finally:
+        set_limit(original_limit)
 
 
 class RunSkillIntegrationTests(unittest.TestCase):
@@ -456,7 +472,7 @@ class RunSkillIntegrationTests(unittest.TestCase):
                 self.assertIsNone(payload["data"])
 
     def test_zero_exit_oversized_json_integers_fail_closed_without_traceback(self) -> None:
-        oversized = "9" * 5_000
+        oversized = "9" * 4_301
         documents = (
             oversized,
             f"-{oversized}",
@@ -464,40 +480,55 @@ class RunSkillIntegrationTests(unittest.TestCase):
             f"[[-{oversized}]]",
             f'diagnostic\n{{"value":{oversized}}}',
         )
-        for stdout_text in documents:
-            with self.subTest(shape=stdout_text[:20]):
-                exit_code, payload, stderr = self.run_mocked_direct_cli(
-                    "school-terms-nz",
-                    ["years"],
-                    {},
-                    0,
-                    stdout_text=stdout_text,
-                )
+        with disabled_runtime_int_digit_limit():
+            for stdout_text in documents:
+                with self.subTest(shape=stdout_text[:20]):
+                    exit_code, payload, stderr = self.run_mocked_direct_cli(
+                        "school-terms-nz",
+                        ["years"],
+                        {},
+                        0,
+                        stdout_text=stdout_text,
+                    )
 
-                self.assertEqual(exit_code, 6)
-                self.assertEqual(stderr, "")
-                self.assertFalse(payload["ok"])
-                self.assertIsNone(payload["data"])
-                error = payload["error"]
-                self.assertIsInstance(error, dict)
-                assert isinstance(error, dict)
-                self.assertEqual(error["code"], 6)
+                    self.assertEqual(exit_code, 6)
+                    self.assertEqual(stderr, "")
+                    self.assertFalse(payload["ok"])
+                    self.assertIsNone(payload["data"])
+                    error = payload["error"]
+                    self.assertIsInstance(error, dict)
+                    assert isinstance(error, dict)
+                    self.assertEqual(error["code"], 6)
+                    self.assertNotIn("Traceback", error["message"])
+                    self.assertLess(len(error["message"]), 500)
 
     def test_json_objects_rejects_oversized_json_integers(self) -> None:
-        oversized = "9" * 5_000
+        oversized = "9" * 4_301
         documents = (
             oversized,
             f"-{oversized}",
             f'{{"value":{oversized}}}',
             f'{{"value":-{oversized}}}',
         )
-        for document in documents:
-            with self.subTest(shape=document[:20]):
-                self.assertEqual(RUN_SKILL_MODULE.json_objects(document), [])
+        with disabled_runtime_int_digit_limit():
+            for document in documents:
+                with self.subTest(shape=document[:20]):
+                    self.assertEqual(RUN_SKILL_MODULE.json_objects(document), [])
+
+    def test_json_integer_digit_bound_counts_digits_not_sign(self) -> None:
+        maximum = "9" * 4_300
+        oversized = maximum + "9"
+        with disabled_runtime_int_digit_limit():
+            self.assertEqual(RUN_SKILL_MODULE.strict_json_loads(maximum), int(maximum))
+            self.assertEqual(RUN_SKILL_MODULE.strict_json_loads(f"-{maximum}"), -int(maximum))
+            for document in (oversized, f"-{oversized}", f'{{"value":{oversized}}}'):
+                with self.subTest(shape=document[:20]), self.assertRaises(ValueError):
+                    RUN_SKILL_MODULE.strict_json_loads(document)
 
     def test_data_parse_normalises_oversized_json_integer(self) -> None:
-        oversized = "9" * 5_000
+        oversized = "9" * 4_301
         with (
+            disabled_runtime_int_digit_limit(),
             mock.patch.object(RUN_SKILL_MODULE, "advertised_failure", return_value=False),
             mock.patch.object(RUN_SKILL_MODULE, "direct_result_envelope", return_value=(None, [])),
         ):
