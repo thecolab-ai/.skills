@@ -109,6 +109,34 @@ class NzfetchTests(unittest.TestCase):
                 self.assertEqual(body, b"decoded")
 
     @mock.patch("nzfetch.urllib.request.urlopen")
+    def test_content_encoding_lists_are_decoded_in_reverse_application_order(self, urlopen):
+        cases = (
+            ("gzip, deflate", zlib.compress(gzip.compress(b"decoded"))),
+            ("deflate,gzip", gzip.compress(zlib.compress(b"decoded"))),
+        )
+        for encoding, encoded in cases:
+            with self.subTest(encoding=encoding):
+                urlopen.return_value = FakeResponse(body=encoded, content_encoding=encoding)
+                body, _content_type, _final_url = nzfetch.fetch_bytes("https://example.test/data")
+                self.assertEqual(body, b"decoded")
+
+    @mock.patch("nzfetch.urllib.request.urlopen")
+    def test_identity_content_encoding_is_a_bounded_passthrough(self, urlopen):
+        urlopen.return_value = FakeResponse(body=b"decoded", content_encoding="identity")
+
+        body, _content_type, _final_url = nzfetch.fetch_bytes("https://example.test/data")
+
+        self.assertEqual(body, b"decoded")
+
+    @mock.patch("nzfetch.urllib.request.urlopen")
+    def test_unsupported_or_malformed_content_encodings_raise_typed_failures(self, urlopen):
+        for encoding in ("br", "plaintext", "gzip,", ",gzip", "identity, gzip"):
+            with self.subTest(encoding=encoding):
+                urlopen.return_value = FakeResponse(body=b"opaque", content_encoding=encoding)
+                with self.assertRaisesRegex(nzfetch.FetchError, "Content-Encoding"):
+                    nzfetch.fetch_bytes("https://example.test/data")
+
+    @mock.patch("nzfetch.urllib.request.urlopen")
     def test_plaintext_advertised_as_gzip_raises_typed_failure(self, urlopen):
         urlopen.return_value = FakeResponse(
             body=b"<html><body>valid-looking source page</body></html>",

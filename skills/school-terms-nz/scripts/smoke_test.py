@@ -102,8 +102,10 @@ def date_queries() -> None:
     earliest_year_summer = module.classify_date(years, "2025-01-15")
     assert earliest_year_summer["kind"] == "school_break"
     assert earliest_year_summer["name"] == "Summer holidays"
-    assert earliest_year_summer["certainty"] == "published"
-    assert earliest_year_summer["description"] == years[0]["terms"][0]["description"]
+    assert earliest_year_summer["certainty"] == "source_derived"
+    assert "opening window" in earliest_year_summer["description"].lower()
+    assert "preceding year's summer holidays section" in earliest_year_summer["caveat"].lower()
+    assert earliest_year_summer["description"] != years[0]["terms"][0]["description"]
     assert earliest_year_summer["end"] == years[0]["terms"][0]["start"]
 
     fixed_term = module.classify_date(years, "2026-05-11")
@@ -192,8 +194,10 @@ def certain_next_break_queries() -> None:
     earliest_year_summer = module.next_break(years, "2025-01-15")
     assert earliest_year_summer["name"] == "Summer holidays"
     assert earliest_year_summer["days_until"] == 0
-    assert earliest_year_summer["certainty"] == "published"
-    assert earliest_year_summer["description"] == years[0]["terms"][0]["description"]
+    assert earliest_year_summer["certainty"] == "source_derived"
+    assert "opening window" in earliest_year_summer["description"].lower()
+    assert "preceding year's summer holidays section" in earliest_year_summer["caveat"].lower()
+    assert earliest_year_summer["description"] != years[0]["terms"][0]["description"]
     assert earliest_year_summer["end"] == years[0]["terms"][0]["start"]
 
     before_opening = module.next_break(years, "2026-01-25")
@@ -245,6 +249,35 @@ def summer_duration_stays_source_derived() -> None:
 
 
 results.append(check("summer duration claims stay source-derived", summer_duration_stays_source_derived))
+
+
+def published_years_and_opening_counts_stay_dynamic() -> None:
+    past_start = fixture_text.index("    <h3>2025 school terms")
+    main_end = fixture_text.index("  </main>")
+    without_2025 = fixture_text[:past_start] + fixture_text[main_end:]
+    assert [item["year"] for item in module.parse_school_terms(without_2025, SOURCE_URL)] == [
+        2026,
+        2027,
+        2028,
+    ]
+
+    future_start = fixture_text.index("    <h2>2028 school terms")
+    past_heading = fixture_text.index("    <h2>Past years")
+    future_sections = fixture_text[future_start:past_heading]
+    future_sections = future_sections.replace("2028", "2029")
+    future_sections = future_sections.replace("382 half days", "384 half days", 1)
+    with_2029 = fixture_text[:past_heading] + future_sections + fixture_text[past_heading:]
+    parsed = module.parse_school_terms(with_2029, SOURCE_URL)
+    assert [item["year"] for item in parsed] == [2025, 2026, 2027, 2028, 2029]
+    assert "384 half days" in parsed[-1]["opening_requirements"][0]
+
+
+results.append(
+    check(
+        "published years and plausible opening counts are discovered from source structure",
+        published_years_and_opening_counts_stay_dynamic,
+    )
+)
 
 
 def cli_surface() -> None:
@@ -320,16 +353,16 @@ def error_contract() -> None:
 results.append(check("fixture errors map schema, blocked and unavailable failures to exits 6, 4 and 5", error_contract))
 
 
-def malformed_advertised_gzip_fails_closed_end_to_end() -> None:
+def malformed_content_encodings_fail_closed_end_to_end() -> None:
     original_build_opener = module.nzfetch.urllib.request.build_opener
     original_argv = sys.argv
 
-    class PlaintextGzipResponse:
-        def __init__(self) -> None:
+    class MalformedEncodingResponse:
+        def __init__(self, content_encoding: str) -> None:
             self.body = fixture_text.encode("utf-8")
             self.headers = {
                 "Content-Type": "text/html; charset=utf-8",
-                "Content-Encoding": "gzip",
+                "Content-Encoding": content_encoding,
             }
 
         def read(self, size: int = -1) -> bytes:
@@ -339,37 +372,46 @@ def malformed_advertised_gzip_fails_closed_end_to_end() -> None:
         def geturl(self) -> str:
             return SOURCE_URL
 
-    class PlaintextGzipOpener:
+    class MalformedEncodingOpener:
+        def __init__(self, content_encoding: str) -> None:
+            self.content_encoding = content_encoding
+
         def open(self, *args, **kwargs):
-            return PlaintextGzipResponse()
+            return MalformedEncodingResponse(self.content_encoding)
 
     try:
-        setattr(
-            module.nzfetch.urllib.request,
-            "build_opener",
-            lambda *args, **kwargs: PlaintextGzipOpener(),
-        )
-        sys.argv = [str(CLI), "years", "--json"]
-        output = io.StringIO()
-        with redirect_stdout(output):
-            exit_code = module.main()
-        payload = json.loads(output.getvalue())
+        for content_encoding, message in (
+            ("gzip", "invalid gzip response body"),
+            ("deflate", "invalid deflate response body"),
+            ("br", "unsupported Content-Encoding"),
+        ):
+            setattr(
+                module.nzfetch.urllib.request,
+                "build_opener",
+                lambda *args, encoding=content_encoding, **kwargs: MalformedEncodingOpener(
+                    encoding
+                ),
+            )
+            sys.argv = [str(CLI), "years", "--json"]
+            output = io.StringIO()
+            with redirect_stdout(output):
+                exit_code = module.main()
+            payload = json.loads(output.getvalue())
+            assert exit_code == 5
+            assert payload["status"] == "error"
+            assert payload["code"] == 5
+            assert payload["error"] == "upstream_unavailable"
+            assert message in payload["message"]
+            assert "years" not in payload
     finally:
         setattr(module.nzfetch.urllib.request, "build_opener", original_build_opener)
         sys.argv = original_argv
 
-    assert exit_code == 5
-    assert payload["status"] == "error"
-    assert payload["code"] == 5
-    assert payload["error"] == "upstream_unavailable"
-    assert "invalid gzip response body" in payload["message"]
-    assert "years" not in payload
-
 
 results.append(
     check(
-        "plaintext Ministry HTML advertised as gzip cannot return successful years",
-        malformed_advertised_gzip_fails_closed_end_to_end,
+        "malformed or unsupported Ministry content encodings cannot return successful years",
+        malformed_content_encodings_fail_closed_end_to_end,
     )
 )
 
@@ -473,6 +515,17 @@ def source_drift_mutations() -> None:
         1,
     )
     assert_schema_error(impossible_opening_requirement)
+
+    inconsistent_opening_requirements = fixture_text.replace(
+        "Primary, intermediate and specialist schools must be open for instruction for a minimum of 378 half days in 2026.",
+        "Primary, intermediate and specialist schools must be open for instruction for a minimum of 370 half days in 2026.",
+        1,
+    ).replace(
+        "Secondary and composite schools must be open for instruction for a minimum of 376 half days in 2026.",
+        "Secondary and composite schools must be open for instruction for a minimum of 380 half days in 2026.",
+        1,
+    )
+    assert_schema_error(inconsistent_opening_requirements)
 
 
 results.append(check("semantic source drift fails closed with source_schema", source_drift_mutations))

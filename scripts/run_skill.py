@@ -118,6 +118,30 @@ def looks_like_result_envelope(payload: dict[str, object]) -> bool:
     return "schema_version" in payload or len(envelope_fields.intersection(payload)) >= 4
 
 
+def advertised_failure(text: str) -> bool:
+    """Return whether a JSON command stream advertises failure or contradicts success.
+
+    This check deliberately runs before direct-envelope forwarding. Otherwise a
+    valid success envelope on stdout could hide a structured failure on stderr,
+    or a partial ``{"ok": false, ...}`` result could be nested as successful
+    legacy data.
+    """
+    payload = json_object(text)
+    if payload is None:
+        return False
+
+    if payload.get("ok") is False or payload.get("status") == "error":
+        return True
+
+    error = payload.get("error")
+    if error not in (None, "", {}):
+        if payload.get("ok") is True or payload.get("status") == "ok":
+            return True
+        if "code" in payload or "message" in payload:
+            return True
+    return False
+
+
 def direct_result_envelope(
     *,
     stdout: str,
@@ -265,6 +289,22 @@ def main() -> int:
 
     stdout = redact_command_output(completed.stdout.strip(), cli_args)
     stderr = redact_command_output(completed.stderr.strip(), cli_args)
+
+    if completed.returncode == 0 and any(advertised_failure(stream) for stream in (stdout, stderr)):
+        payload = result_envelope(
+            ok=False,
+            source_name=metadata["thecolab.source_owner"],
+            source_url=metadata["thecolab.source_url"],
+            query={"argv": query_args},
+            data=None,
+            warnings=[],
+            error={
+                "code": 6,
+                "message": "CLI emitted a structured or contradictory failure with zero exit status",
+            },
+        )
+        emit_envelope(payload)
+        return 6
 
     direct_payload, direct_errors = direct_result_envelope(
         stdout=stdout,

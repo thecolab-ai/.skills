@@ -45,12 +45,10 @@ OPENING_REQUIREMENT_LABELS = (
     ("primary", "Primary, intermediate and specialist schools"),
     ("secondary", "Secondary and composite schools"),
 )
-EXPECTED_OPENING_HALF_DAYS = {
-    2025: {"primary": 382, "secondary": 376},
-    2026: {"primary": 378, "secondary": 376},
-    2027: {"primary": 376, "secondary": 376},
-    2028: {"primary": 382, "secondary": 380},
-}
+# One school day contains two half-days. These broad bounds admit annual
+# Ministry changes while rejecting zero, truncated and calendar-impossible data.
+MIN_OPENING_HALF_DAYS = 300
+MAX_OPENING_HALF_DAYS = 500
 
 
 class SkillError(RuntimeError):
@@ -169,24 +167,32 @@ def has_precision(value: Any, expected: str) -> bool:
     return isinstance(value, dict) and value.get("precision") == expected
 
 
-def opening_requirement_label(text: str, year: int) -> str | None:
-    """Recognise only the two complete Ministry opening-requirement sentences."""
-    expected_counts = EXPECTED_OPENING_HALF_DAYS.get(year)
-    if expected_counts is None:
-        return None
+def opening_requirement(text: str, year: int) -> tuple[str, int] | None:
+    """Parse a complete Ministry opening-requirement sentence semantically."""
     for label, school_group in OPENING_REQUIREMENT_LABELS:
         pattern = (
             rf"{re.escape(school_group)} (?:must|are required to) be open for instruction "
-            rf"for (?:a )?minimum of {expected_counts[label]} half days in {year}\."
+            rf"for (?:a )?minimum of (?P<count>\d+) half days in {year}\."
         )
-        if re.fullmatch(pattern, text):
-            return label
+        match = re.fullmatch(pattern, text)
+        if match:
+            count = int(match.group("count"))
+            if MIN_OPENING_HALF_DAYS <= count <= MAX_OPENING_HALF_DAYS:
+                return label, count
     return None
 
 
 def opening_requirements_valid(item: dict[str, Any]) -> bool:
-    labels = [opening_requirement_label(text, item["year"]) for text in item["opening_requirements"]]
-    return labels == [label for label, _school_group in OPENING_REQUIREMENT_LABELS]
+    parsed = [opening_requirement(text, item["year"]) for text in item["opening_requirements"]]
+    if any(requirement is None for requirement in parsed):
+        return False
+    requirements = [requirement for requirement in parsed if requirement is not None]
+    labels = [label for label, _count in requirements]
+    counts = {label: count for label, count in requirements}
+    return (
+        labels == [label for label, _school_group in OPENING_REQUIREMENT_LABELS]
+        and counts["primary"] >= counts["secondary"]
+    )
 
 
 def year_semantics_valid(item: dict[str, Any]) -> bool:
@@ -355,7 +361,7 @@ def parse_school_terms(source_html: str, source_url: str = SOURCE_URL) -> list[d
                 current_break["public_holidays"].append(text)
         elif mode == "terms" and subsection == "requirements":
             lowered = text.lower()
-            if opening_requirement_label(text, year) is not None:
+            if opening_requirement(text, year) is not None:
                 record["opening_requirements"].append(text)
             if "flexibility" in lowered:
                 record["caveats"].append(text)
@@ -459,14 +465,17 @@ def pre_opening_summer_holiday(years: list[dict[str, Any]], query: dt.date) -> d
         summer = next((item for item in previous["breaks"] if item["name"] == "Summer holidays"), None)
         if summer is not None:
             return summer
-    source_summer = next((item for item in current["breaks"] if item["name"] == "Summer holidays"), None)
-    if source_summer is None:
-        return None
     return {
-        **source_summer,
+        "name": "Summer holidays",
         "start": None,
         "end": term_one["start"],
-        "description": term_one["description"],
+        "description": f"Summer holidays before the published {query.year} Term 1 opening window.",
+        "certainty": "source_derived",
+        "caveat": (
+            "The preceding year's Summer holidays section is not published on the current "
+            "Ministry page; this result is derived from the earliest published Term 1 opening "
+            "date, not copied from a published holiday record."
+        ),
     }
 
 
@@ -487,8 +496,9 @@ def classify_date(years: list[dict[str, Any]], value: str) -> dict[str, Any]:
         return classification(
             prior_summer,
             "school_break",
-            "published",
-            "The summer holiday ends on each school's chosen opening date; this date is before the earliest published Term 1 opening.",
+            prior_summer.get("certainty", "published"),
+            prior_summer.get("caveat")
+            or "The summer holiday ends on each school's chosen opening date; this date is before the earliest published Term 1 opening.",
         )
 
     for item in published["breaks"]:
@@ -552,8 +562,9 @@ def next_break(years: list[dict[str, Any]], value: str) -> dict[str, Any]:
             "end": prior_summer["end"],
             "days_until": 0,
             "description": prior_summer["description"],
-            "certainty": "published",
-            "caveat": "The summer holiday ends on each school's chosen opening date; this date is before the earliest published Term 1 opening.",
+            "certainty": prior_summer.get("certainty", "published"),
+            "caveat": prior_summer.get("caveat")
+            or "The summer holiday ends on each school's chosen opening date; this date is before the earliest published Term 1 opening.",
         }
 
     for published in years:

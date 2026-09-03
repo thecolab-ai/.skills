@@ -225,28 +225,50 @@ def _zlib_decompress_limited(body: bytes, wbits: int, *, concatenated: bool = Fa
     return bytes(output)
 
 
+def _content_encoding_tokens(content_encoding: str | None) -> list[str]:
+    """Parse the ordered HTTP Content-Encoding list and reject ambiguity."""
+    if content_encoding is None or not content_encoding.strip():
+        return []
+    tokens = [token.strip().lower() for token in content_encoding.split(",")]
+    if any(not token for token in tokens):
+        raise FetchError("malformed Content-Encoding header")
+    if tokens == ["identity"]:
+        return []
+    if "identity" in tokens:
+        raise FetchError("identity cannot be combined with another Content-Encoding")
+    unsupported = [token for token in tokens if token not in {"gzip", "deflate"}]
+    if unsupported:
+        raise FetchError(f"unsupported Content-Encoding: {unsupported[0]}")
+    return tokens
+
+
 def _decompress(body: bytes, content_encoding: str | None) -> bytes:
-    """Decode advertised gzip/deflate bodies within the output ceiling.
+    """Decode supported codings in reverse application order within hard limits.
 
     Invalid advertised compression fails closed. The only compatibility fallback
     retained is decoding a valid raw DEFLATE stream after zlib-wrapped decoding
     fails; malformed input never falls back to unverified response bytes.
     """
-    enc = (content_encoding or "").lower()
-    if "gzip" in enc:
+    decoded = body
+    for encoding in reversed(_content_encoding_tokens(content_encoding)):
+        if encoding == "gzip":
+            try:
+                decoded = _zlib_decompress_limited(
+                    decoded,
+                    16 + zlib.MAX_WBITS,
+                    concatenated=True,
+                )
+            except zlib.error as exc:
+                raise FetchError("invalid gzip response body") from exc
+            continue
         try:
-            return _zlib_decompress_limited(body, 16 + zlib.MAX_WBITS, concatenated=True)
-        except zlib.error as exc:
-            raise FetchError("invalid gzip response body") from exc
-    if "deflate" in enc:
-        try:
-            return _zlib_decompress_limited(body, zlib.MAX_WBITS)
+            decoded = _zlib_decompress_limited(decoded, zlib.MAX_WBITS)
         except zlib.error:
             try:
-                return _zlib_decompress_limited(body, -zlib.MAX_WBITS)
+                decoded = _zlib_decompress_limited(decoded, -zlib.MAX_WBITS)
             except zlib.error as exc:
                 raise FetchError("invalid deflate response body") from exc
-    return body
+    return decoded
 
 
 def _normalise_allowed_hosts(allowed_hosts: Iterable[str] | None) -> frozenset[str] | None:

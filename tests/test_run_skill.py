@@ -49,13 +49,18 @@ class RunSkillIntegrationTests(unittest.TestCase):
         returncode: int,
         *,
         failure_stream: bool = False,
+        stderr_payload: dict[str, object] | None = None,
     ) -> tuple[int, dict[str, object], str]:
         encoded = json.dumps(direct_payload)
         completed = subprocess.CompletedProcess(
             args=[],
             returncode=returncode,
             stdout="" if failure_stream else encoded,
-            stderr=encoded if failure_stream else "",
+            stderr=(
+                json.dumps(stderr_payload)
+                if stderr_payload is not None
+                else encoded if failure_stream else ""
+            ),
         )
         stdout = io.StringIO()
         stderr = io.StringIO()
@@ -126,6 +131,117 @@ class RunSkillIntegrationTests(unittest.TestCase):
         self.assertEqual(exit_code, 7)
         self.assertEqual(stderr, "")
         self.assertEqual(payload, direct)
+
+    def test_zero_exit_structured_legacy_errors_fail_closed_on_either_stream(self) -> None:
+        for failure_stream in (False, True):
+            for legacy_code in (7, None, "7", 0):
+                with self.subTest(failure_stream=failure_stream, code=legacy_code):
+                    exit_code, payload, stderr = self.run_mocked_direct_cli(
+                        "school-terms-nz",
+                        ["years"],
+                        {
+                            "status": "error",
+                            "code": legacy_code,
+                            "error": "synthetic_failure",
+                            "message": "synthetic legacy failure",
+                        },
+                        0,
+                        failure_stream=failure_stream,
+                    )
+                    self.assertEqual(exit_code, 6)
+                    self.assertEqual(stderr, "")
+                    self.assertFalse(payload["ok"])
+                    self.assertIsNone(payload["data"])
+                    error = payload["error"]
+                    self.assertIsInstance(error, dict)
+                    assert isinstance(error, dict)
+                    self.assertEqual(error["code"], 6)
+                    self.assertIn("zero exit status", error["message"])
+
+    def test_zero_exit_success_envelope_cannot_hide_structured_stderr_failure(self) -> None:
+        success = {
+            "schema_version": "1",
+            "ok": True,
+            "source": {
+                "name": "Ministry of Education",
+                "url": "https://www.education.govt.nz/school/school-terms-and-holidays",
+                "retrieved_at": "2026-09-03T00:00:00Z",
+            },
+            "query": {"command": "years"},
+            "data": {"years": [2026]},
+            "warnings": [],
+            "blocked": False,
+        }
+        exit_code, payload, stderr = self.run_mocked_direct_cli(
+            "school-terms-nz",
+            ["years"],
+            success,
+            0,
+            stderr_payload={
+                "status": "error",
+                "code": 7,
+                "error": "synthetic_failure",
+                "message": "synthetic legacy failure",
+            },
+        )
+
+        self.assertEqual(exit_code, 6)
+        self.assertEqual(stderr, "")
+        self.assertFalse(payload["ok"])
+        error = payload["error"]
+        self.assertIsInstance(error, dict)
+        assert isinstance(error, dict)
+        self.assertEqual(error["code"], 6)
+
+    def test_zero_exit_partial_result_failure_cannot_be_wrapped_as_success(self) -> None:
+        exit_code, payload, stderr = self.run_mocked_direct_cli(
+            "school-terms-nz",
+            ["years"],
+            {"ok": False, "error": {"code": 7, "message": "synthetic failure"}},
+            0,
+        )
+
+        self.assertEqual(exit_code, 6)
+        self.assertEqual(stderr, "")
+        self.assertFalse(payload["ok"])
+        error = payload["error"]
+        self.assertIsInstance(error, dict)
+        assert isinstance(error, dict)
+        self.assertEqual(error["code"], 6)
+
+    def test_zero_exit_contradictory_success_markers_fail_closed(self) -> None:
+        cases = (
+            {
+                "status": "ok",
+                "code": 7,
+                "error": "synthetic_failure",
+                "message": "contradictory legacy result",
+            },
+            {
+                "ok": True,
+                "error": {"code": 7, "message": "contradictory partial result"},
+            },
+            {
+                "code": None,
+                "error": "synthetic_failure",
+                "message": "malformed legacy result",
+            },
+        )
+        for direct in cases:
+            with self.subTest(direct=direct):
+                exit_code, payload, stderr = self.run_mocked_direct_cli(
+                    "school-terms-nz",
+                    ["years"],
+                    direct,
+                    0,
+                )
+                self.assertEqual(exit_code, 6)
+                self.assertEqual(stderr, "")
+                self.assertFalse(payload["ok"])
+                error = payload["error"]
+                self.assertIsInstance(error, dict)
+                assert isinstance(error, dict)
+                self.assertEqual(error["code"], 6)
 
     def test_invalid_legacy_error_codes_fail_closed_without_crashing(self) -> None:
         for invalid_code in (None, 0, 99, True):
