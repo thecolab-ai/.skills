@@ -113,17 +113,23 @@ def parse_nzaa_numbers(value: str) -> list[str]:
 
 def parse_csv_text(text: str) -> list[dict[str, Any]]:
     """Parse the official export and fail closed if its required schema drifts."""
-    reader = csv.DictReader(io.StringIO(text, newline=""))
-    fields = [field.lstrip("\ufeff").strip() for field in (reader.fieldnames or [])]
-    missing = [column for column in REQUIRED_COLUMNS if column not in fields]
-    if missing:
-        raise SourceSchemaError(f"missing required columns: {', '.join(missing)}")
-
+    reader = csv.DictReader(io.StringIO(text, newline=""), strict=True)
     records: list[dict[str, Any]] = []
     seen: set[str] = set()
     try:
-        rows = enumerate(reader, start=2)
-        for line_number, raw in rows:
+        fields = [field.lstrip("\ufeff").strip() for field in (reader.fieldnames or [])]
+        duplicate_required = [column for column in REQUIRED_COLUMNS if fields.count(column) > 1]
+        if duplicate_required:
+            raise SourceSchemaError(
+                f"duplicate required columns: {', '.join(duplicate_required)}"
+            )
+        missing = [column for column in REQUIRED_COLUMNS if column not in fields]
+        if missing:
+            raise SourceSchemaError(f"missing required columns: {', '.join(missing)}")
+        reader.fieldnames = fields
+
+        for raw in reader:
+            line_number = reader.line_num
             if None in raw or any(value is None or not isinstance(value, str) for value in raw.values()):
                 raise SourceSchemaError(f"row {line_number} has an unexpected field count")
             if not any(value.strip() for value in raw.values()):

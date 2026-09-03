@@ -109,9 +109,7 @@ def main() -> int:
         assert columns == cli.REQUIRED_COLUMNS
         assert captured["max_bytes"] == cli.MAX_DOWNLOAD_BYTES
 
-    def malformed_row_is_cli_schema_error() -> None:
-        malformed = text.splitlines()[0] + "\n" + "," * len(cli.REQUIRED_COLUMNS) + "extra\n"
-
+    def assert_csv_cli_schema_error(malformed: str) -> None:
         def fake_fetch_bytes(url: str, **kwargs):
             return (malformed.encode("utf-8"), "text/csv", url)
 
@@ -126,6 +124,25 @@ def main() -> int:
         payload = json.loads(captured.getvalue())
         assert exit_code == 6
         assert payload["error"] == "source_schema_error"
+
+    def malformed_row_is_cli_schema_error() -> None:
+        malformed = text.splitlines()[0] + "\n" + "," * len(cli.REQUIRED_COLUMNS) + "extra\n"
+        assert_csv_cli_schema_error(malformed)
+
+    def short_row_is_cli_schema_error() -> None:
+        malformed = text.splitlines()[0] + "\n1001,Only two fields\n"
+        assert_csv_cli_schema_error(malformed)
+
+    def unclosed_quoted_field_is_cli_schema_error() -> None:
+        values = ["1001", "Unclosed quote"] + [""] * (len(cli.REQUIRED_COLUMNS) - 3) + ['"unterminated']
+        malformed = text.splitlines()[0] + "\n" + ",".join(values) + "\n"
+        assert_csv_cli_schema_error(malformed)
+
+    def duplicate_normalised_required_header_is_cli_schema_error() -> None:
+        header = text.splitlines()[0] + ", ListNumber "
+        values = ["1001", "Duplicate header"] + [""] * (len(cli.REQUIRED_COLUMNS) - 2) + ["shadow"]
+        malformed = header + "\n" + ",".join(values) + "\n"
+        assert_csv_cli_schema_error(malformed)
 
     def truncated_compression_is_cli_schema_error() -> None:
         def fake_fetch_bytes(url: str, **kwargs):
@@ -151,6 +168,12 @@ def main() -> int:
         check("timeouts, response caps, limits, and exit codes", operational_contracts),
         check("response cap is passed before decompression", response_cap_is_pre_downloaded),
         check("malformed CSV row shape returns CLI schema error", malformed_row_is_cli_schema_error),
+        check("short CSV row shape returns CLI schema error", short_row_is_cli_schema_error),
+        check("unclosed quoted CSV field returns CLI schema error", unclosed_quoted_field_is_cli_schema_error),
+        check(
+            "duplicate normalised required header returns CLI schema error",
+            duplicate_normalised_required_header_is_cli_schema_error,
+        ),
         check("truncated compression returns CLI schema error", truncated_compression_is_cli_schema_error),
     ]
     if not all(results):
