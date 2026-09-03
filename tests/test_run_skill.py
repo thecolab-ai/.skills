@@ -44,7 +44,7 @@ class RunSkillIntegrationTests(unittest.TestCase):
         self,
         skill: str,
         arguments: list[str],
-        direct_payload: dict[str, object],
+        direct_payload: object,
         returncode: int,
         *,
         failure_stream: bool = False,
@@ -344,6 +344,66 @@ class RunSkillIntegrationTests(unittest.TestCase):
         self.assertTrue(payload["ok"])
         self.assertEqual(payload["data"], legacy_data)
         self.assertEqual(payload["warnings"], ["cache diagnostic"])
+
+    def test_zero_exit_legacy_top_level_arrays_are_wrapped_as_success(self) -> None:
+        legacy_arrays: tuple[list[object], ...] = (
+            [],
+            [{"id": 1}],
+            [{"ok": False, "status": "error", "code": 7}],
+        )
+        for legacy_data in legacy_arrays:
+            with self.subTest(legacy_data=legacy_data):
+                exit_code, payload, stderr = self.run_mocked_direct_cli(
+                    "school-terms-nz",
+                    ["years"],
+                    legacy_data,
+                    0,
+                )
+
+                self.assertEqual(exit_code, 0)
+                self.assertEqual(stderr, "")
+                self.assertTrue(payload["ok"])
+                self.assertEqual(payload["data"], legacy_data)
+
+    def test_zero_exit_legacy_json_scalars_are_wrapped_as_success(self) -> None:
+        for legacy_data in (None, True, 0, "value"):
+            with self.subTest(legacy_data=legacy_data):
+                exit_code, payload, stderr = self.run_mocked_direct_cli(
+                    "school-terms-nz",
+                    ["years"],
+                    legacy_data,
+                    0,
+                )
+
+                self.assertEqual(exit_code, 0)
+                self.assertEqual(stderr, "")
+                self.assertTrue(payload["ok"])
+                self.assertEqual(payload["data"], legacy_data)
+
+    def test_zero_exit_malformed_or_multiple_legacy_json_fails_closed(self) -> None:
+        malformed_streams = (
+            "[",
+            "[]\n[]",
+            "true false",
+            "diagnostic\n{} {}",
+            "NaN",
+            "Infinity",
+            "-Infinity",
+        )
+        for stdout_text in malformed_streams:
+            with self.subTest(stdout_text=stdout_text):
+                exit_code, payload, stderr = self.run_mocked_direct_cli(
+                    "school-terms-nz",
+                    ["years"],
+                    {},
+                    0,
+                    stdout_text=stdout_text,
+                )
+
+                self.assertEqual(exit_code, 6)
+                self.assertEqual(stderr, "")
+                self.assertFalse(payload["ok"])
+                self.assertIsNone(payload["data"])
 
     def test_direct_envelope_with_trailing_non_json_fails_closed(self) -> None:
         success: dict[str, object] = {

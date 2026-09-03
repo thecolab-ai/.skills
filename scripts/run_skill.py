@@ -192,22 +192,35 @@ def advertised_failure(text: str) -> bool:
     This check deliberately runs before direct-envelope forwarding. Otherwise a
     valid success envelope on stdout could hide a structured failure on stderr,
     or a partial ``{"ok": false, ...}`` result could be nested as successful
-    legacy data.
+    legacy data. Complete JSON arrays and scalar values are valid legacy data;
+    failure markers only have meaning on top-level objects.
     """
-    payloads = json_objects(text)
-    if len(payloads) > 1:
-        return True
-    if not payloads:
+    stripped = text.strip()
+    if not stripped:
+        return False
+    try:
+        value = json.loads(stripped)
+    except (json.JSONDecodeError, TypeError):
         if json_like(text):
             return True
         for line in text.splitlines()[1:]:
-            line_payloads = json_objects(line)
-            if len(line_payloads) > 1:
-                return True
-            if line_payloads and payload_advertises_failure(line_payloads[0]):
+            try:
+                line_value = json.loads(line)
+            except (json.JSONDecodeError, TypeError):
+                # Plain diagnostics may contain JSON-like fragments (for
+                # example argparse metavars). Only complete JSON values on a
+                # later line are eligible for structured-failure inspection.
+                if len(json_objects(line)) > 1:
+                    return True
+                continue
+            if isinstance(line_value, dict) and payload_advertises_failure(line_value):
                 return True
         return False
-    return payload_advertises_failure(payloads[0])
+    if type(value) is float and stripped.casefold() in {"nan", "infinity", "+infinity", "-infinity"}:
+        # Python's decoder accepts these non-standard constants, but they are
+        # not valid JSON scalar outputs and historically failed closed here.
+        return True
+    return isinstance(value, dict) and payload_advertises_failure(value)
 
 
 def direct_result_envelope(
