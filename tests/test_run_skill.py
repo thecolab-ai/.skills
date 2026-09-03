@@ -172,26 +172,32 @@ class RunSkillIntegrationTests(unittest.TestCase):
             "warnings": [],
             "blocked": False,
         }
-        exit_code, payload, stderr = self.run_mocked_direct_cli(
-            "school-terms-nz",
-            ["years"],
-            success,
-            0,
-            stderr_payload={
+        stderr_failures: tuple[dict[str, object], ...] = (
+            {
                 "status": "error",
                 "code": 7,
                 "error": "synthetic_failure",
                 "message": "synthetic legacy failure",
             },
+            {"code": 6, "message": "parser failed"},
         )
+        for stderr_failure in stderr_failures:
+            with self.subTest(stderr_failure=stderr_failure):
+                exit_code, payload, stderr = self.run_mocked_direct_cli(
+                    "school-terms-nz",
+                    ["years"],
+                    success,
+                    0,
+                    stderr_payload=stderr_failure,
+                )
 
-        self.assertEqual(exit_code, 6)
-        self.assertEqual(stderr, "")
-        self.assertFalse(payload["ok"])
-        error = payload["error"]
-        self.assertIsInstance(error, dict)
-        assert isinstance(error, dict)
-        self.assertEqual(error["code"], 6)
+                self.assertEqual(exit_code, 6)
+                self.assertEqual(stderr, "")
+                self.assertFalse(payload["ok"])
+                error = payload["error"]
+                self.assertIsInstance(error, dict)
+                assert isinstance(error, dict)
+                self.assertEqual(error["code"], 6)
 
     def test_zero_exit_partial_result_failure_cannot_be_wrapped_as_success(self) -> None:
         exit_code, payload, stderr = self.run_mocked_direct_cli(
@@ -210,7 +216,7 @@ class RunSkillIntegrationTests(unittest.TestCase):
         self.assertEqual(error["code"], 6)
 
     def test_zero_exit_contradictory_success_markers_fail_closed(self) -> None:
-        cases = (
+        cases: tuple[dict[str, object], ...] = (
             {
                 "status": "ok",
                 "code": 7,
@@ -226,6 +232,9 @@ class RunSkillIntegrationTests(unittest.TestCase):
                 "error": "synthetic_failure",
                 "message": "malformed legacy result",
             },
+            {"code": 5, "message": "upstream unavailable"},
+            {"error": "upstream unavailable"},
+            {"status": "failed", "message": "upstream unavailable"},
         )
         for direct in cases:
             with self.subTest(direct=direct):

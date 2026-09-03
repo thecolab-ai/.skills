@@ -130,15 +130,21 @@ def advertised_failure(text: str) -> bool:
     if payload is None:
         return False
 
-    if payload.get("ok") is False or payload.get("status") == "error":
+    status = payload.get("status")
+    if payload.get("ok") is False:
+        return True
+    if isinstance(status, str) and status.strip().lower() not in {"ok", "success"}:
         return True
 
     error = payload.get("error")
     if error not in (None, "", {}):
-        if payload.get("ok") is True or payload.get("status") == "ok":
-            return True
-        if "code" in payload or "message" in payload:
-            return True
+        return True
+
+    # A top-level numeric/status code paired with a message is an incomplete
+    # failure envelope, not ordinary command data. Fail closed rather than
+    # nesting it under an apparently successful wrapper envelope.
+    if "code" in payload and "message" in payload:
+        return True
     return False
 
 
