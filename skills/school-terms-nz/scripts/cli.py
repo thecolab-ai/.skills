@@ -431,6 +431,50 @@ def next_break(years: list[dict[str, Any]], value: str) -> dict[str, Any]:
             "certainty": "published",
             "caveat": "The summer holiday ends on each school's chosen opening date; this date is before the earliest published Term 1 opening.",
         }
+
+    for published in years:
+        opening_term = next(
+            (item for item in published["terms"] if isinstance(item["start"], dict)),
+            None,
+        )
+        if opening_term is None:
+            continue
+        opening_start = opening_term["start"]
+        earliest = parse_query_date(opening_start["earliest"])
+        latest = parse_query_date(opening_start["latest"])
+        if not earliest <= query <= latest:
+            continue
+
+        fixed_candidates = [
+            item
+            for year in years
+            for item in year["breaks"]
+            if isinstance(item["start"], str) and parse_query_date(item["start"]) >= query
+        ]
+        if not fixed_candidates:
+            raise SkillError(
+                "no fixed future break is available in the published years",
+                exit_code=2,
+                error_type="invalid_input",
+            )
+        next_fixed = min(fixed_candidates, key=lambda item: parse_query_date(item["start"]))
+        next_fixed_start = parse_query_date(next_fixed["start"])
+        return {
+            "name": "Term 1 opening window",
+            "start": opening_start,
+            "end": opening_start["latest"],
+            "days_until": None,
+            "description": "Schools may still be in summer holidays or may already be in Term 1 on this date.",
+            "certainty": "school_dependent",
+            "caveat": "Check the individual school's calendar: during the published Term 1 opening window, some schools are still in summer holidays while others have opened.",
+            "next_fixed_break": {
+                "name": next_fixed["name"],
+                "start": next_fixed["start"],
+                "end": next_fixed["end"],
+                "days_until": (next_fixed_start - query).days,
+            },
+        }
+
     candidates: list[tuple[dt.date, dt.date | None, dict[str, Any]]] = []
     for published in years:
         for item in published["breaks"]:
@@ -521,7 +565,16 @@ def emit(payload: dict[str, Any], as_json: bool) -> None:
     elif kind == "next_break":
         result = payload["break"]
         print(f"{result['name']}: {result['description']}")
-        print(f"Days until: {result['days_until']}")
+        if result["days_until"] is None:
+            print("Days until: school-dependent")
+        else:
+            print(f"Days until: {result['days_until']}")
+        if result.get("next_fixed_break"):
+            next_fixed = result["next_fixed_break"]
+            print(
+                f"Next fixed break: {next_fixed['name']} from {next_fixed['start']} "
+                f"({next_fixed['days_until']} days)"
+            )
         if result.get("caveat"):
             print(f"Caveat: {result['caveat']}")
     print(f"Source: {payload['source_url']}")

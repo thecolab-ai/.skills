@@ -81,6 +81,7 @@ All data commands accept `--timeout SECONDS` (default 10) and `--json`.
 - Published inter-term breaks are returned as fixed ranges. Summer holidays begin on each school's closing date, no later than the published boundary, and run for 5 or 6 weeks.
 - Weekends, teacher-only days, public holidays, local anniversary days and emergency closures can close a school during a term; this CLI does not infer those local closures.
 - `next-break` returns the current break when the query date is already inside one; otherwise it returns the next break represented by the published years.
+- Inside the inclusive Term 1 opening window, `next-break` cannot know whether an individual school is still on summer holiday or has opened. The usual top-level envelope remains unchanged, but `break` has `certainty: "school_dependent"`, `days_until: null`, an individual-school-calendar `caveat`, and `next_fixed_break` with `name`, `start`, `end` and `days_until` for the next universally published break. Dates before the earliest opening remain current summer holiday results; dates after the latest opening use the usual certain next-break shape.
 
 ## Errors
 

@@ -106,7 +106,69 @@ def date_queries() -> None:
 results.append(check("date lookup distinguishes fixed and school-dependent dates", date_queries))
 
 
-def next_break_query() -> None:
+def opening_window_next_break_query() -> None:
+    expected_window = {
+        "precision": "range",
+        "earliest": "2026-01-26",
+        "latest": "2026-02-09",
+    }
+    for query, fixed_days_until in (
+        ("2026-01-26", 67),
+        ("2026-02-01", 61),
+        ("2026-02-09", 53),
+    ):
+        ambiguous = module.next_break(years, query)
+        assert ambiguous["name"] == "Term 1 opening window"
+        assert ambiguous["start"] == expected_window
+        assert ambiguous["end"] == "2026-02-09"
+        assert ambiguous["days_until"] is None
+        assert ambiguous["certainty"] == "school_dependent"
+        assert "individual school" in ambiguous["caveat"].lower()
+        assert ambiguous["next_fixed_break"] == {
+            "name": "Term 1 break",
+            "start": "2026-04-03",
+            "end": "2026-04-19",
+            "days_until": fixed_days_until,
+        }
+
+
+results.append(check("next-break marks the inclusive Term 1 opening window as school-dependent", opening_window_next_break_query))
+
+
+def opening_window_response_envelope() -> None:
+    original = module.fetch_years
+    try:
+        setattr(module, "fetch_years", lambda timeout: (years, SOURCE_URL, "2026-09-03T00:00:00Z"))
+        args = module.build_parser().parse_args(["next-break", "2026-02-01", "--json"])
+        payload = module.run(args)
+    finally:
+        setattr(module, "fetch_years", original)
+
+    assert set(payload) == {"status", "source_url", "fetched_at", "kind", "date", "break"}
+    assert payload["status"] == "ok"
+    assert payload["source_url"] == SOURCE_URL
+    assert payload["fetched_at"] == "2026-09-03T00:00:00Z"
+    assert payload["kind"] == "next_break"
+    assert payload["date"] == "2026-02-01"
+    assert payload["break"]["certainty"] == "school_dependent"
+    assert payload["break"]["days_until"] is None
+
+
+results.append(check("next-break preserves its JSON envelope and provenance", opening_window_response_envelope))
+
+
+def certain_next_break_queries() -> None:
+    before_opening = module.next_break(years, "2026-01-25")
+    assert before_opening["name"] == "Summer holidays"
+    assert before_opening["days_until"] == 0
+    assert before_opening["certainty"] == "published"
+
+    after_opening = module.next_break(years, "2026-02-10")
+    assert after_opening["name"] == "Term 1 break"
+    assert after_opening["start"] == "2026-04-03"
+    assert after_opening["days_until"] == 52
+    assert after_opening["certainty"] == "published"
+
     next_break = module.next_break(years, "2026-06-01")
     assert next_break["name"] == "Term 2 break"
     assert next_break["start"] == "2026-07-04"
@@ -121,7 +183,7 @@ def next_break_query() -> None:
     assert current_summer["days_until"] == 0
 
 
-results.append(check("next-break returns the current or next published break", next_break_query))
+results.append(check("next-break preserves certain current and future break cases", certain_next_break_queries))
 
 
 def cli_surface() -> None:

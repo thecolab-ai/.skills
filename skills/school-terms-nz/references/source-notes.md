@@ -33,7 +33,7 @@ A year is accepted only when it has four parsed term records and four parsed bre
 - Summer holidays start on the school's closing date, no later than the published boundary, and run for 5 or 6 weeks.
 - Public holidays, local anniversary days, teacher-only days, local events and emergencies can close individual schools during a term.
 
-The CLI therefore returns explicit `certainty` and `caveat` fields rather than inventing precision the Ministry does not publish.
+The CLI therefore returns explicit `certainty` and `caveat` fields rather than inventing precision the Ministry does not publish. For `next-break` queries inside the inclusive Term 1 opening range, the top-level response envelope is unchanged, but `break.days_until` is `null` and `break.certainty` is `school_dependent`: an individual school may still be in summer holidays or may already be open. That conditional response also includes a clear individual-school-calendar caveat and `next_fixed_break` (`name`, `start`, `end`, `days_until`) for the next universally published inter-term break. Before the earliest opening date, summer holiday remains the certain current break; after the latest opening date, the normal certain next fixed break is returned.
 
 ## Failure and maintenance expectations
 
