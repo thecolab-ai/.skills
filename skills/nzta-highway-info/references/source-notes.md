@@ -32,13 +32,13 @@ machine-readable discovery surface and does not require a key.
 
 ## Source licence status
 
-On 2026-09-03 the live CKAN package returned `isopen: false` and null values for
-`license_id`, `license_title`, and `license_url`. No open-data licence may be
-inferred from catalogue publication or public API access. The MIT licence in
-`SKILL.md` applies only to this skill's code and documentation, not to NZTA's
-source data. This client confines itself to bounded, read-only current queries;
-reuse, redistribution, or republication of returned source data requires separate
-due diligence and, where necessary, permission from NZTA.
+On 2026-09-03 the live CKAN package returned `isopen: false` and
+`license_title: null`; `license_id` and `license_url` were absent. No open-data
+licence may be inferred from catalogue publication or public API access. The MIT
+licence in `SKILL.md` applies only to this skill's code and documentation, not to
+NZTA's source data. This client confines itself to bounded, read-only current
+queries; reuse, redistribution, or republication of returned source data requires
+separate due diligence and, where necessary, permission from NZTA.
 
 ## Traffic and Travel API v4
 

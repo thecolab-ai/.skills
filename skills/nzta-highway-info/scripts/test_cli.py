@@ -178,6 +178,46 @@ class CliTests(unittest.TestCase):
             check=False,
         )
 
+    def run_cli_with_response_body(
+        self, body: bytes
+    ) -> subprocess.CompletedProcess[str]:
+        script = f"""
+import importlib.util
+import sys
+
+spec = importlib.util.spec_from_file_location("nzta_cli_subprocess", {str(CLI)!r})
+module = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = module
+spec.loader.exec_module(module)
+
+class FakeResponse:
+    headers = {{}}
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        return False
+
+    def read(self, size):
+        return {body!r}
+
+class FakeOpener:
+    def open(self, request, timeout):
+        return FakeResponse()
+
+module.build_opener = lambda *handlers: FakeOpener()
+raise SystemExit(module.main(["cameras", "--json"]))
+"""
+        return subprocess.run(
+            [sys.executable, "-c", script],
+            cwd=SKILL_DIR,
+            text=True,
+            capture_output=True,
+            timeout=10,
+            check=False,
+        )
+
     def run_cli_with_read_failure(
         self, exception_name: str
     ) -> subprocess.CompletedProcess[str]:
@@ -278,6 +318,16 @@ raise SystemExit(module.main(["cameras", "--json"]))
 
     def test_incomplete_read_emits_upstream_json_error(self) -> None:
         self.assert_json_error(self.run_cli_with_read_failure("incomplete"), 5)
+
+    def test_deep_json_emits_source_schema_json_without_traceback(self) -> None:
+        body = b"[" * 3000 + b"]" * 3000
+        self.assertLess(len(body), module.MAX_RESPONSE_BYTES)
+
+        result = self.run_cli_with_response_body(body)
+
+        self.assert_json_error(result, 6)
+        payload = self.strict_json_loads(result.stdout)
+        self.assertEqual(payload["error"]["category"], "source_schema")
 
     def test_non_finite_normalised_output_emits_schema_error_as_standard_json(
         self,

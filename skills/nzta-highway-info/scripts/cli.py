@@ -410,6 +410,8 @@ def fetch_json(url: str) -> Any:
         raise UpstreamError(f"upstream unavailable or timed out: {reason}") from exc
     try:
         return json.loads(body.decode("utf-8"), parse_constant=reject_json_constant)
+    except RecursionError as exc:
+        raise SchemaError("upstream JSON exceeds the supported nesting depth") from exc
     except (UnicodeDecodeError, ValueError) as exc:
         raise SchemaError("upstream returned invalid JSON") from exc
 
