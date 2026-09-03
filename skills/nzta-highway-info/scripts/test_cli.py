@@ -8,6 +8,7 @@ import subprocess
 import sys
 import unittest
 from pathlib import Path
+from unittest import mock
 
 SKILL_DIR = Path(__file__).resolve().parents[1]
 CLI = SKILL_DIR / "scripts" / "cli.py"
@@ -97,6 +98,49 @@ class CliTests(unittest.TestCase):
         result = self.run_cli("events", "--limit", "0", "--json")
         self.assertEqual(result.returncode, 2)
         self.assertNotIn("Traceback", result.stderr + result.stdout)
+
+
+class NetworkBoundaryTests(unittest.TestCase):
+    def test_off_host_redirect_is_rejected_before_follow_up(self) -> None:
+        foreign_contacted = False
+
+        class RedirectingOpener:
+            def open(self, request, timeout):
+                handler = module.NZTARedirectHandler()
+                handler.redirect_request(
+                    request,
+                    None,
+                    302,
+                    "Found",
+                    {},
+                    "https://attacker.example/foreign.json",
+                )
+                nonlocal foreign_contacted
+                foreign_contacted = True
+
+        with mock.patch.object(module, "build_opener", return_value=RedirectingOpener()):
+            with self.assertRaises(module.SchemaError):
+                module.fetch_json(module.API_ROOT + "cameras/all")
+        self.assertFalse(foreign_contacted)
+
+    def test_malformed_content_length_is_schema_error(self) -> None:
+        class FakeResponse:
+            headers = {"Content-Length": "not-a-number"}
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, traceback):
+                return False
+
+            def read(self, size):
+                return b'{"response":{"camera":[]}}'
+
+        opener = mock.Mock()
+        opener.open.return_value = FakeResponse()
+        with mock.patch.object(module, "build_opener", return_value=opener):
+            with self.assertRaises(module.SchemaError):
+                module.fetch_json(module.API_ROOT + "cameras/all")
 
 
 if __name__ == "__main__":

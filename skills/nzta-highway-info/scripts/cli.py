@@ -10,8 +10,8 @@ import sys
 from datetime import datetime, timezone
 from typing import Any, Callable
 from urllib.error import HTTPError, URLError
-from urllib.parse import urljoin
-from urllib.request import Request, urlopen
+from urllib.parse import urljoin, urlparse
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 API_ROOT = "https://trafficnz.info/service/traffic/rest/4/"
 SITE_ROOT = "https://trafficnz.info/"
@@ -22,6 +22,7 @@ MAX_RESPONSE_BYTES = 4_000_000
 DEFAULT_LIMIT = 20
 MAX_LIMIT = 100
 USER_AGENT = "thecolab-nzta-highway-info/1.0"
+ALLOWED_HOSTS = {"trafficnz.info"}
 
 ENDPOINTS = {
     "events": ("events/all/10", "roadevent"),
@@ -258,13 +259,46 @@ def parse_response(payload: Any, item_key: str, parser: Callable[[dict[str, Any]
     return parsed
 
 
+def validate_source_url(url: str) -> None:
+    try:
+        parsed = urlparse(url)
+        port = parsed.port
+    except ValueError as exc:
+        raise SchemaError("upstream redirect URL is invalid") from exc
+    if (
+        parsed.scheme != "https"
+        or parsed.hostname not in ALLOWED_HOSTS
+        or parsed.username is not None
+        or parsed.password is not None
+        or port not in {None, 443}
+    ):
+        raise SchemaError("upstream redirected outside the declared NZTA host")
+
+
+class NZTARedirectHandler(HTTPRedirectHandler):
+    """Validate each redirect before urllib issues the follow-up request."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        validate_source_url(newurl)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
 def fetch_json(url: str) -> Any:
+    validate_source_url(url)
     request = Request(url, headers={"Accept": "application/json", "User-Agent": USER_AGENT})
     try:
-        with urlopen(request, timeout=TIMEOUT_SECONDS) as response:
+        opener = build_opener(NZTARedirectHandler())
+        with opener.open(request, timeout=TIMEOUT_SECONDS) as response:
             length = response.headers.get("Content-Length")
-            if length and int(length) > MAX_RESPONSE_BYTES:
-                raise UpstreamError("upstream response exceeds the 4 MB safety cap")
+            if length:
+                try:
+                    declared_length = int(length)
+                except ValueError as exc:
+                    raise SchemaError("upstream returned an invalid Content-Length header") from exc
+                if declared_length < 0:
+                    raise SchemaError("upstream returned an invalid Content-Length header")
+                if declared_length > MAX_RESPONSE_BYTES:
+                    raise UpstreamError("upstream response exceeds the 4 MB safety cap")
             body = response.read(MAX_RESPONSE_BYTES + 1)
             if len(body) > MAX_RESPONSE_BYTES:
                 raise UpstreamError("upstream response exceeds the 4 MB safety cap")
@@ -329,7 +363,7 @@ def warning_for(command: str) -> list[str]:
         "This public feed is a current snapshot, not a guarantee of completeness, road safety, or route availability.",
     ]
     if command in {"cameras", "travel-times"}:
-        warnings.append("The source does not provide a per-item update timestamp for this feed; retrieved_at only proves when this client fetched it.")
+        warnings.append("The source may omit per-item update timestamps for this feed; retrieved_at only proves when this client fetched it.")
     if command == "travel-times":
         warnings.append("Travel-time sign minutes are displayed values without a free-flow baseline; no congestion classification is inferred.")
     return warnings
