@@ -5,6 +5,8 @@ import csv
 import datetime as dt
 import decimal
 import functools
+import gzip
+import http.client
 import io
 import re
 import tarfile
@@ -22,6 +24,7 @@ MAX_DOWNLOAD_BYTES = 16 * 1024 * 1024
 MAX_MEMBER_BYTES = 128 * 1024 * 1024
 MAX_ARCHIVE_BYTES = 256 * 1024 * 1024
 MAX_ARCHIVE_MEMBERS = 32
+MAX_DECOMPRESSED_BYTES = MAX_ARCHIVE_BYTES + 4 * 1024 * 1024
 
 DETAILS = "Tariff_Details.csv"
 RATES = "Tariff_Rates.csv"
@@ -269,6 +272,20 @@ class TariffArchive:
             }
 
 
+def _validate_gzip_integrity(blob: bytes) -> None:
+    """Consume the gzip stream through its footer without materialising it."""
+    decompressed_bytes = 0
+    with gzip.GzipFile(fileobj=io.BytesIO(blob), mode="rb") as stream:
+        while chunk := stream.read(1024 * 1024):
+            decompressed_bytes += len(chunk)
+            if decompressed_bytes > MAX_DECOMPRESSED_BYTES:
+                raise SkillError(
+                    "tariff archive expands beyond safety limits",
+                    exit_code=6,
+                    kind="source_schema",
+                )
+
+
 def parse_archive(
     blob: bytes,
     source_url: str,
@@ -278,6 +295,7 @@ def parse_archive(
     if len(blob) > MAX_DOWNLOAD_BYTES:
         raise SkillError("tariff archive exceeds the 16 MiB download limit", exit_code=6, kind="source_schema")
     try:
+        _validate_gzip_integrity(blob)
         with tarfile.open(fileobj=io.BytesIO(blob), mode="r:gz") as archive:
             files: list[tarfile.TarInfo] = []
             names: list[str] = []
@@ -305,7 +323,7 @@ def parse_archive(
             source_timestamp = parse_source_timestamp(stamp_file.read(256).decode("ascii"))
     except SkillError:
         raise
-    except (tarfile.TarError, UnicodeDecodeError, csv.Error, OSError) as exc:
+    except (tarfile.TarError, UnicodeDecodeError, csv.Error, EOFError, OSError) as exc:
         raise SkillError(f"invalid tariff archive: {exc}", exit_code=6, kind="source_schema") from exc
     result = TariffArchive(blob, source_url, retrieved_at, source_timestamp, http_last_modified)
     tables = (
@@ -360,9 +378,16 @@ def fetch_archive(timeout: int = DEFAULT_TIMEOUT) -> TariffArchive:
             final_url = response.geturl()
             _validate_archive_url(final_url)
             content_length = response.headers.get("Content-Length")
-            if content_length and int(content_length) > MAX_DOWNLOAD_BYTES:
+            declared_length = int(content_length) if content_length else None
+            if declared_length is not None and declared_length > MAX_DOWNLOAD_BYTES:
                 raise SkillError("tariff archive exceeds the 16 MiB download limit", exit_code=6, kind="source_schema")
             blob = response.read(MAX_DOWNLOAD_BYTES + 1)
+            if declared_length is not None and len(blob) != declared_length:
+                raise SkillError(
+                    "Customs archive transfer length did not match the declared content length",
+                    exit_code=5,
+                    kind="upstream_unavailable",
+                )
             last_modified = response.headers.get("Last-Modified")
     except urllib.error.HTTPError as exc:
         if exc.code in {403, 429}:
@@ -370,7 +395,7 @@ def fetch_archive(timeout: int = DEFAULT_TIMEOUT) -> TariffArchive:
         raise SkillError(f"Customs archive returned HTTP {exc.code}", exit_code=5, kind="upstream_unavailable") from exc
     except SkillError:
         raise
-    except (urllib.error.URLError, TimeoutError, OSError, ValueError) as exc:
+    except (urllib.error.URLError, http.client.HTTPException, TimeoutError, OSError, ValueError) as exc:
         raise SkillError(f"Customs archive is unavailable: {exc}", exit_code=5, kind="upstream_unavailable") from exc
     return parse_archive(blob, final_url, utc_now(), last_modified)
 

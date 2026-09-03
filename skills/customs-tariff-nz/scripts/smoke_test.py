@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import gzip
+import http.client
 import importlib
+import importlib.util
 import io
 import json
 import subprocess
@@ -17,6 +19,13 @@ sys.path.insert(0, str(SKILL / "scripts"))
 
 customs_cli = importlib.import_module("cli")
 customs_tariff = importlib.import_module("customs_tariff")
+runner_spec = importlib.util.spec_from_file_location(
+    "customs_tariff_common_runner",
+    SKILL.parents[1] / "scripts" / "run_skill.py",
+)
+assert runner_spec is not None and runner_spec.loader is not None
+common_runner = importlib.util.module_from_spec(runner_spec)
+runner_spec.loader.exec_module(common_runner)
 MAX_ARCHIVE_MEMBERS = customs_tariff.MAX_ARCHIVE_MEMBERS
 SkillError = customs_tariff.SkillError
 formula_records = customs_tariff.formula_records
@@ -156,6 +165,103 @@ def run_json_error_probe(*argv_tail: str):
     return exit_code, json.loads(captured.getvalue()), fetch_called
 
 
+def run_json_fetch_failure(fetch):
+    original_fetch = getattr(customs_cli, "fetch_archive")
+    original_argv = sys.argv
+    captured = io.StringIO()
+    try:
+        setattr(customs_cli, "fetch_archive", fetch)
+        sys.argv = [str(SKILL / "scripts" / "cli.py"), "formula", "2", "--json"]
+        with redirect_stdout(captured):
+            exit_code = customs_cli.main()
+    finally:
+        setattr(customs_cli, "fetch_archive", original_fetch)
+        sys.argv = original_argv
+    return exit_code, json.loads(captured.getvalue())
+
+
+def run_canonical_failure(direct_exit: int, direct_payload: dict[str, object]):
+    original_run = common_runner.subprocess.run
+    original_argv = sys.argv
+    captured = io.StringIO()
+
+    def return_direct_failure(*args, **kwargs):
+        return subprocess.CompletedProcess(
+            args=args[0],
+            returncode=direct_exit,
+            stdout=json.dumps(direct_payload),
+            stderr="",
+        )
+
+    try:
+        common_runner.subprocess.run = return_direct_failure
+        sys.argv = [str(SKILL.parents[1] / "scripts" / "run_skill.py"), SKILL.name, "formula", "2"]
+        with redirect_stdout(captured):
+            exit_code = common_runner.main()
+    finally:
+        common_runner.subprocess.run = original_run
+        sys.argv = original_argv
+    return exit_code, json.loads(captured.getvalue())
+
+
+def assert_error_envelopes(fetch, *, exit_code: int, kind: str) -> None:
+    direct_exit, direct_payload = run_json_fetch_failure(fetch)
+    assert direct_exit == exit_code
+    assert direct_payload["ok"] is False and direct_payload["blocked"] is False
+    assert direct_payload["data"] is None
+    assert direct_payload["error"]["code"] == exit_code
+    assert direct_payload["error"]["kind"] == kind
+
+    canonical_exit, canonical_payload = run_canonical_failure(direct_exit, direct_payload)
+    assert canonical_exit == exit_code
+    assert canonical_payload == direct_payload
+
+
+class ShortResponse:
+    def __init__(self, *, body: bytes, raise_incomplete: bool):
+        self.headers = {"Content-Length": "100"}
+        self.body = body
+        self.raise_incomplete = raise_incomplete
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        return False
+
+    def geturl(self):
+        return customs_tariff.ARCHIVE_URL
+
+    def read(self, limit):
+        if self.raise_incomplete:
+            raise http.client.IncompleteRead(b"short", 95)
+        return self.body
+
+
+class ShortOpener:
+    def __init__(self, *, body: bytes, raise_incomplete: bool):
+        self.body = body
+        self.raise_incomplete = raise_incomplete
+
+    def open(self, request, timeout):
+        return ShortResponse(body=self.body, raise_incomplete=self.raise_incomplete)
+
+
+def short_transfer_fetch(*, body: bytes = b"short", raise_incomplete: bool = False):
+    def fetch(timeout):
+        original_opener = customs_tariff.urllib.request.build_opener
+        try:
+            customs_tariff.urllib.request.build_opener = lambda *handlers: ShortOpener(
+                body=body,
+                raise_incomplete=raise_incomplete
+            )
+            return customs_tariff.fetch_archive(timeout)
+        finally:
+            customs_tariff.urllib.request.build_opener = original_opener
+
+    return fetch
+
+
 def main() -> int:
     fixture = SKILL / "tests" / "fixtures" / "tariff-synthetic.tar.gz"
     fixture_bytes = fixture.read_bytes()
@@ -250,6 +356,30 @@ def main() -> int:
     else:
         raise AssertionError("excessive archive member count was accepted")
     print("[PASS] fixture archive member-count bound rejects metadata exhaustion")
+
+    corrupt_archives = {
+        "missing gzip footer": fixture_bytes[:-8],
+        "wrong gzip footer": fixture_bytes[:-8] + bytes([fixture_bytes[-8] ^ 1]) + fixture_bytes[-7:],
+        "truncated archive EOF": fixture_bytes[:-64],
+    }
+    for label, corrupt_bytes in corrupt_archives.items():
+        def fetch_corrupt(timeout, *, blob=corrupt_bytes, source=label):
+            return parse_archive(blob, f"fixture://{source}", "2026-09-02T00:00:00Z")
+
+        assert_error_envelopes(fetch_corrupt, exit_code=6, kind="source_schema")
+    print("[PASS] corrupt gzip/footer failures return source-schema envelopes directly and canonically")
+
+    for fetch in (
+        short_transfer_fetch(),
+        short_transfer_fetch(raise_incomplete=True),
+        short_transfer_fetch(body=b"x" * 101),
+    ):
+        assert_error_envelopes(
+            fetch,
+            exit_code=5,
+            kind="upstream_unavailable",
+        )
+    print("[PASS] HTTP length mismatches and IncompleteRead return upstream envelopes directly and canonically")
 
     redirect_handler = customs_tariff.ArchiveRedirectHandler()
     try:
