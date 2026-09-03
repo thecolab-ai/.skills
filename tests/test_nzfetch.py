@@ -83,6 +83,16 @@ class NzfetchTests(unittest.TestCase):
 
         urlopen.assert_called_once()
 
+    @mock.patch("nzfetch.urllib.request.urlopen")
+    def test_direct_timeout_is_unavailable_not_blocked(self, urlopen):
+        urlopen.side_effect = TimeoutError("synthetic socket timeout")
+
+        with self.assertRaises(nzfetch.FetchError) as caught:
+            nzfetch.fetch_bytes("https://example.test/data")
+
+        self.assertNotIsInstance(caught.exception, nzfetch.Blocked)
+        urlopen.assert_called_once()
+
     @mock.patch("nzfetch.urllib.request.build_opener")
     @mock.patch("nzfetch.urllib.request.urlopen")
     def test_configured_proxy_runs_after_direct_request(self, urlopen, build_opener):

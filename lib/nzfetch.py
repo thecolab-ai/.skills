@@ -358,6 +358,7 @@ def fetch_bytes(
     last = "no attempt made"
     last_status = None
     last_retry_after = None
+    last_was_block = False
     for opener in openers:
         req = urllib.request.Request(url, data=data, headers=hdrs, method=method)
         try:
@@ -375,6 +376,7 @@ def fetch_bytes(
             if e.code in (403, 406, 429, 451):
                 last = f"HTTP {e.code}"
                 last_status = e.code
+                last_was_block = True
                 retry_after = (
                     e.headers.get("Retry-After")
                     if e.code == 429 and e.headers is not None
@@ -390,11 +392,13 @@ def fetch_bytes(
             last = f"network error: {e.reason}"
             last_status = None
             last_retry_after = None
+            last_was_block = False
             continue
         except (TimeoutError, OSError) as e:  # bare socket timeout / connection reset
             last = f"network error: {e}"
             last_status = None
             last_retry_after = None
+            last_was_block = False
             continue
         except http.client.HTTPException as e:
             # A truncated / malformed response body — most often
@@ -404,11 +408,13 @@ def fetch_bytes(
             last = f"network error: incomplete read ({type(e).__name__})"
             last_status = None
             last_retry_after = None
+            last_was_block = False
             continue
         if _looks_like_challenge(body.decode("utf-8", "replace"), content_type, expected_json=expects_json):
             last = "bot-challenge interstitial"
             last_status = None
             last_retry_after = None
+            last_was_block = True
             continue  # rotate and retry
         return body, content_type, final_url
     if last_status == 429:
@@ -416,11 +422,13 @@ def fetch_bytes(
             f"{url} rate-limited after {len(openers)} attempt(s); retry later.",
             retry_after=last_retry_after,
         )
-    raise Blocked(
-        f"{url} blocked after {len(openers)} attempt(s) ({last}). The public source is "
-        f"blocking this network; use an official fallback or configure FETCH_PROXY "
-        f"for bounded proxy retries."
-    )
+    if last_was_block:
+        raise Blocked(
+            f"{url} blocked after {len(openers)} attempt(s) ({last}). The public source is "
+            f"blocking this network; use an official fallback or configure FETCH_PROXY "
+            f"for bounded proxy retries."
+        )
+    raise FetchError(f"{url} unavailable after {len(openers)} attempt(s) ({last})")
 
 
 def fetch_text(url: str, *, encoding: str = "utf-8", **kw) -> str:
