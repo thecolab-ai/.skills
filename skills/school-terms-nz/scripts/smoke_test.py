@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
 import subprocess
 import sys
+from contextlib import redirect_stdout
 from pathlib import Path
 
 SKILL_DIR = Path(__file__).resolve().parents[1]
@@ -106,6 +108,28 @@ def date_queries() -> None:
 results.append(check("date lookup distinguishes fixed and school-dependent dates", date_queries))
 
 
+def term_four_closing_window_queries() -> None:
+    ambiguous = module.classify_date(years, "2026-12-17")
+    assert ambiguous["kind"] == "school_term_or_break"
+    assert ambiguous["name"] == "Term 4 closing window"
+    assert ambiguous["certainty"] == "school_dependent"
+    assert "individual school" in ambiguous["caveat"].lower()
+
+    next_result = module.next_break(years, "2026-12-17")
+    assert next_result["name"] == "Summer holidays"
+    assert next_result["days_until"] is None
+    assert next_result["certainty"] == "school_dependent"
+    assert "individual school" in next_result["caveat"].lower()
+
+    fixed_term = module.classify_date(years, "2026-09-01")
+    assert fixed_term["kind"] == "school_term"
+    assert fixed_term["name"] == "Term 3"
+    assert fixed_term["certainty"] == "published"
+
+
+results.append(check("Term 4 closing dates remain school-dependent without invented precision", term_four_closing_window_queries))
+
+
 def opening_window_next_break_query() -> None:
     expected_window = {
         "precision": "range",
@@ -182,6 +206,15 @@ def certain_next_break_queries() -> None:
     assert current_summer["name"] == "Summer holidays"
     assert current_summer["days_until"] == 0
 
+    after_closing_boundary = module.next_break(years, "2026-12-19")
+    assert after_closing_boundary["name"] == "Summer holidays"
+    assert after_closing_boundary["days_until"] == 0
+    assert after_closing_boundary["certainty"] == "published"
+
+    classified_after_boundary = module.classify_date(years, "2026-12-19")
+    assert classified_after_boundary["kind"] == "school_break"
+    assert classified_after_boundary["certainty"] == "published"
+
 
 results.append(check("next-break preserves certain current and future break cases", certain_next_break_queries))
 
@@ -226,18 +259,135 @@ def error_contract() -> None:
         else:
             raise AssertionError("blocked fetch did not map to exit 4")
 
-        module.nzfetch.fetch_bytes = lambda *args, **kwargs: (_ for _ in ()).throw(module.nzfetch.FetchError("synthetic outage"))
+        setattr(module.nzfetch, "fetch_bytes", lambda *args, **kwargs: (_ for _ in ()).throw(module.nzfetch.FetchError("synthetic outage")))
         try:
             module.fetch_years(1)
         except module.SkillError as exc:
             assert exc.exit_code == 5
         else:
             raise AssertionError("failed fetch did not map to exit 5")
+
+        setattr(module.nzfetch, "fetch_bytes", original)
+        original_build_opener = module.nzfetch.urllib.request.build_opener
+
+        class TimeoutOpener:
+            def open(self, *args, **kwargs):
+                raise TimeoutError("synthetic raw timeout")
+
+        try:
+            setattr(module.nzfetch.urllib.request, "build_opener", lambda *args, **kwargs: TimeoutOpener())
+            try:
+                module.fetch_years(1)
+            except module.SkillError as exc:
+                assert exc.exit_code == 5
+                assert exc.error_type == "upstream_unavailable"
+            else:
+                raise AssertionError("raw timeout did not map to exit 5")
+        finally:
+            setattr(module.nzfetch.urllib.request, "build_opener", original_build_opener)
     finally:
-        module.nzfetch.fetch_bytes = original
+        setattr(module.nzfetch, "fetch_bytes", original)
 
 
 results.append(check("fixture errors map schema, blocked and unavailable failures to exits 6, 4 and 5", error_contract))
+
+
+def source_drift_mutations() -> None:
+    def assert_schema_error(mutated: str) -> None:
+        try:
+            module.parse_school_terms(mutated, SOURCE_URL)
+        except module.SkillError as exc:
+            assert exc.exit_code == 6
+            assert exc.error_type == "source_schema"
+        else:
+            raise AssertionError("semantic source drift did not fail closed")
+
+    incomplete_opening_range = fixture_text.replace(
+        "Starts between Monday 26 January and Monday 9 February and ends Thursday 2 April 2026",
+        "Starts between Monday 26 January and ends Thursday 2 April 2026",
+        1,
+    )
+    assert_schema_error(incomplete_opening_range)
+
+    duplicate_date = fixture_text.replace(
+        "Starts between Monday 26 January and Monday 9 February and ends Thursday 2 April 2026",
+        "Starts between Monday 26 January and Monday 26 January and ends Thursday 2 April 2026",
+        1,
+    )
+    assert_schema_error(duplicate_date)
+
+    duplicate_term = fixture_text.replace("Term 2 (11 weeks)", "Term 1 (11 weeks)", 1)
+    assert_schema_error(duplicate_term)
+
+    duplicate_break = fixture_text.replace(
+        "<h3>Term 2</h3><p>Saturday 4 July to Sunday 19 July 2026.</p>",
+        "<h3>Term 1</h3><p>Saturday 4 July to Sunday 19 July 2026.</p>",
+        1,
+    )
+    assert_schema_error(duplicate_break)
+
+    wrong_year = fixture_text.replace(
+        "ends Thursday 2 April 2026",
+        "ends Thursday 2 April 2027",
+        1,
+    )
+    assert_schema_error(wrong_year)
+
+    missing_year = fixture_text.replace("ends Thursday 2 April 2026", "ends Thursday 2 April", 1)
+    assert_schema_error(missing_year)
+
+    wrong_term_shape = fixture_text.replace(
+        "Monday 20 April to Friday 3 July 2026",
+        "Monday 20 April to no later than Friday 3 July 2026",
+        1,
+    )
+    assert_schema_error(wrong_term_shape)
+
+    wrong_break_shape = fixture_text.replace(
+        "Start no later than Saturday 19 December 2026",
+        "Saturday 19 December to Sunday 20 December 2026",
+        1,
+    )
+    assert_schema_error(wrong_break_shape)
+
+
+results.append(check("semantic source drift fails closed with source_schema", source_drift_mutations))
+
+
+def invalid_dates_do_not_fetch() -> None:
+    original_fetch = module.fetch_years
+    original_argv = sys.argv
+    fetch_calls = 0
+
+    def fail_if_fetched(timeout: int):
+        nonlocal fetch_calls
+        fetch_calls += 1
+        raise AssertionError(f"fetch_years({timeout}) called for invalid local input")
+
+    try:
+        setattr(module, "fetch_years", fail_if_fetched)
+        cases = (
+            (["date", "not-a-date", "--json"], "invalid_input"),
+            (["next-break", "not-a-date", "--json"], "invalid_input"),
+            (["years", "--timeout", "0", "--json"], "invalid_input"),
+        )
+        for arguments, error_type in cases:
+            sys.argv = [str(CLI), *arguments]
+            output = io.StringIO()
+            with redirect_stdout(output):
+                exit_code = module.main()
+            payload = json.loads(output.getvalue())
+            assert exit_code == 2
+            assert payload["status"] == "error"
+            assert payload["code"] == 2
+            assert payload["error"] == error_type
+        assert fetch_calls == 0
+    finally:
+        setattr(module, "fetch_years", original_fetch)
+        sys.argv = original_argv
+
+
+results.append(check("invalid date commands return structured exit 2 without fetching", invalid_dates_do_not_fetch))
 
 
 if not all(results):

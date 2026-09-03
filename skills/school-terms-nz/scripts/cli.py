@@ -38,6 +38,9 @@ DATE_FRAGMENT = re.compile(
     r"(?P<month>January|February|March|April|May|June|July|August|September|October|November|December)",
     re.I,
 )
+YEAR_FRAGMENT = re.compile(r"\b20\d{2}\b")
+EXPECTED_TERM_NAMES = [f"Term {number}" for number in range(1, 5)]
+EXPECTED_BREAK_NAMES = ["Term 1 break", "Term 2 break", "Term 3 break", "Summer holidays"]
 
 
 class SkillError(RuntimeError):
@@ -126,36 +129,98 @@ def date_fragments(text: str, year: int) -> list[str]:
     return [iso_date(year, match) for match in DATE_FRAGMENT.finditer(text)]
 
 
-def parse_term_dates(text: str, year: int) -> tuple[str | dict[str, str], str | dict[str, str]]:
+def semantic_dates(text: str, year: int, *, expected: int, description: str) -> list[str]:
+    """Fail closed when a dated source sentence changes semantic shape."""
+    explicit_years = {int(value) for value in YEAR_FRAGMENT.findall(text)}
+    if explicit_years != {year}:
+        raise SkillError(
+            f"{description} for {year} must contain only its section year: {text}",
+            exit_code=6,
+            error_type="source_schema",
+        )
     dates = date_fragments(text, year)
+    if len(dates) != expected or len(set(dates)) != expected:
+        raise SkillError(
+            f"{description} for {year} expected {expected} unique dates: {text}",
+            exit_code=6,
+            error_type="source_schema",
+        )
+    parsed = [dt.date.fromisoformat(value) for value in dates]
+    if parsed != sorted(parsed):
+        raise SkillError(
+            f"{description} for {year} contains dates out of order: {text}",
+            exit_code=6,
+            error_type="source_schema",
+        )
+    return dates
+
+
+def has_precision(value: Any, expected: str) -> bool:
+    return isinstance(value, dict) and value.get("precision") == expected
+
+
+def year_semantics_valid(item: dict[str, Any]) -> bool:
+    """Validate heading-specific date forms and whole-year chronology."""
+    terms = item["terms"]
+    breaks = item["breaks"]
+    if len(terms) != 4 or len(breaks) != 4:
+        return False
+    shapes_valid = (
+        has_precision(terms[0].get("start"), "range")
+        and has_precision(terms[0].get("end"), "fixed")
+        and all(isinstance(terms[index].get(key), str) for index in (1, 2) for key in ("start", "end"))
+        and isinstance(terms[3].get("start"), str)
+        and has_precision(terms[3].get("end"), "no_later_than")
+        and all(isinstance(breaks[index].get(key), str) for index in range(3) for key in ("start", "end"))
+        and has_precision(breaks[3].get("start"), "no_later_than")
+        and breaks[3].get("end") is None
+    )
+    if not shapes_valid:
+        return False
+
+    ordered_values = [
+        terms[0]["start"]["earliest"],
+        terms[0]["start"]["latest"],
+        terms[0]["end"]["date"],
+        breaks[0]["start"],
+        breaks[0]["end"],
+        terms[1]["start"],
+        terms[1]["end"],
+        breaks[1]["start"],
+        breaks[1]["end"],
+        terms[2]["start"],
+        terms[2]["end"],
+        breaks[2]["start"],
+        breaks[2]["end"],
+        terms[3]["start"],
+        terms[3]["end"]["latest"],
+        breaks[3]["start"]["latest"],
+    ]
+    ordered_dates = [dt.date.fromisoformat(value) for value in ordered_values]
+    return ordered_dates == sorted(set(ordered_dates))
+
+
+def parse_term_dates(text: str, year: int) -> tuple[str | dict[str, str], str | dict[str, str]]:
     lowered = text.lower()
-    if lowered.startswith("starts between") and len(dates) >= 3:
+    if lowered.startswith("starts between"):
+        dates = semantic_dates(text, year, expected=3, description="term opening range")
         return (
             {"precision": "range", "earliest": dates[0], "latest": dates[1]},
             {"precision": "fixed", "date": dates[2]},
         )
-    if "to no later than" in lowered and len(dates) >= 2:
+    if "to no later than" in lowered:
+        dates = semantic_dates(text, year, expected=2, description="variable term range")
         return dates[0], {"precision": "no_later_than", "latest": dates[1]}
-    if len(dates) >= 2:
-        return dates[0], dates[1]
-    raise SkillError(
-        f"could not parse published term dates for {year}: {text}",
-        exit_code=6,
-        error_type="source_schema",
-    )
+    dates = semantic_dates(text, year, expected=2, description="fixed term range")
+    return dates[0], dates[1]
 
 
 def parse_break_dates(text: str, year: int) -> tuple[str | dict[str, str], str | None]:
-    dates = date_fragments(text, year)
-    if text.lower().startswith("start no later than") and dates:
+    if text.lower().startswith("start no later than"):
+        dates = semantic_dates(text, year, expected=1, description="variable holiday start")
         return {"precision": "no_later_than", "latest": dates[0]}, None
-    if len(dates) >= 2:
-        return dates[0], dates[1]
-    raise SkillError(
-        f"could not parse published holiday dates for {year}: {text}",
-        exit_code=6,
-        error_type="source_schema",
-    )
+    dates = semantic_dates(text, year, expected=2, description="fixed holiday range")
+    return dates[0], dates[1]
 
 
 def parse_school_terms(source_html: str, source_url: str = SOURCE_URL) -> list[dict[str, Any]]:
@@ -251,14 +316,18 @@ def parse_school_terms(source_html: str, source_url: str = SOURCE_URL) -> list[d
             if "flexibility" in lowered:
                 record["caveats"].append(text)
     years = [by_year[key] for key in sorted(by_year)]
-    invalid = [
-        str(item["year"])
-        for item in years
-        if len(item["terms"]) != 4
-        or len(item["breaks"]) != 4
-        or any("start" not in entry or "end" not in entry for entry in item["terms"])
-        or any("start" not in entry or "end" not in entry for entry in item["breaks"])
-    ]
+    invalid = []
+    for item in years:
+        term_names = [entry.get("name") for entry in item["terms"]]
+        break_names = [entry.get("name") for entry in item["breaks"]]
+        if (
+            term_names != EXPECTED_TERM_NAMES
+            or break_names != EXPECTED_BREAK_NAMES
+            or not year_semantics_valid(item)
+            or any("start" not in entry or "end" not in entry for entry in item["terms"])
+            or any("start" not in entry or "end" not in entry for entry in item["breaks"])
+        ):
+            invalid.append(str(item["year"]))
     if not years or invalid:
         detail = f"; incomplete years: {', '.join(invalid)}" if invalid else ""
         raise SkillError(
@@ -402,11 +471,12 @@ def classify_date(years: list[dict[str, Any]], value: str) -> dict[str, Any]:
             start_date = parse_query_date(start)
             if start_date <= query <= end_date:
                 if isinstance(end, dict):
+                    closing_window = {**item, "name": "Term 4 closing window"}
                     return classification(
-                        item,
-                        "school_term",
+                        closing_window,
+                        "school_term_or_break",
                         "school_dependent",
-                        "Term 4 starts on the published date, but each school may close before the no-later-than end date.",
+                        "The date falls inside the published Term 4 closing window; whether it is a school term or summer holiday depends on the individual school's closing date.",
                     )
                 return classification(item, "school_term", "published")
 
@@ -475,6 +545,34 @@ def next_break(years: list[dict[str, Any]], value: str) -> dict[str, Any]:
             },
         }
 
+    current_year = next((item for item in years if item["year"] == query.year), None)
+    if current_year is not None:
+        closing_term = next(
+            (
+                item
+                for item in current_year["terms"]
+                if isinstance(item["end"], dict) and item["end"].get("precision") == "no_later_than"
+            ),
+            None,
+        )
+        summer = next(
+            (item for item in current_year["breaks"] if isinstance(item["start"], dict)),
+            None,
+        )
+        if closing_term is not None and summer is not None:
+            closing_start = parse_query_date(closing_term["start"])
+            closing_latest = parse_query_date(closing_term["end"]["latest"])
+            if closing_start <= query <= closing_latest:
+                return {
+                    "name": summer["name"],
+                    "start": summer["start"],
+                    "end": summer["end"],
+                    "days_until": None,
+                    "description": summer["description"],
+                    "certainty": "school_dependent",
+                    "caveat": "The summer holiday begins on the individual school's closing date, so no exact countdown is published; check that school's calendar.",
+                }
+
     candidates: list[tuple[dt.date, dt.date | None, dict[str, Any]]] = []
     for published in years:
         for item in published["breaks"]:
@@ -493,16 +591,21 @@ def next_break(years: list[dict[str, Any]], value: str) -> dict[str, Any]:
         )
     start, end, item = min(candidates, key=lambda candidate: max(query, candidate[0]))
     days_until = max(0, (start - query).days)
+    variable_start_has_passed = isinstance(item["start"], dict) and query >= start
     result = {
         "name": item["name"],
         "start": item["start"],
         "end": item["end"],
         "days_until": days_until,
         "description": item["description"],
-        "certainty": "published" if isinstance(item["start"], str) else "school_dependent",
+        "certainty": "published" if isinstance(item["start"], str) or variable_start_has_passed else "school_dependent",
     }
     if isinstance(item["start"], dict):
-        result["caveat"] = "This is the latest possible summer-holiday start; the individual school may close earlier."
+        result["caveat"] = (
+            "The summer holiday began on the individual school's closing date, no later than this published boundary."
+            if variable_start_has_passed
+            else "This is the latest possible summer-holiday start; the individual school may close earlier."
+        )
     return result
 
 
@@ -584,6 +687,8 @@ def emit(payload: dict[str, Any], as_json: bool) -> None:
 def run(args: argparse.Namespace) -> dict[str, Any]:
     if args.timeout <= 0:
         raise SkillError("--timeout must be greater than zero", exit_code=2, error_type="invalid_input")
+    if args.command in {"date", "next-break"}:
+        parse_query_date(args.date)
     years, source_url, retrieved = fetch_years(args.timeout)
     base = payload_base(source_url, retrieved)
     if args.command == "years":
