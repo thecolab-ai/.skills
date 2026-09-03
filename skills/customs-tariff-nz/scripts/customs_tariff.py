@@ -305,10 +305,12 @@ def parse_archive(
                     if tuple(reader.fieldnames or ()) != expected:
                         raise SkillError(f"unexpected header in {name}", exit_code=6, kind="source_schema")
                     first_row = next(reader, None)
-                    if first_row is None or not any(_clean(value) for value in first_row.values()):
+                    if first_row is None:
                         raise SkillError(f"required table has no data rows: {name}", exit_code=6, kind="source_schema")
-                    if None in first_row or any(value is None for value in first_row.values()):
+                    if None in first_row or any(not isinstance(value, str) for value in first_row.values()):
                         raise SkillError(f"unexpected field count in {name} line 2", exit_code=6, kind="source_schema")
+                    if not any(_clean(value) for value in first_row.values()):
+                        raise SkillError(f"required table has no data rows: {name}", exit_code=6, kind="source_schema")
     except SkillError:
         raise
     except (tarfile.TarError, UnicodeDecodeError, csv.Error, OSError) as exc:

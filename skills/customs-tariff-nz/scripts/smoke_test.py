@@ -82,6 +82,32 @@ def run_json_header_only_probe(source_bytes: bytes, member_name: str):
     return exit_code, json.loads(captured.getvalue())
 
 
+def run_json_malformed_first_row_probe(source_bytes: bytes):
+    original_fetch = customs_cli.fetch_archive
+    original_argv = sys.argv
+    captured = io.StringIO()
+
+    def fetch_malformed(timeout):
+        return parse_archive(
+            build_archive(
+                source_bytes,
+                [("Tariff_Levy_Formulas.csv", b"1~0.000000", b"~~overflow")],
+            ),
+            "fixture://malformed-first-row.tar.gz",
+            "2026-09-02T00:00:00Z",
+        )
+
+    try:
+        customs_cli.fetch_archive = fetch_malformed
+        sys.argv = [str(SKILL / "scripts" / "cli.py"), "lookup", "0901210000", "--json"]
+        with redirect_stdout(captured):
+            exit_code = customs_cli.main()
+    finally:
+        customs_cli.fetch_archive = original_fetch
+        sys.argv = original_argv
+    return exit_code, json.loads(captured.getvalue())
+
+
 def run_json_formula_probe(archive, *argv_tail: str):
     original_fetch = customs_cli.fetch_archive
     original_argv = sys.argv
@@ -157,6 +183,15 @@ def main() -> int:
         assert empty_payload["error"]["kind"] == "source_schema"
         assert member_name in empty_payload["error"]["message"]
     print("[PASS] header-only required tables return the JSON source-schema error envelope")
+
+    malformed_row_exit, malformed_row_payload = run_json_malformed_first_row_probe(fixture_bytes)
+    assert malformed_row_exit == 6
+    assert malformed_row_payload["ok"] is False
+    assert malformed_row_payload["blocked"] is False
+    assert malformed_row_payload["data"] is None
+    assert malformed_row_payload["error"]["code"] == 6
+    assert malformed_row_payload["error"]["kind"] == "source_schema"
+    print("[PASS] malformed first CSV row returns the JSON source-schema error envelope")
 
     malformed_a = parse_archive(
         build_archive(fixture_bytes, [("Tariff_Levy_Formulas.csv", b"2~0.050000", b"A~0.050000")]),
