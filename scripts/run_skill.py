@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import re
 import subprocess
@@ -31,6 +32,38 @@ SENSITIVE_ARGUMENT_NAME = re.compile(
     re.IGNORECASE,
 )
 _MISSING = object()
+
+
+class NonstandardJsonConstant(ValueError):
+    """Raised when Python's JSON decoder encounters NaN or infinity."""
+
+
+def reject_nonstandard_json_constant(constant: str) -> object:
+    """Reject Python's non-standard NaN and infinity JSON extensions."""
+    raise NonstandardJsonConstant(f"non-standard JSON constant: {constant}")
+
+
+def parse_finite_json_float(number: str) -> float:
+    """Decode a JSON number only when it has a finite float representation."""
+    value = float(number)
+    if not math.isfinite(value):
+        raise NonstandardJsonConstant(f"non-finite JSON number: {number}")
+    return value
+
+
+STRICT_JSON_DECODER = json.JSONDecoder(
+    parse_constant=reject_nonstandard_json_constant,
+    parse_float=parse_finite_json_float,
+)
+
+
+def strict_json_loads(text: str) -> object:
+    """Decode standards-compliant JSON without accepting non-finite numbers."""
+    return json.loads(
+        text,
+        parse_constant=reject_nonstandard_json_constant,
+        parse_float=parse_finite_json_float,
+    )
 
 
 def redact_secrets(text: str) -> str:
@@ -97,7 +130,7 @@ def emit_envelope(payload: dict[str, object]) -> None:
     errors = validate_result_envelope(payload)
     if errors:
         raise RuntimeError("invalid common result envelope: " + "; ".join(errors))
-    print(json.dumps(payload, indent=2, ensure_ascii=False))
+    print(json.dumps(payload, indent=2, ensure_ascii=False, allow_nan=False))
 
 
 def json_objects(text: str) -> list[dict[str, object]]:
@@ -105,19 +138,18 @@ def json_objects(text: str) -> list[dict[str, object]]:
     stripped = text.strip()
     if not stripped:
         return []
-    decoder = json.JSONDecoder()
     objects: list[dict[str, object]] = []
     offset = 0
     try:
         while offset < len(stripped):
-            value, end = decoder.raw_decode(stripped, offset)
+            value, end = STRICT_JSON_DECODER.raw_decode(stripped, offset)
             if not isinstance(value, dict):
                 return []
             objects.append(value)
             offset = end
             while offset < len(stripped) and stripped[offset].isspace():
                 offset += 1
-    except (json.JSONDecodeError, TypeError):
+    except (json.JSONDecodeError, TypeError, NonstandardJsonConstant):
         return []
     return objects
 
@@ -199,14 +231,14 @@ def advertised_failure(text: str) -> bool:
     if not stripped:
         return False
     try:
-        value = json.loads(stripped)
-    except (json.JSONDecodeError, TypeError):
+        value = strict_json_loads(stripped)
+    except (json.JSONDecodeError, TypeError, NonstandardJsonConstant):
         if json_like(text):
             return True
         for line in text.splitlines()[1:]:
             try:
-                line_value = json.loads(line)
-            except (json.JSONDecodeError, TypeError):
+                line_value = strict_json_loads(line)
+            except (json.JSONDecodeError, TypeError, NonstandardJsonConstant):
                 # Plain diagnostics may contain JSON-like fragments (for
                 # example argparse metavars). Only complete JSON values on a
                 # later line are eligible for structured-failure inspection.
@@ -216,10 +248,6 @@ def advertised_failure(text: str) -> bool:
             if isinstance(line_value, dict) and payload_advertises_failure(line_value):
                 return True
         return False
-    if type(value) is float and stripped.casefold() in {"nan", "infinity", "+infinity", "-infinity"}:
-        # Python's decoder accepts these non-standard constants, but they are
-        # not valid JSON scalar outputs and historically failed closed here.
-        return True
     return isinstance(value, dict) and payload_advertises_failure(value)
 
 
@@ -433,8 +461,9 @@ def main() -> int:
             data = {"help": stdout}
         else:
             try:
-                data = json.loads(stdout) if stdout else None
-            except json.JSONDecodeError as exc:
+                data = strict_json_loads(stdout) if stdout else None
+            except (json.JSONDecodeError, NonstandardJsonConstant) as exc:
+                message = exc.msg if isinstance(exc, json.JSONDecodeError) else str(exc)
                 payload = result_envelope(
                     ok=False,
                     source_name=metadata["thecolab.source_owner"],
@@ -442,7 +471,7 @@ def main() -> int:
                     query={"argv": query_args},
                     data=None,
                     warnings=[stderr] if stderr else [],
-                    error={"code": 6, "message": f"CLI did not emit valid JSON: {exc.msg}"},
+                    error={"code": 6, "message": f"CLI did not emit valid JSON: {message}"},
                 )
                 emit_envelope(payload)
                 return 6

@@ -405,6 +405,56 @@ class RunSkillIntegrationTests(unittest.TestCase):
                 self.assertFalse(payload["ok"])
                 self.assertIsNone(payload["data"])
 
+    def test_zero_exit_nested_nonstandard_json_constants_fail_closed(self) -> None:
+        nested_documents = tuple(
+            template.format(constant=constant)
+            for constant in ("NaN", "Infinity", "-Infinity")
+            for template in (
+                '{{"rows":[{{"value":{constant}}}]}}',
+                '[[{{"value":{constant}}}]]',
+            )
+        )
+        for stdout_text in nested_documents:
+            with self.subTest(stdout_text=stdout_text):
+                exit_code, payload, stderr = self.run_mocked_direct_cli(
+                    "school-terms-nz",
+                    ["years"],
+                    {},
+                    0,
+                    stdout_text=stdout_text,
+                )
+
+                self.assertEqual(exit_code, 6)
+                self.assertEqual(stderr, "")
+                self.assertFalse(payload["ok"])
+                self.assertIsNone(payload["data"])
+
+    def test_envelope_emission_rejects_nonfinite_values(self) -> None:
+        stdout = io.StringIO()
+        with (
+            mock.patch.object(RUN_SKILL_MODULE, "validate_result_envelope", return_value=[]),
+            redirect_stdout(stdout),
+            self.assertRaisesRegex(ValueError, "Out of range float values"),
+        ):
+            RUN_SKILL_MODULE.emit_envelope({"data": float("nan")})
+        self.assertEqual(stdout.getvalue(), "")
+
+    def test_zero_exit_overflowing_json_numbers_fail_closed(self) -> None:
+        for stdout_text in ('{"rows":[1e309]}', "[[-1e309]]"):
+            with self.subTest(stdout_text=stdout_text):
+                exit_code, payload, stderr = self.run_mocked_direct_cli(
+                    "school-terms-nz",
+                    ["years"],
+                    {},
+                    0,
+                    stdout_text=stdout_text,
+                )
+
+                self.assertEqual(exit_code, 6)
+                self.assertEqual(stderr, "")
+                self.assertFalse(payload["ok"])
+                self.assertIsNone(payload["data"])
+
     def test_direct_envelope_with_trailing_non_json_fails_closed(self) -> None:
         success: dict[str, object] = {
             "schema_version": "1",
