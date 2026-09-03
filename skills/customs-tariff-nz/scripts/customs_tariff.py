@@ -64,6 +64,8 @@ DUTY_FORMULA_SUMMARIES = {
 }
 
 ASCII_DIGITS_RE = re.compile(r"[0-9]+")
+ASCII_TWO_DIGITS_RE = re.compile(r"[0-9]{2}")
+ASCII_CODE_RE = re.compile(r"[A-Z0-9]+")
 
 
 class SkillError(RuntimeError):
@@ -144,6 +146,48 @@ def _source_date(value: str) -> str | None:
     return parsed.isoformat() if parsed else None
 
 
+def _source_tariff_code(row: dict[str, str], *, prefix: str, table: str) -> str:
+    levels = [row[f"{prefix} Tariff Level {level}"] for level in range(1, 6)]
+    for level, value in enumerate(levels, start=1):
+        if ASCII_TWO_DIGITS_RE.fullmatch(value) is None:
+            raise SkillError(
+                f"invalid tariff level {level} in {table}: {value!r}",
+                exit_code=6,
+                kind="source_schema",
+            )
+    return "".join(levels)
+
+
+def _required_source_digits(value: str, *, field: str, table: str) -> str:
+    if ASCII_DIGITS_RE.fullmatch(value) is None:
+        raise SkillError(
+            f"invalid {field} in {table}: {value!r}",
+            exit_code=6,
+            kind="source_schema",
+        )
+    return value
+
+
+def _source_decimal(value: str, *, field: str, table: str, required: bool = False) -> str:
+    if not value and not required:
+        return value
+    try:
+        parsed = decimal.Decimal(value)
+    except decimal.InvalidOperation as exc:
+        raise SkillError(
+            f"invalid {field} in {table}: {value!r}",
+            exit_code=6,
+            kind="source_schema",
+        ) from exc
+    if not parsed.is_finite():
+        raise SkillError(
+            f"invalid {field} in {table}: {value!r}",
+            exit_code=6,
+            kind="source_schema",
+        )
+    return value
+
+
 @dataclass(frozen=True)
 class TariffArchive:
     blob: bytes
@@ -160,7 +204,24 @@ class TariffArchive:
                 if raw is None:
                     raise SkillError(f"archive member is not readable: {name}", exit_code=6, kind="source_schema")
                 with io.TextIOWrapper(raw, encoding="cp1252", newline="") as text:
-                    reader = csv.DictReader(text, delimiter="~")
+                    # Customs uses balanced literal quotes inside unquoted fields, so treat
+                    # quotes as data while still rejecting an unclosed quote on any row.
+                    def strict_source_lines() -> Iterator[str]:
+                        for physical_line_number, line in enumerate(text, start=1):
+                            if line.count('"') % 2:
+                                raise SkillError(
+                                    f"unclosed quoted field in {name} line {physical_line_number}",
+                                    exit_code=6,
+                                    kind="source_schema",
+                                )
+                            yield line
+
+                    reader = csv.DictReader(
+                        strict_source_lines(),
+                        delimiter="~",
+                        quoting=csv.QUOTE_NONE,
+                        strict=True,
+                    )
                     if tuple(reader.fieldnames or ()) != HEADERS[name]:
                         raise SkillError(f"unexpected header in {name}", exit_code=6, kind="source_schema")
                     for line_number, row in enumerate(reader, start=2):
@@ -185,7 +246,7 @@ class TariffArchive:
 
     def iter_details(self) -> Iterator[dict[str, object]]:
         for row in self._iter_csv(DETAILS):
-            code = "".join(row[f"Tic Tariff Level {level}"] for level in range(1, 6))
+            code = _source_tariff_code(row, prefix="Tic", table=DETAILS)
             yield {
                 "tariff_code": code,
                 "display_code": format_code(code),
@@ -209,8 +270,23 @@ class TariffArchive:
 
     def iter_rates(self) -> Iterator[dict[str, object]]:
         for row in self._iter_csv(RATES):
-            code = "".join(row[f"Tdrc Tariff Level {level}"] for level in range(1, 6))
-            formula_code = row["Tdrc Rate Formula"]
+            code = _source_tariff_code(row, prefix="Tdrc", table=RATES)
+            formula_code = _required_source_digits(
+                row["Tdrc Rate Formula"],
+                field="duty formula code",
+                table=RATES,
+            )
+            excise_factor = _source_decimal(
+                row["Tdrc Excise Factor"],
+                field="excise factor",
+                table=RATES,
+            )
+            for letter in "ABCDEF":
+                _source_decimal(
+                    row[f"Tdrc Factor {letter}"],
+                    field=f"Factor {letter}",
+                    table=RATES,
+                )
             factors = {
                 letter.lower(): row[f"Tdrc Factor {letter}"]
                 for letter in "ABCDEF"
@@ -221,7 +297,7 @@ class TariffArchive:
                 "rate_group": row["Tdrc Rate Group"],
                 "start_date": _source_date(row["Tdrc Start Date"]),
                 "expiry_date": _source_date(row["Tdrc Expiry Date"]),
-                "excise_factor": row["Tdrc Excise Factor"] or None,
+                "excise_factor": excise_factor or None,
                 "formula_code": formula_code,
                 "formula_summary": DUTY_FORMULA_SUMMARIES.get(formula_code),
                 "factors": factors,
@@ -231,11 +307,23 @@ class TariffArchive:
 
     def iter_levies(self) -> Iterator[dict[str, object]]:
         for row in self._iter_csv(LEVIES):
-            code = "".join(row[f"Tlrc Tariff Level {level}"] for level in range(1, 6))
+            code = _source_tariff_code(row, prefix="Tlrc", table=LEVIES)
+            levy_type_code = row["Tlrc Levy Type Code"]
+            if ASCII_CODE_RE.fullmatch(levy_type_code) is None:
+                raise SkillError(
+                    f"invalid levy type code in {LEVIES}: {levy_type_code!r}",
+                    exit_code=6,
+                    kind="source_schema",
+                )
+            formula_code = _required_source_digits(
+                row["Tlrc Levy Formula Code"],
+                field="levy formula reference",
+                table=LEVIES,
+            )
             yield {
                 "tariff_code": code,
-                "levy_type_code": row["Tlrc Levy Type Code"],
-                "formula_code": row["Tlrc Levy Formula Code"],
+                "levy_type_code": levy_type_code,
+                "formula_code": formula_code,
                 "start_date": _source_date(row["Tlrc Start Date"]),
                 "expiry_date": _source_date(row["Tlrc Expiry Date"]),
                 "_start": row["Tlrc Start Date"],
@@ -244,28 +332,17 @@ class TariffArchive:
 
     def iter_formulas(self) -> Iterator[dict[str, str]]:
         for row in self._iter_csv(FORMULAS):
-            formula_code = _clean(row["Lfc Levy Formula Codes"])
-            formula_rate = _clean(row["Lfc Levy Formula Rate"])
-            if ASCII_DIGITS_RE.fullmatch(formula_code) is None:
-                raise SkillError(
-                    f"invalid formula code in {FORMULAS}: {formula_code!r}",
-                    exit_code=6,
-                    kind="source_schema",
-                )
-            try:
-                parsed_rate = decimal.Decimal(formula_rate)
-            except decimal.InvalidOperation as exc:
-                raise SkillError(
-                    f"invalid formula rate in {FORMULAS}: {formula_rate!r}",
-                    exit_code=6,
-                    kind="source_schema",
-                ) from exc
-            if not parsed_rate.is_finite():
-                raise SkillError(
-                    f"invalid formula rate in {FORMULAS}: {formula_rate!r}",
-                    exit_code=6,
-                    kind="source_schema",
-                )
+            formula_code = _required_source_digits(
+                row["Lfc Levy Formula Codes"],
+                field="formula code",
+                table=FORMULAS,
+            )
+            formula_rate = _source_decimal(
+                row["Lfc Levy Formula Rate"],
+                field="formula rate",
+                table=FORMULAS,
+                required=True,
+            )
             yield {
                 "formula_code": formula_code,
                 "formula_rate": formula_rate,
@@ -329,13 +406,22 @@ def parse_archive(
     tables = (
         (DETAILS, result.iter_details()),
         (RATES, result.iter_rates()),
-        (LEVIES, result.iter_levies()),
         (FORMULAS, result.iter_formulas()),
+        (LEVIES, result.iter_levies()),
     )
+    formula_codes: set[str] = set()
     for name, records in tables:
         has_records = False
-        for _record in records:
+        for record in records:
             has_records = True
+            if name == FORMULAS:
+                formula_codes.add(str(record["formula_code"]))
+            elif name == LEVIES and str(record["formula_code"]) not in formula_codes:
+                raise SkillError(
+                    f"unknown levy formula reference in {LEVIES}: {record['formula_code']!r}",
+                    exit_code=6,
+                    kind="source_schema",
+                )
         if not has_records:
             raise SkillError(f"required table has no data rows: {name}", exit_code=6, kind="source_schema")
     return result

@@ -262,6 +262,24 @@ def short_transfer_fetch(*, body: bytes = b"short", raise_incomplete: bool = Fal
     return fetch
 
 
+def malformed_archive_fetch(
+    source_bytes: bytes,
+    *,
+    member_name: str,
+    old: bytes,
+    new: bytes,
+    label: str,
+):
+    def fetch(timeout):
+        return parse_archive(
+            build_archive(source_bytes, [(member_name, old, new)]),
+            f"fixture://{label}.tar.gz",
+            "2026-09-02T00:00:00Z",
+        )
+
+    return fetch
+
+
 def main() -> int:
     fixture = SKILL / "tests" / "fixtures" / "tariff-synthetic.tar.gz"
     fixture_bytes = fixture.read_bytes()
@@ -280,6 +298,8 @@ def main() -> int:
     assert lookup["classification"]["statistical_unit"] == "KGM"
     assert lookup["rates"][0]["rate_group"] == "NML"
     assert lookup["rates"][0]["factors"]["a"] == "5.000000"
+    assert lookup_records(dataset, "0101210010", "2026-09-02")["rates"][0]["factors"] == {}
+    assert lookup_records(dataset, "0101210010", "2026-09-02")["rates"][0]["excise_factor"] is None
     assert lookup["levies"][0]["levy_type_code"] == "AL"
     assert lookup["levies"][0]["formula_rate"] == "0.050000"
     print("[PASS] fixture exact lookup joins classifications, rates, levies and formula rates")
@@ -338,6 +358,82 @@ def main() -> int:
         else:
             raise AssertionError("malformed source formula was accepted during archive validation")
     print("[PASS] malformed formula types fail during complete archive validation")
+
+    malformed_source_fields = (
+        (
+            "unclosed quote in first details row",
+            "Tariff_Details.csv",
+            b"LIVE HORSES \x97 SYNTHETIC",
+            b'"LIVE HORSES \x97 SYNTHETIC',
+        ),
+        (
+            "unclosed quote in later details row",
+            "Tariff_Details.csv",
+            b"ROASTED COFFEE \x97 SYNTHETIC",
+            b'"ROASTED COFFEE \x97 SYNTHETIC',
+        ),
+        (
+            "non-numeric first details tariff level",
+            "Tariff_Details.csv",
+            b"01~01~21~00~10~D",
+            b"AA~01~21~00~10~D",
+        ),
+        (
+            "non-numeric later details tariff level",
+            "Tariff_Details.csv",
+            b"09~01~21~00~00~D~2~KGM",
+            b"AA~01~21~00~00~D~2~KGM",
+        ),
+        (
+            "non-numeric rates tariff level",
+            "Tariff_Rates.csv",
+            b"01~01~21~00~10~NML",
+            b"01~01~21~00~AA~NML",
+        ),
+        (
+            "short levies tariff level",
+            "Tariff_Levies.csv",
+            b"09~01~21~00~00~AL",
+            b"09~01~21~00~0~AL",
+        ),
+        (
+            "non-numeric duty formula",
+            "Tariff_Rates.csv",
+            b"~2~5.000000~~~~~",
+            b"~X~5.000000~~~~~",
+        ),
+        (
+            "non-numeric duty factor",
+            "Tariff_Rates.csv",
+            b"~2~5.000000~~~~~",
+            b"~2~X~~~~~",
+        ),
+        (
+            "non-numeric levy formula reference",
+            "Tariff_Levies.csv",
+            b"~AL~2~Jan",
+            b"~AL~X~Jan",
+        ),
+        (
+            "missing levy formula reference",
+            "Tariff_Levies.csv",
+            b"~AL~2~Jan",
+            b"~AL~999~Jan",
+        ),
+    )
+    for label, member_name, old, new in malformed_source_fields:
+        assert_error_envelopes(
+            malformed_archive_fetch(
+                fixture_bytes,
+                member_name=member_name,
+                old=old,
+                new=new,
+                label=label.replace(" ", "-"),
+            ),
+            exit_code=6,
+            kind="source_schema",
+        )
+    print("[PASS] strict CSV and typed source fields fail directly and canonically")
 
     tar_buffer = io.BytesIO()
     with tarfile.open(fileobj=tar_buffer, mode="w") as excessive:
