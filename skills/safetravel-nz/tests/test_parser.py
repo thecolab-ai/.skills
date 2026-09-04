@@ -208,6 +208,32 @@ def main() -> int:
         "[PASS] non-canonical destination URL variants fail before sitemap network I/O"
     )
 
+    for malformed_input_url in (
+        "https://[::1",
+        "https://example.com]/destinations/exampleland",
+        "https://[example.com/destinations/exampleland",
+    ):
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        with (
+            mock.patch.object(cli, "fetch_text") as fetch,
+            contextlib.redirect_stdout(stdout),
+            contextlib.redirect_stderr(stderr),
+        ):
+            exit_code = cli.main(["advice", malformed_input_url, "--json"])
+        assert exit_code == 2
+        assert stdout.getvalue() == ""
+        assert "Traceback" not in stderr.getvalue()
+        assert json.loads(stderr.getvalue()) == {
+            "error": "invalid_input",
+            "message": (
+                "destination URL must be a canonical www.safetravel.govt.nz "
+                "destination URL"
+            ),
+        }
+        fetch.assert_not_called()
+    print("[PASS] malformed bracket-host inputs fail before sitemap network I/O")
+
     assert_schema_error(
         cli,
         source=read_fixture("destination-page-regional-only.html"),
@@ -373,6 +399,23 @@ def main() -> int:
         "[PASS] malformed per-URL sitemap structures fail closed through the JSON CLI"
     )
 
+    for malformed_sitemap_url in (
+        "https://[::1",
+        "https://example.com]/destinations/exampleland",
+        "https://[example.com/destinations/exampleland",
+    ):
+        malformed_url_sitemap_source = replace_once(
+            sitemap_source,
+            requested_url,
+            malformed_sitemap_url,
+        )
+        assert_cli_search_schema_error(
+            cli,
+            sitemap_source=malformed_url_sitemap_source,
+            message_fragment="malformed URL",
+        )
+    print("[PASS] malformed bracket-host sitemap URLs fail closed through the JSON CLI")
+
     stdout = io.StringIO()
     stderr = io.StringIO()
     with (
@@ -407,6 +450,80 @@ def main() -> int:
         message_fragment="destination page identity",
     )
     print("[PASS] mismatched destination page identity fails closed through the CLI")
+
+    inert_only_identity_source = replace_once(
+        destination_source,
+        "<h1>Exampleland</h1>",
+        (
+            "<template><h1>Exampleland</h1></template>"
+            "<p>No visible destination heading</p>"
+        ),
+    ).replace(
+        "Exercise increased caution in Exampleland",
+        "Exercise increased caution in Wrongland",
+    )
+    assert_cli_schema_error(
+        cli,
+        sitemap_source=sitemap_source,
+        destination_source=inert_only_identity_source,
+        message_fragment="missing its destination heading",
+    )
+
+    non_body_identity_source = replace_once(
+        destination_source,
+        "  <h1>Exampleland</h1>",
+        "  <h1>Wrongland</h1>",
+    )
+    non_body_identity_source = replace_once(
+        non_body_identity_source,
+        "<title>Exampleland</title>",
+        "<title>Exampleland</title><h1>Exampleland</h1>",
+    )
+    assert_cli_schema_error(
+        cli,
+        sitemap_source=sitemap_source,
+        destination_source=non_body_identity_source,
+        message_fragment="expected 'exampleland', found 'Wrongland'",
+    )
+
+    adjacent_inert_identity_source = replace_once(
+        destination_source,
+        "<h1>Exampleland</h1>",
+        (
+            "<template><h1>Wrongland before</h1></template>"
+            "<div hidden><h1>Wrongland hidden</h1></div>"
+            "<div inert><h1>Wrongland inert</h1></div>"
+            '<div aria-hidden="true"><h1>Wrongland aria</h1></div>'
+            "<h1>Exampleland</h1>"
+            "<template><h1>Wrongland after</h1></template>"
+        ),
+    )
+    adjacent_inert_detail = cli.parse_destination_page(
+        adjacent_inert_identity_source,
+        slug="exampleland",
+        url=requested_url,
+    )
+    assert adjacent_inert_detail["destination"]["name"] == "Exampleland"
+
+    for duplicate_h1_markup in (
+        "<h1>Exampleland</h1><h1>Exampleland</h1>",
+        "<h1></h1><h1>Exampleland</h1>",
+    ):
+        duplicate_visible_identity_source = replace_once(
+            destination_source,
+            "<h1>Exampleland</h1>",
+            duplicate_h1_markup,
+        )
+        assert_cli_schema_error(
+            cli,
+            sitemap_source=sitemap_source,
+            destination_source=duplicate_visible_identity_source,
+            message_fragment="exactly one visible body destination heading",
+        )
+    print(
+        "[PASS] destination identity requires exactly one visible body H1 and "
+        "ignores adjacent inert H1 elements"
+    )
 
     punctuated_identity_source = replace_once(
         destination_source,
@@ -523,12 +640,12 @@ def main() -> int:
         ),
         replace_once(
             destination_source,
-            '<section id="relatedNews">',
-            (
-                '<div id="js-accordion" data-content="[]"></div>\n'
-                '<div id="js-accordion" data-content="[]"></div>\n'
-                '<section id="relatedNews">'
-            ),
+            advice_container.group(0),
+            advice_container.group(0).replace(
+                'id="js-advice-level-accordion"',
+                'id="js-accordion"',
+            )
+            * 2,
         ),
     )
     for duplicate_advice_source in duplicate_advice_sources:
@@ -539,6 +656,42 @@ def main() -> int:
             message_fragment="duplicate advice container",
         )
     print("[PASS] duplicate supported advice containers fail closed through the CLI")
+
+    general_accordion_source = replace_once(
+        destination_source,
+        '<section id="relatedNews">',
+        (
+            '<div id="js-accordion" data-content="[{&quot;heading&quot;:'
+            '&quot;Visas for New Zealanders&quot;,&quot;body&quot;:'
+            '&quot;General destination information.&quot;}]"></div>\n'
+            '<section id="relatedNews">'
+        ),
+    )
+    general_accordion_detail = cli.parse_destination_page(
+        general_accordion_source,
+        slug="exampleland",
+        url=requested_url,
+    )
+    assert general_accordion_detail["advice_level"]["number"] == 2
+
+    mixed_advice_container_source = replace_once(
+        destination_source,
+        '<section id="relatedNews">',
+        (
+            '<div id="js-accordion" data-content="[{&quot;title&quot;:'
+            '&quot;Do not travel&quot;,&quot;body&quot;:&quot;&lt;p&gt;Do not '
+            'travel to Exampleland (level 4 of 4).&lt;/p&gt;&quot;,'
+            '&quot;level&quot;:&quot;extreme&quot;,&quot;regional&quot;:false}]">'
+            "</div>\n<section id=\"relatedNews\">"
+        ),
+    )
+    assert_cli_schema_error(
+        cli,
+        sitemap_source=sitemap_source,
+        destination_source=mixed_advice_container_source,
+        message_fragment="ambiguous advice containers",
+    )
+    print("[PASS] simultaneous current and legacy advice payloads fail closed")
 
     duplicate_json_member_sources = (
         replace_once(

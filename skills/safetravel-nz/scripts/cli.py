@@ -33,6 +33,7 @@ MAX_JSON_DEPTH = 100
 SITEMAP_NAMESPACE_SCHEME = "http"
 SITEMAP_NAMESPACE_LOCATION = "www.sitemaps.org/schemas/sitemap/0.9"
 SITEMAP_FIELD_NAMES = frozenset(("loc", "lastmod", "changefreq", "priority"))
+INERT_HTML_TAGS = frozenset(("script", "style", "noscript", "svg", "template"))
 VOID_HTML_TAGS = frozenset(
     {
         "area",
@@ -214,8 +215,9 @@ class DestinationPageParser(HTMLParser):
         super().__init__(convert_charrefs=True)
         self._skip_depth = 0
         self.visible_parts: list[str] = []
-        self.h1_depth = 0
-        self.h1_parts: list[str] = []
+        self._ignored_element_depths: set[int] = set()
+        self._body_h1_stack: list[list[str]] = []
+        self.body_h1s: list[str] = []
         self.description: str | None = None
         self.data_content: dict[str, str] = {}
         self._advice_container_ids_seen: set[str] = set()
@@ -252,7 +254,16 @@ class DestinationPageParser(HTMLParser):
                 )
             self._document_tags_seen.add(tag)
             self._document_stack.append(tag)
-        if tag in {"script", "style", "noscript", "svg"}:
+        starts_ignored_subtree = tag in INERT_HTML_TAGS or (
+            tag not in VOID_HTML_TAGS
+            and (
+                "hidden" in attrs_dict
+                or "inert" in attrs_dict
+                or attrs_dict.get("aria-hidden", "").casefold() == "true"
+            )
+        )
+        if starts_ignored_subtree and tag not in VOID_HTML_TAGS:
+            self._ignored_element_depths.add(len(self._element_stack))
             self._skip_depth += 1
             return
         if self._skip_depth:
@@ -276,8 +287,8 @@ class DestinationPageParser(HTMLParser):
                 )
             self._related_news_section_seen = True
             self._related_news_section_depth = len(self._element_stack)
-        if tag == "h1":
-            self.h1_depth += 1
+        if tag == "h1" and self._document_stack[-1:] == ["body"]:
+            self._body_h1_stack.append([])
         if tag == "a" and self._related_news_section_depth is not None:
             href = attrs_dict.get("href", "")
             if href.startswith("/news/"):
@@ -306,8 +317,12 @@ class DestinationPageParser(HTMLParser):
             tag == "section"
             and self._related_news_section_depth == len(self._element_stack)
         )
+        closed_ignored_subtree = (
+            len(self._element_stack) in self._ignored_element_depths
+        )
         self._element_stack.pop()
-        if tag in {"script", "style", "noscript", "svg"}:
+        if closed_ignored_subtree:
+            self._ignored_element_depths.remove(len(self._element_stack) + 1)
             if self._skip_depth:
                 self._skip_depth -= 1
             return
@@ -319,8 +334,8 @@ class DestinationPageParser(HTMLParser):
                     f"destination page HTML had an unmatched {tag} closing element"
                 )
             self._document_stack.pop()
-        if tag == "h1" and self.h1_depth:
-            self.h1_depth -= 1
+        if tag == "h1" and self._body_h1_stack:
+            self.body_h1s.append(clean_text(" ".join(self._body_h1_stack.pop())))
         if tag == "a" and self.anchor_stack:
             self.news_links.append(self.anchor_stack.pop())
         elif self.anchor_stack and tag in {"h1", "h2", "h3", "h4", "h5", "h6"}:
@@ -337,8 +352,8 @@ class DestinationPageParser(HTMLParser):
         if not text:
             return
         self.visible_parts.append(text)
-        if self.h1_depth:
-            self.h1_parts.append(text)
+        for h1_parts in self._body_h1_stack:
+            h1_parts.append(text)
         if self.anchor_stack:
             active = self.anchor_stack[-1]
             active["parts"].append(text)
@@ -353,9 +368,10 @@ class DestinationPageParser(HTMLParser):
         if (
             self._element_stack
             or self._document_stack
-            or self.h1_depth
+            or self._body_h1_stack
             or self.anchor_stack
             or self._skip_depth
+            or self._ignored_element_depths
         ):
             raise SchemaError(
                 "destination page HTML contained unclosed structural elements"
@@ -449,7 +465,12 @@ def parse_sitemap(source: str) -> list[dict[str, str | None]]:
                 "official sitemap url entry must contain exactly one loc field"
             )
         url = fields["loc"]
-        parsed = urlparse(url)
+        try:
+            parsed = urlparse(url)
+        except ValueError as exc:
+            raise SchemaError(
+                f"official sitemap contained a malformed URL: {url!r}"
+            ) from exc
         parts = [part for part in parsed.path.split("/") if part]
         destination_shaped = parsed.path.startswith("/destinations/")
         if (
@@ -509,7 +530,14 @@ def normalise_destination(value: str) -> str:
     candidate = value.strip()
     if not candidate:
         raise SkillError("destination must not be empty", 2)
-    parsed = urlparse(candidate)
+    try:
+        parsed = urlparse(candidate)
+    except ValueError as exc:
+        raise SkillError(
+            "destination URL must be a canonical www.safetravel.govt.nz "
+            "destination URL",
+            2,
+        ) from exc
     if parsed.scheme or parsed.netloc:
         slug = canonical_destination_slug(candidate)
         if slug is None or candidate != f"{DESTINATION_PREFIX}{slug}":
@@ -605,6 +633,27 @@ def reject_duplicate_json_members(
             raise ValueError(f"duplicate object member: {key}")
         result[key] = value
     return result
+
+
+def parse_strict_json(value: str) -> Any:
+    return json.loads(
+        html.unescape(value),
+        object_pairs_hook=reject_duplicate_json_members,
+        parse_constant=reject_json_constant,
+        parse_float=parse_finite_json_float,
+    )
+
+
+def is_advice_level_payload(value: Any) -> bool:
+    required_fields = {"title", "body", "level", "regional"}
+    return (
+        isinstance(value, list)
+        and bool(value)
+        and all(
+            isinstance(item, dict) and required_fields.issubset(item)
+            for item in value
+        )
+    )
 
 
 def parse_finite_json_float(value: str) -> float:
@@ -737,13 +786,19 @@ def parse_destination_page(source: str, *, slug: str, url: str) -> dict[str, Any
         raise SchemaError(
             "destination page did not contain SafeTravel advice-level data"
         )
+    raw_legacy = parser.data_content.get("js-accordion")
+    if raw_legacy:
+        try:
+            legacy_items = parse_strict_json(raw_legacy)
+        except (RecursionError, json.JSONDecodeError, ValueError):
+            legacy_items = None
+        if is_advice_level_payload(legacy_items):
+            raise SchemaError(
+                "destination page HTML had ambiguous advice containers: "
+                "simultaneous current and legacy advice-level payloads"
+            )
     try:
-        raw_items = json.loads(
-            html.unescape(raw_advice),
-            object_pairs_hook=reject_duplicate_json_members,
-            parse_constant=reject_json_constant,
-            parse_float=parse_finite_json_float,
-        )
+        raw_items = parse_strict_json(raw_advice)
     except RecursionError as exc:
         raise SchemaError(
             "destination advice-level JSON exceeded the supported nesting depth"
@@ -777,7 +832,16 @@ def parse_destination_page(source: str, *, slug: str, url: str) -> dict[str, Any
     page_updated_match = re.search(
         r"\bPage updated\s+(\d{1,2}\s+[A-Za-z]+\s+\d{4})\b", page_text, re.IGNORECASE
     )
-    name = clean_text(" ".join(parser.h1_parts))
+    if not parser.body_h1s:
+        raise SchemaError(
+            "destination page identity was missing its destination heading"
+        )
+    if len(parser.body_h1s) != 1:
+        raise SchemaError(
+            "destination page identity must contain exactly one visible body "
+            "destination heading"
+        )
+    name = parser.body_h1s[0]
     if not name:
         raise SchemaError(
             "destination page identity was missing its destination heading"
