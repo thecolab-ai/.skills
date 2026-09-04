@@ -42,12 +42,9 @@ CREDENTIAL_MARKER = re.compile(
     re.I,
 )
 NETWORK_MARKER = re.compile(
-    r"network error|upstream unavailable|blocked after|nodename nor servname|name or service not known|"
+    r"network error|upstream unavailable|blocked after|nodename nor servname|"
+    r"name or service not known|"
     r"temporary failure|timed? out|http (?:403|406|429|451|5\d\d)",
-    re.I,
-)
-SKIP_GATING_MARKER = re.compile(
-    r"network|upstream|unavailable|blocked|timed? out|credential|api[_ ]?key|token|username|password",
     re.I,
 )
 TRACEBACK_MARKER = re.compile(r"traceback|syntaxerror", re.I)
@@ -130,7 +127,9 @@ def run_one(skill_dir: Path, timeout: int) -> dict[str, object]:
         }
     try:
         environment = os.environ.copy()
-        environment.setdefault("UV_CACHE_DIR", str(Path(tempfile.gettempdir()) / "thecolab-uv-cache"))
+        environment.setdefault(
+            "UV_CACHE_DIR", str(Path(tempfile.gettempdir()) / "thecolab-uv-cache")
+        )
         completed = subprocess.run(
             smoke_command(smoke),
             cwd=REPO_ROOT,
@@ -140,7 +139,11 @@ def run_one(skill_dir: Path, timeout: int) -> dict[str, object]:
             check=False,
             env=environment,
         )
-        log = "\n".join(part for part in (completed.stdout.strip(), completed.stderr.strip()) if part)
+        log = "\n".join(
+            part
+            for part in (completed.stdout.strip(), completed.stderr.strip())
+            if part
+        )
         exit_code = completed.returncode
     except subprocess.TimeoutExpired as exc:
         log = f"smoke timeout after {timeout}s: {exc}"
@@ -151,7 +154,9 @@ def run_one(skill_dir: Path, timeout: int) -> dict[str, object]:
     pass_candidates = [
         (index, line)
         for index, line in enumerate(lines)
-        if PASS_LINE.search(line) and "--help" not in line and "skips without" not in line
+        if PASS_LINE.search(line)
+        and "--help" not in line
+        and "skips without" not in line
     ]
     # Legacy test wrappers sometimes print [PASS] after the test body already
     # emitted [SKIP]. Do not turn that wrapper bookkeeping into an assertion.
@@ -178,7 +183,9 @@ def run_one(skill_dir: Path, timeout: int) -> dict[str, object]:
         or (kind is None and exit_code == 0)
         for line in explicit_failure_lines
     )
-    outage_only = exit_code != 0 and NETWORK_MARKER.search(log) and not deterministic_failure
+    outage_only = (
+        exit_code != 0 and NETWORK_MARKER.search(log) and not deterministic_failure
+    )
     if deterministic_failure:
         status = "fail"
     elif outage_only:
@@ -186,9 +193,7 @@ def run_one(skill_dir: Path, timeout: int) -> dict[str, object]:
         skips.append("upstream outage prevented live assertions")
     elif exit_code != 0:
         status = "fail"
-    elif not classified_passes and skips and (
-        CREDENTIAL_MARKER.search(log) or NETWORK_MARKER.search(log) or SKIP_GATING_MARKER.search(log)
-    ):
+    elif not live_passes and skips:
         status = "gated"
     elif classified_passes:
         status = "pass"
@@ -224,7 +229,10 @@ def write_summary(results: list[dict[str, object]]) -> None:
     summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
     if not summary_path:
         return
-    counts = {state: sum(result["status"] == state for result in results) for state in ("pass", "gated", "untested", "fail")}
+    counts = {
+        state: sum(result["status"] == state for result in results)
+        for state in ("pass", "gated", "untested", "fail")
+    }
     lines = [
         "## Skill smoke results",
         "",
@@ -232,21 +240,45 @@ def write_summary(results: list[dict[str, object]]) -> None:
         "|---|---:|---:|---:|---:|---:|",
     ]
     lines.extend(
-        f"| `{result['skill']}` | {result['status']} | {result['fixture_assertions']} | {result['contract_assertions']} | {result['live_assertions']} | {len(result['skips'])} |"
+        "| "
+        f"`{result['skill']}` | {result['status']} | "
+        f"{result['fixture_assertions']} | {result['contract_assertions']} | "
+        f"{result['live_assertions']} | {len(result['skips'])} |"
         for result in results
     )
-    lines.extend(("", f"PASS: {counts['pass']} | GATED: {counts['gated']} | UNTESTED: {counts['untested']} | FAIL: {counts['fail']}", ""))
+    lines.extend(
+        (
+            "",
+            f"PASS: {counts['pass']} | GATED: {counts['gated']} | "
+            f"UNTESTED: {counts['untested']} | FAIL: {counts['fail']}",
+            "",
+        )
+    )
     for result in results:
         if result["status"] == "fail":
-            lines.extend((f"<details><summary>{result['skill']}</summary>", "", "```", str(result["log"]), "```", "</details>", ""))
+            lines.extend(
+                (
+                    f"<details><summary>{result['skill']}</summary>",
+                    "",
+                    "```",
+                    str(result["log"]),
+                    "```",
+                    "</details>",
+                    "",
+                )
+            )
     with Path(summary_path).open("a", encoding="utf-8") as handle:
         handle.write("\n".join(lines))
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("skills", nargs="*", help="optional skill names; defaults to all")
-    parser.add_argument("--changed-from", help="run skills changed from this git revision")
+    parser.add_argument(
+        "skills", nargs="*", help="optional skill names; defaults to all"
+    )
+    parser.add_argument(
+        "--changed-from", help="run skills changed from this git revision"
+    )
     parser.add_argument("--jobs", type=int, default=16)
     parser.add_argument("--timeout", type=int, default=120)
     parser.add_argument("--json", action="store_true")
@@ -257,7 +289,9 @@ def main() -> int:
     )
     args = parser.parse_args()
     try:
-        names = args.skills or (changed_skills(args.changed_from) if args.changed_from else [])
+        names = args.skills or (
+            changed_skills(args.changed_from) if args.changed_from else []
+        )
     except RuntimeError as exc:
         parser.error(str(exc))
     if names:
@@ -266,8 +300,12 @@ def main() -> int:
         skill_dirs = []
     else:
         skill_dirs = list(iter_skill_dirs(REPO_ROOT))
-    with ThreadPoolExecutor(max_workers=min(max(1, args.jobs), max(1, len(skill_dirs)))) as executor:
-        results = list(executor.map(lambda path: run_one(path, args.timeout), skill_dirs))
+    with ThreadPoolExecutor(
+        max_workers=min(max(1, args.jobs), max(1, len(skill_dirs)))
+    ) as executor:
+        results = list(
+            executor.map(lambda path: run_one(path, args.timeout), skill_dirs)
+        )
     results.sort(key=lambda result: str(result["skill"]))
     write_summary(results)
     if args.summary_json:
@@ -280,7 +318,9 @@ def main() -> int:
                 {
                     "schema_version": "1",
                     "counts": counts,
-                    "failures": [result for result in results if result["status"] == "fail"],
+                    "failures": [
+                        result for result in results if result["status"] == "fail"
+                    ],
                     "untested": [
                         {"skill": result["skill"], "skips": result["skips"]}
                         for result in results
@@ -302,13 +342,20 @@ def main() -> int:
         for result in results:
             print(
                 f"[{str(result['status']).upper()}] {result['skill']} "
-                f"fixtures={result['fixture_assertions']} contract={result['contract_assertions']} "
+                f"fixtures={result['fixture_assertions']} "
+                f"contract={result['contract_assertions']} "
                 f"live={result['live_assertions']} skips={len(result['skips'])}"
             )
             if result["status"] == "fail":
                 print(result["log"])
-        counts = {state: sum(result["status"] == state for result in results) for state in ("pass", "gated", "untested", "fail")}
-        print(f"PASS: {counts['pass']}, GATED: {counts['gated']}, UNTESTED: {counts['untested']}, FAIL: {counts['fail']}")
+        counts = {
+            state: sum(result["status"] == state for result in results)
+            for state in ("pass", "gated", "untested", "fail")
+        }
+        print(
+            f"PASS: {counts['pass']}, GATED: {counts['gated']}, "
+            f"UNTESTED: {counts['untested']}, FAIL: {counts['fail']}"
+        )
     return 1 if any(result["status"] == "fail" for result in results) else 0
 
 
