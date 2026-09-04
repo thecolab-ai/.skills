@@ -1,0 +1,19 @@
+{
+  "pageResults": 1,
+  "totalResults": 1,
+  "resultsStartNumber": 1,
+  "reportOrganisation": [
+    {
+      "id": "b87fd7cf-288b-4d7e-9294-244b8339bd94",
+      "name": "Auckland Grammar School",
+      "category": 1,
+      "organisationType": "Secondary (Year 9-15)",
+      "moeNumber": 54,
+      "address": "Mountain Road , Epsom, Auckland",
+      "latestReportDate": "2026-05-14",
+      "url": "/institution/54/auckland-grammar-school",
+      "versionId": "b9c9072d-ab60-49ce-bbdf-2c6284ff8555",
+      "moeNumberDisplay": "54"
+    }
+  ]
+}

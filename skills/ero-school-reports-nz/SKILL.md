@@ -19,14 +19,15 @@ metadata:
   thecolab.pack: "nz-public-data"
   thecolab.source_url: "https://www.ero.govt.nz/review-reports"
   thecolab.allowed_domains: "ero.govt.nz, www.ero.govt.nz"
-  thecolab.last_verified: "2026-07-19"
-  thecolab.health: "degraded"
+  thecolab.last_verified: "2026-09-04"
+  thecolab.health: "healthy"
   thecolab.maintainer: "@adam91holt"
 ---
 
 # ERO School Reports NZ
 
 Use the read-only Python CLI to retrieve and filter records exposed by the official first-party source.
+Discovery uses ERO's reports index API to resolve the current institution URL, then the CLI parses the institution page HTML.
 Every command supports `--json`, bounded requests, stable exit codes, source URLs and retrieval timestamps.
 
 ## Commands

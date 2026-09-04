@@ -15,7 +15,7 @@
   "record_fields": {
     "rating": "not generated",
     "section_or_page_provenance": "verify in linked HTML or PDF report",
-    "extraction_limitations": "institution-page report sections only; navigation is excluded"
+    "extraction_limitations": "reports API resolves institution URLs; institution-page report sections only; navigation is excluded"
   },
   "smoke_args": [
     "search",
