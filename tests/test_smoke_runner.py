@@ -140,24 +140,32 @@ metadata:
 
     def test_explicit_fixture_pass_is_meaningful(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            skill = self.make_skill(Path(tmp), "print('[PASS] fixture parser retained identifier')\n")
+            skill = self.make_skill(
+                Path(tmp), "print('[PASS] fixture parser retained identifier')\n"
+            )
             result = run_one(skill, 10)
             self.assertEqual(result["status"], "pass")
             self.assertEqual(result["fixture_assertions"], 1)
 
     def test_explicit_unavailable_skip_is_gated(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            skill = self.make_skill(Path(tmp), "print('[SKIP] source asset unavailable')\n")
+            skill = self.make_skill(
+                Path(tmp), "print('[SKIP] source asset unavailable')\n"
+            )
             result = run_one(skill, 10)
             self.assertEqual(result["status"], "gated")
 
     def test_fixture_failure_is_hard_even_if_script_exits_zero(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            skill = self.make_skill(Path(tmp), "print('[FAIL] fixture parser shape changed')\n")
+            skill = self.make_skill(
+                Path(tmp), "print('[FAIL] fixture parser shape changed')\n"
+            )
             result = run_one(skill, 10)
             self.assertEqual(result["status"], "fail")
 
-    def test_fixture_pass_describing_fail_closed_behaviour_is_not_a_failure(self) -> None:
+    def test_fixture_pass_describing_fail_closed_behaviour_is_not_a_failure(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             skill = self.make_skill(
                 Path(tmp),
@@ -168,7 +176,9 @@ metadata:
 
     def test_declared_skill_requirements_are_installed_with_uv(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            skill = self.make_skill(Path(tmp), "print('[PASS] fixture dependency loaded')\n")
+            skill = self.make_skill(
+                Path(tmp), "print('[PASS] fixture dependency loaded')\n"
+            )
             requirements = skill / "requirements.txt"
             requirements.write_text("example-package==1.0\n", encoding="utf-8")
             smoke = skill / "scripts" / "smoke_test.py"
