@@ -525,6 +525,61 @@ def main() -> int:
         "ignores adjacent inert H1 elements"
     )
 
+    hidden_h1_styles = (
+        "display:none",
+        " DISPLAY : NONE ",
+        "display:\t none",
+        "visibility:hidden",
+        " VISIBILITY : HIDDEN ",
+        "content-visibility:hidden",
+        " CONTENT-VISIBILITY : HIDDEN ",
+        "display: /* inert */ none !IMPORTANT",
+        "display:block; display:none",
+        "display:none; display:block",
+    )
+    for hidden_h1_style in hidden_h1_styles:
+        hidden_h1_source = replace_once(
+            destination_source,
+            "<h1>Exampleland</h1>",
+            f'<h1 style="{hidden_h1_style}">Exampleland</h1>',
+        )
+        assert_cli_schema_error(
+            cli,
+            sitemap_source=sitemap_source,
+            destination_source=hidden_h1_source,
+            message_fragment="missing its destination heading",
+        )
+    print(
+        "[PASS] inline CSS-hidden destination H1 variants fail closed through "
+        "the JSON CLI"
+    )
+
+    duplicate_style_attribute_source = replace_once(
+        destination_source,
+        "<h1>Exampleland</h1>",
+        '<h1 style="display:block" STYLE="display:none">Exampleland</h1>',
+    )
+    assert_cli_schema_error(
+        cli,
+        sitemap_source=sitemap_source,
+        destination_source=duplicate_style_attribute_source,
+        message_fragment="duplicate HTML attribute name: style",
+    )
+    print("[PASS] duplicate case-variant inline style attributes fail closed")
+
+    visible_styled_h1_source = replace_once(
+        destination_source,
+        "<h1>Exampleland</h1>",
+        '<h1 style="color: navy; display: block">Exampleland</h1>',
+    )
+    visible_styled_h1_detail = cli.parse_destination_page(
+        visible_styled_h1_source,
+        slug="exampleland",
+        url=requested_url,
+    )
+    assert visible_styled_h1_detail["destination"]["name"] == "Exampleland"
+    print("[PASS] benign inline H1 styling remains compatible")
+
     punctuated_identity_source = replace_once(
         destination_source,
         "<h1>Exampleland</h1>",
@@ -566,6 +621,49 @@ def main() -> int:
         message_fragment="advice body HTML fragment",
     )
     print("[PASS] self-closing non-void advice body HTML fails closed")
+
+    template_only_body_source = replace_once(
+        destination_source,
+        (
+            "&lt;p&gt;Exercise increased caution in Exampleland "
+            "(level 2 of 4).&lt;/p&gt;"
+        ),
+        (
+            "&lt;template&gt;Exercise increased caution in Exampleland "
+            "(level 2 of 4).&lt;/template&gt;"
+        ),
+    )
+    assert_cli_schema_error(
+        cli,
+        sitemap_source=sitemap_source,
+        destination_source=template_only_body_source,
+        message_fragment="missing a title, level, or advice body",
+    )
+
+    template_injected_body_source = replace_once(
+        destination_source,
+        (
+            "&lt;p&gt;Exercise increased caution in Exampleland "
+            "(level 2 of 4).&lt;/p&gt;"
+        ),
+        (
+            "&lt;p&gt;Exercise increased caution in Exampleland.&lt;/p&gt;"
+            "&lt;template&gt;(level 2 of 4).&lt;/template&gt;"
+        ),
+    )
+    assert_cli_schema_error(
+        cli,
+        sitemap_source=sitemap_source,
+        destination_source=template_injected_body_source,
+        message_fragment="did not contain a recognised level marker",
+    )
+    assert cli.html_to_text(
+        "<p>Visible advice.</p><template>Injected advice.</template>"
+    ) == "Visible advice."
+    print(
+        "[PASS] template-only and template-injected advice cannot satisfy visible "
+        "advice text through the JSON CLI"
+    )
 
     nested_body_source = replace_once(
         destination_source,

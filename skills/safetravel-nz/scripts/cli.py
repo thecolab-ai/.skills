@@ -135,6 +135,28 @@ def clean_text(value: str) -> str:
     return " ".join(html.unescape(value).split())
 
 
+def inline_style_hides_element(value: str) -> bool:
+    """Return true when any inline CSS declaration makes an element inert."""
+    style = re.sub(r"/\*.*?\*/", "", value, flags=re.DOTALL)
+    hidden_values = {
+        "display": "none",
+        "visibility": "hidden",
+        "content-visibility": "hidden",
+    }
+    for declaration in style.split(";"):
+        property_name, separator, raw_value = declaration.partition(":")
+        if not separator:
+            continue
+        property_name = property_name.strip().casefold()
+        expected_value = hidden_values.get(property_name)
+        if expected_value is None:
+            continue
+        css_value = "".join(raw_value.casefold().split()).removesuffix("!important")
+        if css_value == expected_value:
+            return True
+    return False
+
+
 class VisibleTextParser(HTMLParser):
     """Validate and extract visible text from a safety-critical HTML fragment."""
 
@@ -148,7 +170,7 @@ class VisibleTextParser(HTMLParser):
         tag = tag.lower()
         if tag not in VOID_HTML_TAGS:
             self._element_stack.append(tag)
-        if tag in {"script", "style", "noscript", "svg"}:
+        if tag in INERT_HTML_TAGS:
             self._skip_depth += 1
 
     def handle_startendtag(
@@ -172,7 +194,7 @@ class VisibleTextParser(HTMLParser):
                 f"{tag} closing element"
             )
         self._element_stack.pop()
-        if tag in {"script", "style", "noscript", "svg"} and self._skip_depth:
+        if tag in INERT_HTML_TAGS and self._skip_depth:
             self._skip_depth -= 1
 
     def handle_data(self, data: str) -> None:
@@ -260,6 +282,7 @@ class DestinationPageParser(HTMLParser):
                 "hidden" in attrs_dict
                 or "inert" in attrs_dict
                 or attrs_dict.get("aria-hidden", "").casefold() == "true"
+                or inline_style_hides_element(attrs_dict.get("style", ""))
             )
         )
         if starts_ignored_subtree and tag not in VOID_HTML_TAGS:
