@@ -27,7 +27,10 @@ SITEMAP_URL = urljoin(BASE_URL, "sitemap.xml")
 DESTINATION_PREFIX = urljoin(BASE_URL, "destinations/")
 ALLOWED_HOSTS = ("www.safetravel.govt.nz",)
 TIMEOUT_SECONDS = 10
-CHANGE_WARNING = "Travel advice can change. Consult the official SafeTravel page before travelling or making safety-critical decisions."
+CHANGE_WARNING = (
+    "Travel advice can change. Consult the official SafeTravel page before "
+    "travelling or making safety-critical decisions."
+)
 ADVICE_LEVEL_NUMBERS = {
     "low": 1,
     "moderate": 2,
@@ -129,7 +132,10 @@ def html_to_text(value: str) -> str:
 
 
 class DestinationPageParser(HTMLParser):
-    """Capture the supported SafeTravel page surfaces with deterministic stdlib parsing."""
+    (
+        "Capture the supported SafeTravel page surfaces with deterministic "
+        "stdlib parsing."
+    )
 
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
@@ -279,7 +285,8 @@ def normalise_destination(value: str) -> str:
             or parsed.fragment
         ):
             raise SkillError(
-                "destination URL must be a canonical www.safetravel.govt.nz destination URL",
+                "destination URL must be a canonical www.safetravel.govt.nz "
+                "destination URL",
                 2,
             )
         parts = [part for part in parsed.path.split("/") if part]
@@ -317,7 +324,8 @@ def parse_advice_item(item: Any) -> dict[str, Any]:
     level_number = int(level_number_match.group(1))
     if level_number != expected_level_number:
         raise SchemaError(
-            f"advice-level data disagreed: {title!r} had level {raw_level!r} but body level {level_number}"
+            f"advice-level data disagreed: {title!r} had level {raw_level!r} "
+            f"but body level {level_number}"
         )
     return {
         "title": title,
@@ -361,7 +369,8 @@ def parse_related_news(
         if not title:
             continue
         # Footer registration material uses a /news/ instructional URL but is not
-        # destination-related news; this skill intentionally excludes registration workflows.
+        # destination-related news; this skill intentionally excludes registration
+        # workflows.
         if (
             title.casefold() == "register your travel"
             or "registering-on-safetravel" in url.casefold()
@@ -409,7 +418,8 @@ def parse_destination_page(source: str, *, slug: str, url: str) -> dict[str, Any
     ]
     if len(primary_items) != 1:
         raise SchemaError(
-            "destination advice-level data must contain exactly one non-regional primary item"
+            "destination advice-level data must contain exactly one non-regional "
+            "primary item"
         )
     primary = primary_items[0]
     regional = [
@@ -524,7 +534,8 @@ def cmd_advice(args: argparse.Namespace) -> dict[str, Any]:
     destination = next((item for item in destinations if item["slug"] == slug), None)
     if destination is None:
         raise SkillError(
-            f"destination '{slug}' was not found in the official SafeTravel sitemap; use search first",
+            f"destination '{slug}' was not found in the official SafeTravel "
+            "sitemap; use search first",
             2,
         )
     page_url = str(destination["url"])
@@ -535,7 +546,8 @@ def cmd_advice(args: argparse.Namespace) -> dict[str, Any]:
     final_slug = canonical_destination_slug(final_url)
     if final_slug is None:
         raise SchemaError(
-            "destination fetch did not resolve to a canonical SafeTravel destination URL"
+            "destination fetch did not resolve to a canonical SafeTravel "
+            "destination URL"
         )
     if final_slug != slug:
         raise SchemaError(
@@ -629,7 +641,8 @@ def print_human(result: dict[str, Any]) -> None:
             print("Regional cautions:")
             for item in data["regional_cautions"]:
                 print(
-                    f"- Level {item['number']} ({item['level']}): {item['title']} {item['subtitle']}"
+                    f"- Level {item['number']} ({item['level']}): {item['title']} "
+                    f"{item['subtitle']}"
                 )
         if data["related_alerts_news"]:
             print("Related alerts/news:")

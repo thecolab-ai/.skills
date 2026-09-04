@@ -69,7 +69,10 @@ def main() -> int:
         "slug": "exampleland",
         "url": "https://www.safetravel.govt.nz/destinations/exampleland",
         "page_updated": "15 August 2026",
-        "summary": "The New Zealand Government's official travel advice for Exampleland.",
+        "summary": (
+            "The New Zealand Government's official travel advice for "
+            "Exampleland."
+        ),
     }
     assert detail["advice_level"]["number"] == 2
     assert detail["advice_level"]["level"] == "moderate"
@@ -82,7 +85,10 @@ def main() -> int:
             "number": 4,
             "last_updated": "29 July 2026",
             "still_current_at": "03 September 2026",
-            "body": "Do not travel to North Exampleland (level 4 of 4) because of armed conflict.",
+            "body": (
+                "Do not travel to North Exampleland (level 4 of 4) because of "
+                "armed conflict."
+            ),
         }
     ]
     assert detail["related_alerts_news"] == [
@@ -163,7 +169,8 @@ def main() -> int:
         ),
     }
     print(
-        "[PASS] cross-destination redirects fail closed without a mixed success response"
+        "[PASS] cross-destination redirects fail closed without a mixed success "
+        "response"
     )
 
     stdout = io.StringIO()
