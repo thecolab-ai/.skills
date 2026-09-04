@@ -1,6 +1,6 @@
 ---
 name: babycity-nz
-description: "Query babycity NZ's public Shopify product search, product details, current online price snapshots, variant availability, and verified store-locator page. Use when comparing babycity products, looking up a product handle or URL, or finding official babycity store information. Read-only; no cart, checkout, account, payment, booking, or other mutations."
+description: "Query babycity NZ's public storefront search, product details, current online price snapshots, variant availability, and verified store-locator page. Use when comparing babycity products, looking up a product handle or URL, or finding official babycity store information. Read-only; no cart, checkout, account, payment, booking, or other mutations. Product pages use canonical /shop/... storefront URLs."
 license: MIT
 compatibility: "Requires Python 3.10+ and network access for live data"
 metadata:
@@ -19,7 +19,7 @@ metadata:
   thecolab.pack: "nz-commercial-web"
   thecolab.source_url: "https://www.babycity.co.nz"
   thecolab.allowed_domains: "babyonthemove.co.nz,www.babycity.co.nz,www.dimples.co.nz,www.naturebaby.co.nz"
-  thecolab.last_verified: "2026-07-19"
+  thecolab.last_verified: "2026-09-04"
   thecolab.health: "healthy"
   thecolab.maintainer: "@adam91holt"
 ---
@@ -40,7 +40,7 @@ Use this skill for narrow, live lookups against babycity NZ's public storefront.
 
 ```bash
 python3 skills/babycity-nz/scripts/cli.py search "cot" --limit 5 --json
-python3 skills/babycity-nz/scripts/cli.py product sunbury-tiburon-cot --json
+python3 skills/babycity-nz/scripts/cli.py product duet-carrycot-bundle-mountain-buggy-duettm-carrycot-plustm-bundle-11918 --json
 python3 skills/babycity-nz/scripts/cli.py stores --json
 ```
 
@@ -50,7 +50,7 @@ Commands:
 - `product <handle-or-product-url> [--timeout 1..30] [--json]`
 - `stores [--timeout 1..30] [--json]`
 
-Network timeout defaults to 10 seconds. Search is bounded to 10 predictive-search results. Availability means the online storefront state only, never physical store stock.
+Network timeout defaults to 10 seconds. Search is bounded to 10 storefront results. Availability means the online storefront state only, never physical store stock.
 
 ## Boundaries
 

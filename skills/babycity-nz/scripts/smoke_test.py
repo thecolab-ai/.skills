@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Live, outage-tolerant smoke tests for this Shopify retailer skill."""
+"""Live, outage-tolerant smoke tests for this HTML storefront skill."""
 from __future__ import annotations
 
-import json
 import importlib.util
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -13,7 +13,7 @@ NETWORK_MARKERS = ("network error", "timed out", "temporarily unavailable", "htt
 
 
 def run(*args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run([sys.executable, str(CLI), *args], capture_output=True, text=True, timeout=40)
+    return subprocess.run([sys.executable, str(CLI), *args], capture_output=True, check=False, text=True, timeout=40)
 
 
 def require(condition: bool, message: str) -> None:
@@ -76,27 +76,72 @@ def main() -> int:
     require(redirect_rejected, "redirect handler did not intercept foreign origin")
     require(fetch_rejected(module, "https://evil.example/test"), "foreign final URL was accepted")
     require(fetch_rejected(module, module.BASE_URL + "/test"), "oversized response was accepted")
-    original_fetch_json = getattr(module, "fetch_json")
-    setattr(module, "fetch_json", lambda url, timeout: ({"resources": {"results": {"products": {}}}}, url))
+    search_html = """
+    <html><body>
+      <div class="col tp-product-item tp-product-item-grid-1" data-product-template-id="123">
+        <form class="h-100 bg-white" role="article" data-publish="on" aria-label="Fixture Product">
+          <input type="hidden" name="product_id" value="456"/>
+          <div class="tp-product-content border-top p-2">
+            <a class="tp-link-dark text-truncate d-block" itemprop="name" title="Fixture Product" href="/shop/fixture-product-456" content="Fixture Product">Fixture Product</a>
+            <div aria-label="Price information" class="product_price">
+              <span class="h6 text-primary mb-0"><span class="oe_currency_value">12.34</span></span>
+            </div>
+            <img src="/web/image/product.product/456/image_1024/fixture.webp"/>
+          </div>
+        </form>
+      </div>
+    </body></html>
+    """
+    parsed_search = module.parse_search_page(search_html, 1)
+    require(parsed_search[0]["handle"] == "fixture-product-456", "search parser must preserve the canonical shop handle")
+    require(module.normalize_search(parsed_search[0])["url"].endswith("/shop/fixture-product-456"), "search url must be canonical shop-based")
+    require(module.product_lookup_url(parsed_search[0]["handle"]).endswith("/shop/fixture-product-456"), "search handle must resolve to a shop URL")
     try:
-        module.search_products("cot", 1, 1)
+        module.parse_search_page("<html><body><div class='missing'></div></body></html>", 1)
         malformed_rejected = False
     except module.StorefrontError:
         malformed_rejected = True
-    finally:
-        setattr(module, "fetch_json", original_fetch_json)
-    require(malformed_rejected, "malformed predictive-search products must be a concise error")
+    require(malformed_rejected, "malformed search HTML must fail closed")
 
-    search_fixture = {"id": 1, "handle": "fixture", "title": "Fixture", "price_min": 10.0, "price_max": 10.0, "compare_at_price_min": 0}
-    require(module.normalize_search(search_fixture)["compare_at_price_min"] is None, "zero compare-at sentinel must be null")
-    require(module.amount("nan") is None and module.amount(-0.01) is None, "non-finite and negative prices must fail closed")
+    product_html = """
+    <html><head><link rel="canonical" href="https://www.babycity.co.nz/shop/fixture-product-456"/></head>
+    <body>
+      <section id="product_detail">
+        <input type="hidden" name="product_id" value="456"/>
+        <input type="hidden" name="product_type" value="consu"/>
+        <h1 class="h3">Fixture Product</h1>
+        <span class="product-price"><span class="oe_currency_value">2229.93</span></span>
+        <input class="js_variant_change" checked="True" data-value-name="Fixture Option" title="Fixture Option"/>
+        <button class="product-add-to-cart btn btn-primary-soft">Add to Cart</button>
+        <img src="/web/image/product.product/456/image_1024/fixture.webp"/>
+      </section>
+    </body></html>
+    """
+    parsed_product = module.parse_product_page(product_html, "fixture-product-456")
+    normalized_product = module.normalize_detail(parsed_product)
+    require(normalized_product["handle"] == "fixture-product-456", "product parser must preserve the canonical shop handle")
+    require(normalized_product["url"].endswith("/shop/fixture-product-456"), "product url must remain canonical")
+    require(normalized_product["price"] == 2229.93 and normalized_product["variants"][0]["price"] == 2229.93, "detail price must preserve decimal NZD values")
+    require(isinstance(normalized_product.get("variants"), list) and normalized_product["variants"], "product variants missing")
+    try:
+        module.parse_product_page("<html><body><h1 class='h3'>Broken</h1></body></html>", "broken")
+        malformed_rejected = False
+    except module.StorefrontError:
+        malformed_rejected = True
+    require(malformed_rejected, "malformed product HTML must fail closed")
+
+    search_fixture = {"id": 1, "handle": "fixture", "title": "Fixture", "price_min": 2229.93, "price_max": 2229.93, "compare_at_price_min": 0}
+    normalized_search = module.normalize_search(search_fixture)
+    require(normalized_search["price_min"] == 2229.93 and normalized_search["price_max"] == 2229.93, "search price must preserve decimal NZD values")
+    require(normalized_search["compare_at_price_min"] is None, "zero compare-at sentinel must be null")
+    require(module.amount("nan") is None and module.amount(float("inf")) is None and module.amount(-0.01) is None, "non-finite and negative prices must fail closed")
     try:
         module.normalize_search({})
         malformed_search_rejected = False
     except module.StorefrontError:
         malformed_search_rejected = True
     require(malformed_search_rejected, "malformed predictive-search item must fail closed")
-    for malformed_product in ({}, {"handle": "fixture", "title": "Fixture", "variants": None}, {"handle": "fixture", "title": "Fixture", "variants": []}, {"handle": "fixture", "title": "Fixture", "variants": ["bad"]}, {"handle": "fixture", "title": "Fixture", "variants": [{}]}):
+    for malformed_product in ({}, {"handle": "fixture", "title": "Fixture", "variants": None}, {"handle": "fixture", "title": "Fixture", "variants": []}, {"handle": "fixture", "title": "Fixture", "variants": ["bad"]}, {"handle": "fixture", "title": "Fixture", "variants": [{}]}, {"handle": "fixture", "title": "Fixture", "price": float("nan"), "variants": [{"id": 1, "price": 2229.93}]}):
         try:
             module.normalize_detail(malformed_product)
             product_rejected = False
@@ -138,12 +183,13 @@ def main() -> int:
     require(len(products) <= 3, "search exceeded limit")
     first = products[0]
     require(first.get("handle"), "product missing handle")
+    require(str(first.get("url", "")).startswith("https://www.babycity.co.nz/shop/"), "search url must be canonical shop-based")
     require(first.get("availability_scope") == "online storefront, not store stock", "availability scope unclear")
 
     detail = run("product", first["handle"], "--json")
     if live_or_skip(detail):
         item = json.loads(detail.stdout)
-        require(item.get("source_url", "").endswith(".js"), "detail source must be product .js")
+        require("/shop/" in item.get("source_url", ""), "detail source must be the current storefront page")
         require(item.get("retrieved_at", "").endswith("Z"), "detail missing retrieved_at")
         require(item["product"]["handle"] == first["handle"], "detail handle mismatch")
         require(isinstance(item["product"].get("variants"), list), "variants missing")
