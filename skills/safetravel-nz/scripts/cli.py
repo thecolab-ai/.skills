@@ -578,28 +578,16 @@ def ensure_bounded_json_depth(value: Any) -> None:
 
 
 def is_canonical_news_path(path: str) -> bool:
-    current = path
-    for _ in range(5):
-        if re.search(r"%(?:2f|5c)", current, re.IGNORECASE):
-            return False
-        if re.search(r"%(?![0-9a-f]{2})", current, re.IGNORECASE):
-            return False
-        decoded = unquote(current)
-        if "\\" in decoded or any(
-            segment in {".", ".."} for segment in decoded.split("/")
-        ):
-            return False
-        normalised = posixpath.normpath(decoded)
-        if (
-            normalised != decoded
-            or normalised == "/news"
-            or not normalised.startswith("/news/")
-        ):
-            return False
-        if decoded == current:
-            return True
-        current = decoded
-    return False
+    if "%" in path or "\\" in path:
+        return False
+    if any(segment in {".", ".."} for segment in path.split("/")):
+        return False
+    normalised = posixpath.normpath(path)
+    return (
+        normalised == path
+        and normalised != "/news"
+        and normalised.startswith("/news/")
+    )
 
 
 def canonical_related_news_url(page_url: str, href: str) -> str:

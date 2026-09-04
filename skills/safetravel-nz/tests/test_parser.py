@@ -497,6 +497,7 @@ def main() -> int:
         "/news/exampleland%255c..%255cdestinations/another-place",
         "/news/exampleland\\..\\destinations/another-place",
         "/news/exampleland%2Fupdate",
+        "/news/%65xampleland-security-update",
     ):
         encoded_escape_source = replace_once(
             destination_source,
@@ -511,6 +512,25 @@ def main() -> int:
         )
     print(
         "[PASS] non-canonical, encoded, and backslash related-news paths fail closed"
+    )
+
+    encoded_duplicate_news_source = replace_once(
+        destination_source,
+        "    <a href=\"/news/registering-on-safetravel-instructions\"",
+        (
+            "    <a href=\"/news/%65xampleland-security-update\" "
+            "aria-label=\"Encoded duplicate\"><h4>Encoded duplicate</h4></a>\n"
+            "    <a href=\"/news/registering-on-safetravel-instructions\""
+        ),
+    )
+    assert_cli_schema_error(
+        cli,
+        sitemap_source=sitemap_source,
+        destination_source=encoded_duplicate_news_source,
+        message_fragment="related-news URL",
+    )
+    print(
+        "[PASS] percent-encoded duplicates cannot bypass literal related-news identity"
     )
 
     for suffix in ("?variant=1", "#variant", ";variant=1"):
