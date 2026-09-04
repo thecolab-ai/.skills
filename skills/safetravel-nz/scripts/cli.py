@@ -33,7 +33,7 @@ MAX_JSON_DEPTH = 100
 SITEMAP_NAMESPACE_SCHEME = "http"
 SITEMAP_NAMESPACE_LOCATION = "www.sitemaps.org/schemas/sitemap/0.9"
 SITEMAP_FIELD_NAMES = frozenset(("loc", "lastmod", "changefreq", "priority"))
-INERT_HTML_TAGS = frozenset(("script", "style", "noscript", "svg", "template"))
+INERT_HTML_TAGS = frozenset(("script", "noscript", "svg", "template"))
 VOID_HTML_TAGS = frozenset(
     {
         "area",
@@ -141,8 +141,8 @@ def clean_text(value: str) -> str:
     return " ".join(html.unescape(value).split())
 
 
-def inline_style_hides_element(value: str) -> bool:
-    """Fail closed unless every inline declaration is provably visible and benign."""
+def inline_style_is_untrusted(value: str) -> bool:
+    """Fail closed unless every inline declaration is source-visibly benign."""
     style = re.sub(r"/\*.*?\*/", "", value, flags=re.DOTALL)
     if "/*" in style or "*/" in style or "\\" in style:
         return True
@@ -180,7 +180,7 @@ def starts_ignored_html_subtree(tag: str, attrs: dict[str, str]) -> bool:
             "hidden" in attrs
             or "inert" in attrs
             or attrs.get("aria-hidden", "").casefold() == "true"
-            or inline_style_hides_element(attrs.get("style", ""))
+            or inline_style_is_untrusted(attrs.get("style", ""))
         )
     )
 
@@ -200,8 +200,17 @@ def normalise_html_attrs(
     return result
 
 
+def reject_embedded_style_element(tag: str, *, context: str) -> None:
+    """Reject same-document CSS because selectors can hide trusted source text."""
+    if tag == "style":
+        raise SchemaError(
+            f"{context} contained an embedded style element; source-text "
+            "visibility cannot be proven"
+        )
+
+
 class VisibleTextParser(HTMLParser):
-    """Validate and extract visible text from a safety-critical HTML fragment."""
+    """Validate and extract source-visible text from a safety-critical fragment."""
 
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
@@ -213,6 +222,7 @@ class VisibleTextParser(HTMLParser):
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         tag = tag.lower()
         attrs_dict = normalise_html_attrs(attrs, context="advice body HTML fragment")
+        reject_embedded_style_element(tag, context="advice body HTML fragment")
         if tag not in VOID_HTML_TAGS:
             self._element_stack.append(tag)
         if starts_ignored_html_subtree(tag, attrs_dict) and tag not in VOID_HTML_TAGS:
@@ -305,6 +315,7 @@ class DestinationPageParser(HTMLParser):
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         tag = tag.lower()
         attrs_dict = normalise_html_attrs(attrs, context="destination page HTML")
+        reject_embedded_style_element(tag, context="destination page HTML")
         if tag not in VOID_HTML_TAGS:
             self._element_stack.append(tag)
         if tag in {"html", "head", "body"}:

@@ -28,6 +28,26 @@ Destination parsing also requires complete outer `html`/`head`/`body` structure 
 parser-relevant elements. Materially truncated or unclosed markup fails closed instead of
 yielding partial advice.
 
+### Source-text visibility trust boundary
+
+This stdlib parser does not run a browser, build a CSS object model, fetch linked stylesheets,
+or claim computed browser visibility. Its bounded guarantee is narrower: destination identity,
+advice, level markers, page dates, and related-news text must survive the source-level checks
+below before they can be returned.
+
+- Any embedded `<style>` element in the destination document or decoded advice-body fragment is
+  rejected as a source-schema failure (exit 6). Even apparently benign embedded CSS is rejected
+  because a selector can hide an H1, advice body, or level marker elsewhere in the same document.
+- Inline `style` attributes are handled fail closed. Only the small explicit allowlist in
+  `scripts/cli.py` is treated as source-visibly benign; colour, unknown properties, malformed
+  declarations, CSS escapes, and hidden/collapsed/transparent values make that subtree
+  untrusted. Required identity or advice sourced only from such a subtree then fails schema
+  validation.
+- `<link rel="stylesheet">` elements remain accepted for compatibility with the live official
+  source, which currently links font and site stylesheets. Those stylesheets are not fetched or
+  evaluated by this CLI and are outside its visibility guarantee. Consequently, parser output
+  is trusted source text under these checks, not proof that a browser renders the text visibly.
+
 The visible page includes a `Page updated <date>` label. Related news cards link to `/news/...` pages and can display `Updated <date>`. Their text is returned only as a short source-page summary; this skill does not fetch or interpret the linked news article itself. Footer registration material is deliberately excluded from related-news output.
 
 ## Advice levels

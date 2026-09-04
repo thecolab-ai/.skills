@@ -593,6 +593,104 @@ def main() -> int:
     assert visible_styled_h1_detail["destination"]["name"] == "Exampleland"
     print("[PASS] benign inline H1 styling remains compatible")
 
+    embedded_class_rule = "<style>.source-hidden { display: none }</style>"
+    stylesheet_encoded_primary_body = (
+        "&lt;p&gt;Exercise increased caution in Exampleland "
+        "(level 2 of 4).&lt;/p&gt;"
+    )
+    stylesheet_visible_advice_text = (
+        "Exercise increased caution in Exampleland (level 2 of 4)."
+    )
+    stylesheet_source = replace_once(
+        destination_source,
+        "</head>",
+        f"  {embedded_class_rule}\n</head>",
+    )
+    stylesheet_hidden_surfaces = (
+        (
+            "destination H1",
+            replace_once(
+                stylesheet_source,
+                "<h1>Exampleland</h1>",
+                '<h1 class="source-hidden">Exampleland</h1>',
+            ),
+        ),
+        (
+            "advice body",
+            replace_once(
+                stylesheet_source,
+                stylesheet_encoded_primary_body,
+                (
+                    "&lt;p class=&#39;source-hidden&#39;&gt;Exercise increased caution "
+                    "in Exampleland (level 2 of 4).&lt;/p&gt;"
+                ),
+            ),
+        ),
+        (
+            "advice level marker",
+            replace_once(
+                stylesheet_source,
+                stylesheet_encoded_primary_body,
+                (
+                    "&lt;p&gt;Exercise increased caution in Exampleland "
+                    "&lt;span class=&#39;source-hidden&#39;&gt;(level 2 of 4)"
+                    "&lt;/span&gt;.&lt;/p&gt;"
+                ),
+            ),
+        ),
+        (
+            "advice-local embedded CSS",
+            replace_once(
+                destination_source,
+                stylesheet_encoded_primary_body,
+                (
+                    "&lt;style&gt;.source-hidden { display: none }&lt;/style&gt;"
+                    "&lt;p class=&#39;source-hidden&#39;&gt;Exercise increased caution "
+                    "in Exampleland (level 2 of 4).&lt;/p&gt;"
+                ),
+            ),
+        ),
+    )
+    for _surface, stylesheet_hidden_source in stylesheet_hidden_surfaces:
+        assert_schema_error(
+            cli,
+            source=stylesheet_hidden_source,
+            slug="exampleland",
+            message_fragment="embedded style element",
+        )
+        assert_cli_schema_error(
+            cli,
+            sitemap_source=sitemap_source,
+            destination_source=stylesheet_hidden_source,
+            message_fragment="embedded style element",
+        )
+    print(
+        "[PASS] embedded class CSS cannot supply the destination H1, advice body, "
+        "or level marker through the JSON CLI"
+    )
+
+    linked_stylesheet_source = replace_once(
+        destination_source,
+        "</head>",
+        (
+            '  <link rel="stylesheet" href="/public/assets/fonts.css">\n'
+            '  <link href="/public/assets/main.css?v=20260814.1" '
+            'rel="stylesheet">\n'
+            "</head>"
+        ),
+    )
+    linked_stylesheet_detail = cli.parse_destination_page(
+        linked_stylesheet_source,
+        slug="exampleland",
+        url=requested_url,
+    )
+    assert linked_stylesheet_detail["destination"]["name"] == "Exampleland"
+    assert (
+        linked_stylesheet_detail["advice_level"]["body"]
+        == stylesheet_visible_advice_text
+    )
+    print("[PASS] live-shaped linked stylesheets remain source-compatible")
+
     punctuated_identity_source = replace_once(
         destination_source,
         "<h1>Exampleland</h1>",
