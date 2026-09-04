@@ -90,7 +90,7 @@ def as_number(value: Any) -> float | None:
 
 def json_ld_objects(markup: str) -> list[dict[str, Any]]:
     objects: list[dict[str, Any]] = []
-    pattern = re.compile(r"<script[^>]*type=[\"']application/ld\+json[\"'][^>]*>(.*?)</script>", re.I | re.S)
+    pattern = re.compile(r"<script[^>]*type=[\"']application/ld\+json[\"'][^>]*>(.*?)</script>", re.IGNORECASE | re.DOTALL)
     for match in pattern.finditer(markup):
         try:
             value = json.loads(match.group(1).strip())
@@ -101,15 +101,38 @@ def json_ld_objects(markup: str) -> list[dict[str, Any]]:
     return objects
 
 
+def _first_offer(value: Any) -> dict[str, Any]:
+    if isinstance(value, list):
+        return next((item for item in value if isinstance(item, dict)), {})
+    return value if isinstance(value, dict) else {}
+
+
+def _normalize_offer(offers: Any) -> dict[str, Any]:
+    offer = _first_offer(offers)
+    if not offer:
+        return {}
+    if offer.get("@type") != "AggregateOffer":
+        return offer
+
+    aggregate = offer
+    nested = _first_offer(aggregate.get("offers"))
+    normalized = dict(nested)
+    for key in ("priceCurrency", "availability", "url", "itemCondition", "acceptedPaymentMethod", "availableDeliveryMethod", "sku"):
+        if normalized.get(key) in (None, "") and aggregate.get(key) not in (None, ""):
+            normalized[key] = aggregate.get(key)
+    if normalized.get("price") is None:
+        for candidate in (aggregate.get("price"), aggregate.get("lowPrice"), aggregate.get("highPrice")):
+            if candidate is not None:
+                normalized["price"] = candidate
+                break
+    return normalized or aggregate
+
+
 def parse_product(markup: str, source_url: str) -> dict[str, Any] | None:
     product = next((item for item in json_ld_objects(markup) if item.get("@type") == "Product"), None)
     if not product:
         return None
-    offers = product.get("offers")
-    if isinstance(offers, list):
-        offers = next((item for item in offers if isinstance(item, dict)), {})
-    if not isinstance(offers, dict):
-        offers = {}
+    offers = _normalize_offer(product.get("offers"))
     brand = product.get("brand")
     if isinstance(brand, dict):
         brand = brand.get("name")
