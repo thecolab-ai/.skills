@@ -262,6 +262,89 @@ def main() -> int:
     destination_source = read_fixture("destination-page.html")
     requested_url = "https://www.safetravel.govt.nz/destinations/exampleland"
 
+    head_only_date_source = replace_once(
+        destination_source,
+        "<title>Exampleland</title>",
+        "<title>Page updated 1 January 2001</title>",
+    )
+    head_only_date_source = replace_once(
+        head_only_date_source,
+        "<p>Page updated 15 August 2026</p>",
+        "<p>Official destination advice</p>",
+    )
+    head_only_date_detail = cli.parse_destination_page(
+        head_only_date_source,
+        slug="exampleland",
+        url=requested_url,
+    )
+    assert head_only_date_detail["destination"]["page_updated"] is None
+
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    with (
+        mock.patch.object(
+            cli,
+            "fetch_text",
+            side_effect=[
+                (sitemap_source, cli.SITEMAP_URL),
+                (head_only_date_source, requested_url),
+            ],
+        ),
+        contextlib.redirect_stdout(stdout),
+        contextlib.redirect_stderr(stderr),
+    ):
+        exit_code = cli.main(["advice", "exampleland", "--json"])
+    assert exit_code == 0
+    assert stderr.getvalue() == ""
+    head_only_date_payload = json.loads(stdout.getvalue())
+    assert head_only_date_payload["data"]["destination"]["page_updated"] is None
+    assert "1 January 2001" not in stdout.getvalue()
+    print("[PASS] head title dates cannot supply page_updated through the JSON CLI")
+
+    aria_only_news_source = replace_once(
+        destination_source,
+        (
+            '    <a href="/news/exampleland-security-update" '
+            'aria-label="Exampleland security update">\n'
+            "      <p>Updated 29 July 2026</p>\n"
+            "      <h4>Exampleland security update</h4>\n"
+            "      <p>Official update for travellers.</p>\n"
+            "    </a>"
+        ),
+        (
+            '    <a href="/news/exampleland-security-update" '
+            'aria-label="Exampleland security update"></a>'
+        ),
+    )
+    aria_only_news_detail = cli.parse_destination_page(
+        aria_only_news_source,
+        slug="exampleland",
+        url=requested_url,
+    )
+    assert aria_only_news_detail["related_alerts_news"] == []
+
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    with (
+        mock.patch.object(
+            cli,
+            "fetch_text",
+            side_effect=[
+                (sitemap_source, cli.SITEMAP_URL),
+                (aria_only_news_source, requested_url),
+            ],
+        ),
+        contextlib.redirect_stdout(stdout),
+        contextlib.redirect_stderr(stderr),
+    ):
+        exit_code = cli.main(["advice", "exampleland", "--json"])
+    assert exit_code == 0
+    assert stderr.getvalue() == ""
+    aria_only_news_payload = json.loads(stdout.getvalue())
+    assert aria_only_news_payload["data"]["related_alerts_news"] == []
+    assert "Exampleland security update" not in stdout.getvalue()
+    print("[PASS] aria-label-only news titles are excluded through the JSON CLI")
+
     for tainted_final_url in (
         "https://WWW.SAFETRAVEL.GOVT.NZ/destinations/exampleland",
         "HTTPS://www.safetravel.govt.nz/destinations/exampleland",

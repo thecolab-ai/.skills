@@ -297,7 +297,7 @@ class DestinationPageParser(HTMLParser):
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
         self._skip_depth = 0
-        self.visible_parts: list[str] = []
+        self.body_visible_parts: list[str] = []
         self._ignored_element_depths: set[int] = set()
         self._body_h1_stack: list[list[str]] = []
         self.body_h1s: list[str] = []
@@ -363,7 +363,6 @@ class DestinationPageParser(HTMLParser):
                 self.anchor_stack.append(
                     {
                         "href": href,
-                        "aria": clean_text(attrs_dict.get("aria-label", "")),
                         "parts": [],
                         "heading_parts": [],
                         "heading_depth": 0,
@@ -419,7 +418,8 @@ class DestinationPageParser(HTMLParser):
         text = clean_text(data)
         if not text:
             return
-        self.visible_parts.append(text)
+        if self._document_stack[-1:] == ["body"]:
+            self.body_visible_parts.append(text)
         for h1_parts in self._body_h1_stack:
             h1_parts.append(text)
         if self.anchor_stack:
@@ -798,7 +798,7 @@ def parse_related_news(
             continue
         text = clean_text(" ".join(anchor["parts"]))
         headings = clean_text(" ".join(anchor["heading_parts"]))
-        title = headings or str(anchor["aria"]) or text
+        title = headings or text
         title = re.sub(
             r"\bUpdated\s+\d{1,2}\s+[A-Za-z]+\s+\d{4}\b", "", title, flags=re.IGNORECASE
         )
@@ -896,7 +896,7 @@ def parse_destination_page(source: str, *, slug: str, url: str) -> dict[str, Any
         for index, item in enumerate(advice_items)
         if regional_flags[index]
     ]
-    page_text = clean_text(" ".join(parser.visible_parts))
+    page_text = clean_text(" ".join(parser.body_visible_parts))
     page_updated_match = re.search(
         r"\bPage updated\s+(\d{1,2}\s+[A-Za-z]+\s+\d{4})\b", page_text, re.IGNORECASE
     )

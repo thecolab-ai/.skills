@@ -48,7 +48,12 @@ below before they can be returned.
   evaluated by this CLI and are outside its visibility guarantee. Consequently, parser output
   is trusted source text under these checks, not proof that a browser renders the text visibly.
 
-The visible page includes a `Page updated <date>` label. Related news cards link to `/news/...` pages and can display `Updated <date>`. Their text is returned only as a short source-page summary; this skill does not fetch or interpret the linked news article itself. Footer registration material is deliberately excluded from related-news output.
+The visible body includes a `Page updated <date>` label; matching date-like text in the document
+head is ignored. Related news cards link to `/news/...` pages and can display `Updated <date>`.
+A related-news title must come from trusted visible anchor or heading text: accessibility-only
+attributes such as `aria-label` are not emitted or used as output fallbacks. Card text is returned
+only as a short source-page summary; this skill does not fetch or interpret the linked news article
+itself. Footer registration material is deliberately excluded from related-news output.
 
 ## Advice levels
 
