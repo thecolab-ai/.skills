@@ -622,47 +622,165 @@ def main() -> int:
     )
     print("[PASS] self-closing non-void advice body HTML fails closed")
 
-    template_only_body_source = replace_once(
-        destination_source,
+    encoded_primary_body = (
+        "&lt;p&gt;Exercise increased caution in Exampleland "
+        "(level 2 of 4).&lt;/p&gt;"
+    )
+    visible_advice_text = "Exercise increased caution in Exampleland (level 2 of 4)."
+    hidden_advice_wrappers = (
+        ("template", "&lt;template&gt;", "&lt;/template&gt;"),
+        ("hidden", "&lt;div hidden&gt;&lt;p&gt;", "&lt;/p&gt;&lt;/div&gt;"),
+        ("inert", "&lt;div inert&gt;&lt;p&gt;", "&lt;/p&gt;&lt;/div&gt;"),
         (
-            "&lt;p&gt;Exercise increased caution in Exampleland "
-            "(level 2 of 4).&lt;/p&gt;"
+            "aria-hidden",
+            "&lt;div aria-hidden=&#39;true&#39;&gt;&lt;p&gt;",
+            "&lt;/p&gt;&lt;/div&gt;",
         ),
         (
-            "&lt;template&gt;Exercise increased caution in Exampleland "
-            "(level 2 of 4).&lt;/template&gt;"
+            "display none",
+            "&lt;div style=&#39;display:none&#39;&gt;&lt;p&gt;",
+            "&lt;/p&gt;&lt;/div&gt;",
+        ),
+        (
+            "display case and whitespace",
+            "&lt;div style=&#39; DISPLAY : NONE &#39;&gt;&lt;p&gt;",
+            "&lt;/p&gt;&lt;/div&gt;",
+        ),
+        (
+            "display tab whitespace",
+            "&lt;div style=&#39;display:\\t none&#39;&gt;&lt;p&gt;",
+            "&lt;/p&gt;&lt;/div&gt;",
+        ),
+        (
+            "visibility hidden",
+            "&lt;div style=&#39;visibility:hidden&#39;&gt;&lt;p&gt;",
+            "&lt;/p&gt;&lt;/div&gt;",
+        ),
+        (
+            "visibility case and whitespace",
+            "&lt;div style=&#39; VISIBILITY : HIDDEN &#39;&gt;&lt;p&gt;",
+            "&lt;/p&gt;&lt;/div&gt;",
+        ),
+        (
+            "content visibility hidden",
+            "&lt;div style=&#39;content-visibility:hidden&#39;&gt;&lt;p&gt;",
+            "&lt;/p&gt;&lt;/div&gt;",
+        ),
+        (
+            "content visibility case and whitespace",
+            "&lt;div style=&#39; CONTENT-VISIBILITY : HIDDEN &#39;&gt;&lt;p&gt;",
+            "&lt;/p&gt;&lt;/div&gt;",
+        ),
+        (
+            "comment and important",
+            "&lt;div style=&#39;display: /* inert */ none !IMPORTANT&#39;&gt;&lt;p&gt;",
+            "&lt;/p&gt;&lt;/div&gt;",
+        ),
+        (
+            "duplicate visible then hidden declaration",
+            "&lt;div style=&#39;display:block; display:none&#39;&gt;&lt;p&gt;",
+            "&lt;/p&gt;&lt;/div&gt;",
+        ),
+        (
+            "duplicate hidden then visible declaration",
+            "&lt;div style=&#39;display:none; display:block&#39;&gt;&lt;p&gt;",
+            "&lt;/p&gt;&lt;/div&gt;",
         ),
     )
-    assert_cli_schema_error(
-        cli,
-        sitemap_source=sitemap_source,
-        destination_source=template_only_body_source,
-        message_fragment="missing a title, level, or advice body",
+    for _label, opening_markup, closing_markup in hidden_advice_wrappers:
+        hidden_only_body_source = replace_once(
+            destination_source,
+            encoded_primary_body,
+            f"{opening_markup}{visible_advice_text}{closing_markup}",
+        )
+        assert_cli_schema_error(
+            cli,
+            sitemap_source=sitemap_source,
+            destination_source=hidden_only_body_source,
+            message_fragment="missing a title, level, or advice body",
+        )
+
+        hidden_marker_injection_source = replace_once(
+            destination_source,
+            encoded_primary_body,
+            (
+                "&lt;p&gt;Exercise increased caution in Exampleland.&lt;/p&gt;"
+                f"{opening_markup}(level 2 of 4).{closing_markup}"
+            ),
+        )
+        assert_cli_schema_error(
+            cli,
+            sitemap_source=sitemap_source,
+            destination_source=hidden_marker_injection_source,
+            message_fragment="did not contain a recognised level marker",
+        )
+    print(
+        "[PASS] every ignored advice subtree fails closed for hidden-only and "
+        "hidden-marker injection JSON CLI cases"
     )
 
-    template_injected_body_source = replace_once(
-        destination_source,
+    duplicate_advice_attribute_fragments = (
         (
-            "&lt;p&gt;Exercise increased caution in Exampleland "
-            "(level 2 of 4).&lt;/p&gt;"
+            "&lt;div style=&#39;display:none&#39; "
+            "STYLE=&#39;display:block&#39;&gt;"
+            f"{visible_advice_text}&lt;/div&gt;"
         ),
         (
-            "&lt;p&gt;Exercise increased caution in Exampleland.&lt;/p&gt;"
-            "&lt;template&gt;(level 2 of 4).&lt;/template&gt;"
+            "&lt;div style=&#39;display:block&#39; "
+            "STYLE=&#39;display:none&#39;&gt;"
+            f"{visible_advice_text}&lt;/div&gt;"
         ),
     )
-    assert_cli_schema_error(
-        cli,
-        sitemap_source=sitemap_source,
-        destination_source=template_injected_body_source,
-        message_fragment="did not contain a recognised level marker",
-    )
-    assert cli.html_to_text(
-        "<p>Visible advice.</p><template>Injected advice.</template>"
-    ) == "Visible advice."
+    for duplicate_attribute_fragment in duplicate_advice_attribute_fragments:
+        duplicate_attribute_source = replace_once(
+            destination_source,
+            encoded_primary_body,
+            duplicate_attribute_fragment,
+        )
+        assert_cli_schema_error(
+            cli,
+            sitemap_source=sitemap_source,
+            destination_source=duplicate_attribute_source,
+            message_fragment="duplicate HTML attribute name: style",
+        )
     print(
-        "[PASS] template-only and template-injected advice cannot satisfy visible "
-        "advice text through the JSON CLI"
+        "[PASS] duplicate case-variant advice fragment attributes cannot bypass "
+        "hidden-content rejection"
+    )
+
+    hidden_injections = "".join(
+        f"{opening_markup}Injected level 4 of 4.{closing_markup}"
+        for _label, opening_markup, closing_markup in hidden_advice_wrappers
+    )
+    visible_plus_hidden_body_source = replace_once(
+        destination_source,
+        encoded_primary_body,
+        f"{encoded_primary_body}{hidden_injections}",
+    )
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    with (
+        mock.patch.object(
+            cli,
+            "fetch_text",
+            side_effect=[
+                (sitemap_source, cli.SITEMAP_URL),
+                (visible_plus_hidden_body_source, requested_url),
+            ],
+        ),
+        contextlib.redirect_stdout(stdout),
+        contextlib.redirect_stderr(stderr),
+    ):
+        exit_code = cli.main(["advice", "exampleland", "--json"])
+    assert exit_code == 0
+    assert stderr.getvalue() == ""
+    assert json.loads(stdout.getvalue())["data"]["advice_level"]["body"] == (
+        visible_advice_text
+    )
+    assert "Injected" not in stdout.getvalue()
+    print(
+        "[PASS] visible advice remains accepted while every adjacent hidden injection "
+        "is excluded"
     )
 
     nested_body_source = replace_once(

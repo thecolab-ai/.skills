@@ -157,20 +157,51 @@ def inline_style_hides_element(value: str) -> bool:
     return False
 
 
+def starts_ignored_html_subtree(tag: str, attrs: dict[str, str]) -> bool:
+    """Apply one fail-closed visibility rule to every HTML text surface."""
+    return tag in INERT_HTML_TAGS or (
+        tag not in VOID_HTML_TAGS
+        and (
+            "hidden" in attrs
+            or "inert" in attrs
+            or attrs.get("aria-hidden", "").casefold() == "true"
+            or inline_style_hides_element(attrs.get("style", ""))
+        )
+    )
+
+
+def normalise_html_attrs(
+    attrs: list[tuple[str, str | None]], *, context: str
+) -> dict[str, str]:
+    """Reject ambiguous case-variant attributes before applying HTML policy."""
+    result: dict[str, str] = {}
+    for key, value in attrs:
+        normalised_key = key.casefold()
+        if normalised_key in result:
+            raise SchemaError(
+                f"{context} had a duplicate HTML attribute name: {normalised_key}"
+            )
+        result[normalised_key] = value or ""
+    return result
+
+
 class VisibleTextParser(HTMLParser):
     """Validate and extract visible text from a safety-critical HTML fragment."""
 
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
         self._skip_depth = 0
+        self._ignored_element_depths: set[int] = set()
         self._element_stack: list[str] = []
         self.parts: list[str] = []
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         tag = tag.lower()
+        attrs_dict = normalise_html_attrs(attrs, context="advice body HTML fragment")
         if tag not in VOID_HTML_TAGS:
             self._element_stack.append(tag)
-        if tag in INERT_HTML_TAGS:
+        if starts_ignored_html_subtree(tag, attrs_dict) and tag not in VOID_HTML_TAGS:
+            self._ignored_element_depths.add(len(self._element_stack))
             self._skip_depth += 1
 
     def handle_startendtag(
@@ -193,16 +224,21 @@ class VisibleTextParser(HTMLParser):
                 "advice body HTML fragment had an unmatched or misnested "
                 f"{tag} closing element"
             )
+        closed_ignored_subtree = (
+            len(self._element_stack) in self._ignored_element_depths
+        )
         self._element_stack.pop()
-        if tag in INERT_HTML_TAGS and self._skip_depth:
-            self._skip_depth -= 1
+        if closed_ignored_subtree:
+            self._ignored_element_depths.remove(len(self._element_stack) + 1)
+            if self._skip_depth:
+                self._skip_depth -= 1
 
     def handle_data(self, data: str) -> None:
         if not self._skip_depth and clean_text(data):
             self.parts.append(clean_text(data))
 
     def validate_complete_fragment(self) -> None:
-        if self._element_stack or self._skip_depth:
+        if self._element_stack or self._skip_depth or self._ignored_element_depths:
             raise SchemaError(
                 "advice body HTML fragment contained unclosed structural elements"
             )
@@ -253,16 +289,7 @@ class DestinationPageParser(HTMLParser):
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         tag = tag.lower()
-        attribute_names: set[str] = set()
-        for key, _value in attrs:
-            normalised_key = key.casefold()
-            if normalised_key in attribute_names:
-                raise SchemaError(
-                    "destination page HTML had a duplicate HTML attribute name: "
-                    f"{normalised_key}"
-                )
-            attribute_names.add(normalised_key)
-        attrs_dict = {key.lower(): value or "" for key, value in attrs}
+        attrs_dict = normalise_html_attrs(attrs, context="destination page HTML")
         if tag not in VOID_HTML_TAGS:
             self._element_stack.append(tag)
         if tag in {"html", "head", "body"}:
@@ -276,15 +303,7 @@ class DestinationPageParser(HTMLParser):
                 )
             self._document_tags_seen.add(tag)
             self._document_stack.append(tag)
-        starts_ignored_subtree = tag in INERT_HTML_TAGS or (
-            tag not in VOID_HTML_TAGS
-            and (
-                "hidden" in attrs_dict
-                or "inert" in attrs_dict
-                or attrs_dict.get("aria-hidden", "").casefold() == "true"
-                or inline_style_hides_element(attrs_dict.get("style", ""))
-            )
-        )
+        starts_ignored_subtree = starts_ignored_html_subtree(tag, attrs_dict)
         if starts_ignored_subtree and tag not in VOID_HTML_TAGS:
             self._ignored_element_depths.add(len(self._element_stack))
             self._skip_depth += 1
