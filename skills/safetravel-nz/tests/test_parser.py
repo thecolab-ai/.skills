@@ -143,32 +143,37 @@ def main() -> int:
         )
         == "another-place"
     )
-    stdout = io.StringIO()
-    stderr = io.StringIO()
-    with (
-        mock.patch.object(cli, "fetch_text") as fetch,
-        contextlib.redirect_stdout(stdout),
-        contextlib.redirect_stderr(stderr),
+    canonical_input_url = (
+        "https://www.safetravel.govt.nz/destinations/exampleland"
+    )
+    for noncanonical_input_url in (
+        canonical_input_url + "/",
+        "https://www.safetravel.govt.nz/destinations//exampleland",
+        canonical_input_url + "?",
+        canonical_input_url + "#",
+        canonical_input_url + ";variant=1",
     ):
-        exit_code = cli.main(
-            [
-                "advice",
-                "https://www.safetravel.govt.nz/destinations/"
-                "exampleland;variant=1",
-                "--json",
-            ]
-        )
-    assert exit_code == 2
-    assert stdout.getvalue() == ""
-    assert json.loads(stderr.getvalue()) == {
-        "error": "invalid_input",
-        "message": (
-            "destination URL must be a canonical www.safetravel.govt.nz "
-            "destination URL"
-        ),
-    }
-    fetch.assert_not_called()
-    print("[PASS] URL path parameters fail before sitemap network I/O")
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        with (
+            mock.patch.object(cli, "fetch_text") as fetch,
+            contextlib.redirect_stdout(stdout),
+            contextlib.redirect_stderr(stderr),
+        ):
+            exit_code = cli.main(["advice", noncanonical_input_url, "--json"])
+        assert exit_code == 2
+        assert stdout.getvalue() == ""
+        assert json.loads(stderr.getvalue()) == {
+            "error": "invalid_input",
+            "message": (
+                "destination URL must be a canonical www.safetravel.govt.nz "
+                "destination URL"
+            ),
+        }
+        fetch.assert_not_called()
+    print(
+        "[PASS] non-canonical destination URL variants fail before sitemap network I/O"
+    )
 
     assert_schema_error(
         cli,
@@ -197,6 +202,28 @@ def main() -> int:
     sitemap_source = read_fixture("sitemap.xml")
     destination_source = read_fixture("destination-page.html")
     requested_url = "https://www.safetravel.govt.nz/destinations/exampleland"
+
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    with (
+        mock.patch.object(
+            cli,
+            "fetch_text",
+            return_value=(sitemap_source, requested_url),
+        ),
+        contextlib.redirect_stdout(stdout),
+        contextlib.redirect_stderr(stderr),
+    ):
+        exit_code = cli.main(["search", "exampleland", "--json"])
+    assert exit_code == 6
+    assert stdout.getvalue() == ""
+    assert json.loads(stderr.getvalue()) == {
+        "error": "source_schema_failure",
+        "message": (
+            "sitemap fetch did not resolve to the canonical SafeTravel sitemap URL"
+        ),
+    }
+    print("[PASS] same-host sitemap redirects fail closed through the JSON CLI")
 
     mismatched_identity_source = replace_once(
         destination_source,
@@ -459,6 +486,8 @@ def main() -> int:
     print("[PASS] related-news dot segments cannot escape the /news/ namespace")
 
     for escaping_href in (
+        "/news//exampleland-security-update",
+        "/news/exampleland-security-update/",
         "/news/%2e%2e/destinations/another-place",
         "/news/%2E/destinations/another-place",
         "/news/%252e%252e/destinations/another-place",
@@ -481,7 +510,7 @@ def main() -> int:
             message_fragment="related-news URL",
         )
     print(
-        "[PASS] encoded dot segments and encoded or backslash separators fail closed"
+        "[PASS] non-canonical, encoded, and backslash related-news paths fail closed"
     )
 
     for suffix in ("?variant=1", "#variant", ";variant=1"):

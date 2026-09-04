@@ -460,24 +460,14 @@ def normalise_destination(value: str) -> str:
         raise SkillError("destination must not be empty", 2)
     parsed = urlparse(candidate)
     if parsed.scheme or parsed.netloc:
-        if (
-            parsed.scheme != "https"
-            or parsed.netloc.lower() not in ALLOWED_HOSTS
-            or parsed.params
-            or parsed.query
-            or parsed.fragment
-        ):
+        slug = canonical_destination_slug(candidate)
+        if slug is None or candidate != f"{DESTINATION_PREFIX}{slug}":
             raise SkillError(
                 "destination URL must be a canonical www.safetravel.govt.nz "
                 "destination URL",
                 2,
             )
-        parts = [part for part in parsed.path.split("/") if part]
-        if len(parts) != 2 or parts[0] != "destinations":
-            raise SkillError(
-                "destination URL must have the form /destinations/<slug>", 2
-            )
-        candidate = parts[1]
+        candidate = slug
     candidate = re.sub(r"\s+", "-", candidate.strip().casefold())
     if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", candidate):
         raise SkillError(
@@ -600,7 +590,11 @@ def is_canonical_news_path(path: str) -> bool:
         ):
             return False
         normalised = posixpath.normpath(decoded)
-        if normalised == "/news" or not normalised.startswith("/news/"):
+        if (
+            normalised != decoded
+            or normalised == "/news"
+            or not normalised.startswith("/news/")
+        ):
             return False
         if decoded == current:
             return True
@@ -814,6 +808,10 @@ def get_destinations() -> tuple[list[dict[str, str | None]], str, str]:
     text, final_url = fetch_text(
         SITEMAP_URL, accept="application/xml,text/xml;q=0.9,*/*;q=0.8"
     )
+    if final_url != SITEMAP_URL:
+        raise SchemaError(
+            "sitemap fetch did not resolve to the canonical SafeTravel sitemap URL"
+        )
     return parse_sitemap(text), final_url, retrieved_at
 
 
