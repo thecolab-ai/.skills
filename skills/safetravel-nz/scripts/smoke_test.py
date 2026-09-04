@@ -11,6 +11,10 @@ from pathlib import Path
 SKILL_DIR = Path(__file__).resolve().parents[1]
 CLI = SKILL_DIR / "scripts" / "cli.py"
 PARSER_TEST = SKILL_DIR / "tests" / "test_parser.py"
+AUSTRALIA_SLUG = "australia"
+AUSTRALIA_NAME = "Australia"
+AUSTRALIA_URL = "https://www.safetravel.govt.nz/destinations/australia"
+SITEMAP_URL = "https://www.safetravel.govt.nz/sitemap.xml"
 
 
 def run(args: list[str]) -> subprocess.CompletedProcess[str]:
@@ -44,11 +48,15 @@ def check_live_advice() -> bool:
         payload = json.loads(advice.stdout)
         assert payload["schema_version"] == "1"
         assert payload["ok"] is True
-        assert payload["source"]["url"].startswith(
-            "https://www.safetravel.govt.nz/destinations/australia"
-        )
+        assert payload["source"]["url"] == AUSTRALIA_URL
         assert payload["source"]["retrieved_at"].endswith("Z")
         assert payload["source"]["page_updated"]
+        assert payload["query"]["command"] == "advice"
+        assert payload["query"]["destination"] == AUSTRALIA_SLUG
+        assert payload["data"]["kind"] == "destination_advice"
+        assert payload["data"]["destination"]["name"] == AUSTRALIA_NAME
+        assert payload["data"]["destination"]["slug"] == AUSTRALIA_SLUG
+        assert payload["data"]["destination"]["url"] == AUSTRALIA_URL
         assert payload["data"]["advice_level"]["number"] in {1, 2, 3, 4}
         assert payload["data"]["advice_level"]["title"]
         assert any(
@@ -81,12 +89,19 @@ def check_live_search() -> bool:
         return False
     try:
         search_payload = json.loads(search.stdout)
+        assert search_payload["source"]["url"] == SITEMAP_URL
+        assert search_payload["source"]["retrieved_at"].endswith("Z")
+        assert search_payload["query"]["command"] == "search"
+        assert search_payload["query"]["text"] == AUSTRALIA_SLUG
+        assert search_payload["query"]["limit"] == 5
         assert search_payload["data"]["kind"] == "destination_search"
+        assert search_payload["data"]["sitemap_url"] == SITEMAP_URL
         assert any(
-            item["slug"] == "australia"
+            item["name"] == AUSTRALIA_NAME
+            and item["slug"] == AUSTRALIA_SLUG
+            and item["url"] == AUSTRALIA_URL
             for item in search_payload["data"]["destinations"]
         )
-        assert search_payload["source"]["retrieved_at"].endswith("Z")
     except (AssertionError, KeyError, TypeError, ValueError) as exc:
         print(f"[FAIL] live search schema assertion: {exc}")
         return False
