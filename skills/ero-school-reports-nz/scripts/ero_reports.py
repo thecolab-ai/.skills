@@ -74,14 +74,14 @@ class Extract(HTMLParser):
 
 def _institution_title(title, url):
     title = " ".join(title.split())
-    if title and not re.match(r"^(?:view|read)\b", title, re.I):
+    if title and not re.match(r"^(?:view|read)\b", title, re.IGNORECASE):
         return title
     slug = urlparse(url).path.rstrip("/").rsplit("/", 1)[-1]
     return " ".join(part.capitalize() for part in slug.split("-") if part)
 
 
 def parse_page(html, source_url, retrieved_at):
-    if re.search(r"captcha|access denied", html, re.I):
+    if re.search(r"captcha|access denied", html, re.IGNORECASE):
         raise ValueError("ERO source returned an access challenge")
     parser = Extract()
     parser.feed(html)
@@ -91,7 +91,7 @@ def parse_page(html, source_url, retrieved_at):
     for href, title in parser.links:
         url = urljoin(source_url, href)
         title = " ".join(title.split())
-        generic = not title or bool(re.match(r"^(?:view|read)\b", title, re.I))
+        generic = not title or bool(re.match(r"^(?:view|read)\b", title, re.IGNORECASE))
         if urlparse(url).hostname == host and re.search(r"/institution/\d+", url):
             candidate = {"title": _institution_title(title, url), "source_url": url, "retrieved_at": retrieved_at}
             score = 0 if generic else 1
@@ -129,7 +129,7 @@ def fetch_reports_index(search_term, *, page_number=1, page_size=100, timeout=30
     )
     payload = json.loads(nzfetch.fetch_text(url, timeout=timeout, allowed_hosts=ALLOWED_HOSTS))
     if not isinstance(payload, dict):
-        raise ValueError("ERO reports index returned an unexpected payload")
+        raise ValueError("ERO reports index returned an unexpected payload")  # noqa: TRY004
     return payload
 
 
@@ -141,10 +141,17 @@ def _matches_report_organisation(row, query):
     return needle in str(row.get("name") or "").casefold()
 
 
-def report_organisation_rows(payload, retrieved_at, query=None):
-    rows = payload.get("reportOrganisation") or []
-    if not isinstance(rows, list):
+def _report_organisation_rows(payload):
+    if not isinstance(payload, dict) or "reportOrganisation" not in payload:
         raise ValueError("ERO reports index returned an unexpected payload")
+    rows = payload["reportOrganisation"]
+    if not isinstance(rows, list):
+        raise ValueError("ERO reports index returned an unexpected payload")  # noqa: TRY004
+    return rows
+
+
+def report_organisation_rows(payload, retrieved_at, query=None):
+    rows = _report_organisation_rows(payload)
     results = []
     for row in rows:
         if not isinstance(row, dict):
@@ -162,9 +169,7 @@ def report_organisation_rows(payload, retrieved_at, query=None):
 
 
 def resolve_report_organisation_url(payload, query):
-    rows = payload.get("reportOrganisation") or []
-    if not isinstance(rows, list):
-        raise ValueError("ERO reports index returned an unexpected payload")
+    rows = _report_organisation_rows(payload)
     for row in rows:
         if isinstance(row, dict) and _matches_report_organisation(row, query):
             return urljoin("https://www.ero.govt.nz", str(row.get("url") or ""))
@@ -183,26 +188,27 @@ def report_sections(page):
     current_date = None
     current_school = None
     markers = []
+    date_pattern = r"\b(\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4})\b"
     for index, section in enumerate(sections):
         if section["level"] == 1:
             current_school = section["heading"]
-        date_match = re.search(
-            r"\b(\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4})\b",
-            section["text"] or section["heading"],
-            re.I,
-        )
-        if date_match:
-            try:
-                current_date = datetime.strptime(date_match.group(1), "%d %b %Y").date().isoformat()
-            except ValueError:
-                try:
-                    current_date = datetime.strptime(date_match.group(1), "%d %B %Y").date().isoformat()
-                except ValueError:
-                    pass
         heading = section["heading"].casefold()
-        if section["level"] in {2, 3} and not heading.startswith("reports for ") and (
-            "report" in heading or any(key in heading for key in ("evaluation", "assurance", "profile"))
-        ):
+        text = f"{section['heading']} {section['text']}"
+        heading_has_date = re.search(date_pattern, section["heading"], re.IGNORECASE)
+        text_has_date = re.search(date_pattern, section["text"], re.IGNORECASE)
+        is_report_marker = section["level"] == 2 and heading != "other reports" and not heading.startswith("reports for ") and (
+            "report" in heading or any(key in heading for key in ("evaluation", "assurance", "profile")) or heading_has_date or text_has_date
+        )
+        if is_report_marker:
+            date_match = heading_has_date or text_has_date or re.search(date_pattern, text, re.IGNORECASE)
+            if date_match:
+                try:
+                    current_date = datetime.strptime(date_match.group(1), "%d %b %Y").date().isoformat()  # noqa: DTZ007
+                except ValueError:
+                    try:
+                        current_date = datetime.strptime(date_match.group(1), "%d %B %Y").date().isoformat()  # noqa: DTZ007
+                    except ValueError:
+                        pass
             markers.append((index, current_school, current_date))
     marker_indices = {item[0] for item in markers}
     for _, (index, school, published) in enumerate(markers):

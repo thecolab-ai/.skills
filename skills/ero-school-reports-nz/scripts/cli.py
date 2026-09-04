@@ -12,16 +12,16 @@ from urllib.parse import quote_plus
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "lib"))
 
-import nzfetch  # noqa: E402
-from ero_reports import (  # noqa: E402
+import nzfetch
+from ero_reports import (
     fetch_reports_index,
     parse_page,
     report_organisation_rows,
-    resolve_institution_url,
     report_sections,
     require_report,
+    resolve_institution_url,
 )
-from result_contract import result_envelope, utc_now  # noqa: E402
+from result_contract import result_envelope, utc_now
 
 WARN = [
     "Do not turn ERO reports into numeric rankings.",
