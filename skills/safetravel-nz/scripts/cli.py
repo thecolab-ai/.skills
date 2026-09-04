@@ -181,6 +181,15 @@ class DestinationPageParser(HTMLParser):
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         tag = tag.lower()
+        attribute_names: set[str] = set()
+        for key, _value in attrs:
+            normalised_key = key.casefold()
+            if normalised_key in attribute_names:
+                raise SchemaError(
+                    "destination page HTML had a duplicate HTML attribute name: "
+                    f"{normalised_key}"
+                )
+            attribute_names.add(normalised_key)
         attrs_dict = {key.lower(): value or "" for key, value in attrs}
         if tag not in VOID_HTML_TAGS:
             self._element_stack.append(tag)
@@ -473,6 +482,17 @@ def reject_json_constant(value: str) -> None:
     raise ValueError(f"non-standard JSON constant: {value}")
 
 
+def reject_duplicate_json_members(
+    pairs: list[tuple[str, Any]],
+) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate object member: {key}")
+        result[key] = value
+    return result
+
+
 def parse_finite_json_float(value: str) -> float:
     parsed = float(value)
     if not math.isfinite(parsed):
@@ -550,6 +570,7 @@ def parse_destination_page(source: str, *, slug: str, url: str) -> dict[str, Any
     try:
         raw_items = json.loads(
             html.unescape(raw_advice),
+            object_pairs_hook=reject_duplicate_json_members,
             parse_constant=reject_json_constant,
             parse_float=parse_finite_json_float,
         )

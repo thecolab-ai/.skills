@@ -230,6 +230,60 @@ def main() -> int:
         )
     print("[PASS] duplicate supported advice containers fail closed through the CLI")
 
+    duplicate_json_member_sources = (
+        replace_once(
+            destination_source,
+            "&quot;level&quot;:&quot;moderate&quot;",
+            (
+                "&quot;level&quot;:&quot;low&quot;,"
+                "&quot;level&quot;:&quot;moderate&quot;"
+            ),
+        ),
+        replace_once(
+            destination_source,
+            "&quot;isAutoExpanded&quot;:true",
+            (
+                "&quot;metadata&quot;:{&quot;token&quot;:1,"
+                "&quot;token&quot;:2}"
+            ),
+        ),
+    )
+    for duplicate_json_member_source in duplicate_json_member_sources:
+        assert_cli_schema_error(
+            cli,
+            sitemap_source=sitemap_source,
+            destination_source=duplicate_json_member_source,
+            message_fragment="duplicate object member",
+        )
+    print(
+        "[PASS] duplicate advice JSON object members fail closed at every depth "
+        "through the CLI"
+    )
+
+    duplicate_attribute_sources = (
+        replace_once(
+            destination_source,
+            'id="js-advice-level-accordion"',
+            'id="js-advice-level-accordion" ID="conflicting-advice-id"',
+        ),
+        replace_once(
+            destination_source,
+            " data-content='",
+            ' DATA-CONTENT="[]" data-content=\'',
+        ),
+    )
+    for duplicate_attribute_source in duplicate_attribute_sources:
+        assert_cli_schema_error(
+            cli,
+            sitemap_source=sitemap_source,
+            destination_source=duplicate_attribute_source,
+            message_fragment="duplicate HTML attribute name",
+        )
+    print(
+        "[PASS] duplicate HTML attribute names fail closed case-insensitively "
+        "through the CLI"
+    )
+
     unrelated_news_source = replace_once(
         destination_source,
         "<body>\n",
