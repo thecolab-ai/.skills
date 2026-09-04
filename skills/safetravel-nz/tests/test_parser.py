@@ -530,9 +530,13 @@ def main() -> int:
         " DISPLAY : NONE ",
         "display:\t none",
         "visibility:hidden",
+        "visibility:collapse",
         " VISIBILITY : HIDDEN ",
         "content-visibility:hidden",
         " CONTENT-VISIBILITY : HIDDEN ",
+        "opacity:0",
+        r"d\69splay:none",
+        "transform:scale(0)",
         "display: /* inert */ none !IMPORTANT",
         "display:block; display:none",
         "display:none; display:block",
@@ -542,6 +546,12 @@ def main() -> int:
             destination_source,
             "<h1>Exampleland</h1>",
             f'<h1 style="{hidden_h1_style}">Exampleland</h1>',
+        )
+        assert_schema_error(
+            cli,
+            source=hidden_h1_source,
+            slug="exampleland",
+            message_fragment="missing its destination heading",
         )
         assert_cli_schema_error(
             cli,
@@ -657,6 +667,11 @@ def main() -> int:
             "&lt;/p&gt;&lt;/div&gt;",
         ),
         (
+            "visibility collapse",
+            "&lt;div style=&#39;visibility:collapse&#39;&gt;&lt;p&gt;",
+            "&lt;/p&gt;&lt;/div&gt;",
+        ),
+        (
             "visibility case and whitespace",
             "&lt;div style=&#39; VISIBILITY : HIDDEN &#39;&gt;&lt;p&gt;",
             "&lt;/p&gt;&lt;/div&gt;",
@@ -669,6 +684,21 @@ def main() -> int:
         (
             "content visibility case and whitespace",
             "&lt;div style=&#39; CONTENT-VISIBILITY : HIDDEN &#39;&gt;&lt;p&gt;",
+            "&lt;/p&gt;&lt;/div&gt;",
+        ),
+        (
+            "opacity zero",
+            "&lt;div style=&#39;opacity:0&#39;&gt;&lt;p&gt;",
+            "&lt;/p&gt;&lt;/div&gt;",
+        ),
+        (
+            "CSS-escaped display property",
+            "&lt;div style=&#39;d\\\\69splay:none&#39;&gt;&lt;p&gt;",
+            "&lt;/p&gt;&lt;/div&gt;",
+        ),
+        (
+            "unsupported transform property",
+            "&lt;div style=&#39;transform:scale(0)&#39;&gt;&lt;p&gt;",
             "&lt;/p&gt;&lt;/div&gt;",
         ),
         (
@@ -693,6 +723,12 @@ def main() -> int:
             encoded_primary_body,
             f"{opening_markup}{visible_advice_text}{closing_markup}",
         )
+        assert_schema_error(
+            cli,
+            source=hidden_only_body_source,
+            slug="exampleland",
+            message_fragment="missing a title, level, or advice body",
+        )
         assert_cli_schema_error(
             cli,
             sitemap_source=sitemap_source,
@@ -707,6 +743,12 @@ def main() -> int:
                 "&lt;p&gt;Exercise increased caution in Exampleland.&lt;/p&gt;"
                 f"{opening_markup}(level 2 of 4).{closing_markup}"
             ),
+        )
+        assert_schema_error(
+            cli,
+            source=hidden_marker_injection_source,
+            slug="exampleland",
+            message_fragment="did not contain a recognised level marker",
         )
         assert_cli_schema_error(
             cli,
@@ -782,6 +824,22 @@ def main() -> int:
         "[PASS] visible advice remains accepted while every adjacent hidden injection "
         "is excluded"
     )
+
+    benign_styled_body_source = replace_once(
+        destination_source,
+        encoded_primary_body,
+        (
+            "&lt;div style=&#39;color:navy; display:block&#39;&gt;"
+            f"{encoded_primary_body}&lt;/div&gt;"
+        ),
+    )
+    benign_styled_body_detail = cli.parse_destination_page(
+        benign_styled_body_source,
+        slug="exampleland",
+        url=requested_url,
+    )
+    assert benign_styled_body_detail["advice_level"]["body"] == visible_advice_text
+    print("[PASS] benign inline advice styling remains compatible")
 
     nested_body_source = replace_once(
         destination_source,

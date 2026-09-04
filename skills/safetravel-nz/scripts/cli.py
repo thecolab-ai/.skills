@@ -52,6 +52,15 @@ VOID_HTML_TAGS = frozenset(
         "wbr",
     }
 )
+SAFE_VISIBLE_INLINE_STYLE_VALUES = {
+    "content-visibility": frozenset(("visible",)),
+    "display": frozenset(("block", "inline", "inline-block")),
+    "opacity": frozenset(("1", "1.0", "100%")),
+    "visibility": frozenset(("visible",)),
+}
+CSS_GLOBAL_VALUES = frozenset(
+    ("currentcolor", "inherit", "initial", "revert", "revert-layer", "unset")
+)
 TIMEOUT_SECONDS = 10
 CHANGE_WARNING = (
     "Travel advice can change. Consult the official SafeTravel page before "
@@ -136,24 +145,36 @@ def clean_text(value: str) -> str:
 
 
 def inline_style_hides_element(value: str) -> bool:
-    """Return true when any inline CSS declaration makes an element inert."""
+    """Fail closed unless every inline declaration is provably visible and benign."""
     style = re.sub(r"/\*.*?\*/", "", value, flags=re.DOTALL)
-    hidden_values = {
-        "display": "none",
-        "visibility": "hidden",
-        "content-visibility": "hidden",
-    }
+    if "/*" in style or "*/" in style or "\\" in style:
+        return True
     for declaration in style.split(";"):
+        if not declaration.strip():
+            continue
         property_name, separator, raw_value = declaration.partition(":")
         if not separator:
-            continue
-        property_name = property_name.strip().casefold()
-        expected_value = hidden_values.get(property_name)
-        if expected_value is None:
-            continue
-        css_value = "".join(raw_value.casefold().split()).removesuffix("!important")
-        if css_value == expected_value:
             return True
+        property_name = property_name.strip().casefold()
+        if re.fullmatch(r"[a-z][a-z-]*", property_name) is None:
+            return True
+        css_value = "".join(raw_value.casefold().split()).removesuffix("!important")
+        safe_values = SAFE_VISIBLE_INLINE_STYLE_VALUES.get(property_name)
+        if safe_values is not None:
+            if css_value not in safe_values:
+                return True
+            continue
+        if property_name == "color":
+            if (
+                re.fullmatch(r"[a-z]+", css_value) is None
+                or css_value == "transparent"
+                or css_value in CSS_GLOBAL_VALUES
+            ):
+                return True
+            continue
+        # CSS can hide or move source text in many ways. Unknown declarations are
+        # therefore not evidence that this security-boundary text is visible.
+        return True
     return False
 
 
