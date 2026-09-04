@@ -7,6 +7,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any, cast
 
 CLI = Path(__file__).with_name("cli.py")
 spec = importlib.util.spec_from_file_location("animates_cli", CLI)
@@ -28,7 +29,7 @@ def check(name: str, condition: bool, detail: str = "") -> None:
 
 
 def run(*args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run([sys.executable, str(CLI), *args], text=True, capture_output=True, timeout=45)
+    return subprocess.run([sys.executable, str(CLI), *args], text=True, capture_output=True, timeout=45, check=False)
 
 
 def outage(result: subprocess.CompletedProcess[str]) -> bool:
@@ -69,15 +70,29 @@ check("boolean, non-finite and negative prices fail closed", cli.as_number(True)
 boolean_price_fixture = '''<script type="application/ld+json">{"@type":"Product","name":"Invalid Price","offers":{"price":true}}</script>'''
 boolean_price_product = cli.parse_product(boolean_price_fixture, "https://www.animates.co.nz/invalid.html")
 check("boolean JSON-LD price remains incomplete", bool(boolean_price_product and boolean_price_product["price"] is None))
+aggregate_offer_fixture = '''<script type="application/ld+json">{"@type":"Product","@id":"https://www.animates.co.nz/bundle.html","name":"Bundle Example","offers":{"@type":"AggregateOffer","lowPrice":"60.27","highPrice":"60.27","priceCurrency":"NZD","offers":[{"@type":"Offer","url":"https://www.animates.co.nz/bundle.html","price":"60.27","priceCurrency":"NZD","availability":"http://schema.org/OutOfStock"}]}}</script>'''
+aggregate_offer_product = cli.parse_product(aggregate_offer_fixture, "https://www.animates.co.nz/bundle.html")
+check("aggregate JSON-LD offers parse", bool(aggregate_offer_product and aggregate_offer_product["price"] == 60.27 and aggregate_offer_product["availability"] == "OutOfStock" and aggregate_offer_product["source_url"].endswith("bundle.html")))
 original_fetch_text = cli.fetch_text
-setattr(cli, "fetch_text", lambda url, timeout=10, max_bytes=cli.MAX_PAGE_BYTES: (boolean_price_fixture, url))
+cli_any = cast(Any, cli)
+cli_any.fetch_text = lambda url, timeout=10, max_bytes=cli.MAX_PAGE_BYTES: (aggregate_offer_fixture, url)
+try:
+    bundle_product, _ = cli.get_product("https://www.animates.co.nz/bundle.html", 10)
+    aggregate_offer_rejected = not (bundle_product.get("price") == 60.27 and bundle_product.get("availability") == "OutOfStock")
+except cli.CliError:
+    aggregate_offer_rejected = True
+finally:
+    cli_any.fetch_text = original_fetch_text
+check("complete-product validation accepts aggregate offers", not aggregate_offer_rejected)
+original_fetch_text = cli.fetch_text
+cli_any.fetch_text = lambda url, timeout=10, max_bytes=cli.MAX_PAGE_BYTES: (boolean_price_fixture, url)
 try:
     cli.get_product("https://www.animates.co.nz/invalid.html", 10)
     boolean_price_rejected = False
 except cli.CliError:
     boolean_price_rejected = True
 finally:
-    setattr(cli, "fetch_text", original_fetch_text)
+    cli_any.fetch_text = original_fetch_text
 check("complete-product validation rejects boolean JSON-LD price", boolean_price_rejected)
 entity_fixture = '<script type="application/ld+json">{"@type":"Product","name":"A &quot; B"}</script>'
 check("JSON-LD script data is not HTML-unescaped", cli.json_ld_objects(entity_fixture)[0]["name"] == "A &quot; B")
