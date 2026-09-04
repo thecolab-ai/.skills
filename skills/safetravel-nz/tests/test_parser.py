@@ -535,6 +535,9 @@ def main() -> int:
         "content-visibility:hidden",
         " CONTENT-VISIBILITY : HIDDEN ",
         "opacity:0",
+        "color:Canvas",
+        "color:navy",
+        " COLOR : CANVAS ",
         r"d\69splay:none",
         "transform:scale(0)",
         "display: /* inert */ none !IMPORTANT",
@@ -580,7 +583,7 @@ def main() -> int:
     visible_styled_h1_source = replace_once(
         destination_source,
         "<h1>Exampleland</h1>",
-        '<h1 style="color: navy; display: block">Exampleland</h1>',
+        '<h1 style="display: block; opacity: 1">Exampleland</h1>',
     )
     visible_styled_h1_detail = cli.parse_destination_page(
         visible_styled_h1_source,
@@ -689,6 +692,16 @@ def main() -> int:
         (
             "opacity zero",
             "&lt;div style=&#39;opacity:0&#39;&gt;&lt;p&gt;",
+            "&lt;/p&gt;&lt;/div&gt;",
+        ),
+        (
+            "system colour",
+            "&lt;div style=&#39;color:Canvas&#39;&gt;&lt;p&gt;",
+            "&lt;/p&gt;&lt;/div&gt;",
+        ),
+        (
+            "named colour",
+            "&lt;div style=&#39;color:navy&#39;&gt;&lt;p&gt;",
             "&lt;/p&gt;&lt;/div&gt;",
         ),
         (
@@ -829,7 +842,7 @@ def main() -> int:
         destination_source,
         encoded_primary_body,
         (
-            "&lt;div style=&#39;color:navy; display:block&#39;&gt;"
+            "&lt;div style=&#39;display:block; opacity:1&#39;&gt;"
             f"{encoded_primary_body}&lt;/div&gt;"
         ),
     )
