@@ -8,6 +8,7 @@ import html
 import importlib
 import json
 import math
+import posixpath
 import re
 import sys
 import unicodedata
@@ -586,25 +587,53 @@ def ensure_bounded_json_depth(value: Any) -> None:
             stack.extend((item, depth + 1) for item in current)
 
 
+def is_canonical_news_path(path: str) -> bool:
+    current = path
+    for _ in range(5):
+        if re.search(r"%(?:2f|5c)", current, re.IGNORECASE):
+            return False
+        if re.search(r"%(?![0-9a-f]{2})", current, re.IGNORECASE):
+            return False
+        decoded = unquote(current)
+        if "\\" in decoded or any(
+            segment in {".", ".."} for segment in decoded.split("/")
+        ):
+            return False
+        normalised = posixpath.normpath(decoded)
+        if normalised == "/news" or not normalised.startswith("/news/"):
+            return False
+        if decoded == current:
+            return True
+        current = decoded
+    return False
+
+
+def canonical_related_news_url(page_url: str, href: str) -> str:
+    url = urljoin(page_url, href)
+    parsed = urlparse(url)
+    href_path = urlparse(href).path
+    if (
+        parsed.scheme != "https"
+        or parsed.netloc.lower() not in ALLOWED_HOSTS
+        or parsed.params
+        or parsed.query
+        or parsed.fragment
+        or not is_canonical_news_path(href_path)
+        or not is_canonical_news_path(parsed.path)
+    ):
+        raise SchemaError(
+            f"destination page contained a non-canonical related-news URL: {url!r}"
+        )
+    return url
+
+
 def parse_related_news(
     parser: DestinationPageParser, page_url: str
 ) -> list[dict[str, str | None]]:
     results: list[dict[str, str | None]] = []
     seen_urls: set[str] = set()
     for anchor in parser.news_links:
-        url = urljoin(page_url, str(anchor["href"]))
-        parsed = urlparse(url)
-        if (
-            parsed.scheme != "https"
-            or parsed.netloc.lower() not in ALLOWED_HOSTS
-            or parsed.params
-            or parsed.query
-            or parsed.fragment
-            or not parsed.path.startswith("/news/")
-        ):
-            raise SchemaError(
-                f"destination page contained a non-canonical related-news URL: {url!r}"
-            )
+        url = canonical_related_news_url(page_url, str(anchor["href"]))
         if url in seen_urls:
             continue
         text = clean_text(" ".join(anchor["parts"]))

@@ -458,6 +458,32 @@ def main() -> int:
     )
     print("[PASS] related-news dot segments cannot escape the /news/ namespace")
 
+    for escaping_href in (
+        "/news/%2e%2e/destinations/another-place",
+        "/news/%2E/destinations/another-place",
+        "/news/%252e%252e/destinations/another-place",
+        "/news/exampleland%2f..%2fdestinations/another-place",
+        "/news/exampleland%252f..%252fdestinations/another-place",
+        "/news/exampleland%5c..%5cdestinations/another-place",
+        "/news/exampleland%255c..%255cdestinations/another-place",
+        "/news/exampleland\\..\\destinations/another-place",
+        "/news/exampleland%2Fupdate",
+    ):
+        encoded_escape_source = replace_once(
+            destination_source,
+            "/news/exampleland-security-update",
+            escaping_href,
+        )
+        assert_cli_schema_error(
+            cli,
+            sitemap_source=sitemap_source,
+            destination_source=encoded_escape_source,
+            message_fragment="related-news URL",
+        )
+    print(
+        "[PASS] encoded dot segments and encoded or backslash separators fail closed"
+    )
+
     for suffix in ("?variant=1", "#variant", ";variant=1"):
         noncanonical_sitemap_source = replace_once(
             sitemap_source,
@@ -503,7 +529,9 @@ def main() -> int:
     except cli.SchemaError as exc:
         assert "malformed destination URL" in str(exc)
     else:
-        raise AssertionError("expected malformed destination-shaped sitemap URL rejection")
+        raise AssertionError(
+            "expected malformed destination-shaped sitemap URL rejection"
+        )
     print("[PASS] malformed destination-shaped sitemap URLs fail closed")
 
     duplicate_slug_sitemap_source = replace_once(
