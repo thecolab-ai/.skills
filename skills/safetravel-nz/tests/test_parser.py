@@ -173,6 +173,94 @@ def main() -> int:
     destination_source = read_fixture("destination-page.html")
     requested_url = "https://www.safetravel.govt.nz/destinations/exampleland"
 
+    mismatched_identity_source = replace_once(
+        destination_source,
+        "<h1>Exampleland</h1>",
+        "<h1>Another Place</h1>",
+    )
+    assert_cli_schema_error(
+        cli,
+        sitemap_source=sitemap_source,
+        destination_source=mismatched_identity_source,
+        message_fragment="destination page identity",
+    )
+    print("[PASS] mismatched destination page identity fails closed through the CLI")
+
+    punctuated_identity_source = replace_once(
+        destination_source,
+        "<h1>Exampleland</h1>",
+        "<h1>São Tomé &amp; Príncipe</h1>",
+    )
+    punctuated_detail = cli.parse_destination_page(
+        punctuated_identity_source,
+        slug="sao-tome-and-principe",
+        url=(
+            "https://www.safetravel.govt.nz/destinations/"
+            "sao-tome-and-principe"
+        ),
+    )
+    assert punctuated_detail["destination"]["name"] == "São Tomé & Príncipe"
+    print("[PASS] legitimate destination accents and punctuation preserve identity")
+
+    malformed_body_source = replace_once(
+        destination_source,
+        "(level 2 of 4).&lt;/p&gt;",
+        "(level 2 of 4).&lt;strong&gt;",
+    )
+    assert_cli_schema_error(
+        cli,
+        sitemap_source=sitemap_source,
+        destination_source=malformed_body_source,
+        message_fragment="advice body HTML fragment",
+    )
+    print("[PASS] malformed decoded advice body HTML fails closed through the CLI")
+
+    self_closing_non_void_body_source = replace_once(
+        destination_source,
+        "(level 2 of 4).&lt;/p&gt;",
+        "(level 2 of 4).&lt;strong/&gt;&lt;/p&gt;",
+    )
+    assert_cli_schema_error(
+        cli,
+        sitemap_source=sitemap_source,
+        destination_source=self_closing_non_void_body_source,
+        message_fragment="advice body HTML fragment",
+    )
+    print("[PASS] self-closing non-void advice body HTML fails closed")
+
+    nested_body_source = replace_once(
+        destination_source,
+        (
+            "&lt;p&gt;Exercise increased caution in Exampleland "
+            "(level 2 of 4).&lt;/p&gt;"
+        ),
+        (
+            "&lt;p&gt;&lt;strong&gt;Exercise increased caution&lt;/strong&gt; "
+            "in Exampleland (level 2 of 4).&lt;br&gt;&lt;/p&gt;"
+        ),
+    )
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    with (
+        mock.patch.object(
+            cli,
+            "fetch_text",
+            side_effect=[
+                (sitemap_source, cli.SITEMAP_URL),
+                (nested_body_source, requested_url),
+            ],
+        ),
+        contextlib.redirect_stdout(stdout),
+        contextlib.redirect_stderr(stderr),
+    ):
+        exit_code = cli.main(["advice", "exampleland", "--json"])
+    assert exit_code == 0
+    assert stderr.getvalue() == ""
+    assert json.loads(stdout.getvalue())["data"]["advice_level"]["body"] == (
+        "Exercise increased caution in Exampleland (level 2 of 4)."
+    )
+    print("[PASS] balanced nested and void advice body HTML remains accepted")
+
     contradictory_title_source = replace_once(
         destination_source,
         "&quot;title&quot;:&quot;Exercise increased caution&quot;",

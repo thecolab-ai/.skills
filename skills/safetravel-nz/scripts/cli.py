@@ -10,6 +10,7 @@ import json
 import math
 import re
 import sys
+import unicodedata
 import xml.etree.ElementTree as ET
 from html.parser import HTMLParser
 from pathlib import Path
@@ -130,31 +131,73 @@ def clean_text(value: str) -> str:
 
 
 class VisibleTextParser(HTMLParser):
-    """Extract visible text from an HTML fragment without a third-party parser."""
+    """Validate and extract visible text from a safety-critical HTML fragment."""
 
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
         self._skip_depth = 0
+        self._element_stack: list[str] = []
         self.parts: list[str] = []
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        if tag.lower() in {"script", "style", "noscript", "svg"}:
+        tag = tag.lower()
+        if tag not in VOID_HTML_TAGS:
+            self._element_stack.append(tag)
+        if tag in {"script", "style", "noscript", "svg"}:
             self._skip_depth += 1
 
+    def handle_startendtag(
+        self, tag: str, attrs: list[tuple[str, str | None]]
+    ) -> None:
+        tag = tag.lower()
+        if tag not in VOID_HTML_TAGS:
+            raise SchemaError(
+                "advice body HTML fragment used self-closing syntax for "
+                f"non-void {tag} element"
+            )
+        self.handle_starttag(tag, attrs)
+
     def handle_endtag(self, tag: str) -> None:
-        if tag.lower() in {"script", "style", "noscript", "svg"} and self._skip_depth:
+        tag = tag.lower()
+        if tag in VOID_HTML_TAGS:
+            return
+        if not self._element_stack or self._element_stack[-1] != tag:
+            raise SchemaError(
+                "advice body HTML fragment had an unmatched or misnested "
+                f"{tag} closing element"
+            )
+        self._element_stack.pop()
+        if tag in {"script", "style", "noscript", "svg"} and self._skip_depth:
             self._skip_depth -= 1
 
     def handle_data(self, data: str) -> None:
         if not self._skip_depth and clean_text(data):
             self.parts.append(clean_text(data))
 
+    def validate_complete_fragment(self) -> None:
+        if self._element_stack or self._skip_depth:
+            raise SchemaError(
+                "advice body HTML fragment contained unclosed structural elements"
+            )
+
 
 def html_to_text(value: str) -> str:
     parser = VisibleTextParser()
     parser.feed(value)
     parser.close()
+    parser.validate_complete_fragment()
     return clean_text(" ".join(parser.parts))
+
+
+def destination_identity_key(value: str) -> str:
+    """Normalise legitimate display punctuation without accepting another place."""
+    value = unicodedata.normalize("NFKD", clean_text(value).casefold())
+    value = value.replace("&", " and ")
+    return "".join(
+        character
+        for character in value
+        if character.isascii() and character.isalnum()
+    )
 
 
 class DestinationPageParser(HTMLParser):
@@ -622,7 +665,16 @@ def parse_destination_page(source: str, *, slug: str, url: str) -> dict[str, Any
     page_updated_match = re.search(
         r"\bPage updated\s+(\d{1,2}\s+[A-Za-z]+\s+\d{4})\b", page_text, re.IGNORECASE
     )
-    name = clean_text(" ".join(parser.h1_parts)) or slug.replace("-", " ").title()
+    name = clean_text(" ".join(parser.h1_parts))
+    if not name:
+        raise SchemaError(
+            "destination page identity was missing its destination heading"
+        )
+    if destination_identity_key(name) != destination_identity_key(slug):
+        raise SchemaError(
+            "destination page identity did not match the requested destination: "
+            f"expected {slug!r}, found {name!r}"
+        )
     return {
         "destination": {
             "name": name,
