@@ -173,6 +173,141 @@ def main() -> int:
     destination_source = read_fixture("destination-page.html")
     requested_url = "https://www.safetravel.govt.nz/destinations/exampleland"
 
+    contradictory_title_source = replace_once(
+        destination_source,
+        "&quot;title&quot;:&quot;Exercise increased caution&quot;",
+        "&quot;title&quot;:&quot;Do not travel&quot;",
+    )
+    assert_cli_schema_error(
+        cli,
+        sitemap_source=sitemap_source,
+        destination_source=contradictory_title_source,
+        message_fragment="title disagreed",
+    )
+    print("[PASS] official advice title contradictions fail closed through the CLI")
+
+    conflicting_body_source = replace_once(
+        destination_source,
+        "(level 2 of 4).&lt;/p&gt;",
+        "(level 2 of 4), not level 4 of 4.&lt;/p&gt;",
+    )
+    assert_cli_schema_error(
+        cli,
+        sitemap_source=sitemap_source,
+        destination_source=conflicting_body_source,
+        message_fragment="conflicting level markers",
+    )
+    print("[PASS] conflicting secondary body level markers fail closed through the CLI")
+
+    advice_container = re.search(
+        r'^  <div id="js-advice-level-accordion"[^\n]+</div>\n',
+        destination_source,
+        re.MULTILINE,
+    )
+    assert advice_container
+    duplicate_advice_sources = (
+        replace_once(
+            destination_source,
+            advice_container.group(0),
+            advice_container.group(0) * 2,
+        ),
+        replace_once(
+            destination_source,
+            '<section id="relatedNews">',
+            (
+                '<div id="js-accordion" data-content="[]"></div>\n'
+                '<div id="js-accordion" data-content="[]"></div>\n'
+                '<section id="relatedNews">'
+            ),
+        ),
+    )
+    for duplicate_advice_source in duplicate_advice_sources:
+        assert_cli_schema_error(
+            cli,
+            sitemap_source=sitemap_source,
+            destination_source=duplicate_advice_source,
+            message_fragment="duplicate advice container",
+        )
+    print("[PASS] duplicate supported advice containers fail closed through the CLI")
+
+    unrelated_news_source = replace_once(
+        destination_source,
+        "<body>\n",
+        (
+            '<body>\n  <nav><a href="/news/site-announcement" '
+            'aria-label="Site announcement">Site announcement</a></nav>\n'
+        ),
+    )
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    with (
+        mock.patch.object(
+            cli,
+            "fetch_text",
+            side_effect=[
+                (sitemap_source, cli.SITEMAP_URL),
+                (unrelated_news_source, requested_url),
+            ],
+        ),
+        contextlib.redirect_stdout(stdout),
+        contextlib.redirect_stderr(stderr),
+    ):
+        exit_code = cli.main(["advice", "exampleland", "--json"])
+    assert exit_code == 0
+    assert stderr.getvalue() == ""
+    payload = json.loads(stdout.getvalue())
+    assert [item["title"] for item in payload["data"]["related_alerts_news"]] == [
+        "Exampleland security update"
+    ]
+    assert "Site announcement" not in stdout.getvalue()
+    print("[PASS] related news is scoped to the destination Related News surface")
+
+    duplicate_news_surface_source = replace_once(
+        destination_source,
+        '<section id="relatedNews">',
+        '<section id="relatedNews"></section>\n<section id="relatedNews">',
+    )
+    assert_cli_schema_error(
+        cli,
+        sitemap_source=sitemap_source,
+        destination_source=duplicate_news_surface_source,
+        message_fragment="duplicate Related News surfaces",
+    )
+    print(
+        "[PASS] ambiguous duplicate Related News surfaces fail closed through "
+        "the CLI"
+    )
+
+    for suffix in ("?variant=1", "#variant", ";variant=1"):
+        noncanonical_sitemap_source = replace_once(
+            sitemap_source,
+            requested_url,
+            requested_url + suffix,
+        )
+        assert_cli_schema_error(
+            cli,
+            sitemap_source=noncanonical_sitemap_source,
+            destination_source=destination_source,
+            message_fragment="non-canonical destination URL",
+        )
+    print(
+        "[PASS] sitemap query, fragment, and path parameters fail closed "
+        "through the CLI"
+    )
+
+    duplicate_slug_sitemap_source = replace_once(
+        sitemap_source,
+        "</urlset>",
+        f"  <url><loc>{requested_url}</loc></url>\n</urlset>",
+    )
+    assert_cli_schema_error(
+        cli,
+        sitemap_source=duplicate_slug_sitemap_source,
+        destination_source=destination_source,
+        message_fragment="duplicate destination slug",
+    )
+    print("[PASS] duplicate sitemap destination slugs fail closed through the CLI")
+
     for constant in ("NaN", "Infinity", "-Infinity"):
         malformed_json_source = replace_once(
             destination_source,

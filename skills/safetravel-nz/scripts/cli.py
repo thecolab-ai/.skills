@@ -58,6 +58,12 @@ ADVICE_LEVEL_NUMBERS = {
     "avoid": 4,
     "extreme": 4,
 }
+ADVICE_LEVEL_TITLES = {
+    1: "exercise normal safety and security precautions",
+    2: "exercise increased caution",
+    3: "avoid non-essential travel",
+    4: "do not travel",
+}
 
 
 class SkillError(Exception):
@@ -164,8 +170,11 @@ class DestinationPageParser(HTMLParser):
         self.h1_parts: list[str] = []
         self.description: str | None = None
         self.data_content: dict[str, str] = {}
+        self._advice_container_ids_seen: set[str] = set()
         self.anchor_stack: list[dict[str, Any]] = []
         self.news_links: list[dict[str, Any]] = []
+        self._related_news_section_depth: int | None = None
+        self._related_news_section_seen = False
         self._element_stack: list[str] = []
         self._document_stack: list[str] = []
         self._document_tags_seen: set[str] = set()
@@ -194,14 +203,25 @@ class DestinationPageParser(HTMLParser):
         if tag == "meta" and attrs_dict.get("name", "").lower() == "description":
             self.description = clean_text(attrs_dict.get("content", "")) or None
         element_id = attrs_dict.get("id", "")
-        if (
-            element_id in {"js-advice-level-accordion", "js-accordion"}
-            and "data-content" in attrs_dict
-        ):
-            self.data_content[element_id] = attrs_dict["data-content"]
+        if element_id in {"js-advice-level-accordion", "js-accordion"}:
+            if element_id in self._advice_container_ids_seen:
+                raise SchemaError(
+                    "destination page HTML had a duplicate advice container: "
+                    f"{element_id}"
+                )
+            self._advice_container_ids_seen.add(element_id)
+            if "data-content" in attrs_dict:
+                self.data_content[element_id] = attrs_dict["data-content"]
+        if tag == "section" and element_id == "relatedNews":
+            if self._related_news_section_seen:
+                raise SchemaError(
+                    "destination page HTML had duplicate Related News surfaces"
+                )
+            self._related_news_section_seen = True
+            self._related_news_section_depth = len(self._element_stack)
         if tag == "h1":
             self.h1_depth += 1
-        if tag == "a":
+        if tag == "a" and self._related_news_section_depth is not None:
             href = attrs_dict.get("href", "")
             if href.startswith("/news/"):
                 self.anchor_stack.append(
@@ -225,6 +245,10 @@ class DestinationPageParser(HTMLParser):
                 f"destination page HTML had an unmatched or misnested {tag} "
                 "closing element"
             )
+        closed_related_news = (
+            tag == "section"
+            and self._related_news_section_depth == len(self._element_stack)
+        )
         self._element_stack.pop()
         if tag in {"script", "style", "noscript", "svg"}:
             if self._skip_depth:
@@ -246,6 +270,8 @@ class DestinationPageParser(HTMLParser):
             active = self.anchor_stack[-1]
             if active["heading_depth"]:
                 active["heading_depth"] -= 1
+        if closed_related_news:
+            self._related_news_section_depth = None
 
     def handle_data(self, data: str) -> None:
         if self._skip_depth:
@@ -287,6 +313,7 @@ def parse_sitemap(source: str) -> list[dict[str, str | None]]:
         raise SchemaError(f"official sitemap XML could not be parsed: {exc}") from exc
 
     destinations: list[dict[str, str | None]] = []
+    seen_slugs: set[str] = set()
     for node in root.iter():
         if node.tag.rsplit("}", 1)[-1] != "url":
             continue
@@ -297,15 +324,24 @@ def parse_sitemap(source: str) -> list[dict[str, str | None]]:
         parsed = urlparse(url)
         parts = [part for part in parsed.path.split("/") if part]
         if (
-            parsed.scheme != "https"
-            or parsed.netloc.lower() not in ALLOWED_HOSTS
-            or len(parts) != 2
+            len(parts) != 2
             or parts[0] != "destinations"
-            or parts[1] == "about-our-travel-advice"
-            or not re.fullmatch(r"[a-z0-9-]+", parts[1])
+            or not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", parts[1])
         ):
             continue
         slug = parts[1]
+        if slug == "about-our-travel-advice":
+            continue
+        canonical_url = f"{DESTINATION_PREFIX}{slug}"
+        if url != canonical_url:
+            raise SchemaError(
+                f"official sitemap contained a non-canonical destination URL: {url!r}"
+            )
+        if slug in seen_slugs:
+            raise SchemaError(
+                f"official sitemap contained a duplicate destination slug: {slug!r}"
+            )
+        seen_slugs.add(slug)
         destinations.append(
             {
                 "name": slug.replace("-", " ").title(),
@@ -383,7 +419,10 @@ def parse_advice_item(item: Any) -> dict[str, Any]:
     title = clean_text(advice_string_field(item, "title"))
     body = html_to_text(advice_string_field(item, "body"))
     raw_level = clean_text(advice_string_field(item, "level")).casefold()
-    level_number_match = re.search(r"\blevel\s+([1-4])\s+of\s+4\b", body, re.IGNORECASE)
+    body_level_numbers = [
+        int(value)
+        for value in re.findall(r"\blevel\s+(\d+)\s+of\s+4\b", body, re.IGNORECASE)
+    ]
     if not title or not body or not raw_level:
         raise SchemaError("advice-level data is missing a title, level, or advice body")
     expected_level_number = ADVICE_LEVEL_NUMBERS.get(raw_level)
@@ -391,16 +430,24 @@ def parse_advice_item(item: Any) -> dict[str, Any]:
         raise SchemaError(
             f"advice-level data used an unsupported level value: {raw_level!r}"
         )
-    if level_number_match is None:
+    if not body_level_numbers:
         raise SchemaError(
             f"advice body did not contain a recognised level marker for {title!r}"
         )
-    level_number = int(level_number_match.group(1))
-    if level_number != expected_level_number:
+    if any(number != expected_level_number for number in body_level_numbers):
         raise SchemaError(
             f"advice-level data disagreed: {title!r} had level {raw_level!r} "
-            f"but body level {level_number}"
+            "but its body contained conflicting level markers "
+            f"{sorted(set(body_level_numbers))!r}"
         )
+    expected_title = ADVICE_LEVEL_TITLES[expected_level_number]
+    normalised_title = title.casefold().removesuffix(".")
+    if normalised_title != expected_title:
+        raise SchemaError(
+            f"advice-level title disagreed: {title!r} did not match "
+            f"level {expected_level_number} of 4"
+        )
+    level_number = expected_level_number
     return {
         "title": title,
         "subtitle": clean_text(advice_string_field(item, "subtitle")),
