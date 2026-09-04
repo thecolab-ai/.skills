@@ -15,7 +15,7 @@ import xml.etree.ElementTree as ET
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
-from urllib.parse import urljoin, urlparse
+from urllib.parse import unquote, urljoin, urlparse
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO_ROOT / "lib"))
@@ -358,6 +358,22 @@ class DestinationPageParser(HTMLParser):
             )
 
 
+def is_unsupported_canonical_destination_slug(slug: str) -> bool:
+    """Recognise canonical punctuation slugs that this strict CLI cannot accept."""
+    if not re.fullmatch(r"(?:[a-z0-9,-]|%[0-9A-Fa-f]{2})+", slug):
+        return False
+    try:
+        decoded = unquote(slug, errors="strict")
+    except UnicodeDecodeError:
+        return False
+    return (
+        decoded == decoded.casefold()
+        and re.fullmatch(r"[a-z0-9]+(?:(?:-|['’]|,-)[a-z0-9]+)*", decoded)
+        is not None
+        and re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", decoded) is None
+    )
+
+
 def parse_sitemap(source: str) -> list[dict[str, str | None]]:
     """Return destination pages from the official sitemap, sorted by display name."""
     try:
@@ -376,11 +392,22 @@ def parse_sitemap(source: str) -> list[dict[str, str | None]]:
         url = fields.get("loc", "")
         parsed = urlparse(url)
         parts = [part for part in parsed.path.split("/") if part]
+        destination_shaped = parsed.path.startswith("/destinations/")
         if (
             len(parts) != 2
             or parts[0] != "destinations"
             or not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", parts[1])
         ):
+            if destination_shaped and not (
+                len(parts) == 2
+                and parts[0] == "destinations"
+                and url == f"{DESTINATION_PREFIX}{parts[1]}"
+                and is_unsupported_canonical_destination_slug(parts[1])
+            ):
+                raise SchemaError(
+                    "official sitemap contained a malformed destination URL: "
+                    f"{url!r}"
+                )
             continue
         slug = parts[1]
         if slug == "about-our-travel-advice":
@@ -435,6 +462,7 @@ def normalise_destination(value: str) -> str:
         if (
             parsed.scheme != "https"
             or parsed.netloc.lower() not in ALLOWED_HOSTS
+            or parsed.params
             or parsed.query
             or parsed.fragment
         ):
@@ -565,6 +593,18 @@ def parse_related_news(
     seen_urls: set[str] = set()
     for anchor in parser.news_links:
         url = urljoin(page_url, str(anchor["href"]))
+        parsed = urlparse(url)
+        if (
+            parsed.scheme != "https"
+            or parsed.netloc.lower() not in ALLOWED_HOSTS
+            or parsed.params
+            or parsed.query
+            or parsed.fragment
+            or not parsed.path.startswith("/news/")
+        ):
+            raise SchemaError(
+                f"destination page contained a non-canonical related-news URL: {url!r}"
+            )
         if url in seen_urls:
             continue
         text = clean_text(" ".join(anchor["parts"]))

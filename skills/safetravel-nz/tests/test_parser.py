@@ -143,7 +143,32 @@ def main() -> int:
         )
         == "another-place"
     )
-    print("[PASS] fixture destination input normalisation")
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    with (
+        mock.patch.object(cli, "fetch_text") as fetch,
+        contextlib.redirect_stdout(stdout),
+        contextlib.redirect_stderr(stderr),
+    ):
+        exit_code = cli.main(
+            [
+                "advice",
+                "https://www.safetravel.govt.nz/destinations/"
+                "exampleland;variant=1",
+                "--json",
+            ]
+        )
+    assert exit_code == 2
+    assert stdout.getvalue() == ""
+    assert json.loads(stderr.getvalue()) == {
+        "error": "invalid_input",
+        "message": (
+            "destination URL must be a canonical www.safetravel.govt.nz "
+            "destination URL"
+        ),
+    }
+    fetch.assert_not_called()
+    print("[PASS] URL path parameters fail before sitemap network I/O")
 
     assert_schema_error(
         cli,
@@ -420,6 +445,19 @@ def main() -> int:
         "the CLI"
     )
 
+    escaping_news_source = replace_once(
+        destination_source,
+        "/news/exampleland-security-update",
+        "/news/../destinations/another-place",
+    )
+    assert_schema_error(
+        cli,
+        source=escaping_news_source,
+        slug="exampleland",
+        message_fragment="related-news URL",
+    )
+    print("[PASS] related-news dot segments cannot escape the /news/ namespace")
+
     for suffix in ("?variant=1", "#variant", ";variant=1"):
         noncanonical_sitemap_source = replace_once(
             sitemap_source,
@@ -436,6 +474,37 @@ def main() -> int:
         "[PASS] sitemap query, fragment, and path parameters fail closed "
         "through the CLI"
     )
+
+    root_destination_sitemap_source = replace_once(
+        sitemap_source,
+        "</urlset>",
+        (
+            "  <url><loc>https://www.safetravel.govt.nz/destinations"
+            "</loc></url>\n"
+            "  <url><loc>https://www.safetravel.govt.nz/destinations/"
+            "cote-d%E2%80%99ivoire</loc></url>\n"
+            "  <url><loc>https://www.safetravel.govt.nz/destinations/"
+            "virgin-islands,-u-s</loc></url>\n</urlset>"
+        ),
+    )
+    assert cli.parse_sitemap(root_destination_sitemap_source) == destinations
+    print("[PASS] destination index URL is ignored without hiding malformed entries")
+
+    malformed_destination_sitemap_source = replace_once(
+        sitemap_source,
+        "</urlset>",
+        (
+            "  <url><loc>https://www.safetravel.govt.nz/destinations/"
+            "Bad-Slug</loc></url>\n</urlset>"
+        ),
+    )
+    try:
+        cli.parse_sitemap(malformed_destination_sitemap_source)
+    except cli.SchemaError as exc:
+        assert "malformed destination URL" in str(exc)
+    else:
+        raise AssertionError("expected malformed destination-shaped sitemap URL rejection")
+    print("[PASS] malformed destination-shaped sitemap URLs fail closed")
 
     duplicate_slug_sitemap_source = replace_once(
         sitemap_source,

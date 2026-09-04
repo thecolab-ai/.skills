@@ -24,36 +24,22 @@ def run(args: list[str]) -> subprocess.CompletedProcess[str]:
     )
 
 
-def main() -> int:
-    fixture = run([str(PARSER_TEST)])
-    if fixture.returncode != 0:
-        print("[FAIL] fixture parser assertions")
-        print((fixture.stdout + fixture.stderr).strip())
-        return 1
-    print(fixture.stdout.strip())
-
-    help_result = run([str(CLI), "--help"])
-    if help_result.returncode != 0 or "{search,advice}" not in help_result.stdout:
-        print("[FAIL] contract CLI help surface")
-        print((help_result.stdout + help_result.stderr).strip())
-        return 1
-    print("[PASS] contract CLI help declares search and advice")
-
+def check_live_advice() -> bool:
     try:
         advice = run([str(CLI), "advice", "australia", "--json"])
     except subprocess.TimeoutExpired:
         print("[SKIP] live advice unavailable: network timed out")
-        return 0
+        return True
     if advice.returncode in {4, 5}:
         print(
             "[SKIP] live advice unavailable: "
             + (advice.stderr.strip() or "upstream unavailable")
         )
-        return 0
+        return True
     if advice.returncode != 0:
         print("[FAIL] live advice command")
         print((advice.stdout + advice.stderr).strip())
-        return 1
+        return False
     try:
         payload = json.loads(advice.stdout)
         assert payload["schema_version"] == "1"
@@ -70,26 +56,29 @@ def main() -> int:
         )
     except (AssertionError, KeyError, TypeError, ValueError) as exc:
         print(f"[FAIL] live advice schema assertion: {exc}")
-        return 1
+        return False
     print(
         "[PASS] live Australia advice includes source, timestamps, level, and warning"
     )
+    return True
 
+
+def check_live_search() -> bool:
     try:
         search = run([str(CLI), "search", "australia", "--limit", "5", "--json"])
     except subprocess.TimeoutExpired:
         print("[SKIP] live search unavailable: network timed out")
-        return 0
+        return True
     if search.returncode in {4, 5}:
         print(
             "[SKIP] live search unavailable: "
             + (search.stderr.strip() or "upstream unavailable")
         )
-        return 0
+        return True
     if search.returncode != 0:
         print("[FAIL] live search command")
         print((search.stdout + search.stderr).strip())
-        return 1
+        return False
     try:
         search_payload = json.loads(search.stdout)
         assert search_payload["data"]["kind"] == "destination_search"
@@ -100,9 +89,29 @@ def main() -> int:
         assert search_payload["source"]["retrieved_at"].endswith("Z")
     except (AssertionError, KeyError, TypeError, ValueError) as exc:
         print(f"[FAIL] live search schema assertion: {exc}")
-        return 1
+        return False
     print("[PASS] live search returns the official Australia destination")
-    return 0
+    return True
+
+
+def main() -> int:
+    fixture = run([str(PARSER_TEST)])
+    if fixture.returncode != 0:
+        print("[FAIL] fixture parser assertions")
+        print((fixture.stdout + fixture.stderr).strip())
+        return 1
+    print(fixture.stdout.strip())
+
+    help_result = run([str(CLI), "--help"])
+    if help_result.returncode != 0 or "{search,advice}" not in help_result.stdout:
+        print("[FAIL] contract CLI help surface")
+        print((help_result.stdout + help_result.stderr).strip())
+        return 1
+    print("[PASS] contract CLI help declares search and advice")
+
+    advice_ok = check_live_advice()
+    search_ok = check_live_search()
+    return 0 if advice_ok and search_ok else 1
 
 
 if __name__ == "__main__":

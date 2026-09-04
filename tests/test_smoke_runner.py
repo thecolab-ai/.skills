@@ -106,7 +106,7 @@ metadata:
                 "print('[PASS] contract invalid input is rejected')\n",
             )
             result = run_one(skill, 10)
-            self.assertEqual(result["status"], "pass")
+            self.assertEqual(result["status"], "gated")
             self.assertEqual(result["contract_assertions"], 1)
 
     def test_generic_live_summary_after_any_skip_is_not_live_evidence(self) -> None:
@@ -118,10 +118,25 @@ metadata:
                 "print('[PASS] live smoke assertions completed')\n",
             )
             result = run_one(skill, 10)
-            self.assertEqual(result["status"], "pass")
+            self.assertEqual(result["status"], "gated")
             self.assertEqual(result["fixture_assertions"], 1)
             self.assertEqual(result["live_assertions"], 0)
-            self.assertEqual(result["source_health"], "untested")
+            self.assertEqual(result["source_health"], "gated")
+
+    def test_deterministic_passes_with_only_skipped_live_probes_are_gated(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            skill = self.make_skill(
+                Path(tmp),
+                "print('[PASS] fixture parser retained source identifier')\n"
+                "print('[PASS] contract CLI help declares commands')\n"
+                "print('[SKIP] live probe intentionally skipped')\n",
+            )
+            result = run_one(skill, 10)
+            self.assertEqual(result["status"], "gated")
+            self.assertEqual(result["fixture_assertions"], 1)
+            self.assertEqual(result["contract_assertions"], 1)
+            self.assertEqual(result["live_assertions"], 0)
+            self.assertEqual(result["source_health"], "gated")
 
     def test_explicit_fixture_pass_is_meaningful(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

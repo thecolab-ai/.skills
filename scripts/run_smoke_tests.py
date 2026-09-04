@@ -46,10 +46,6 @@ NETWORK_MARKER = re.compile(
     r"temporary failure|timed? out|http (?:403|406|429|451|5\d\d)",
     re.I,
 )
-SKIP_GATING_MARKER = re.compile(
-    r"network|upstream|unavailable|blocked|timed? out|credential|api[_ ]?key|token|username|password",
-    re.I,
-)
 TRACEBACK_MARKER = re.compile(r"traceback|syntaxerror", re.I)
 
 
@@ -186,9 +182,7 @@ def run_one(skill_dir: Path, timeout: int) -> dict[str, object]:
         skips.append("upstream outage prevented live assertions")
     elif exit_code != 0:
         status = "fail"
-    elif not classified_passes and skips and (
-        CREDENTIAL_MARKER.search(log) or NETWORK_MARKER.search(log) or SKIP_GATING_MARKER.search(log)
-    ):
+    elif not live_passes and skips:
         status = "gated"
     elif classified_passes:
         status = "pass"
