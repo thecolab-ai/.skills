@@ -6,6 +6,7 @@ import contextlib
 import importlib.util
 import io
 import json
+import re
 import sys
 from pathlib import Path
 from unittest import mock
@@ -37,6 +38,38 @@ def assert_schema_error(cli, *, source: str, slug: str, message_fragment: str) -
         assert message_fragment in str(exc)
     else:
         raise AssertionError(f"expected SchemaError containing {message_fragment!r}")
+
+
+def replace_once(source: str, old: str, new: str) -> str:
+    assert source.count(old) >= 1, f"fixture mutation target missing: {old!r}"
+    return source.replace(old, new, 1)
+
+
+def assert_cli_schema_error(
+    cli, *, sitemap_source: str, destination_source: str, message_fragment: str
+) -> None:
+    requested_url = "https://www.safetravel.govt.nz/destinations/exampleland"
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    with (
+        mock.patch.object(
+            cli,
+            "fetch_text",
+            side_effect=[
+                (sitemap_source, cli.SITEMAP_URL),
+                (destination_source, requested_url),
+            ],
+        ),
+        contextlib.redirect_stdout(stdout),
+        contextlib.redirect_stderr(stderr),
+    ):
+        exit_code = cli.main(["advice", "exampleland", "--json"])
+    assert exit_code == 6
+    assert stdout.getvalue() == ""
+    assert "Traceback" not in stderr.getvalue()
+    error_payload = json.loads(stderr.getvalue())
+    assert error_payload["error"] == "source_schema_failure"
+    assert message_fragment in error_payload["message"]
 
 
 def main() -> int:
@@ -139,6 +172,106 @@ def main() -> int:
     sitemap_source = read_fixture("sitemap.xml")
     destination_source = read_fixture("destination-page.html")
     requested_url = "https://www.safetravel.govt.nz/destinations/exampleland"
+
+    for constant in ("NaN", "Infinity", "-Infinity"):
+        malformed_json_source = replace_once(
+            destination_source,
+            "&quot;isAutoExpanded&quot;:true",
+            (
+                "&quot;metadata&quot;:{&quot;deep&quot;:["
+                f"{constant}]}}"
+            ),
+        )
+        assert_cli_schema_error(
+            cli,
+            sitemap_source=sitemap_source,
+            destination_source=malformed_json_source,
+            message_fragment="not valid JSON",
+        )
+    print("[PASS] non-standard JSON constants are rejected at every depth")
+
+    overflowed_number_source = replace_once(
+        destination_source,
+        "&quot;isAutoExpanded&quot;:true",
+        "&quot;metadata&quot;:{&quot;deep&quot;:[1e309]}",
+    )
+    assert_cli_schema_error(
+        cli,
+        sitemap_source=sitemap_source,
+        destination_source=overflowed_number_source,
+        message_fragment="not valid JSON",
+    )
+    print("[PASS] overflowed JSON numbers cannot produce non-finite values")
+
+    deeply_nested_source = replace_once(
+        destination_source,
+        "&quot;isAutoExpanded&quot;:true",
+        "&quot;metadata&quot;:" + "[" * 3000 + "null" + "]" * 3000,
+    )
+    assert_cli_schema_error(
+        cli,
+        sitemap_source=sitemap_source,
+        destination_source=deeply_nested_source,
+        message_fragment="nesting depth",
+    )
+    print("[PASS] deeply nested advice JSON is rejected cleanly")
+
+    unclosed_source = re.sub(r"</[^>]+>", "", destination_source)
+    assert unclosed_source != destination_source
+    assert_cli_schema_error(
+        cli,
+        sitemap_source=sitemap_source,
+        destination_source=unclosed_source,
+        message_fragment="destination page HTML",
+    )
+    print("[PASS] materially unclosed destination HTML fails closed")
+
+    unclosed_head_source = replace_once(destination_source, "</head>", "")
+    assert_cli_schema_error(
+        cli,
+        sitemap_source=sitemap_source,
+        destination_source=unclosed_head_source,
+        message_fragment="destination page HTML",
+    )
+    print("[PASS] an individually unclosed structural element is rejected")
+
+    missing_regional_source = replace_once(
+        destination_source, ",&quot;regional&quot;:false", ""
+    )
+    assert_cli_schema_error(
+        cli,
+        sitemap_source=sitemap_source,
+        destination_source=missing_regional_source,
+        message_fragment="regional classification",
+    )
+    print("[PASS] missing regional classification is rejected")
+
+    for invalid_boolean in ("&quot;false&quot;", "0", "null"):
+        invalid_regional_source = replace_once(
+            destination_source,
+            "&quot;regional&quot;:false",
+            f"&quot;regional&quot;:{invalid_boolean}",
+        )
+        assert_cli_schema_error(
+            cli,
+            sitemap_source=sitemap_source,
+            destination_source=invalid_regional_source,
+            message_fragment="regional classification",
+        )
+    print("[PASS] regional classification rejects truthy and falsey coercions")
+
+    boolean_title_source = replace_once(
+        destination_source,
+        "&quot;title&quot;:&quot;Exercise increased caution&quot;",
+        "&quot;title&quot;:true",
+    )
+    assert_cli_schema_error(
+        cli,
+        sitemap_source=sitemap_source,
+        destination_source=boolean_title_source,
+        message_fragment="invalid title field",
+    )
+    print("[PASS] boolean advice strings are rejected instead of coerced")
 
     stdout = io.StringIO()
     stderr = io.StringIO()

@@ -7,6 +7,7 @@ import argparse
 import html
 import importlib
 import json
+import math
 import re
 import sys
 import xml.etree.ElementTree as ET
@@ -26,6 +27,24 @@ BASE_URL = "https://www.safetravel.govt.nz/"
 SITEMAP_URL = urljoin(BASE_URL, "sitemap.xml")
 DESTINATION_PREFIX = urljoin(BASE_URL, "destinations/")
 ALLOWED_HOSTS = ("www.safetravel.govt.nz",)
+VOID_HTML_TAGS = frozenset(
+    {
+        "area",
+        "base",
+        "br",
+        "col",
+        "embed",
+        "hr",
+        "img",
+        "input",
+        "link",
+        "meta",
+        "param",
+        "source",
+        "track",
+        "wbr",
+    }
+)
 TIMEOUT_SECONDS = 10
 CHANGE_WARNING = (
     "Travel advice can change. Consult the official SafeTravel page before "
@@ -147,10 +166,26 @@ class DestinationPageParser(HTMLParser):
         self.data_content: dict[str, str] = {}
         self.anchor_stack: list[dict[str, Any]] = []
         self.news_links: list[dict[str, Any]] = []
+        self._element_stack: list[str] = []
+        self._document_stack: list[str] = []
+        self._document_tags_seen: set[str] = set()
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         tag = tag.lower()
         attrs_dict = {key.lower(): value or "" for key, value in attrs}
+        if tag not in VOID_HTML_TAGS:
+            self._element_stack.append(tag)
+        if tag in {"html", "head", "body"}:
+            if tag in self._document_tags_seen:
+                raise SchemaError(f"destination page HTML repeated its {tag} element")
+            expected_parent = {"html": None, "head": "html", "body": "html"}[tag]
+            actual_parent = self._document_stack[-1] if self._document_stack else None
+            if actual_parent != expected_parent:
+                raise SchemaError(
+                    f"destination page HTML had an invalid {tag} element structure"
+                )
+            self._document_tags_seen.add(tag)
+            self._document_stack.append(tag)
         if tag in {"script", "style", "noscript", "svg"}:
             self._skip_depth += 1
             return
@@ -183,12 +218,26 @@ class DestinationPageParser(HTMLParser):
 
     def handle_endtag(self, tag: str) -> None:
         tag = tag.lower()
+        if tag in VOID_HTML_TAGS:
+            return
+        if not self._element_stack or self._element_stack[-1] != tag:
+            raise SchemaError(
+                f"destination page HTML had an unmatched or misnested {tag} "
+                "closing element"
+            )
+        self._element_stack.pop()
         if tag in {"script", "style", "noscript", "svg"}:
             if self._skip_depth:
                 self._skip_depth -= 1
             return
         if self._skip_depth:
             return
+        if tag in {"html", "head", "body"}:
+            if not self._document_stack or self._document_stack[-1] != tag:
+                raise SchemaError(
+                    f"destination page HTML had an unmatched {tag} closing element"
+                )
+            self._document_stack.pop()
         if tag == "h1" and self.h1_depth:
             self.h1_depth -= 1
         if tag == "a" and self.anchor_stack:
@@ -212,6 +261,22 @@ class DestinationPageParser(HTMLParser):
             active["parts"].append(text)
             if active["heading_depth"]:
                 active["heading_parts"].append(text)
+
+    def validate_complete_document(self) -> None:
+        if self._document_tags_seen != {"html", "head", "body"}:
+            raise SchemaError(
+                "destination page HTML was missing html/head/body structure"
+            )
+        if (
+            self._element_stack
+            or self._document_stack
+            or self.h1_depth
+            or self.anchor_stack
+            or self._skip_depth
+        ):
+            raise SchemaError(
+                "destination page HTML contained unclosed structural elements"
+            )
 
 
 def parse_sitemap(source: str) -> list[dict[str, str | None]]:
@@ -303,12 +368,21 @@ def normalise_destination(value: str) -> str:
     return candidate
 
 
+def advice_string_field(item: dict[str, Any], field: str) -> str:
+    if field not in item:
+        return ""
+    value = item[field]
+    if not isinstance(value, str):
+        raise SchemaError(f"advice-level data had an invalid {field} field")
+    return value
+
+
 def parse_advice_item(item: Any) -> dict[str, Any]:
     if not isinstance(item, dict):
         raise SchemaError("advice-level data included a non-object item")
-    title = clean_text(str(item.get("title", "")))
-    body = html_to_text(str(item.get("body", "")))
-    raw_level = clean_text(str(item.get("level", ""))).casefold()
+    title = clean_text(advice_string_field(item, "title"))
+    body = html_to_text(advice_string_field(item, "body"))
+    raw_level = clean_text(advice_string_field(item, "level")).casefold()
     level_number_match = re.search(r"\blevel\s+([1-4])\s+of\s+4\b", body, re.IGNORECASE)
     if not title or not body or not raw_level:
         raise SchemaError("advice-level data is missing a title, level, or advice body")
@@ -329,13 +403,34 @@ def parse_advice_item(item: Any) -> dict[str, Any]:
         )
     return {
         "title": title,
-        "subtitle": clean_text(str(item.get("subtitle", ""))),
+        "subtitle": clean_text(advice_string_field(item, "subtitle")),
         "level": raw_level,
         "number": level_number,
-        "last_updated": clean_text(str(item.get("lastUpdated", ""))) or None,
-        "still_current_at": clean_text(str(item.get("stillCurrentAt", ""))) or None,
+        "last_updated": clean_text(advice_string_field(item, "lastUpdated")) or None,
+        "still_current_at": clean_text(advice_string_field(item, "stillCurrentAt"))
+        or None,
         "body": body,
     }
+
+
+def required_regional_classification(item: Any) -> bool:
+    if not isinstance(item, dict) or "regional" not in item:
+        raise SchemaError("advice-level data is missing a regional classification")
+    regional = item["regional"]
+    if not isinstance(regional, bool):
+        raise SchemaError("advice-level data has an invalid regional classification")
+    return regional
+
+
+def reject_json_constant(value: str) -> None:
+    raise ValueError(f"non-standard JSON constant: {value}")
+
+
+def parse_finite_json_float(value: str) -> float:
+    parsed = float(value)
+    if not math.isfinite(parsed):
+        raise ValueError(f"JSON number is not finite: {value}")
+    return parsed
 
 
 def parse_related_news(
@@ -393,6 +488,9 @@ def parse_destination_page(source: str, *, slug: str, url: str) -> dict[str, Any
     try:
         parser.feed(source)
         parser.close()
+        parser.validate_complete_document()
+    except SchemaError:
+        raise
     except (
         Exception
     ) as exc:  # HTMLParser is permissive, but retain a clean parser failure.
@@ -403,18 +501,27 @@ def parse_destination_page(source: str, *, slug: str, url: str) -> dict[str, Any
             "destination page did not contain SafeTravel advice-level data"
         )
     try:
-        raw_items = json.loads(html.unescape(raw_advice))
-    except json.JSONDecodeError as exc:
+        raw_items = json.loads(
+            html.unescape(raw_advice),
+            parse_constant=reject_json_constant,
+            parse_float=parse_finite_json_float,
+        )
+    except RecursionError as exc:
+        raise SchemaError(
+            "destination advice-level JSON exceeded the supported nesting depth"
+        ) from exc
+    except (json.JSONDecodeError, ValueError) as exc:
         raise SchemaError(
             f"destination advice-level data was not valid JSON: {exc}"
         ) from exc
     if not isinstance(raw_items, list) or not raw_items:
         raise SchemaError("destination advice-level data was empty")
     advice_items = [parse_advice_item(item) for item in raw_items]
+    regional_flags = [required_regional_classification(item) for item in raw_items]
     primary_items = [
         item
         for index, item in enumerate(advice_items)
-        if not bool(raw_items[index].get("regional"))
+        if not regional_flags[index]
     ]
     if len(primary_items) != 1:
         raise SchemaError(
@@ -425,7 +532,7 @@ def parse_destination_page(source: str, *, slug: str, url: str) -> dict[str, Any
     regional = [
         item
         for index, item in enumerate(advice_items)
-        if bool(raw_items[index].get("regional"))
+        if regional_flags[index]
     ]
     page_text = clean_text(" ".join(parser.visible_parts))
     page_updated_match = re.search(

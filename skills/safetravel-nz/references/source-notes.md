@@ -15,7 +15,18 @@ Owner: Ministry of Foreign Affairs and Trade (MFAT). Authentication: none. Decla
 
 The official sitemap is XML and currently exposes destination pages under `/destinations/<slug>`. The CLI accepts only those canonical pages after first resolving their slug in the sitemap; it does not follow arbitrary user-provided URLs.
 
-A destination page currently exposes its advice entries in the `data-content` attribute of `#js-advice-level-accordion`. The attribute holds a JSON list whose observed fields include `title`, `subtitle`, `body`, `level`, `regional`, `lastUpdated`, and `stillCurrentAt`. The parser extracts a country-wide entry as `advice_level` and entries with `regional: true` as `regional_cautions`.
+A destination page currently exposes its advice entries in the `data-content` attribute of
+`#js-advice-level-accordion`. The attribute must contain a standards-compliant JSON list:
+non-standard constants, non-finite numbers, and unsupported nesting fail as source-schema
+errors. Advice text/date fields retain their published JSON string types rather than being
+coerced from booleans, numbers, objects, or nulls. Each item must carry an explicit JSON
+boolean `regional` classification; missing, string, numeric, or null classifications are
+rejected rather than coerced. The parser extracts a country-wide entry as `advice_level` and
+entries with `regional: true` as `regional_cautions`.
+
+Destination parsing also requires complete outer `html`/`head`/`body` structure and closed
+parser-relevant elements. Materially truncated or unclosed markup fails closed instead of
+yielding partial advice.
 
 The visible page includes a `Page updated <date>` label. Related news cards link to `/news/...` pages and can display `Updated <date>`. Their text is returned only as a short source-page summary; this skill does not fetch or interpret the linked news article itself. Footer registration material is deliberately excluded from related-news output.
 
