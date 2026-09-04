@@ -318,8 +318,8 @@ def normalize_variant(raw: dict[str, Any]) -> dict[str, Any]:
         "id": raw.get("id"),
         "title": raw.get("title") or "",
         "sku": raw.get("sku") or "",
-        "price": amount(raw.get("price"), cents=True),
-        "compare_at_price": amount(raw.get("compare_at_price"), cents=True),
+        "price": amount(raw.get("price")),
+        "compare_at_price": amount(raw.get("compare_at_price")),
         "available_online": bool(raw.get("available")),
         "availability_scope": AVAILABILITY_SCOPE,
         "options": [raw.get(key) for key in ("option1", "option2", "option3") if raw.get(key) is not None],
@@ -330,8 +330,8 @@ def normalize_detail(raw: dict[str, Any]) -> dict[str, Any]:
     handle = str(raw.get("handle") or "")
     title = str(raw.get("title") or "").strip()
     variants_value = raw.get("variants")
-    product_price = amount(raw.get("price"), cents=True)
-    if not handle or not title or raw.get("id") is None or product_price is None or not isinstance(variants_value, list) or not variants_value or not all(isinstance(item, dict) and item.get("id") is not None and amount(item.get("price"), cents=True) is not None for item in variants_value):
+    product_price = amount(raw.get("price"))
+    if not handle or not title or raw.get("id") is None or product_price is None or not isinstance(variants_value, list) or not variants_value or not all(isinstance(item, dict) and item.get("id") is not None and amount(item.get("price")) is not None for item in variants_value):
         raise StorefrontError("unexpected product response shape")
     variants = [normalize_variant(item) for item in variants_value if isinstance(item, dict)]
     images_value = raw.get("images")
@@ -344,7 +344,7 @@ def normalize_detail(raw: dict[str, Any]) -> dict[str, Any]:
         "vendor": raw.get("vendor") or "",
         "product_type": raw.get("type") or "",
         "price": product_price,
-        "compare_at_price": amount(raw.get("compare_at_price"), cents=True),
+        "compare_at_price": amount(raw.get("compare_at_price")),
         "available_online": bool(raw.get("available")),
         "availability_scope": AVAILABILITY_SCOPE,
         "variants": variants,

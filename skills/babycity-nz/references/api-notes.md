@@ -13,9 +13,9 @@ All routes were verified without authentication. The CLI sends a descriptive Use
 
 ## Output semantics
 
-Search prices are decimal NZD strings normalised to numbers. Product `.js` prices are integer cents normalised to NZD decimal numbers. Every result includes the final `source_url` and UTC `retrieved_at`; prices are snapshots at that time, not price history.
+Search-card and product-detail prices are decimal NZD values parsed from the public HTML storefront and normalised to numbers without cents conversion. Every result includes the final `source_url` and UTC `retrieved_at`; prices are snapshots at that time, not price history.
 
-`available_online` and each variant's availability reflect Shopify's online storefront. They do not represent stock at a babycity shop. The `stores` command returns official page metadata but does not infer inventory.
+`available_online` and each variant's availability reflect the public online storefront. They do not represent stock at a babycity shop. The `stores` command returns official page metadata but does not infer inventory.
 
 ## Limits and failure modes
 

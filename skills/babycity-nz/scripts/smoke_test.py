@@ -110,7 +110,7 @@ def main() -> int:
         <input type="hidden" name="product_id" value="456"/>
         <input type="hidden" name="product_type" value="consu"/>
         <h1 class="h3">Fixture Product</h1>
-        <span class="product-price"><span class="oe_currency_value">12.34</span></span>
+        <span class="product-price"><span class="oe_currency_value">2229.93</span></span>
         <input class="js_variant_change" checked="True" data-value-name="Fixture Option" title="Fixture Option"/>
         <button class="product-add-to-cart btn btn-primary-soft">Add to Cart</button>
         <img src="/web/image/product.product/456/image_1024/fixture.webp"/>
@@ -121,6 +121,7 @@ def main() -> int:
     normalized_product = module.normalize_detail(parsed_product)
     require(normalized_product["handle"] == "fixture-product-456", "product parser must preserve the canonical shop handle")
     require(normalized_product["url"].endswith("/shop/fixture-product-456"), "product url must remain canonical")
+    require(normalized_product["price"] == 2229.93 and normalized_product["variants"][0]["price"] == 2229.93, "detail price must preserve decimal NZD values")
     require(isinstance(normalized_product.get("variants"), list) and normalized_product["variants"], "product variants missing")
     try:
         module.parse_product_page("<html><body><h1 class='h3'>Broken</h1></body></html>", "broken")
@@ -129,16 +130,18 @@ def main() -> int:
         malformed_rejected = True
     require(malformed_rejected, "malformed product HTML must fail closed")
 
-    search_fixture = {"id": 1, "handle": "fixture", "title": "Fixture", "price_min": 10.0, "price_max": 10.0, "compare_at_price_min": 0}
-    require(module.normalize_search(search_fixture)["compare_at_price_min"] is None, "zero compare-at sentinel must be null")
-    require(module.amount("nan") is None and module.amount(-0.01) is None, "non-finite and negative prices must fail closed")
+    search_fixture = {"id": 1, "handle": "fixture", "title": "Fixture", "price_min": 2229.93, "price_max": 2229.93, "compare_at_price_min": 0}
+    normalized_search = module.normalize_search(search_fixture)
+    require(normalized_search["price_min"] == 2229.93 and normalized_search["price_max"] == 2229.93, "search price must preserve decimal NZD values")
+    require(normalized_search["compare_at_price_min"] is None, "zero compare-at sentinel must be null")
+    require(module.amount("nan") is None and module.amount(float("inf")) is None and module.amount(-0.01) is None, "non-finite and negative prices must fail closed")
     try:
         module.normalize_search({})
         malformed_search_rejected = False
     except module.StorefrontError:
         malformed_search_rejected = True
     require(malformed_search_rejected, "malformed predictive-search item must fail closed")
-    for malformed_product in ({}, {"handle": "fixture", "title": "Fixture", "variants": None}, {"handle": "fixture", "title": "Fixture", "variants": []}, {"handle": "fixture", "title": "Fixture", "variants": ["bad"]}, {"handle": "fixture", "title": "Fixture", "variants": [{}]}):
+    for malformed_product in ({}, {"handle": "fixture", "title": "Fixture", "variants": None}, {"handle": "fixture", "title": "Fixture", "variants": []}, {"handle": "fixture", "title": "Fixture", "variants": ["bad"]}, {"handle": "fixture", "title": "Fixture", "variants": [{}]}, {"handle": "fixture", "title": "Fixture", "price": float("nan"), "variants": [{"id": 1, "price": 2229.93}]}):
         try:
             module.normalize_detail(malformed_product)
             product_rejected = False
