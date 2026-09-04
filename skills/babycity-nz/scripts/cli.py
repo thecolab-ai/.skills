@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Read-only Shopify storefront search, product detail, and store-page CLI."""
+"""Read-only storefront HTML search, product detail, and store-page CLI."""
 from __future__ import annotations
 
 import argparse
+import html as html_lib
 import json
 import math
 import re
-import socket
 import sys
 import urllib.error
 import urllib.parse
@@ -123,7 +123,7 @@ def fetch(url: str, timeout: int, accept: str) -> tuple[bytes, str]:
         if exc.code == 404:
             raise StorefrontError(f"not found (HTTP 404): {url}") from exc
         raise StorefrontError(f"upstream HTTP {exc.code}: {url}") from exc
-    except (urllib.error.URLError, TimeoutError, socket.timeout) as exc:
+    except (urllib.error.URLError, TimeoutError) as exc:
         reason = getattr(exc, "reason", exc)
         raise StorefrontError(f"network error calling {url}: {reason}") from exc
 
@@ -140,6 +140,8 @@ def amount(value: Any, *, cents: bool = False) -> float | None:
     if value is None or isinstance(value, bool):
         return None
     try:
+        if isinstance(value, str):
+            value = value.replace(",", "")
         result = float(value)
     except (OverflowError, TypeError, ValueError):
         return None
@@ -148,25 +150,167 @@ def amount(value: Any, *, cents: bool = False) -> float | None:
     return round(result, 2) if math.isfinite(result) and result >= 0 else None
 
 
+def slugify_handle(text: str) -> str:
+    text = html_lib.unescape(text).strip().lower()
+    text = re.sub(r"[^a-z0-9]+", "-", text)
+    return text.strip("-")
+
+
+def parse_attributes(tag: str) -> dict[str, str]:
+    return {match.group(1): html_lib.unescape(match.group(2)) for match in re.finditer(r'([a-zA-Z_:][-a-zA-Z0-9_:.]*)="([^"]*)"', tag)}
+
+
+def parse_search_page(html: str, limit: int) -> list[dict[str, Any]]:
+    starts = list(re.finditer(r'<div class="col tp-product-item[^>]*data-product-template-id="(\d+)">', html, re.DOTALL))
+    if not starts:
+        raise StorefrontError("unexpected search page shape")
+    products: list[dict[str, Any]] = []
+    for index, match in enumerate(starts):
+        if len(products) >= limit:
+            break
+        start = match.start()
+        end = starts[index + 1].start() if index + 1 < len(starts) else len(html)
+        card = html[start:end]
+        template_id = int(match.group(1))
+        hidden = re.search(r'<input[^>]*name="product_id"[^>]*value="(\d+)"', card, re.DOTALL)
+        title_match = re.search(r'<a[^>]*class="[^"]*tp-link-dark[^"]*"[^>]*title="([^"]+)"[^>]*href="([^"]+)"[^>]*>(.*?)</a>', card, re.DOTALL)
+        price_match = re.search(r'<span class="oe_currency_value">([0-9][0-9,]*(?:\.[0-9]{1,2})?)</span>', card)
+        if not hidden or not title_match or not price_match:
+            raise StorefrontError("unexpected search result shape")
+        title = html_lib.unescape(title_match.group(1)).strip()
+        href = html_lib.unescape(title_match.group(2)).strip()
+        price = amount(price_match.group(1))
+        if price is None:
+            raise StorefrontError("unexpected search result price")
+        image_match = re.search(r'<img[^>]*src="([^"]+)"[^>]*>', card, re.DOTALL)
+        image_url = html_lib.unescape(image_match.group(1)).strip() if image_match else ""
+        products.append({
+            "id": int(hidden.group(1)),
+            "handle": clean_handle(href),
+            "title": title,
+            "url": product_lookup_url(href),
+            "price_min": price,
+            "price_max": price,
+            "compare_at_price_min": None,
+            "available": True,
+            "image": image_url,
+            "template_id": template_id,
+        })
+    if not products:
+        raise StorefrontError("unexpected search page shape")
+    return products
+
+
+def parse_product_page(html: str, requested_handle: str | None) -> dict[str, Any]:
+    title_match = re.search(r'<h1 class="h3[^"]*">([^<]+)</h1>', html, re.DOTALL)
+    product_id_match = re.search(r'<input[^>]*name="product_id"[^>]*value="(\d+)"', html, re.DOTALL)
+    product_type_match = re.search(r'<input[^>]*name="product_type"[^>]*value="([^"]+)"', html, re.DOTALL)
+    price_match = re.search(r'<span class="product-price"[^>]*>.*?<span class="oe_currency_value">([0-9][0-9,]*(?:\.[0-9]{1,2})?)</span>', html, re.DOTALL)
+    if not title_match or not product_id_match or not price_match:
+        raise StorefrontError("unexpected product page shape")
+    title = html_lib.unescape(title_match.group(1)).strip()
+    price = amount(price_match.group(1))
+    if price is None:
+        raise StorefrontError("unexpected product page price")
+    checked_inputs = []
+    for input_match in re.finditer(r'<input\b[^>]*class="[^"]*js_variant_change[^"]*"[^>]*>', html, re.DOTALL):
+        tag = input_match.group(0)
+        attrs = parse_attributes(tag)
+        if attrs.get("checked") != "True":
+            continue
+        checked_inputs.append(attrs)
+    options = [attrs.get("data-value-name") or attrs.get("title") for attrs in checked_inputs if attrs.get("data-value-name") or attrs.get("title")]
+    if not options:
+        options = [title]
+    image_urls = []
+    for img_match in re.finditer(r'<img[^>]*src="([^"]+)"[^>]*>', html, re.DOTALL):
+        src = html_lib.unescape(img_match.group(1)).strip()
+        if "/web/image/product" in src:
+            image_urls.append(src)
+    if not image_urls:
+        image_urls = []
+    available = "Add to Cart" in html and "disabled" not in html.lower()
+    canonical_match = re.search(r'rel="canonical" href="([^"]+)"', html)
+    if canonical_match:
+        canonical_url = html_lib.unescape(canonical_match.group(1)).strip()
+        if not is_allowed_storefront_url(canonical_url):
+            raise StorefrontError("unexpected product canonical URL")
+        handle = clean_handle(canonical_url)
+    else:
+        handle = requested_handle or slugify_handle(title)
+        canonical_url = absolute_product_url(handle)
+    variant = {
+        "id": int(product_id_match.group(1)),
+        "title": title,
+        "sku": "",
+        "price": price,
+        "compare_at_price": None,
+        "available": available,
+        "option1": options[0],
+        "option2": options[1] if len(options) > 1 else None,
+        "option3": options[2] if len(options) > 2 else None,
+    }
+    return {
+        "id": int(product_id_match.group(1)),
+        "handle": handle,
+        "title": title,
+        "type": product_type_match.group(1) if product_type_match else "",
+        "vendor": "",
+        "price": price,
+        "compare_at_price": None,
+        "available": available,
+        "variants": [variant],
+        "images": image_urls,
+        "canonical_url": canonical_url,
+    }
+
+
 def clean_handle(value: str) -> str:
     text = value.strip()
-    if "/products/" in text:
-        parsed = urllib.parse.urlparse(text if "://" in text else "https://" + text.lstrip("/"))
+    if not text:
+        raise StorefrontError("product must be a valid handle or storefront /shop/<slug> URL")
+    text = text.removesuffix(".js")
+    if "://" in text or text.startswith("/"):
+        parsed = urllib.parse.urlparse(text if "://" in text else urllib.parse.urljoin(BASE_URL, text))
         base_host = urllib.parse.urlparse(BASE_URL).hostname or ""
         bare_host = base_host.removeprefix("www.")
         if parsed.hostname not in {base_host, bare_host, "www." + bare_host}:
             raise StorefrontError("product URL must use the configured storefront")
-        text = parsed.path.split("/products/", 1)[1]
-    text = urllib.parse.unquote(text.split("?", 1)[0].split("#", 1)[0].strip("/"))
-    if text.endswith(".js"):
-        text = text[:-3]
-    if not HANDLE_RE.fullmatch(text):
-        raise StorefrontError("product must be a valid handle or storefront /products/<handle> URL")
+        path = parsed.path.rstrip("/")
+        if path.startswith("/shop/"):
+            text = path.split("/shop/", 1)[1]
+        elif path.startswith("/products/"):
+            text = path.split("/products/", 1)[1]
+        else:
+            raise StorefrontError("product URL must use the configured storefront product paths")
+    else:
+        text = text.split("?", 1)[0].split("#", 1)[0].strip("/")
+    text = urllib.parse.unquote(text)
+    if "/" in text or not HANDLE_RE.fullmatch(text):
+        raise StorefrontError("product must be a valid handle or storefront /shop/<slug> URL")
     return text
 
 
+def product_lookup_url(value: str) -> str:
+    text = value.strip()
+    if "://" in text or text.startswith("/"):
+        parsed = urllib.parse.urlparse(text if "://" in text else urllib.parse.urljoin(BASE_URL, text))
+        base_host = urllib.parse.urlparse(BASE_URL).hostname or ""
+        bare_host = base_host.removeprefix("www.")
+        if parsed.hostname not in {base_host, bare_host, "www." + bare_host}:
+            raise StorefrontError("product URL must use the configured storefront")
+        path = parsed.path.rstrip("/")
+        if path.startswith("/shop/"):
+            return parsed._replace(path=path).geturl()
+        if path.startswith("/products/"):
+            return absolute_product_url(clean_handle(path))
+        raise StorefrontError("product URL must use the configured storefront product paths")
+    handle = clean_handle(text)
+    return absolute_product_url(handle)
+
+
 def absolute_product_url(handle: str) -> str:
-    return f"{BASE_URL}/products/{urllib.parse.quote(handle, safe='-')}"
+    return f"{BASE_URL}/shop/{urllib.parse.quote(handle, safe='-')}"
 
 
 def normalize_variant(raw: dict[str, Any]) -> dict[str, Any]:
@@ -196,7 +340,7 @@ def normalize_detail(raw: dict[str, Any]) -> dict[str, Any]:
         "id": raw.get("id"),
         "title": title,
         "handle": handle,
-        "url": absolute_product_url(handle),
+        "url": raw.get("canonical_url") or absolute_product_url(handle),
         "vendor": raw.get("vendor") or "",
         "product_type": raw.get("type") or "",
         "price": product_price,
@@ -219,7 +363,7 @@ def normalize_search(raw: dict[str, Any]) -> dict[str, Any]:
         "id": raw.get("id"),
         "title": title,
         "handle": handle,
-        "url": absolute_product_url(handle),
+        "url": raw.get("url") or absolute_product_url(handle),
         "vendor": raw.get("vendor") or "",
         "product_type": raw.get("type") or "",
         "price_min": price_min,
@@ -235,21 +379,14 @@ def search_products(query: str, limit: int, timeout: int) -> dict[str, Any]:
     query = query.strip()
     if not query:
         raise StorefrontError("search query must not be empty")
-    params = {
-        "q": query,
-        "resources[type]": "product",
-        "resources[limit]": limit,
-        "resources[options][unavailable_products]": "last",
-    }
-    endpoint = BASE_URL + "/search/suggest.json?" + urllib.parse.urlencode(params)
-    payload, source_url = fetch_json(endpoint, timeout)
+    endpoint = BASE_URL + "/shop?search=" + urllib.parse.quote(query)
+    body, source_url = fetch(endpoint, timeout, "text/html")
     try:
-        raw_products = payload["resources"]["results"]["products"]
-    except (KeyError, TypeError) as exc:
-        raise StorefrontError("unexpected predictive-search response shape") from exc
-    if not isinstance(raw_products, list):
-        raise StorefrontError("unexpected predictive-search products shape")
-    products = [normalize_search(item) for item in raw_products[:limit] if isinstance(item, dict)]
+        html = body.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise StorefrontError(f"invalid HTML from {source_url}") from exc
+    raw_products = parse_search_page(html, limit)
+    products = [normalize_search(item) for item in raw_products[:limit]]
     stamp = retrieved_at()
     return {
         "retailer": LABEL,
@@ -266,11 +403,15 @@ def search_products(query: str, limit: int, timeout: int) -> dict[str, Any]:
 
 
 def product_detail(value: str, timeout: int) -> dict[str, Any]:
-    handle = clean_handle(value)
-    endpoint = absolute_product_url(handle) + ".js"
-    payload, source_url = fetch_json(endpoint, timeout)
-    if not isinstance(payload, dict):
-        raise StorefrontError("unexpected product response shape")
+    endpoint = product_lookup_url(value)
+    requested_handle = None if ("://" in value or value.startswith("/")) else clean_handle(value)
+    body, source_url = fetch(endpoint, timeout, "text/html")
+    try:
+        html = body.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise StorefrontError(f"invalid HTML from {source_url}") from exc
+    raw_product = parse_product_page(html, requested_handle)
+    product = normalize_detail(raw_product)
     stamp = retrieved_at()
     return {
         "retailer": LABEL,
@@ -279,7 +420,7 @@ def product_detail(value: str, timeout: int) -> dict[str, Any]:
         "availability_scope": AVAILABILITY_SCOPE,
         "source_url": source_url,
         "retrieved_at": stamp,
-        "product": normalize_detail(payload),
+        "product": product,
     }
 
 

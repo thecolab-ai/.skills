@@ -4,10 +4,10 @@ Unofficial, read-only access to public storefront routes on `https://www.babycit
 
 ## Verified sources
 
-- Predictive product search: `GET /search/suggest.json?q={query}&resources[type]=product&resources[limit]={1..10}`
-- Handle detail: `GET /products/{handle}.js`
+- Product search: `GET /shop?search={query}` (public storefront HTML; parse product cards from the results grid)
+- Product detail: `GET /shop/{canonical-handle}` (public storefront HTML; canonical product URLs now live under `/shop/<slug>-<id>`)
 - Store information: `GET /pages/store-locator`
-- Public catalogue route also observed: `GET /products.json?limit={n}`; the CLI does not crawl it because predictive search is narrower.
+- Search cards expose canonical `/shop/<slug>-<id>` anchors; the CLI preserves those canonical shop URLs instead of reconstructing legacy `/products/...` paths.
 
 All routes were verified without authentication. The CLI sends a descriptive User-Agent, uses HTTPS GET only, and defaults to a 10-second timeout.
 
@@ -19,7 +19,7 @@ Search prices are decimal NZD strings normalised to numbers. Product `.js` price
 
 ## Limits and failure modes
 
-Search accepts 1–10 results in one request. Product lookup accepts a strict handle or `/products/<handle>` URL and performs one request. Redirects must remain on the configured storefront host. HTTP, timeout, DNS, malformed JSON, and unexpected response-shape failures produce concise stderr messages without tracebacks.
+Search accepts 1–10 results in one request. Product lookup accepts a strict handle or canonical `/shop/<slug>` URL and performs one request; legacy `/products/<handle>` inputs are normalized when possible. Redirects must remain on the configured storefront host. HTTP, timeout, DNS, malformed JSON, and unexpected response-shape failures produce concise stderr messages without tracebacks.
 
 ## Safety
 

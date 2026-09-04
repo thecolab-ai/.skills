@@ -196,7 +196,7 @@
     },
     {
       "name": "babycity-nz",
-      "description": "Query babycity NZ's public Shopify product search, product details, current online price snapshots, variant availability, and verified store-locator page. Use when comparing babycity products, looking up a product handle or URL, or finding official babycity store information. Read-only; no cart, checkout, account, payment, booking, or other mutations.",
+      "description": "Query babycity NZ's public storefront search, product details, current online price snapshots, variant availability, and verified store-locator page. Use when comparing babycity products, looking up a product handle or URL, or finding official babycity store information. Read-only; no cart, checkout, account, payment, booking, or other mutations. Product pages use canonical /shop/... storefront URLs.",
       "path": "skills/babycity-nz",
       "category": "retail",
       "source_owner": "babycity",
@@ -218,7 +218,7 @@
         "www.dimples.co.nz",
         "www.naturebaby.co.nz"
       ],
-      "last_verified": "2026-07-19",
+      "last_verified": "2026-09-04",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
