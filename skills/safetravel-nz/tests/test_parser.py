@@ -405,6 +405,24 @@ def main() -> int:
     )
     print("[PASS] deeply nested advice JSON is rejected cleanly")
 
+    bounded_depth_source = replace_once(
+        destination_source,
+        "&quot;isAutoExpanded&quot;:true",
+        (
+            "&quot;metadata&quot;:"
+            + "[" * (cli.MAX_JSON_DEPTH + 1)
+            + "null"
+            + "]" * (cli.MAX_JSON_DEPTH + 1)
+        ),
+    )
+    assert_cli_schema_error(
+        cli,
+        sitemap_source=sitemap_source,
+        destination_source=bounded_depth_source,
+        message_fragment="nesting depth",
+    )
+    print("[PASS] explicit JSON nesting limit is runtime-independent")
+
     unclosed_source = re.sub(r"</[^>]+>", "", destination_source)
     assert unclosed_source != destination_source
     assert_cli_schema_error(

@@ -27,6 +27,7 @@ BASE_URL = "https://www.safetravel.govt.nz/"
 SITEMAP_URL = urljoin(BASE_URL, "sitemap.xml")
 DESTINATION_PREFIX = urljoin(BASE_URL, "destinations/")
 ALLOWED_HOSTS = ("www.safetravel.govt.nz",)
+MAX_JSON_DEPTH = 100
 VOID_HTML_TAGS = frozenset(
     {
         "area",
@@ -500,6 +501,20 @@ def parse_finite_json_float(value: str) -> float:
     return parsed
 
 
+def ensure_bounded_json_depth(value: Any) -> None:
+    stack: list[tuple[Any, int]] = [(value, 1)]
+    while stack:
+        current, depth = stack.pop()
+        if depth > MAX_JSON_DEPTH:
+            raise SchemaError(
+                "destination advice-level JSON exceeded the supported nesting depth"
+            )
+        if isinstance(current, dict):
+            stack.extend((item, depth + 1) for item in current.values())
+        elif isinstance(current, list):
+            stack.extend((item, depth + 1) for item in current)
+
+
 def parse_related_news(
     parser: DestinationPageParser, page_url: str
 ) -> list[dict[str, str | None]]:
@@ -582,6 +597,7 @@ def parse_destination_page(source: str, *, slug: str, url: str) -> dict[str, Any
         raise SchemaError(
             f"destination advice-level data was not valid JSON: {exc}"
         ) from exc
+    ensure_bounded_json_depth(raw_items)
     if not isinstance(raw_items, list) or not raw_items:
         raise SchemaError("destination advice-level data was empty")
     advice_items = [parse_advice_item(item) for item in raw_items]
