@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
-  "last_verified": "2026-09-03",
+  "last_verified": "2026-09-04",
   "skill_count": 146,
   "skills": [
     {
@@ -957,8 +957,8 @@
         "ero.govt.nz",
         " www.ero.govt.nz"
       ],
-      "last_verified": "2026-07-19",
-      "health": "degraded",
+      "last_verified": "2026-09-04",
+      "health": "healthy",
       "maintainer": "@adam91holt"
     },
     {
