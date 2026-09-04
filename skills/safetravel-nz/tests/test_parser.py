@@ -72,6 +72,29 @@ def assert_cli_schema_error(
     assert message_fragment in error_payload["message"]
 
 
+def assert_cli_search_schema_error(
+    cli, *, sitemap_source: str, message_fragment: str
+) -> None:
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    with (
+        mock.patch.object(
+            cli,
+            "fetch_text",
+            return_value=(sitemap_source, cli.SITEMAP_URL),
+        ),
+        contextlib.redirect_stdout(stdout),
+        contextlib.redirect_stderr(stderr),
+    ):
+        exit_code = cli.main(["search", "exampleland", "--json"])
+    assert exit_code == 6
+    assert stdout.getvalue() == ""
+    assert "Traceback" not in stderr.getvalue()
+    error_payload = json.loads(stderr.getvalue())
+    assert error_payload["error"] == "source_schema_failure"
+    assert message_fragment in error_payload["message"]
+
+
 def main() -> int:
     cli = load_cli()
 
@@ -202,6 +225,116 @@ def main() -> int:
     sitemap_source = read_fixture("sitemap.xml")
     destination_source = read_fixture("destination-page.html")
     requested_url = "https://www.safetravel.govt.nz/destinations/exampleland"
+
+    duplicate_identical_loc_source = replace_once(
+        sitemap_source,
+        f"<loc>{requested_url}</loc>",
+        f"<loc>{requested_url}</loc><loc>{requested_url}</loc>",
+    )
+    assert_cli_search_schema_error(
+        cli,
+        sitemap_source=duplicate_identical_loc_source,
+        message_fragment="duplicate field 'loc'",
+    )
+
+    untrusted_then_canonical_loc_source = replace_once(
+        sitemap_source,
+        f"<loc>{requested_url}</loc>",
+        (
+            "<loc>https://attacker.invalid/destinations/exampleland</loc>"
+            f"<loc>{requested_url}</loc>"
+        ),
+    )
+    assert_cli_search_schema_error(
+        cli,
+        sitemap_source=untrusted_then_canonical_loc_source,
+        message_fragment="duplicate field 'loc'",
+    )
+    print("[PASS] duplicate sitemap loc fields fail closed through the JSON CLI")
+
+    malformed_sitemap_entries = (
+        (
+            replace_once(
+                sitemap_source,
+                "<lastmod>2026-08-15</lastmod>",
+                "<lastmod>2026-08-15</lastmod><lastmod>2026-08-16</lastmod>",
+            ),
+            "duplicate field 'lastmod'",
+        ),
+        (
+            replace_once(
+                sitemap_source,
+                f"<loc>{requested_url}</loc>",
+                "",
+            ),
+            "exactly one loc field",
+        ),
+        (
+            replace_once(
+                sitemap_source,
+                f"<loc>{requested_url}</loc>",
+                f"<loc><span>{requested_url}</span></loc>",
+            ),
+            "nested content",
+        ),
+        (
+            replace_once(
+                sitemap_source,
+                f"<loc>{requested_url}</loc>",
+                f"<loc>{requested_url}<suffix>/ignored</suffix></loc>",
+            ),
+            "nested content",
+        ),
+        (
+            replace_once(
+                sitemap_source,
+                f"<loc>{requested_url}</loc>",
+                f"unexpected text<loc>{requested_url}</loc>",
+            ),
+            "unexpected text",
+        ),
+        (
+            replace_once(
+                sitemap_source,
+                f"<loc>{requested_url}</loc>",
+                f"<loc>{requested_url}</loc>unexpected text",
+            ),
+            "unexpected text",
+        ),
+        (
+            replace_once(
+                sitemap_source,
+                f"<loc>{requested_url}</loc>",
+                f"<loc>{requested_url}</loc><unknown>ignored</unknown>",
+            ),
+            "unexpected field",
+        ),
+        (
+            replace_once(
+                sitemap_source,
+                f"<loc>{requested_url}</loc>",
+                f"<loc source=\"untrusted\">{requested_url}</loc>",
+            ),
+            "unexpected attributes",
+        ),
+        (
+            replace_once(
+                sitemap_source,
+                f"<url><loc>{requested_url}</loc>",
+                f"<url source=\"untrusted\"><loc>{requested_url}</loc>",
+            ),
+            "invalid url entry",
+        ),
+    )
+    for malformed_sitemap_source, message_fragment in malformed_sitemap_entries:
+        assert_cli_search_schema_error(
+            cli,
+            sitemap_source=malformed_sitemap_source,
+            message_fragment=message_fragment,
+        )
+    print(
+        "[PASS] malformed per-URL sitemap structures fail closed through the JSON CLI"
+    )
 
     stdout = io.StringIO()
     stderr = io.StringIO()

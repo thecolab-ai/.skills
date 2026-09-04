@@ -30,6 +30,9 @@ SITEMAP_URL = urljoin(BASE_URL, "sitemap.xml")
 DESTINATION_PREFIX = urljoin(BASE_URL, "destinations/")
 ALLOWED_HOSTS = ("www.safetravel.govt.nz",)
 MAX_JSON_DEPTH = 100
+SITEMAP_NAMESPACE_SCHEME = "http"
+SITEMAP_NAMESPACE_LOCATION = "www.sitemaps.org/schemas/sitemap/0.9"
+SITEMAP_FIELD_NAMES = frozenset(("loc", "lastmod", "changefreq", "priority"))
 VOID_HTML_TAGS = frozenset(
     {
         "area",
@@ -382,15 +385,70 @@ def parse_sitemap(source: str) -> list[dict[str, str | None]]:
     except ET.ParseError as exc:
         raise SchemaError(f"official sitemap XML could not be parsed: {exc}") from exc
 
+    root_namespace, namespace_end, root_name = (
+        root.tag[1:].partition("}") if root.tag.startswith("{") else ("", "", "")
+    )
+    namespace_scheme, scheme_end, namespace_location = root_namespace.partition(
+        "://"
+    )
+    if (
+        namespace_end != "}"
+        or root_name != "urlset"
+        or namespace_scheme != SITEMAP_NAMESPACE_SCHEME
+        or scheme_end != "://"
+        or namespace_location != SITEMAP_NAMESPACE_LOCATION
+        or root.attrib
+    ):
+        raise SchemaError("official sitemap had an invalid urlset root")
+    if root.text and root.text.strip():
+        raise SchemaError(
+            "official sitemap contained unexpected text outside a url entry"
+        )
+
     destinations: list[dict[str, str | None]] = []
     seen_slugs: set[str] = set()
-    for node in root.iter():
-        if node.tag.rsplit("}", 1)[-1] != "url":
-            continue
-        fields = {
-            child.tag.rsplit("}", 1)[-1]: clean_text(child.text or "") for child in node
-        }
-        url = fields.get("loc", "")
+    namespace_prefix = f"{{{root_namespace}}}"
+    for node in root:
+        if node.tag != f"{namespace_prefix}url" or node.attrib:
+            raise SchemaError("official sitemap contained an invalid url entry")
+        if (node.text and node.text.strip()) or (node.tail and node.tail.strip()):
+            raise SchemaError("official sitemap url entry contained unexpected text")
+
+        fields: dict[str, str] = {}
+        for child in node:
+            if not child.tag.startswith(namespace_prefix):
+                raise SchemaError(
+                    "official sitemap url entry contained an unexpected field"
+                )
+            field_name = child.tag.removeprefix(namespace_prefix)
+            if field_name not in SITEMAP_FIELD_NAMES:
+                raise SchemaError(
+                    "official sitemap url entry contained an unexpected field"
+                )
+            if field_name in fields:
+                raise SchemaError(
+                    "official sitemap url entry contained duplicate field "
+                    f"{field_name!r}"
+                )
+            if child.attrib:
+                raise SchemaError(
+                    f"official sitemap field {field_name!r} had unexpected attributes"
+                )
+            if len(child):
+                raise SchemaError(
+                    f"official sitemap field {field_name!r} contained nested content"
+                )
+            if child.tail and child.tail.strip():
+                raise SchemaError(
+                    "official sitemap url entry contained unexpected text"
+                )
+            fields[field_name] = clean_text(child.text or "")
+
+        if "loc" not in fields or not fields["loc"]:
+            raise SchemaError(
+                "official sitemap url entry must contain exactly one loc field"
+            )
+        url = fields["loc"]
         parsed = urlparse(url)
         parts = [part for part in parsed.path.split("/") if part]
         destination_shaped = parsed.path.startswith("/destinations/")
