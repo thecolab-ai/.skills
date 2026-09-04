@@ -2,7 +2,7 @@
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
   "last_verified": "2026-09-03",
-  "skill_count": 145,
+  "skill_count": 146,
   "skills": [
     {
       "name": "airnz-flights",
@@ -3538,6 +3538,31 @@
         "safeswim.org.nz"
       ],
       "last_verified": "2026-07-19",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "safetravel-nz",
+      "description": "Use when looking up New Zealand Government SafeTravel destination advice, advice levels, regional cautions, related alerts or news, or source timestamps. Read-only, official, keyless travel-advice lookup.",
+      "path": "skills/safetravel-nz",
+      "category": "travel-safety",
+      "source_owner": "Ministry of Foreign Affairs and Trade (MFAT)",
+      "source_type": "official",
+      "source_url": "https://www.safetravel.govt.nz/",
+      "auth": "none",
+      "access_mode": "html-readonly",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "medium",
+      "cache_ttl": "none",
+      "schema_version": "1",
+      "skill_type": "html-readonly",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "www.safetravel.govt.nz"
+      ],
+      "last_verified": "2026-09-03",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
