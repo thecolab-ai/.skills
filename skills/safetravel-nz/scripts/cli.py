@@ -497,17 +497,10 @@ def parse_sitemap(source: str) -> list[dict[str, str | None]]:
 
 
 def canonical_destination_slug(url: str) -> str | None:
-    """Return the slug only for an exact canonical SafeTravel destination URL."""
-    parsed = urlparse(url)
-    if (
-        parsed.scheme != "https"
-        or parsed.netloc.lower() not in ALLOWED_HOSTS
-        or parsed.params
-        or parsed.query
-        or parsed.fragment
-    ):
-        return None
-    match = re.fullmatch(r"/destinations/([a-z0-9]+(?:-[a-z0-9]+)*)", parsed.path)
+    """Return the slug only for an exact literal canonical destination URL."""
+    match = re.fullmatch(
+        re.escape(DESTINATION_PREFIX) + r"([a-z0-9]+(?:-[a-z0-9]+)*)", url
+    )
     return match.group(1) if match else None
 
 
@@ -649,17 +642,27 @@ def is_canonical_news_path(path: str) -> bool:
 
 
 def canonical_related_news_url(page_url: str, href: str) -> str:
+    if (
+        not href
+        or not href.isascii()
+        or any(ord(character) < 0x21 or ord(character) == 0x7F for character in href)
+    ):
+        raise SchemaError(
+            f"destination page contained a non-canonical related-news URL: {href!r}"
+        )
     url = urljoin(page_url, href)
     parsed = urlparse(url)
     href_path = urlparse(href).path
+    canonical_url = f"{BASE_URL.rstrip('/')}{parsed.path}"
     if (
         parsed.scheme != "https"
-        or parsed.netloc.lower() not in ALLOWED_HOSTS
+        or parsed.netloc not in ALLOWED_HOSTS
         or parsed.params
         or parsed.query
         or parsed.fragment
         or not is_canonical_news_path(href_path)
         or not is_canonical_news_path(parsed.path)
+        or url != canonical_url
     ):
         raise SchemaError(
             f"destination page contained a non-canonical related-news URL: {url!r}"
@@ -899,6 +902,20 @@ def cmd_advice(args: argparse.Namespace) -> dict[str, Any]:
     source, final_url = fetch_text(
         page_url, accept="text/html,application/xhtml+xml;q=0.9,*/*;q=0.8"
     )
+    if final_url != page_url:
+        canonical_final_slug = canonical_destination_slug(final_url)
+        if (
+            canonical_final_slug is not None
+            and final_url == f"{DESTINATION_PREFIX}{canonical_final_slug}"
+            and canonical_final_slug != slug
+        ):
+            raise SchemaError(
+                "destination fetch resolved to a different canonical destination: "
+                f"requested {slug!r}, received {canonical_final_slug!r}"
+            )
+        raise SchemaError(
+            "destination fetch did not resolve to the exact canonical destination URL"
+        )
     final_slug = canonical_destination_slug(final_url)
     if final_slug is None:
         raise SchemaError(

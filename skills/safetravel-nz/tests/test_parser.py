@@ -46,7 +46,12 @@ def replace_once(source: str, old: str, new: str) -> str:
 
 
 def assert_cli_schema_error(
-    cli, *, sitemap_source: str, destination_source: str, message_fragment: str
+    cli,
+    *,
+    sitemap_source: str,
+    destination_source: str,
+    message_fragment: str,
+    destination_final_url: str | None = None,
 ) -> None:
     requested_url = "https://www.safetravel.govt.nz/destinations/exampleland"
     stdout = io.StringIO()
@@ -57,7 +62,12 @@ def assert_cli_schema_error(
             "fetch_text",
             side_effect=[
                 (sitemap_source, cli.SITEMAP_URL),
-                (destination_source, requested_url),
+                (
+                    destination_source,
+                    destination_final_url
+                    if destination_final_url is not None
+                    else requested_url,
+                ),
             ],
         ),
         contextlib.redirect_stdout(stdout),
@@ -225,6 +235,33 @@ def main() -> int:
     sitemap_source = read_fixture("sitemap.xml")
     destination_source = read_fixture("destination-page.html")
     requested_url = "https://www.safetravel.govt.nz/destinations/exampleland"
+
+    for tainted_final_url in (
+        "https://WWW.SAFETRAVEL.GOVT.NZ/destinations/exampleland",
+        "HTTPS://www.safetravel.govt.nz/destinations/exampleland",
+        "https://www.safetravel.govt.nz:443/destinations/exampleland",
+        requested_url + "/",
+        requested_url + "?variant=1",
+        requested_url + "#variant",
+        requested_url + ";variant=1",
+        requested_url.replace("exampleland", "%65xampleland"),
+        requested_url + "\r",
+        requested_url + "\n",
+        requested_url + "\t",
+        requested_url + "\x00",
+        requested_url + "\u2028",
+    ):
+        assert_cli_schema_error(
+            cli,
+            sitemap_source=sitemap_source,
+            destination_source=destination_source,
+            destination_final_url=tainted_final_url,
+            message_fragment="exact canonical destination URL",
+        )
+    print(
+        "[PASS] non-literal and control-tainted destination final URLs fail closed "
+        "through the CLI"
+    )
 
     duplicate_identical_loc_source = replace_once(
         sitemap_source,
@@ -646,6 +683,40 @@ def main() -> int:
     print(
         "[PASS] non-canonical, encoded, and backslash related-news paths fail closed"
     )
+
+    for tainted_href in (
+        "/news/exampleland\n-security-update",
+        "/news/exampleland\t-security-update",
+        "/news/exampleland\r-security-update",
+        "/news/exampleland\x00-security-update",
+        "/news/exampleland\u2028-security-update",
+        "/news/exampl\u00e9land-security-update",
+        "/news/exampleland\u2215security-update",
+        "/news/exampleland security-update",
+    ):
+        tainted_news_source = replace_once(
+            destination_source,
+            "/news/exampleland-security-update",
+            tainted_href,
+        )
+        assert_cli_schema_error(
+            cli,
+            sitemap_source=sitemap_source,
+            destination_source=tainted_news_source,
+            message_fragment="related-news URL",
+        )
+    print(
+        "[PASS] control, non-ASCII, Unicode-separator, and whitespace related-news "
+        "paths fail closed through the CLI"
+    )
+
+    comma_news_path = (
+        "/news/travel,-fuel-supply-and-security-impacts-of-conflict-in-the-middle-east"
+    )
+    assert cli.canonical_related_news_url(requested_url, comma_news_path) == (
+        f"https://www.safetravel.govt.nz{comma_news_path}"
+    )
+    print("[PASS] valid ASCII related-news slugs with punctuation remain accepted")
 
     encoded_duplicate_news_source = replace_once(
         destination_source,
