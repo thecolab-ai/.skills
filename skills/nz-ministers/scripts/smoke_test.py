@@ -7,8 +7,8 @@ the test clears the challenge with --browser and asserts real data; otherwise it
 asserts the clean machine-readable `clearance_required` blocked state. Network /
 upstream challenges are treated as SKIP, not failures.
 """
-import json
 import importlib.util
+import json
 import os
 import subprocess
 import sys
@@ -22,7 +22,7 @@ MINISTER = "hon-simeon-brown"
 def run(args, timeout=120):
     return subprocess.run(
         [sys.executable, str(CLI)] + args,
-        capture_output=True, text=True, cwd=str(SKILL_DIR), timeout=timeout,
+        capture_output=True, text=True, cwd=str(SKILL_DIR), timeout=timeout, check=False,
     )
 
 
@@ -42,7 +42,7 @@ def browser_available():
     try:
         import cloakbrowser  # noqa: F401
         return True
-    except Exception:
+    except Exception:  # noqa: BLE001 - optional dependency may fail during import
         return False
 
 
@@ -50,6 +50,18 @@ def is_transient(stderr):
     low = stderr.lower()
     return any(s in low for s in ("network error", "http 5", "timeout", "timed out",
                                   "browser_blocked", "temporarily blocked"))
+
+
+def transient_skip_line(stderr, *, browser=False):
+    _ = stderr  # keep the call site explicit, but never echo raw details
+    reason = "browser/upstream blocked" if browser else "upstream unavailable"
+    return f"  [SKIP] {reason}"
+
+
+def test_transient_skip_line_is_sanitised():
+    raw = "Traceback (most recent call last):\n  File \"x\", line 1, in <module>\nSyntaxError: invalid syntax"
+    line = transient_skip_line(raw, browser=True)
+    return line == "  [SKIP] browser/upstream blocked" and "Traceback" not in line and "SyntaxError" not in line and "\n" not in line
 
 
 results = []
@@ -67,6 +79,7 @@ def test_fixture_rss_parser():
 
 
 results.append(test("fixture Beehive RSS parsing", test_fixture_rss_parser))
+results.append(test("transient skip line is sanitised", test_transient_skip_line_is_sanitised))
 
 
 def test_help():
@@ -80,7 +93,7 @@ def test_latest():
     r = run(["latest", "--limit", "5", "--json"])
     if r.returncode != 0:
         if is_transient(r.stderr):
-            print(f"  [SKIP] upstream unavailable: {r.stderr.strip()[:140]}")
+            print(transient_skip_line(r.stderr))
             return True
         print(f"  stderr: {r.stderr[:200]}")
         return False
@@ -108,7 +121,7 @@ def test_minister():
     if WANT_BROWSER:
         if r.returncode != 0:
             if is_transient(r.stderr):
-                print(f"  [SKIP] browser/upstream blocked: {r.stderr.strip()[:140]}")
+                print(transient_skip_line(r.stderr, browser=True))
                 return True
             print(f"  stderr: {r.stderr[:200]}")
             return False
@@ -144,7 +157,7 @@ def test_articles():
     r = run(["articles", MINISTER, "--limit", "5", "--browser", "--json"])
     if r.returncode != 0:
         if is_transient(r.stderr):
-            print(f"  [SKIP] browser/upstream blocked: {r.stderr.strip()[:140]}")
+            print(transient_skip_line(r.stderr, browser=True))
             return True
         print(f"  stderr: {r.stderr[:200]}")
         return False
@@ -170,7 +183,7 @@ def test_roles():
     r = run(["roles", MINISTER, "--browser", "--json"])
     if r.returncode != 0:
         if is_transient(r.stderr):
-            print(f"  [SKIP] browser/upstream blocked: {r.stderr.strip()[:140]}")
+            print(transient_skip_line(r.stderr, browser=True))
             return True
         print(f"  stderr: {r.stderr[:200]}")
         return False
@@ -196,7 +209,7 @@ def test_diary():
     r = run(["diary", MINISTER, "--browser", "--json"])
     if r.returncode != 0:
         if is_transient(r.stderr):
-            print(f"  [SKIP] browser/upstream blocked: {r.stderr.strip()[:140]}")
+            print(transient_skip_line(r.stderr, browser=True))
             return True
         print(f"  stderr: {r.stderr[:200]}")
         return False
