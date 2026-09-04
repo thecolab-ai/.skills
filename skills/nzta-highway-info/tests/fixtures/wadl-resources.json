@@ -1,0 +1,13 @@
+{
+  "fixture": "synthetic-wadl-contract-sentinel",
+  "contains_live_credentials": false,
+  "contains_personal_data": false,
+  "version": "4",
+  "required_get_resources": [
+    "cameras/all",
+    "events/all/{zoomlevel}",
+    "regions/all/{zoomlevel}",
+    "signs/tim/all",
+    "signs/vms/all"
+  ]
+}

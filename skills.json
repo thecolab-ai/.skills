@@ -2,7 +2,7 @@
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
   "last_verified": "2026-09-03",
-  "skill_count": 144,
+  "skill_count": 145,
   "skills": [
     {
       "name": "airnz-flights",
@@ -2987,6 +2987,34 @@
       ],
       "last_verified": "2026-07-19",
       "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "nzta-highway-info",
+      "description": "Query current official NZTA state-highway events, travel-time signs, traffic cameras, and variable-message signs. Use for bounded live highway-condition lookups; read-only and not a complete safety source.",
+      "path": "skills/nzta-highway-info",
+      "category": "transport",
+      "source_owner": "NZ Transport Agency Waka Kotahi",
+      "source_type": "official",
+      "source_url": "https://catalogue.data.govt.nz/dataset/nzta-highway-information1",
+      "auth": "none",
+      "access_mode": "public-api",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "none",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "catalogue.data.govt.nz",
+        "trafficnz.info",
+        "services.arcgis.com",
+        "www.journeys.nzta.govt.nz"
+      ],
+      "last_verified": "2026-09-03",
+      "health": "degraded",
       "maintainer": "@adam91holt"
     },
     {
