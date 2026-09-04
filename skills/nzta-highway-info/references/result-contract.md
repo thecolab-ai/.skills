@@ -45,9 +45,15 @@ complete operational or safety coverage.
 Dates are preserved as source strings. The client does not guess a timezone or
 rewrite fuzzy expected-resolution text.
 
+The source `planned` field is required and accepts the same strict boolean forms
+as camera state. Missing, null, or malformed values fail closed.
+
 Event, camera, VMS, and travel-time sign `id` values must be non-empty strings or
 integers. Missing, boolean, fractional, object, list, or blank identifiers are
 source-schema failures rather than normalised nulls.
+
+When an event, camera, VMS, or travel-time sign includes a region object, its
+`id` follows the same identifier rules. Region-list item IDs do too.
 
 ## Camera items
 
@@ -94,9 +100,9 @@ clear route.
 A numeric right-hand sign value is treated as displayed minutes. No comparison to
 normal/free-flow time is made.
 
-The source `enabled` field is required and accepts the same strict boolean forms
-as camera state. Missing, null, or malformed values fail closed rather than
-defaulting to `false`.
+The source `enabled` and `virtual` fields are required and accept the same strict
+boolean forms as camera state. Missing, null, or malformed values fail closed
+rather than defaulting to `false`.
 
 ## Region items
 

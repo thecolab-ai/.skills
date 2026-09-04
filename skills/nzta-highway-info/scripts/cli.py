@@ -140,6 +140,15 @@ def nested_name(value: Any) -> str | None:
     return str(name).strip() if name not in (None, "") else None
 
 
+def region_name(value: Any, item_name: str) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise SchemaError(f"{item_name} item has an invalid region")
+    required_identifier(value, f"{item_name} region")
+    return nested_name(value)
+
+
 def normalise_highway(value: Any) -> str | None:
     if value in (None, ""):
         return None
@@ -162,16 +171,9 @@ def absolute_site_url(value: Any) -> str | None:
     return resolved.replace("http://", "https://", 1)
 
 
-def bool_value(value: Any) -> bool:
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, (int, float)):
-        return value != 0
-    return str(value).strip().lower() in {"1", "true", "yes", "y"}
-
-
 def normalise_event(item: dict[str, Any]) -> dict[str, Any]:
     item_id = required_identifier(item, "road-event")
+    planned = required_bool(item, "planned", "road-event")
     way = nested_name(item.get("way")) or nested_name(item.get("journey"))
     return {
         "id": item_id,
@@ -181,13 +183,13 @@ def normalise_event(item: dict[str, Any]) -> dict[str, Any]:
         "location": scalar(item.get("locationArea")),
         "impact": scalar(item.get("impact")),
         "status": scalar(item.get("status")),
-        "planned": bool_value(item.get("planned")),
+        "planned": planned,
         "start_at": scalar(item.get("startDate")),
         "end_at": scalar(item.get("endDate")),
         "expected_resolution": scalar(item.get("expectedResolution")),
         "last_updated_at": scalar(item.get("eventModified")),
         "alternative_route": scalar(item.get("alternativeRoute")),
-        "region": nested_name(item.get("region")),
+        "region": region_name(item.get("region"), "road-event"),
         "highway": normalise_highway(way),
         "geometry_wkt": scalar(item.get("geometry")),
     }
@@ -208,7 +210,7 @@ def normalise_camera(item: dict[str, Any]) -> dict[str, Any]:
         "name": scalar(item.get("name")),
         "description": scalar(item.get("description")),
         "direction": scalar(item.get("direction")),
-        "region": nested_name(item.get("region")),
+        "region": region_name(item.get("region"), "camera"),
         "highway": normalise_highway(highway),
         "latitude": scalar(item.get("latitude")),
         "longitude": scalar(item.get("longitude")),
@@ -241,7 +243,7 @@ def normalise_vms(item: dict[str, Any]) -> dict[str, Any]:
         "name": scalar(item.get("name")),
         "description": scalar(item.get("description")),
         "direction": scalar(item.get("direction")),
-        "region": nested_name(item.get("region")),
+        "region": region_name(item.get("region"), "VMS"),
         "highway": normalise_highway(highway),
         "latitude": scalar(item.get("latitude")),
         "longitude": scalar(item.get("longitude")),
@@ -291,17 +293,18 @@ def parse_tim_pages(
 def normalise_tim(item: dict[str, Any]) -> dict[str, Any]:
     item_id = required_identifier(item, "travel-time sign")
     enabled = required_bool(item, "enabled", "travel-time sign")
+    virtual = required_bool(item, "virtual", "travel-time sign")
     pages, destinations = parse_tim_pages(item.get("page"))
     return {
         "id": item_id,
         "name": scalar(item.get("name")),
-        "region": nested_name(item.get("region")),
+        "region": region_name(item.get("region"), "travel-time sign"),
         "highway": normalise_highway(nested_name(item.get("way"))),
         "latitude": scalar(item.get("latitude")),
         "longitude": scalar(item.get("longitude")),
         "enabled": enabled,
         "mode": scalar(item.get("mode")),
-        "virtual": bool_value(item.get("virtual")),
+        "virtual": virtual,
         "pages": pages,
         "destinations": destinations,
         "congestion_status": None,
@@ -311,9 +314,10 @@ def normalise_tim(item: dict[str, Any]) -> dict[str, Any]:
 
 
 def normalise_region(item: dict[str, Any]) -> dict[str, Any]:
-    if item.get("id") in (None, "") or item.get("name") in (None, ""):
-        raise SchemaError("region item is missing id or name")
-    return {"id": scalar(item.get("id")), "name": scalar(item.get("name"))}
+    item_id = required_identifier(item, "region")
+    if item.get("name") in (None, ""):
+        raise SchemaError("region item is missing name")
+    return {"id": item_id, "name": scalar(item.get("name"))}
 
 
 NORMALISERS: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {
@@ -408,6 +412,8 @@ def fetch_json(url: str) -> Any:
     except (URLError, TimeoutError) as exc:
         reason = getattr(exc, "reason", exc)
         raise UpstreamError(f"upstream unavailable or timed out: {reason}") from exc
+    except (OSError, http.client.HTTPException) as exc:
+        raise UpstreamError(f"upstream connection interrupted: {exc}") from exc
     try:
         return json.loads(body.decode("utf-8"), parse_constant=reject_json_constant)
     except RecursionError as exc:
