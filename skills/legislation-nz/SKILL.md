@@ -50,6 +50,8 @@ Do not use this for:
 python3 skills/legislation-nz/scripts/cli.py search "Grocery Industry" --type act --json
 python3 skills/legislation-nz/scripts/cli.py get-act 2003/52 --json
 python3 skills/legislation-nz/scripts/cli.py get-section 2003/52 9C --json
+python3 skills/legislation-nz/scripts/cli.py get-section 1993/105 "Schedule 7" --json
+python3 skills/legislation-nz/scripts/cli.py get-section 1993/105 "Schedule 7 clause 1" --json
 python3 skills/legislation-nz/scripts/cli.py versions 2003/52 --json
 python3 skills/legislation-nz/scripts/cli.py updates --since 2026-07-01 --json
 python3 skills/legislation-nz/scripts/cli.py list-bills --json
@@ -67,6 +69,8 @@ Commands:
 - `sources` or `datasets` for source metadata and caveats
 
 `ACT_ID` can be a `year/number` pair such as `2003/52`, a work/version id such as `act_public_2003_52`, or a canonical legislation.govt.nz URL.
+
+`SECTION` accepts a body section label (`9C`), a schedule (`Schedule 7`, `sch 7`, `sched 7`), or a clause within a schedule (`Schedule 7 clause 1`, `sch 7 cl 1`). Schedules live in a separate XML tree from body sections, so they must be asked for by name. Bare numeric labels always resolve to the body section first — `get-section 1993/105 7` returns s7 "Control defined", not Schedule 7. Each result carries a `kind` field of `section`, `schedule`, or `schedule-clause`; schedule clauses also carry a `schedule` field. Check `kind` before quoting a result as a section.
 
 ## Source Behaviour
 

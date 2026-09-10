@@ -347,31 +347,114 @@ def section_rows(root: ET.Element, *, limit: int | None = None) -> tuple[list[di
     return rows, total
 
 
-def find_section(root: ET.Element, section: str) -> ET.Element | None:
-    wanted = re.sub(r"\s+", "", section).lower()
-    for prov in root.findall(".//prov"):
-        label = child_text(prov, "label")
-        if label and re.sub(r"\s+", "", label).lower() == wanted:
-            return prov
+SCHEDULE_QUERY_RE = re.compile(
+    r"^(?:schedule|sched|sch)\.?\s*([0-9A-Za-z]+)"
+    r"(?:\s*(?:clause|cl|c)\.?\s*([0-9A-Za-z()]+))?$",
+    flags=re.I,
+)
+
+
+def _norm_label(value: str | None) -> str | None:
+    if not value:
+        return None
+    return re.sub(r"\s+", "", value).lower()
+
+
+def find_schedule(root: ET.Element, wanted: str) -> ET.Element | None:
+    for sched in root.iter("schedule"):
+        if _norm_label(child_text(sched, "label")) == wanted:
+            return sched
     return None
 
 
-def section_payload(prov: ET.Element, act: dict[str, Any]) -> dict[str, Any]:
+def find_section(root: ET.Element, section: str) -> ET.Element | None:
+    """Resolve a section, a schedule, or a clause within a schedule.
+
+    Schedules live in a separate <schedule> tree, not under <prov>, so a bare
+    ``.//prov`` walk silently misses them (e.g. Schedule 7 of the Companies
+    Act 1993). Explicit "Schedule N" queries resolve against schedules only;
+    bare labels prefer body sections, then fall back to schedules.
+    """
+    raw = section.strip()
+    wanted = _norm_label(raw)
+    if not wanted:
+        return None
+
+    sched_match = SCHEDULE_QUERY_RE.match(raw)
+    if sched_match:
+        sched = find_schedule(root, _norm_label(sched_match.group(1)))
+        if sched is None:
+            return None
+        clause = _norm_label(sched_match.group(2))
+        if not clause:
+            return sched
+        for prov in sched.iter("prov"):
+            if _norm_label(child_text(prov, "label")) == clause:
+                return prov
+        return None
+
+    # Body sections take precedence over identically-labelled schedule clauses.
+    schedule_provs = {id(prov) for sched in root.iter("schedule") for prov in sched.iter("prov")}
+    fallback = None
+    for prov in root.findall(".//prov"):
+        if _norm_label(child_text(prov, "label")) != wanted:
+            continue
+        if id(prov) not in schedule_provs:
+            return prov
+        fallback = fallback or prov
+    return fallback or find_schedule(root, wanted)
+
+
+def owning_schedule(root: ET.Element | None, prov: ET.Element) -> ET.Element | None:
+    """Return the <schedule> containing ``prov``, if any."""
+    if root is None or prov.tag == "schedule":
+        return None
+    for sched in root.iter("schedule"):
+        for child in sched.iter("prov"):
+            if child is prov:
+                return sched
+    return None
+
+
+def section_payload(
+    prov: ET.Element, act: dict[str, Any], root: ET.Element | None = None
+) -> dict[str, Any]:
     label = child_text(prov, "label")
     heading = child_text(prov, "heading")
-    body = prov.find("prov.body")
+    schedule_label = None
+    if prov.tag == "schedule":
+        body = prov.find("schedule.provisions")
+        kind = "schedule"
+        schedule_label = f"Schedule {label}" if label else "Schedule"
+        label = schedule_label
+    else:
+        body = prov.find("prov.body")
+        sched = owning_schedule(root, prov)
+        if sched is not None:
+            # A clause inside a schedule is NOT a body section; labelling it
+            # "section" is how duplicate labels end up misattributed.
+            kind = "schedule-clause"
+            sched_label = child_text(sched, "label")
+            schedule_label = f"Schedule {sched_label}" if sched_label else "Schedule"
+            label = f"{schedule_label} clause {label}" if label else schedule_label
+        else:
+            kind = "section"
     text = element_text(body if body is not None else prov)
     history = [element_text(note) for note in prov.findall(".//history-note")]
     xml_id = prov.attrib.get("id")
     source_url = act["source_url"] + (f"#{xml_id}" if xml_id else "")
-    return {
+    payload = {
         "label": label,
+        "kind": kind,
         "heading": heading,
         "xml_id": xml_id,
         "text": text,
         "history_notes": history,
         "source_url": source_url,
     }
+    if kind == "schedule-clause":
+        payload["schedule"] = schedule_label
+    return payload
 
 
 def parse_total(html_text: str) -> int | None:
@@ -717,7 +800,7 @@ def cmd_get_section(args: argparse.Namespace) -> None:
             "retrieved_at": now_iso(),
             "source": "legislation.govt.nz XML format",
             "act": act,
-            "section": section_payload(prov, act),
+            "section": section_payload(prov, act, root),
         },
         args.json,
     )
