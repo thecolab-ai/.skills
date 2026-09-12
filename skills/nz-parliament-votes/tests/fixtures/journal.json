@@ -1,0 +1,10 @@
+{
+  "fixture_notice": "SYNTHETIC: invented parties, names, bill and tallies; not historical evidence. JSON and CSS shape model the official Journals API.",
+  "Id": "00000000-0000-0000-0000-000000000001",
+  "DocumentType": "Journal",
+  "Title": "Synthetic weekly Journal",
+  "StartDate": "2025-10-15T00:00:00+13:00",
+  "CreatedDate": "2025-10-20T12:00:00+13:00",
+  "LastUpdatedDate": "2025-10-22T12:00:00+13:00",
+  "PublishHtml": "<h2>Wednesday, 15 October 2025</h2><h3>Example Journal Bill</h3><p>On the question, That the bill be now read a first time, the votes were recorded as follows:</p><p class='jps-JVResultParty'>Ayes 4</p><p class='jps-JVParty'>Example Party A 3; Example-Surname</p><p class='jps-JVResultParty'>Noes 1</p><p class='jps-JVParty'>Example Party B 1</p><p class='jps-JVResultParty'>Abstentions 1</p><p class='jps-JVParty'>Example Party C 1</p><p>Motion agreed to.</p><p class='jps-JHeadNextDay'>Thursday, 16 October 2025</p><h3>Example amendment</h3><p>On the question, That the amendment be agreed to, the votes were recorded as follows:</p><p class='jps-JVResultParty'>Ayes 1</p><p class='jps-JVParty'>Example Party B 1</p><p class='jps-JVResultParty'>Noes 5</p><p class='jps-JVParty'>Example Party A 3; Example Party C 1; Example-Surname</p>"
+}

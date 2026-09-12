@@ -18,6 +18,13 @@ from election_results import (  # noqa: E402
     parse_turnout,
     parse_winning_candidates,
 )
+from political_finance import (  # noqa: E402
+    filter_party,
+    finance_source,
+    parse_annual_aggregates,
+    parse_expense_aggregates,
+    parse_reporting_rules,
+)
 from result_contract import result_envelope, utc_now  # noqa: E402
 
 ALLOWED = {"elections.nz", "www.elections.nz", "electionresults.govt.nz", "www.electionresults.govt.nz"}
@@ -33,6 +40,18 @@ def build_parser() -> argparse.ArgumentParser:
         child = commands.add_parser(name); child.add_argument(pos); child.add_argument("--year", type=int, required=True); child.add_argument("--limit", type=int, default=100); child.add_argument("--json", action="store_true")
     donations = commands.add_parser("donations"); donations.add_argument("--party", required=True); donations.add_argument("--limit", type=int, default=100); donations.add_argument("--json", action="store_true")
     expenses = commands.add_parser("expenses"); expenses.add_argument("--candidate", required=True); expenses.add_argument("--limit", type=int, default=100); expenses.add_argument("--json", action="store_true")
+    finance = commands.add_parser("finance-aggregates", help="Commission-published party aggregate totals only")
+    finance.add_argument("party", nargs="?", help="optional published party-name filter")
+    finance.add_argument("--kind", choices=("annual", "expenses"), default="annual")
+    finance.add_argument("--year", type=int, required=True)
+    finance.add_argument("--limit", type=int, default=100)
+    finance.add_argument("--json", action="store_true")
+    rules = commands.add_parser("finance-rules", help="source-wording reporting rules, not legal advice")
+    rules.add_argument("topic", nargs="?", help="optional text filter")
+    rules.add_argument("--kind", choices=("annual", "expenses"), default="annual")
+    rules.add_argument("--year", type=int, required=True)
+    rules.add_argument("--limit", type=int, default=100)
+    rules.add_argument("--json", action="store_true")
     return root
 
 
@@ -40,7 +59,20 @@ def main() -> int:
     args = build_parser().parse_args(); retrieved_at = utc_now()
     try:
         if not 1 <= args.limit <= 100: raise ValueError("--limit must be between 1 and 100")
-        if hasattr(args, "year"):
+        if args.command in {"finance-aggregates", "finance-rules"}:
+            source_url = finance_source(args.kind, args.year)
+            html = nzfetch.fetch_text(source_url, timeout=20, allowed_hosts=ALLOWED)
+            if args.command == "finance-rules":
+                rows = parse_reporting_rules(html, source_url, retrieved_at, args.year)
+                if args.topic:
+                    needle = args.topic.casefold()
+                    rows = [row for row in rows if needle in str(row["evidence_text"]).casefold()]
+                data = rows[:args.limit]
+            else:
+                parser = parse_annual_aggregates if args.kind == "annual" else parse_expense_aggregates
+                data = filter_party(parser(html, source_url, retrieved_at, args.year), args.party)[:args.limit]
+            freshness = "official Commission-published finance page observed at retrieval time"
+        elif hasattr(args, "year"):
             if args.year not in {2005, 2008, 2011, 2014, 2017, 2020, 2023}: raise ValueError("unsupported general-election year")
             base = f"https://electionresults.govt.nz/electionresults_{args.year}/statistics/csv"
             filename = "overall-results-summary.csv" if args.command in {"results", "party-vote"} else "party-votes-and-turnout-by-electorate.csv"
