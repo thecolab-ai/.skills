@@ -55,7 +55,9 @@ def clean(value: str | None) -> str | None:
 
 
 def classify_document(title: str, url: str = "") -> str:
-    text = clean(f"{title} {url}") or ""
+    # Use visible text and the document filename, never unrelated parent directories.
+    filename = unquote(urlsplit(url).path.rsplit("/", 1)[-1]) if url else ""
+    text = clean(f"{title} {filename}") or ""
     folded = text.casefold().replace("_", " ").replace("-", " ")
     if re.search(r"\b(independent|external)\b.*\bquality (?:assurance|assessment|review)\b|\bquality (?:assurance|assessment|review)\b.*\b(independent|external)\b", folded):
         return "independent_quality_assessment"
@@ -84,7 +86,7 @@ def classify_document(title: str, url: str = "") -> str:
     return "publication_page"
 
 
-def canonical_official_url(url: str, base: str | None = None) -> str | None:
+def canonical_official_url(url: str, base: str | None = None, required_host: str | None = None) -> str | None:
     absolute = urljoin(base, url) if base else url
     parts = urlsplit(absolute)
     host = (parts.hostname or "").casefold()
@@ -105,7 +107,7 @@ def canonical_official_url(url: str, base: str | None = None) -> str | None:
         return None
     if "\\" in decoded_path or any(ord(char) < 32 for char in decoded_path) or any(segment in {".", ".."} for segment in decoded_path.split("/")):
         return None
-    if host not in ALLOWED_HOSTS or not any(decoded_path.startswith(p) for p in ALLOWED_PREFIXES[host]):
+    if host not in ALLOWED_HOSTS or (required_host and host != required_host) or not any(decoded_path.startswith(p) for p in ALLOWED_PREFIXES[host]):
         return None
     canonical_path = quote(decoded_path, safe="/!$&'()*+,-.:;=@_~")
     return urlunsplit(("https", host, canonical_path, parts.query, ""))
@@ -131,20 +133,21 @@ def fetch_html(url: str) -> tuple[str, str]:
     current = canonical_official_url(url)
     if not current:
         raise CliError("URL is outside the supported official publication paths", 2)
+    required_host = urlsplit(current).hostname
     opener = build_opener(NoRedirect)
     for _ in range(MAX_REDIRECTS + 1):
         request = Request(current, headers={"User-Agent": USER_AGENT, "Accept": "text/html,application/xhtml+xml", "Accept-Encoding": "identity"})
         try:
             with opener.open(request, timeout=TIMEOUT) as response:
                 body, final_url = _read_response(response)
-                canonical = canonical_official_url(final_url)
+                canonical = canonical_official_url(final_url, required_host=required_host)
                 if not canonical:
                     raise CliError("official source redirected outside the allowlist", 4, blocked=True)
                 return body.decode("utf-8", errors="replace"), canonical
         except HTTPError as exc:
             if exc.code in {301, 302, 303, 307, 308}:
                 location = exc.headers.get("Location")
-                target = canonical_official_url(location or "", current)
+                target = canonical_official_url(location or "", current, required_host)
                 if not target:
                     raise CliError("official source redirected outside the allowlist", 4, blocked=True) from exc
                 current = target
@@ -227,7 +230,8 @@ class EnvironmentListingParser(HTMLParser):
         if suffix not in {"", "['id']", "['results']", "['total']"} or not isinstance(listing, dict):
             raise ValueError("unsupported embedded listing expression")
         results = listing.get("results")
-        if not isinstance(results, list) or not isinstance(listing.get("total"), int):
+        total = listing.get("total")
+        if not isinstance(results, list) or isinstance(total, bool) or not isinstance(total, int) or total < 0 or total < len(results):
             raise ValueError("embedded listing is missing results or total")
         self.listings.append(listing)
 
@@ -264,7 +268,7 @@ class DetailParser(HTMLParser):
         if tag == "h1" and self._in_h1:
             self.title, self._in_h1 = clean("".join(self._h1)), False
         elif tag == "a" and self._anchor is not None:
-            href = canonical_official_url(self._anchor["href"], self.page_url)
+            href = canonical_official_url(self._anchor["href"], self.page_url, urlsplit(self.page_url).hostname)
             label = clean("".join(self._anchor["text"])) or "Untitled document"
             if href and urlsplit(href).path.casefold().endswith(".pdf"):
                 self.documents.append({"title": label, "url": href, "document_type": classify_document(label, href)})
@@ -277,7 +281,7 @@ def parse_regulation_page(text: str, page_url: str = REGULATION_INDEX) -> tuple[
     records: list[dict[str, Any]] = []
     seen: set[str] = set()
     for raw in parser.records:
-        url = canonical_official_url(raw.get("href") or "", REGULATION_INDEX)
+        url = canonical_official_url(raw.get("href") or "", REGULATION_INDEX, "www.regulation.govt.nz")
         title = clean(raw.get("title"))
         if not url or not title or url in seen:
             continue
@@ -287,7 +291,7 @@ def parse_regulation_page(text: str, page_url: str = REGULATION_INDEX) -> tuple[
         records.append({"title": title, "url": url, "published": date, "author": author, "document_type": classify_document(title, url), "publisher": "Ministry for Regulation"})
     if not parser.saw_results_container or (not records and not parser.saw_no_results):
         raise CliError("official regulation search result structure is missing or invalid", 6)
-    next_url = canonical_official_url(parser.next_href or "", page_url) if parser.next_href else None
+    next_url = canonical_official_url(parser.next_href or "", page_url, "www.regulation.govt.nz") if parser.next_href else None
     if parser.next_href and (not next_url or urlsplit(next_url).path != urlsplit(REGULATION_INDEX).path):
         raise CliError("official regulation pagination URL is outside the search index", 6)
     return records, next_url
@@ -311,7 +315,7 @@ def parse_environment_search(text: str) -> tuple[list[dict[str, Any]], int]:
     for raw in listing["results"]:
         if not isinstance(raw, dict):
             raise CliError("environment listing contains a non-record result", 6)
-        url = canonical_official_url(str(raw.get("href") or ""), ENVIRONMENT_INDEX)
+        url = canonical_official_url(str(raw.get("href") or ""), ENVIRONMENT_INDEX, "environment.govt.nz")
         title = clean(str(raw.get("title") or ""))
         if not url or not title:
             raise CliError("environment listing result is missing an official URL or title", 6)

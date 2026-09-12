@@ -115,10 +115,16 @@ def main() -> int:
     }
     for title, expected in cases.items():
         assert cli.classify_document(title) == expected, (title, cli.classify_document(title))
+    assert cli.classify_document("Neutral package", cli.ENVIRONMENT_INDEX + "neutral/") == "publication_page"
     print("[PASS] adversarial type classifier keeps RAS, RIS, RIA, QA, SAR, CRIS, and Cabinet records distinct")
 
     malicious = '<listing-results-container :id="{&quot;results&quot;:[],&quot;total&quot;:0}.__class__"></listing-results-container>'
     expect_cli_error(lambda: cli.parse_environment_search(malicious), 6)
+    for invalid_total in (-1, True):
+        total_html = f'<listing-results-container :id="{{&quot;results&quot;:[],&quot;total&quot;:{str(invalid_total).lower()}}}"></listing-results-container>'
+        expect_cli_error(lambda html=total_html: cli.parse_environment_search(html), 6)
+    undersized_total = '<listing-results-container :id="{&quot;results&quot;:[{&quot;href&quot;:&quot;/what-government-is-doing/cabinet-papers-and-regulatory-impact-statements/x/&quot;,&quot;title&quot;:&quot;X&quot;}],&quot;total&quot;:0}"></listing-results-container>'
+    expect_cli_error(lambda: cli.parse_environment_search(undersized_total), 6)
     expect_cli_error(lambda: cli.parse_environment_search("<html><h1>normal-looking empty page</h1></html>"), 6)
     expect_cli_error(lambda: cli.parse_regulation_search("<html><h1>normal-looking empty page</h1></html>"), 6)
     assert cli.parse_regulation_search('<div class="search__results"><div class="search__results-no-results">No match</div></div>') == []
@@ -132,6 +138,19 @@ def main() -> int:
     assert cli.canonical_official_url("https://environment.govt.nz/assets/%252e%252e/private/x.pdf") is None
     assert cli.canonical_official_url("https://environment.govt.nz/assets/%25252e%25252e/private/x.pdf") is None
     assert cli.canonical_official_url("https://environment.govt.nz/assets/%255c..%255cprivate/x.pdf") is None
+    assert cli.canonical_official_url(cli.ENVIRONMENT_INDEX, required_host="www.regulation.govt.nz") is None
+    cross_regulation = (FIXTURES / "regulation-search.html").read_text(encoding="utf-8").replace(
+        "/publications-and-resources/regulatory-analysis-summaries/sample-ris/",
+        cli.ENVIRONMENT_INDEX + "sample-ris/",
+    )
+    expect_cli_error(lambda: cli.parse_regulation_search(cross_regulation), 6)
+    cross_environment = (FIXTURES / "environment-search.html").read_text(encoding="utf-8").replace(
+        "\\/what-government-is-doing\\/cabinet-papers-and-regulatory-impact-statements\\/synthetic-package\\/",
+        "https:\\/\\/www.regulation.govt.nz\\/publications-and-resources\\/regulatory-analysis-summaries\\/example-package\\/",
+    )
+    expect_cli_error(lambda: cli.parse_environment_search(cross_environment), 6)
+    cross_detail = '<h1>Package</h1><a href="' + cli.REGULATION_ROOT + '/assets/cross.pdf">Cross-host PDF</a>'
+    assert cli.parse_detail(cross_detail, cli.ENVIRONMENT_INDEX + "package/")["document_count"] == 0
     print("[PASS] repeatedly encoded traversal cannot escape scheme, host, or publication-path allowlists")
 
     expect_cli_error(lambda: cli._read_response(FakeResponse(b"<html>Verify you are human</html>")), 4, True)
