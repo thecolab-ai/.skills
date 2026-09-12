@@ -1,6 +1,6 @@
 ---
 name: nz-parliament-votes
-description: "Query official New Zealand Parliament weekly Journals for recorded divisions, preserving only printed party counts and explicitly printed voter names."
+description: "Query official New Zealand Parliament weekly Journals for recorded divisions, preserving printed party counts and ambiguous singleton labels without identity inference."
 license: MIT
 compatibility: "Requires Python 3.10+ and network access for live data"
 metadata:

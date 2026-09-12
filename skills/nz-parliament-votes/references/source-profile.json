@@ -11,7 +11,7 @@
   ],
   "record_fields": {
     "source_authority": "weekly_draft",
-    "participant_scope": "printed party counts and explicit singleton names only",
+    "participant_scope": "printed party counts and ambiguous singleton labels preserved as unknown",
     "identity_resolution": false
   },
   "smoke_args": ["search"],
