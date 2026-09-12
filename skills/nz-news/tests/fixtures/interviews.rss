@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:podcast="https://podcastindex.org/namespace/1.0"><channel>
+<title>The Mike Hosking Breakfast</title>
+<item><title>Example Speaker: Minister on a synthetic policy</title><link>https://omny.fm/shows/example/one</link><guid>synthetic-1</guid><pubDate>Fri, 11 Sep 2026 10:00:00 +1200</pubDate><description>Do not redistribute this synthetic description.</description><podcast:transcript url="https://www.omnycontent.com/example/transcript.vtt" type="text/vtt" language="en-NZ"/></item>
+<item><title>Another Speaker: Advocate on transport</title><link>https://omny.fm/shows/example/two</link><guid>synthetic-2</guid><pubDate>Sun, 14 Jun 2026 00:00:00 +0000</pubDate></item>
+<item><title>Old Speaker: Expert on housing</title><link>https://omny.fm/shows/example/old</link><guid>synthetic-old</guid><pubDate>Sat, 13 Jun 2026 23:59:59 +0000</pubDate></item>
+<item><title>Future Speaker: Expert on housing</title><link>https://omny.fm/shows/example/future</link><guid>synthetic-future</guid><pubDate>Sun, 13 Sep 2026 00:00:00 +0000</pubDate></item>
+<item><title>Unknown Speaker: Expert on housing</title><link>https://omny.fm/shows/example/undated</link><guid>synthetic-undated</guid><pubDate>unknown</pubDate></item>
+<item><title>Full Show Podcast: Discussion on housing</title><link>https://omny.fm/shows/example/full</link><guid>synthetic-full</guid><pubDate>Fri, 11 Sep 2026 00:00:00 +0000</pubDate></item>
+<item><title>Example Speaker: Minister on a synthetic policy</title><link>https://omny.fm/shows/example/one</link><guid>synthetic-1</guid><pubDate>Fri, 11 Sep 2026 10:00:00 +1200</pubDate></item>
+</channel></rss>
