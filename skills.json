@@ -2,7 +2,7 @@
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
   "last_verified": "2026-09-12",
-  "skill_count": 148,
+  "skill_count": 149,
   "skills": [
     {
       "name": "airnz-flights",
@@ -3719,6 +3719,31 @@
         "www.stats.govt.nz"
       ],
       "last_verified": "2026-07-19",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "stats-nz-census",
+      "description": "Query official public 2018 Stats NZ Census national-highlights CSV tables while preserving dimensions and suppression/status markers. No API key required.",
+      "path": "skills/stats-nz-census",
+      "category": "public-data",
+      "source_owner": "Stats NZ",
+      "source_type": "official",
+      "source_url": "https://www.stats.govt.nz/assets/Uploads/2018-Census-totals-by-topic-national-highlights-csv-update-30-04-20.zip",
+      "auth": "none",
+      "access_mode": "public-download",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "24h",
+      "schema_version": "1",
+      "skill_type": "public-download",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "www.stats.govt.nz"
+      ],
+      "last_verified": "2026-09-12",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
