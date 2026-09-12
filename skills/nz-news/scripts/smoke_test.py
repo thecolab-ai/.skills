@@ -40,7 +40,7 @@ def main():
     result = unittest.TextTestRunner(verbosity=1).run(suite)
     if not result.wasSuccessful():
         return 1
-    print(f'[PASS] {result.testsRun} news/interview fixture tests')
+    print(f'[PASS] fixture suite: {result.testsRun} news/interview tests')
     run = subprocess.run([sys.executable, str(CLI), '--help'], capture_output=True, timeout=10)
     assert run.returncode == 0 and b'interviews' in run.stdout
     for extra in ([], ['--contains', 'zz-no-interview-match-928374']):
