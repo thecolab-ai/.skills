@@ -2,7 +2,7 @@
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
   "last_verified": "2026-09-12",
-  "skill_count": 146,
+  "skill_count": 147,
   "skills": [
     {
       "name": "airnz-flights",
@@ -2750,6 +2750,32 @@
       ],
       "last_verified": "2026-07-19",
       "health": "degraded",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "nz-regulatory-analysis",
+      "description": "Use when finding or inspecting current official New Zealand Regulatory Analysis Summaries (RAS), Regulatory Impact Statements or Assessments (RIS/RIA), supplementary or cost-recovery analyses, quality assessments, Cabinet documents, and linked PDFs published by the Ministry for Regulation or Ministry for the Environment.",
+      "path": "skills/nz-regulatory-analysis",
+      "category": "government-policy",
+      "source_owner": "Ministry for Regulation and Ministry for the Environment",
+      "source_type": "official",
+      "source_url": "https://www.regulation.govt.nz/publications-and-resources/regulatory-analysis-summaries/",
+      "auth": "none",
+      "access_mode": "html-readonly",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "none",
+      "schema_version": "1",
+      "skill_type": "html-readonly",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "www.regulation.govt.nz",
+        "environment.govt.nz"
+      ],
+      "last_verified": "2026-09-12",
+      "health": "healthy",
       "maintainer": "@adam91holt"
     },
     {
