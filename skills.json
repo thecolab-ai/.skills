@@ -881,7 +881,7 @@
     },
     {
       "name": "elections-nz",
-      "description": "Query official New Zealand election results, electorate voting, turnout and published finance resources from the Electoral Commission.",
+      "description": "Query official New Zealand election results, electorate voting, turnout, aggregate party political finance and reporting rules from the Electoral Commission.",
       "path": "skills/elections-nz",
       "category": "government",
       "source_owner": "Electoral Commission",
@@ -903,8 +903,8 @@
         "electionresults.govt.nz",
         "www.electionresults.govt.nz"
       ],
-      "last_verified": "2026-07-19",
-      "health": "degraded",
+      "last_verified": "2026-09-12",
+      "health": "healthy",
       "maintainer": "@adam91holt"
     },
     {
@@ -2672,6 +2672,31 @@
         "bills.parliament.nz"
       ],
       "last_verified": "2026-07-19",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "nz-parliament-votes",
+      "description": "Query official New Zealand Parliament weekly Journals for recorded divisions, preserving printed party counts and ambiguous singleton labels without identity inference.",
+      "path": "skills/nz-parliament-votes",
+      "category": "government",
+      "source_owner": "New Zealand Parliament",
+      "source_type": "official",
+      "source_url": "https://journals.parliament.nz/",
+      "auth": "none",
+      "access_mode": "public-api",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "none",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "journals.parliament.nz"
+      ],
+      "last_verified": "2026-09-12",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
