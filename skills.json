@@ -2,7 +2,7 @@
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
   "last_verified": "2026-09-12",
-  "skill_count": 147,
+  "skill_count": 148,
   "skills": [
     {
       "name": "airnz-flights",
