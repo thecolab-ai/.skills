@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
-  "last_verified": "2026-09-04",
+  "last_verified": "2026-09-12",
   "skill_count": 146,
   "skills": [
     {
@@ -2619,7 +2619,7 @@
     },
     {
       "name": "nz-news",
-      "description": "Aggregate RSS feeds from major New Zealand news websites. Use when the task involves NZ news, current events in New Zealand, what's happening in NZ, NZ headlines, or searching NZ stories by topic, timeframe, or source. No authentication required.",
+      "description": "Aggregate RSS feeds from major New Zealand news websites. Use when the task involves NZ news, current events in New Zealand, what's happening in NZ, NZ headlines, or searching NZ stories by topic, timeframe, or source. Discover recent interview episode candidates from public programme feeds with dated provenance and transcript availability. No authentication required.",
       "path": "skills/nz-news",
       "category": "events-and-media",
       "source_owner": "Participating New Zealand news publishers",
@@ -2641,10 +2641,13 @@
         "www.interest.co.nz",
         "www.newsroom.co.nz",
         "www.rnz.co.nz",
-        "www.stuff.co.nz"
+        "www.stuff.co.nz",
+        "www.omnycontent.com",
+        "omny.fm",
+        "podcastindex.org"
       ],
-      "last_verified": "2026-07-19",
-      "health": "healthy",
+      "last_verified": "2026-09-12",
+      "health": "degraded",
       "maintainer": "@adam91holt"
     },
     {

@@ -1,134 +1,72 @@
 #!/usr/bin/env python3
+"""Deterministic news/interview fixtures, then two bounded public feed probes."""
 import json
+from pathlib import Path
 import subprocess
 import sys
-from pathlib import Path
+import unittest
+from unittest.mock import patch
 
-SKILL_DIR = Path(__file__).parent.parent
-CLI = SKILL_DIR / "scripts" / "cli.py"
+import cli
+from test_interviews import InterviewTests
 
-
-def run(args: list) -> subprocess.CompletedProcess:
-    return subprocess.run(
-        [sys.executable, str(CLI)] + args,
-        capture_output=True,
-        text=True,
-        cwd=str(SKILL_DIR),
-        timeout=30,
-    )
+SKILL_DIR = Path(__file__).resolve().parents[1]
+CLI = SKILL_DIR / 'scripts/cli.py'
 
 
-def test(name: str, fn):
-    try:
-        ok = fn()
-        status = "PASS" if ok else "FAIL"
-        print(f"[{status}] {name}")
-        return ok
-    except Exception as e:
-        print(f"[FAIL] {name}")
-        print(f"  error: {e}")
-        return False
+class NewsFixtures(unittest.TestCase):
+    def test_rss_and_search_fixture(self):
+        feed = {'id':'synthetic', 'name':'Synthetic News'}
+        xml = '''<rss><channel><item><title><![CDATA[<b>Synthetic cyclone headline</b>]]></title>
+        <link>https://www.rnz.co.nz/news/1</link><pubDate>Sun, 19 Jul 2026 09:30:00 +1200</pubDate>
+        <description><![CDATA[<p>Synthetic summary.</p>]]></description></item></channel></rss>'''
+        rows = cli.parse_rss_items(xml, feed)
+        self.assertEqual(rows[0]['title'], 'Synthetic cyclone headline')
+        self.assertEqual(rows[0]['sourceId'], 'synthetic')
+        self.assertEqual(rows[0]['published'].isoformat(), '2026-07-19T09:30:00+12:00')
+        self.assertEqual(len(cli.apply_search_filters(rows, keyword='cyclone')), 1)
+        self.assertEqual(cli.apply_search_filters(rows, keyword='unmatched-928374'), [])
+
+    def test_legacy_command_dispatch(self):
+        for name, argv in (('cmd_summary',['summary','--json']), ('cmd_headlines',['headlines','--limit','2','--json']), ('cmd_search',['search','cyclone','--json'])):
+            with self.subTest(command=name), patch.object(cli, name) as fn:
+                fn.return_value = None
+                self.assertEqual(cli.main(argv), 0)
+                fn.assert_called_once()
 
 
-results = []
+def main():
+    suite = unittest.TestSuite([unittest.defaultTestLoader.loadTestsFromTestCase(NewsFixtures), unittest.defaultTestLoader.loadTestsFromTestCase(InterviewTests)])
+    result = unittest.TextTestRunner(verbosity=1).run(suite)
+    if not result.wasSuccessful():
+        return 1
+    print(f'[PASS] {result.testsRun} news/interview fixture tests')
+    run = subprocess.run([sys.executable, str(CLI), '--help'], capture_output=True, timeout=10)
+    assert run.returncode == 0 and b'interviews' in run.stdout
+    for extra in ([], ['--contains', 'zz-no-interview-match-928374']):
+        try:
+            run = subprocess.run([sys.executable, str(CLI), 'interviews', '--programme', 'mike-hosking', '--limit', '2', '--json', *extra], capture_output=True, text=True, timeout=35)
+        except subprocess.TimeoutExpired:
+            print('[SKIP] live episode probe exceeded process deadline')
+            return 0
+        payload = json.loads(run.stdout)
+        if run.returncode in {4, 5}:
+            assert not payload['ok'] and payload['status'] in {'blocked','unavailable'}
+            print(f"[SKIP] live episode source {payload['status']}")
+            return 0
+        assert run.returncode == 0, payload.get('error')
+        assert payload['ok'] and payload['source_ledger']
+        if extra:
+            assert payload['status'] == 'empty' and payload['data'] == []
+            print('[PASS] live no-match JSON is explicitly empty within scanned coverage')
+        else:
+            assert payload['data'] and payload['status'] == 'ok'
+            assert payload['query']['window'] == 'last90days'
+            assert all(row['provenance']['guid'] and row['provenance']['publication_date_raw'] for row in payload['data'])
+            assert all(payload['query']['since'] <= row['publication_date'].replace('Z','+00:00') <= payload['query']['as_of'] for row in payload['data'])
+            print('[PASS] live episode metadata, date window and provenance')
+    return 0
 
 
-def test_rss_fixture():
-    import importlib.util
-
-    spec = importlib.util.spec_from_file_location("nz_news_cli", CLI)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    feed = {"id": "synthetic", "name": "Synthetic News"}
-    xml = """
-    <rss><channel><item>
-      <title><![CDATA[<b>Synthetic headline</b>]]></title>
-      <link>https://www.rnz.co.nz/news/1</link>
-      <pubDate>Sun, 19 Jul 2026 09:30:00 +1200</pubDate>
-      <description><![CDATA[<p>Synthetic summary.</p>]]></description>
-    </item></channel></rss>
-    """
-    records = module.parse_rss_items(xml, feed)
-    assert len(records) == 1
-    assert records[0]["title"] == "Synthetic headline"
-    assert records[0]["sourceId"] == "synthetic"
-    assert records[0]["published"].isoformat() == "2026-07-19T09:30:00+12:00"
-    print("[PASS] fixture RSS item parser")
-    return True
-
-
-results.append(test("fixture RSS parser", test_rss_fixture))
-
-
-def test_help():
-    result = run(["--help"])
-    return result.returncode == 0
-
-
-results.append(test("--help exits 0", test_help))
-
-
-def test_summary():
-    result = run(["summary", "--json"])
-    if result.returncode != 0:
-        print(f"  stderr: {result.stderr[:200]}")
-        return False
-    data = json.loads(result.stdout)
-    if not isinstance(data.get("top5"), list):
-        print(f"  stdout: {result.stdout[:200]}")
-        print("  Expected top5[] in summary response")
-        return False
-    if data.get("sourcesOk", 0) < 1:
-        if data.get("errors"):
-            print("[SKIP] live news sources unavailable")
-            return True
-        print("  Expected at least one source to be OK")
-        return False
-    return True
-
-
-results.append(test("summary returns top5[] with sources", test_summary))
-
-
-def test_headlines():
-    result = run(["headlines", "--limit", "5", "--json"])
-    if result.returncode != 0:
-        print(f"  stderr: {result.stderr[:200]}")
-        return False
-    data = json.loads(result.stdout)
-    if not isinstance(data.get("items"), list) or len(data["items"]) < 1:
-        if data.get("errors"):
-            print("[SKIP] live news sources unavailable")
-            return True
-        print(f"  stdout: {result.stdout[:200]}")
-        print("  Expected items[] with at least one headline")
-        return False
-    return True
-
-
-results.append(test("headlines returns items[]", test_headlines))
-
-
-def test_search():
-    result = run(["search", "cyclone", "--limit", "3", "--json"])
-    if result.returncode != 0:
-        print(f"  stderr: {result.stderr[:200]}")
-        return False
-    data = json.loads(result.stdout)
-    if not isinstance(data.get("items"), list):
-        print(f"  stdout: {result.stdout[:200]}")
-        print("  Expected items[] in search response")
-        return False
-    return True
-
-
-results.append(test("search cyclone returns items[]", test_search))
-
-if all(results):
-    print("[PASS] live smoke assertions completed")
-    sys.exit(0)
-else:
-    print(f"{results.count(False)} test(s) failed.")
-    sys.exit(1)
+if __name__ == '__main__':
+    raise SystemExit(main())

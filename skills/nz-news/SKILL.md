@@ -1,6 +1,6 @@
 ---
 name: nz-news
-description: "Aggregate RSS feeds from major New Zealand news websites. Use when the task involves NZ news, current events in New Zealand, what's happening in NZ, NZ headlines, or searching NZ stories by topic, timeframe, or source. No authentication required."
+description: "Aggregate RSS feeds from major New Zealand news websites. Use when the task involves NZ news, current events in New Zealand, what's happening in NZ, NZ headlines, or searching NZ stories by topic, timeframe, or source. Discover recent interview episode candidates from public programme feeds with dated provenance and transcript availability. No authentication required."
 license: MIT
 compatibility: "Requires Python 3.10+ and network access for live data"
 metadata:
@@ -18,9 +18,9 @@ metadata:
   thecolab.skill_type: "html-readonly"
   thecolab.pack: "nz-commercial-web"
   thecolab.source_url: "https://rss.nzherald.co.nz/rss/xml/nzhrsscid_000000001.xml"
-  thecolab.allowed_domains: "rss.nzherald.co.nz,thespinoff.co.nz,www.interest.co.nz,www.newsroom.co.nz,www.rnz.co.nz,www.stuff.co.nz"
-  thecolab.last_verified: "2026-07-19"
-  thecolab.health: "healthy"
+  thecolab.allowed_domains: "rss.nzherald.co.nz,thespinoff.co.nz,www.interest.co.nz,www.newsroom.co.nz,www.rnz.co.nz,www.stuff.co.nz,www.omnycontent.com,omny.fm,podcastindex.org"
+  thecolab.last_verified: "2026-09-12"
+  thecolab.health: "degraded"
   thecolab.maintainer: "@adam91holt"
 ---
 
@@ -171,6 +171,31 @@ Examples:
 python3 skills/nz-news/scripts/cli.py summary
 python3 skills/nz-news/scripts/cli.py summary --json
 ```
+
+### `interviews --programme NAME [--contains TEXT] [--limit N] [--json]`
+
+Discover interview candidates in the last90days from one programme feed. The
+window is exactly the previous 90 days through the current UTC instant; future
+and undated episodes are excluded. `mike-hosking` is live-tested.
+`rnz-morning-report` currently reports a robots block without fetching its feed.
+
+```bash
+python3 skills/nz-news/scripts/cli.py interviews --programme mike-hosking --limit 5 --json
+python3 skills/nz-news/scripts/cli.py interviews --programme mike-hosking --contains Minister --json
+python3 skills/nz-news/scripts/cli.py interviews --programme rnz-morning-report --json
+```
+
+Results contain source URL, programme, source-title speaker attribution,
+publication date, unknown broadcast date, advertised transcript links, and exact
+feed/GUID/date-field provenance. Speaker attribution is explicitly unverified;
+this does not establish an utterance, identity, office history or party alignment.
+No political persuasion, voter profiling, audio or transcript downloads.
+
+The feed read is capped at 512 KiB. Only complete items in that prefix count.
+`coverage.window_complete` is false: this is discovery within a rolling window,
+not a complete 90-day archive. A no-match result is scoped to the scanned prefix.
+The JSON result envelope distinguishes `empty`, `blocked`, `unavailable` and
+`schema_error`. See [interview API notes](references/api-notes.md).
 
 ## Sources
 
