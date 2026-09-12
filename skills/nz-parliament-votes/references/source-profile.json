@@ -1,0 +1,30 @@
+{
+  "description": "Official weekly New Zealand Parliament Journal search and conservative recorded-division extraction",
+  "source_name": "New Zealand Parliament Journals",
+  "source_url": "https://journals.parliament.nz/",
+  "allowed_hosts": ["journals.parliament.nz"],
+  "freshness": "live official weekly Journal API; weekly records are drafts",
+  "warnings": [
+    "Weekly Journals are draft records; consult authoritative Sessional Journals for formal historical citation.",
+    "Return printed party counts and preserve ambiguous singleton labels as unknown.",
+    "Never infer an MP vote from party membership or resolve printed labels to identities."
+  ],
+  "record_fields": {
+    "source_authority": "weekly_draft",
+    "participant_scope": "printed party counts and explicit singleton names only",
+    "identity_resolution": false
+  },
+  "smoke_args": ["search"],
+  "commands": {
+    "search": {
+      "help": "list and filter weekly Journal records",
+      "positionals": [{"name": "query", "required": false}]
+    },
+    "votes": {
+      "help": "extract recorded divisions from one weekly Journal",
+      "positionals": [{"name": "journal_id"}]
+    }
+  },
+  "discovery_only": false,
+  "discovery_commands": []
+}

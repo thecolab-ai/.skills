@@ -2,7 +2,7 @@
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
   "last_verified": "2026-09-12",
-  "skill_count": 146,
+  "skill_count": 147,
   "skills": [
     {
       "name": "airnz-flights",
@@ -2672,6 +2672,31 @@
         "bills.parliament.nz"
       ],
       "last_verified": "2026-07-19",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "nz-parliament-votes",
+      "description": "Query official New Zealand Parliament weekly Journals for recorded divisions, preserving only printed party counts and explicitly printed voter names.",
+      "path": "skills/nz-parliament-votes",
+      "category": "government",
+      "source_owner": "New Zealand Parliament",
+      "source_type": "official",
+      "source_url": "https://journals.parliament.nz/",
+      "auth": "none",
+      "access_mode": "public-api",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "none",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "journals.parliament.nz"
+      ],
+      "last_verified": "2026-09-12",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },

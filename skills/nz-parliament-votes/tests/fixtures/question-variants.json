@@ -1,0 +1,12 @@
+{
+  "fixture_notice": "CAPTURED PUBLIC-SOURCE EXCERPT: exact question wording, CSS classes, party labels, and tallies from the official NZ Parliament weekly Journal API; retained as parser regression evidence.",
+  "capture_source_url": "https://journals.parliament.nz/api/data/Journal/c20c381d-97bf-4309-8923-08dd0900bd01",
+  "capture_date": "2026-09-12",
+  "Id": "c20c381d-97bf-4309-8923-08dd0900bd01",
+  "DocumentType": "Journal",
+  "Title": "Captured question-form excerpts",
+  "StartDate": "2025-10-15T00:00:00+13:00",
+  "CreatedDate": "2025-10-20T12:00:00+13:00",
+  "LastUpdatedDate": "2025-10-22T12:00:00+13:00",
+  "PublishHtml": "<h2>Wednesday, 15 October 2025</h2><p>On the question, That the motion be agreed to, the votes were recorded as follows:</p><p class='jps-JVResultParty'>Ayes 68</p><p class='jps-JVParty'>New Zealand National 49; ACT New Zealand 11; New Zealand First 8</p><p class='jps-JVResultParty'>Noes 55</p><p class='jps-JVParty'>New Zealand Labour 34; Green Party of Aotearoa New Zealand 15; Te Pāti Māori 6</p><p>On the question that the amendment be agreed to, the votes were recorded as follows:</p><p class='jps-JVResultParty'>Ayes 55</p><p class='jps-JVParty'>New Zealand Labour 34; Green Party of Aotearoa New Zealand 15; Te Pāti Māori 6</p><p class='jps-JVResultParty'>Noes 68</p><p class='jps-JVParty'>New Zealand National 49; ACT New Zealand 11; New Zealand First 8</p>"
+}
