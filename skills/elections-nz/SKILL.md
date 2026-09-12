@@ -1,6 +1,6 @@
 ---
 name: elections-nz
-description: "Query official New Zealand election results, electorate voting, turnout and published finance resources from the Electoral Commission."
+description: "Query official New Zealand election results, electorate voting, turnout, aggregate party political finance and reporting rules from the Electoral Commission."
 license: MIT
 compatibility: "Requires Python 3.10+ and network access for live data"
 metadata:
@@ -19,8 +19,8 @@ metadata:
   thecolab.pack: "nz-public-data"
   thecolab.source_url: "https://elections.nz/stats-and-research/"
   thecolab.allowed_domains: "elections.nz,www.elections.nz,electionresults.govt.nz,www.electionresults.govt.nz"
-  thecolab.last_verified: "2026-07-19"
-  thecolab.health: "degraded"
+  thecolab.last_verified: "2026-09-12"
+  thecolab.health: "healthy"
   thecolab.maintainer: "@adam91holt"
 ---
 
@@ -46,6 +46,12 @@ python3 scripts/cli.py candidate NAME --year VALUE --json
 python3 scripts/cli.py donations --party VALUE --json
 # discover candidate expense returns
 python3 scripts/cli.py expenses --candidate VALUE --json
+# query Commission-published annual donation/loan aggregates (optional party filter)
+python3 scripts/cli.py finance-aggregates [PARTY] --kind annual --year 2025 --json
+# query Commission-published election-expense aggregates
+python3 scripts/cli.py finance-aggregates [PARTY] --kind expenses --year 2023 --json
+# retrieve exact source-wording rules (optional topic filter)
+python3 scripts/cli.py finance-rules [TOPIC] --kind annual --year 2025 --json
 ```
 
 Add `--limit N` (1–100) to bound any command. Human output is the default.
@@ -54,15 +60,18 @@ Add `--limit N` (1–100) to bound any command. Human output is the default.
 
 - Only Electoral Commission outcomes are authoritative.
 - Preserve preliminary versus official status and publication date.
-- Finance records retain reporting-period and disclosure-threshold context.
+- Finance aggregates retain reporting period, metric and missing-value context. Donation, loan, expense, expense-limit and broadcasting metrics remain distinct.
+- Reporting rules preserve source wording and mentioned amounts. Unknown effective dates stay unknown; this output is not legal advice.
+- Finance aggregation uses only the Commission's published party-summary tables. It never extracts donor/contributor names, addresses or donor-level records, and never recomputes totals from detailed schedules.
 - Do not derive voter-level profiles or political persuasion.
 
-Result commands parse the Commission's published CSV tables and finance commands return matching first-party return documents. It never converts a parser failure into an empty success. Follow linked primary records for definitions and reporting-period context.
+Result commands parse the Commission's published CSV tables. Existing `donations` and `expenses` commands continue to return matching first-party return documents. `finance-aggregates` returns structured party-summary facts; `finance-rules` returns scoped official wording. A valid unmatched filter is an empty success, while source-layout or amount drift fails explicitly.
 
 ## Resources
 
 - `scripts/cli.py` — canonical command entrypoint
 - `scripts/test_contract.py` — deterministic repository contract audit
+- `scripts/test_finance.py` — aggregate-only, adversarial and CLI-state tests
 - `scripts/smoke_test.py` — parser fixture and bounded live probe
-- `tests/fixtures/overall-results.csv`, `turnout.csv`, `winning-candidates.csv` and `finance.html` — export-specific fixtures
+- `tests/fixtures/overall-results.csv`, `turnout.csv`, `winning-candidates.csv`, `finance.html`, `finance-annual.html` and `finance-expenses.html` — scrubbed export-specific fixtures
 - `references/source-notes.md` — feasibility, provenance and source limits
