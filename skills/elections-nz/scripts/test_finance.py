@@ -98,6 +98,10 @@ class ParserTests(unittest.TestCase):
         duplicate = ANNUAL.replace("</table>", "<tr><td>Kōwhai Example Party</td><td>$2</td><td>$3</td><td></td><td></td></tr></table>", 1)
         with self.assertRaisesRegex(ValueError, "duplicate"):
             parse_annual_aggregates(duplicate, ANNUAL_URL, STAMP, 2025)
+        expense_row = '<tr><td>Kōwhai Example Party</td><td>$2</td><td>$3</td><td>$4</td><td>$5</td><td>Filed</td></tr>'
+        duplicate_expense = EXPENSES.replace("</table>", expense_row + "</table>", 1)
+        with self.assertRaisesRegex(ValueError, "duplicate"):
+            parse_expense_aggregates(duplicate_expense, EXPENSE_URLS[2023], STAMP, 2023)
         for url in ("http://elections.nz/example", "https://elections.nz.evil.test/", "https://user:secret@elections.nz/"):
             with self.assertRaises(ValueError):
                 safe_source_url(url)

@@ -336,6 +336,9 @@ def parse_expense_aggregates(html: str, source_url: str, retrieved_at: str, year
                 })
     if not matched_layout:
         raise ValueError("party-expense page contains no supported aggregate summary table")
+    keys = [(row["party_name_as_published"], row["reporting_year"], row["metric"]) for row in results]
+    if len(keys) != len(set(keys)):
+        raise ValueError("duplicate party-year metric in party-expense aggregate summary")
     return results
 
 
