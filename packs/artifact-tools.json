@@ -3,8 +3,9 @@
   "name": "artifact-tools",
   "description": "Local artifact creation and editing with declared filesystem writes.",
   "default": false,
-  "skill_count": 1,
+  "skill_count": 2,
   "skills": [
-    "pptx"
+    "pptx",
+    "video-reels"
   ]
 }

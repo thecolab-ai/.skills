@@ -1,0 +1,30 @@
+{
+ "_note": "synthetic script-vs-transcript cases for the Whisper check",
+ "cases": [
+  {
+   "expected": "One idea per line.",
+   "heard": " One idea per line",
+   "ok": true
+  },
+  {
+   "expected": "Cut on the beat.",
+   "heard": "Cut on the beach.",
+   "ok": false,
+   "issue": {
+    "op": "replace",
+    "expected": "beat",
+    "heard": "beach"
+   }
+  },
+  {
+   "expected": "Held long enough to read.",
+   "heard": "Held long enough to actually read.",
+   "ok": false,
+   "issue": {
+    "op": "insert",
+    "expected": "",
+    "heard": "actually"
+   }
+  }
+ ]
+}

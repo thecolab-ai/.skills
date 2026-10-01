@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>reel</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="data:,">
+<style>
+	/*
+	 * Self-host your three typefaces next to this file and declare them here with
+	 * font-display:block so no frame is ever drawn with a fallback font, e.g.
+	 * @font-face { font-family: 'Barlow Condensed'; src: url(fonts/barlowcondensed-800.woff2) format('woff2'); font-weight: 800; font-display: block; }
+	 */
+	html, body { margin: 0; height: 100%; background: #050505; overflow: hidden; }
+	body { display: grid; place-items: center; }
+	canvas { display: block; max-width: 100vw; max-height: 100vh; }
+	body.capture { display: block; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script src="engine.js"></script>
+<script>
+	// The aspect must be set before reel.js reads FF.W / FF.H.
+	FF.setAspect(new URLSearchParams(location.search).get('aspect') || '9x16');
+</script>
+<script src="reel.js"></script>
+<script>
+(function () {
+	// ?aspect=9x16|16x9|1x1|4x5  ?capture=1 (no autoplay; exposes renderAt)
+	// ?scale=0.333 (canvas pixels vs logical size)  ?samples=N ?fast=N ?fps=30 ?grain=0.05
+	const q = new URLSearchParams(location.search);
+	const capture = q.has('capture');
+	const scale = Number(q.get('scale') || 1);
+	const canvas = document.getElementById('c');
+	canvas.width = 2 * Math.round((FF.W * scale) / 2); // even sizes for x264
+	canvas.height = 2 * Math.round((FF.H * scale) / 2);
+	if (capture) {
+		document.body.classList.add('capture');
+		canvas.style.width = canvas.width + 'px';
+		canvas.style.height = canvas.height + 'px';
+	} else {
+		canvas.style.aspectRatio = FF.W + ' / ' + FF.H;
+		canvas.style.height = FF.H >= FF.W ? '100vh' : 'auto';
+		canvas.style.width = FF.H >= FF.W ? 'auto' : '100vw';
+	}
+	const player = FF.create(canvas, FF_REEL, {
+		samples: Number(q.get('samples') || 1),
+		fastSamples: Number(q.get('fast') || q.get('samples') || 1),
+		fps: Number(q.get('fps') || 30),
+		grain: q.has('grain') ? Number(q.get('grain')) : 0.05,
+	});
+	window.REEL_INFO = { duration: FF_REEL.DURATION, width: canvas.width, height: canvas.height, timing: FF_REEL.TIMING };
+	window.__ready = Promise.all([FF.ready, FF_REEL.load()]).then(() => { player.render(0); return true; });
+	// Async on purpose: scenes that load footage frames await them before drawing.
+	window.renderAt = async (t) => { player.render(t); return true; };
+	if (capture) return;
+	let t0 = null;
+	function frame(now) {
+		if (t0 === null) t0 = now;
+		player.render(((now - t0) / 1000) % FF_REEL.DURATION);
+		requestAnimationFrame(frame);
+	}
+	window.__ready.then(() => requestAnimationFrame(frame));
+})();
+</script>
+</body>
+</html>
