@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
-  "last_verified": "2026-09-12",
-  "skill_count": 149,
+  "last_verified": "2026-10-01",
+  "skill_count": 150,
   "skills": [
     {
       "name": "airnz-flights",
@@ -3956,6 +3956,42 @@
       "last_verified": "2026-07-19",
       "health": "degraded",
       "maintainer": "@adam91holt"
+    },
+    {
+      "name": "video-reels",
+      "description": "Make short kinetic-type video reels (30 s to 3 min hype, explainer, pitch or event videos) from an HTML canvas project: brief, sourced facts, script, AI voiceover, music, beat-grid sync, stills review, chunked headless-Chromium render, -14 LUFS mix and social delivery. Use when asked to make, edit, render or QA a reel, promo, showreel, lyric/kinetic-type video or vertical phone video. Not for editing existing camera footage timelines in an NLE.",
+      "path": "skills/video-reels",
+      "category": "artifact-and-workflow",
+      "source_owner": "TheColab",
+      "source_type": "community",
+      "source_url": "https://github.com/thecolab-ai/.skills/tree/main/skills/video-reels",
+      "auth": "mixed",
+      "access_mode": "local-cli-and-headless-chromium-render",
+      "data_class": "public",
+      "writes": true,
+      "browser": true,
+      "risk": "medium",
+      "cache_ttl": "none",
+      "schema_version": "1",
+      "skill_type": "documentation-workflow",
+      "pack": "artifact-tools",
+      "allowed_domains": [
+        "github.com",
+        "api.elevenlabs.io",
+        "huggingface.co"
+      ],
+      "last_verified": "2026-10-01",
+      "health": "healthy",
+      "maintainer": "@adam91holt",
+      "mutations": [
+        "local-files"
+      ],
+      "local_output": [
+        "video-project-files",
+        "rendered-video",
+        "audio-mixes",
+        "stills"
+      ]
     },
     {
       "name": "wcc-arcgis-nz",
