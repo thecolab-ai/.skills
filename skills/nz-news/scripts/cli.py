@@ -8,11 +8,14 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import functools
+import html
 import json
 import re
 import pathlib
 import sys
 import time
+import unicodedata
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
@@ -33,7 +36,7 @@ FEEDS = [
     {"id": "rnz-sport",      "name": "RNZ Sport",        "url": "https://www.rnz.co.nz/rss/sport.xml",                        "format": "rss", "category": "sport"},
     {"id": "rnz-te-ao-maori","name": "RNZ Te Ao Maori",  "url": "https://www.rnz.co.nz/rss/te-ao-maori.xml",                  "format": "rss", "category": "te-ao-maori"},
     {"id": "newsroom",       "name": "Newsroom",         "url": "https://www.newsroom.co.nz/rss",                             "format": "rss"},
-    {"id": "spinoff",        "name": "The Spinoff",      "url": "https://thespinoff.co.nz/feed",                              "format": "atom"},
+    {"id": "spinoff",        "name": "The Spinoff",      "url": "https://thespinoff.co.nz/api/rss",                           "format": "atom"},
     {"id": "interest",       "name": "Interest.co.nz",   "url": "https://www.interest.co.nz/rss",                             "format": "rss"},
 ]
 
@@ -258,28 +261,94 @@ def collect_items(results: list[dict]) -> list[dict]:
 
 
 def normalise_search_text(text: str) -> str:
+    """Legacy ASCII normalisation, used only by --substring matching."""
     text = re.sub(r"<[^>]+>", " ", text)
     text = text.lower()
     text = re.sub(r"[^a-z0-9]+", " ", text)
     return text.strip()
 
 
-def searchable_text(item: dict) -> str:
-    return normalise_search_text(f"{item['title']} {item.get('summary') or ''}")
+# Single letters joined by dots ("A.I.", "U.S.A") collapse to one word.
+_DOTTED_ACRONYM = re.compile(r"\b(?:[^\W\d_]\.)+[^\W\d_]\b\.?")
 
 
-def matches_keyword(item: dict, keyword: str, exact: bool = False, contains_all: bool = False) -> bool:
-    haystack = searchable_text(item)
-    kw = normalise_search_text(keyword)
-    if not kw:
+@functools.lru_cache(maxsize=1)
+def word_pattern() -> re.Pattern:
+    """A word is a letter or digit, then letters, digits or combining marks.
+
+    Python's \\w omits combining marks, which would split Indic words at their
+    vowel signs. The mark ranges are read once from unicodedata (BMP, ~10 ms).
+    """
+    ranges, start = [], None
+    for code in range(0x10001):
+        is_mark = code < 0x10000 and unicodedata.category(chr(code)).startswith("M")
+        if is_mark and start is None:
+            start = code
+        elif not is_mark and start is not None:
+            ranges.append(f"\\u{start:04x}-\\u{code - 1:04x}")
+            start = None
+    return re.compile(rf"[^\W_](?:[^\W_]|[{''.join(ranges)}])*")
+
+
+# Combining diacritics that follow a Latin letter after NFKD ("ā" -> "a" + U+0304).
+_LATIN_DIACRITICS = re.compile(r"(?<=[A-Za-z\u00c0-\u024f\u1e00-\u1eff])[\u0300-\u036f]+")
+
+
+def fold_latin_accents(text: str) -> str:
+    """Drop combining marks on Latin letters only; other scripts keep theirs."""
+    return _LATIN_DIACRITICS.sub("", text)
+
+
+def word_tokens(text: str) -> list[str]:
+    """Split text into case- and accent-folded Unicode words.
+
+    Hyphens, apostrophes and other punctuation separate words, so "AI-driven"
+    holds the word "ai" and "co-op" is the two-word phrase "co op". Macrons and
+    other accents fold away, so "Māori" and "Maori" are the same word.
+    """
+    text = html.unescape(re.sub(r"<[^>]+>", " ", text))
+    text = fold_latin_accents(unicodedata.normalize("NFKD", text))
+    text = _DOTTED_ACRONYM.sub(lambda m: m.group(0).replace(".", ""), text.casefold())
+    return word_pattern().findall(text)
+
+
+def search_index(item: dict, substring: bool = False) -> dict:
+    """Build the per-item search text once; reused by keyword and exclude checks."""
+    raw = f"{item['title']} {item.get('summary') or ''}"
+    if substring:
+        return {"legacy": normalise_search_text(raw)}
+    tokens = word_tokens(raw)
+    return {"words": " " + " ".join(tokens) + " ", "wordSet": frozenset(tokens)}
+
+
+def has_phrase(index: dict, phrase: list[str]) -> bool:
+    return f" {' '.join(phrase)} " in index["words"]
+
+
+def matches_keyword(
+    item: dict,
+    keyword: str,
+    exact: bool = False,
+    contains_all: bool = False,
+    substring: bool = False,
+    index: dict | None = None,
+) -> bool:
+    if substring and not exact:
+        index = index or search_index(item, substring=True)
+        kw = normalise_search_text(keyword)
+        if not kw:
+            return True
+        if contains_all:
+            return all(t in index["legacy"] for t in kw.split())
+        return kw in index["legacy"]
+    terms = word_tokens(keyword)
+    if not terms:
         return True
-    if exact:
-        pattern = r"(^| )" + re.escape(kw).replace(r"\ ", r" +") + r"( |$)"
-        return bool(re.search(pattern, haystack, re.IGNORECASE))
+    index = index or search_index(item)
     if contains_all:
-        terms = kw.split()
-        return all(t in haystack for t in terms)
-    return kw in haystack
+        return index["wordSet"].issuperset(terms)
+    # Default and --exact: the whole query as a run of complete words.
+    return has_phrase(index, terms)
 
 
 def within_since_window(item: dict, since_hours: float | None, since_date: str | None) -> bool:
@@ -298,11 +367,20 @@ def within_since_window(item: dict, since_hours: float | None, since_date: str |
     return True
 
 
-def passes_exclude(item: dict, exclude: list[str]) -> bool:
+def passes_exclude(item: dict, exclude: list[str], substring: bool = False, index: dict | None = None) -> bool:
     if not exclude:
         return True
-    haystack = searchable_text(item)
-    return not any(normalise_search_text(term) in haystack for term in exclude)
+    index = index or search_index(item, substring=substring)
+    for term in exclude:
+        if substring:
+            kw = normalise_search_text(term)
+            if kw and kw in index["legacy"]:
+                return False
+        else:
+            words = word_tokens(term)
+            if words and has_phrase(index, words):
+                return False
+    return True
 
 
 def apply_search_filters(
@@ -313,14 +391,20 @@ def apply_search_filters(
     exact: bool = False,
     contains_all: bool = False,
     exclude: list[str] | None = None,
+    substring: bool = False,
 ) -> list[dict]:
     exclude = exclude or []
-    return [
-        item for item in items
-        if within_since_window(item, since_hours, since_date)
-        and passes_exclude(item, exclude)
-        and matches_keyword(item, keyword, exact=exact, contains_all=contains_all)
-    ]
+    substring = substring and not exact  # --exact is always a whole-word phrase
+    matched = []
+    for item in items:
+        if not within_since_window(item, since_hours, since_date):
+            continue
+        index = search_index(item, substring=substring)
+        if passes_exclude(item, exclude, substring=substring, index=index) and matches_keyword(
+            item, keyword, exact=exact, contains_all=contains_all, substring=substring, index=index
+        ):
+            matched.append(item)
+    return matched
 
 
 def resolve_feed(name: str) -> dict | None:
@@ -440,6 +524,8 @@ def cmd_search(args: argparse.Namespace) -> None:
     # Validate flags
     if getattr(args, "contains_all", False) and getattr(args, "exact", False):
         die("Use either --contains-all or --exact, not both.")
+    if getattr(args, "substring", False) and getattr(args, "exact", False):
+        die("Use either --substring or --exact, not both.")
     if getattr(args, "since_hours", None) is not None and getattr(args, "since_date", None):
         die("Use either --since-hours or --since-date, not both.")
 
@@ -467,17 +553,20 @@ def cmd_search(args: argparse.Namespace) -> None:
         exact=bool(getattr(args, "exact", False)),
         contains_all=bool(getattr(args, "contains_all", False)),
         exclude=getattr(args, "exclude", None) or [],
+        substring=bool(getattr(args, "substring", False)),
     )
     shown = filtered[:limit]
 
     exact = bool(getattr(args, "exact", False))
     contains_all = bool(getattr(args, "contains_all", False))
-    match_mode = "exact" if exact else "contains-all" if contains_all else "substring"
+    substring = bool(getattr(args, "substring", False))
+    match_mode = "exact" if exact else "contains-all" if contains_all else "substring" if substring else "phrase"
 
     output = {
         "fetchedAt": now_utc(),
         "keyword": keyword,
         "matchMode": match_mode,
+        "wordMatch": not substring,
         "sourcesQueried": len(results),
         "sourcesOk": sum(1 for r in results if r["ok"]),
         "filters": {
@@ -507,6 +596,8 @@ def cmd_search(args: argparse.Namespace) -> None:
             lines.append("Match mode: all search terms must appear")
         if exact:
             lines.append("Match mode: exact phrase")
+        if substring:
+            lines.append("Match mode: substring (parts of words also match)")
         excl = getattr(args, "exclude", None) or []
         if excl:
             lines.append(f"Exclude: {', '.join(excl)}")
@@ -629,6 +720,8 @@ def build_parser() -> argparse.ArgumentParser:
                     help="match the exact phrase")
     sp.add_argument("--exclude", type=parse_csv_list,
                     help="comma-separated terms to exclude from title or summary")
+    sp.add_argument("--substring", action="store_true",
+                    help="legacy matching: terms may match inside longer words (AI matches 'against')")
     sp.add_argument("--limit", type=positive_int, default=10, help="number of items to show (default 10)")
     sp.add_argument("--json", action="store_true")
     sp.set_defaults(func=cmd_search)
@@ -643,6 +736,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp2.add_argument("--contains-all", action="store_true", dest="contains_all")
     sp2.add_argument("--exact", action="store_true")
     sp2.add_argument("--exclude", type=parse_csv_list)
+    sp2.add_argument("--substring", action="store_true")
     sp2.add_argument("--limit", type=positive_int, default=10)
     sp2.add_argument("--json", action="store_true")
     sp2.set_defaults(func=cmd_search)

@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
-  "last_verified": "2026-10-01",
+  "last_verified": "2026-10-07",
   "skill_count": 150,
   "skills": [
     {
@@ -2646,7 +2646,7 @@
         "omny.fm",
         "podcastindex.org"
       ],
-      "last_verified": "2026-09-12",
+      "last_verified": "2026-10-07",
       "health": "degraded",
       "maintainer": "@adam91holt"
     },

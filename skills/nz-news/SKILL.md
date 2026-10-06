@@ -19,7 +19,7 @@ metadata:
   thecolab.pack: "nz-commercial-web"
   thecolab.source_url: "https://rss.nzherald.co.nz/rss/xml/nzhrsscid_000000001.xml"
   thecolab.allowed_domains: "rss.nzherald.co.nz,thespinoff.co.nz,www.interest.co.nz,www.newsroom.co.nz,www.rnz.co.nz,www.stuff.co.nz,www.omnycontent.com,omny.fm,podcastindex.org"
-  thecolab.last_verified: "2026-09-12"
+  thecolab.last_verified: "2026-10-07"
   thecolab.health: "degraded"
   thecolab.maintainer: "@adam91holt"
 ---
@@ -51,8 +51,9 @@ Aggregate live RSS feeds from major New Zealand news websites into a single CLI 
 1. Run `scripts/cli.py` with the narrowest subcommand that answers the task
 2. Start with `search` for any topic lookup, either positionally or with flags
 3. Use `--source`, `--since-hours`, `--since-date`, `--contains-all`, `--exact`, and `--exclude` when the request needs tighter matching
-4. Use default human output for direct answers
-5. Use `--json` when another tool or agent needs machine-readable output
+4. Terms match whole words by default; add `--substring` only when parts of words must match
+5. Use default human output for direct answers
+6. Use `--json` when another tool or agent needs machine-readable output
 
 ## CLI
 
@@ -120,14 +121,24 @@ Useful flags:
 - `--contains-all` to require every term in a multi-word query
 - `--exact` to match an exact phrase
 - `--exclude sport,opinion` to remove unwanted terms
+- `--substring` to use the old matching, where a term can match inside a longer word
 - `--limit N`
 - `--json`
+
+Matching rules:
+
+- Matching is case-insensitive and uses whole words. `AI` matches "AI", "AI-driven", "AI's" and "A.I.". It does not match "against" or "said".
+- A multi-word query matches as a phrase of whole words. `housing market` matches "housing-market" but not "rehousing marketplace".
+- `--contains-all` needs each word, in any order. `--exact` needs the full phrase. `--exclude` removes a story if it has the full excluded term.
+- Hyphens, apostrophes and other punctuation separate words, so `co-op` matches "co-op" and "co op". Macrons and other accents fold, so `Māori` matches "Māori" and "Maori".
+- `--substring` cannot be used with `--exact`.
 
 JSON shape:
 
 - `fetchedAt`
 - `keyword`
-- `matchMode`
+- `matchMode`: `phrase` (default), `contains-all`, `exact`, or `substring` (`--substring` only)
+- `wordMatch`: `true` unless `--substring` is set
 - `sourcesQueried`
 - `sourcesOk`
 - `filters.sourceIds`
@@ -205,7 +216,7 @@ The JSON result envelope distinguishes `empty`, `blocked`, `unavailable` and
 | stuff | Stuff | Atom | Primary |
 | rnz | RNZ | RSS | Primary |
 | newsroom | Newsroom | RSS | Primary |
-| spinoff | The Spinoff | Atom | Primary |
+| spinoff | The Spinoff | Atom (`/api/rss`) | Primary |
 | interest | Interest.co.nz | RSS | Primary |
 | rnz-politics | RNZ Politics | RSS | Category |
 | rnz-business | RNZ Business | RSS | Category |
