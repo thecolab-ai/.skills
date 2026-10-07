@@ -20,6 +20,8 @@ The 2026-10-07 verification ran `sources`: all 12 news feeds returned items.
 The Spinoff old WordPress feed (`/feed`) now returns HTTP 404 after a site
 rebuild. Its homepage has no `rel="alternate"` feed link. The working Atom feed
 is `https://thespinoff.co.nz/api/rss` (20 entries; each entry has the full
-article HTML in `<content>`, so search reads the full Spinoff article text).
+article HTML in `<content>` and no `<summary>`). The CLI keeps only a short
+plain-text excerpt (first paragraph, max 280 chars) as the summary, so output
+and search cover the standfirst like other feeds, not the full article.
 The `rnz-morning-report` interview selector is still blocked by RNZ robots
 rules, so declared health stays degraded.

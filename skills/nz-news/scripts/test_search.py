@@ -63,8 +63,39 @@ class SearchMatcherTests(unittest.TestCase):
         self.assertEqual(hits('plan', 'Transport plan released', exclude=['sport']), ['Transport plan released'])
         self.assertEqual(hits('ai', *titles, exclude=['sport']), [])
         self.assertEqual(hits('funding', *titles, exclude=['sport funding']), [])
-        self.assertEqual(hits('minister', *titles, exclude=['sport']), ['Sports minister speaks'])
         self.assertEqual(hits('plan', *titles, exclude=['-', '']), ['Transport plan released'])
+
+    def test_exclude_allows_plural_variants(self):
+        self.assertEqual(hits('minister', 'Sports minister speaks', exclude=['sport']), [])
+        self.assertEqual(hits('cut', 'Buses cut', 'Bus cut', 'Busy cut', exclude=['bus']), ['Busy cut'])
+        self.assertEqual(hits('plan', 'Sportsman plan', 'Transports plan', exclude=['sport']),
+                         ['Sportsman plan', 'Transports plan'])
+        self.assertEqual(hits('cut', 'Sports funds cut', 'Sport funding cut', exclude=['sport fund']),
+                         ['Sport funding cut'])
+        # Plural folding is one-way and exclude-only; search terms stay exact words.
+        self.assertEqual(hits('sport', 'Sports minister speaks'), [])
+        self.assertEqual(hits('minister', 'Sport minister speaks', exclude=['sports']), ['Sport minister speaks'])
+
+    def test_atom_content_becomes_short_excerpt(self):
+        body = ''.join(f'<p>Paragraph {n} of the full article body.</p>' for n in range(200))
+        xml = ('<feed><entry><title type="html"><![CDATA[Spinoff story]]></title>'
+               '<link href="https://thespinoff.co.nz/a"/><updated>2026-10-07T22:39:01Z</updated>'
+               '<content type="html"><![CDATA[<div class="article-content"><p> </p>'
+               '<p>The <b>standfirst</b>\n line.</p>' + body + ']]></content></entry></feed>')
+        [item] = cli.parse_atom_items(xml, cli.FEED_BY_ID['spinoff'])
+        self.assertEqual(item['summary'], 'The standfirst line.')
+        long_para = '<p>' + ' '.join(['word'] * 200) + '</p>'
+        excerpt = cli.content_excerpt(long_para)
+        self.assertLessEqual(len(excerpt), cli.SUMMARY_MAX_CHARS + 1)
+        self.assertTrue(excerpt.endswith('word…'))
+        self.assertEqual(cli.content_excerpt('Plain <i>text</i> only'), 'Plain text only')
+        self.assertEqual(cli.content_excerpt(''), '')
+
+    def test_atom_summary_is_preferred_over_content(self):
+        xml = ('<feed><entry><title>Stuff story</title><link href="https://www.stuff.co.nz/a"/>'
+               '<summary>Short summary.</summary><content>&lt;p&gt;Long body&lt;/p&gt;</content></entry></feed>')
+        [item] = cli.parse_atom_items(xml, cli.FEED_BY_ID['stuff'])
+        self.assertEqual(item['summary'], 'Short summary.')
 
     def test_macrons_and_hyphens(self):
         titles = ('Māori wards vote passes', 'Maori health plan', 'Te Ao Māori news', 'Co-op dairy payout lifts',

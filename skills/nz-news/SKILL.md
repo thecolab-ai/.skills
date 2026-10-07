@@ -129,7 +129,7 @@ Matching rules:
 
 - Matching is case-insensitive and uses whole words. `AI` matches "AI", "AI-driven", "AI's" and "A.I.". It does not match "against" or "said".
 - A multi-word query matches as a phrase of whole words. `housing market` matches "housing-market" but not "rehousing marketplace".
-- `--contains-all` needs each word, in any order. `--exact` needs the full phrase. `--exclude` removes a story if it has the full excluded term.
+- `--contains-all` needs each word, in any order. `--exact` needs the full phrase. `--exclude` removes a story if it has the full excluded term as whole words; each excluded word also covers its simple plural (`sport` drops "sports" but not "transport").
 - Hyphens, apostrophes and other punctuation separate words, so `co-op` matches "co-op" and "co op". Macrons and other accents fold, so `Māori` matches "Māori" and "Maori".
 - `--substring` cannot be used with `--exact`.
 

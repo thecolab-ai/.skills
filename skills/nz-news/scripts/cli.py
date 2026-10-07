@@ -169,6 +169,28 @@ def strip_html(text: str) -> str:
     return re.sub(r"<[^>]+>", " ", text)
 
 
+SUMMARY_MAX_CHARS = 280
+
+
+def content_excerpt(content: str, max_chars: int = SUMMARY_MAX_CHARS) -> str:
+    """Short plain-text excerpt from full article HTML (e.g. Atom <content>).
+
+    Uses the first non-empty paragraph (the standfirst on The Spinoff), then
+    cuts at a word boundary so the summary stays comparable to RSS descriptions.
+    """
+    text = ""
+    for m in re.finditer(r"<p\b[^>]*>([\s\S]*?)</p>", content, re.IGNORECASE):
+        text = " ".join(strip_html(m.group(1)).split())
+        if text:
+            break
+    if not text:
+        text = " ".join(strip_html(content).split())
+    if len(text) <= max_chars:
+        return text
+    cut = text[:max_chars].rsplit(" ", 1)[0].rstrip(" ,;:.-")
+    return f"{cut or text[:max_chars]}…"
+
+
 def parse_rss_items(xml: str, feed: dict) -> list[dict]:
     items = []
     for m in re.finditer(r"<item>([\s\S]*?)</item>", xml, re.IGNORECASE):
@@ -196,7 +218,7 @@ def parse_atom_items(xml: str, feed: dict) -> list[dict]:
         title = extract_tag(block, "title")
         link = extract_attr(block, "link", "href")
         published = extract_tag(block, "published") or extract_tag(block, "updated")
-        summary = extract_tag(block, "summary") or extract_tag(block, "content")
+        summary = extract_tag(block, "summary") or content_excerpt(extract_tag(block, "content"))
         if title and link:
             items.append({
                 "title": strip_html(title).strip(),
@@ -367,6 +389,19 @@ def within_since_window(item: dict, since_hours: float | None, since_date: str |
     return True
 
 
+@functools.lru_cache(maxsize=256)
+def exclude_pattern(term: str) -> re.Pattern | None:
+    """Whole-word phrase for --exclude; each word may take a plural -s/-es.
+
+    So "sport" drops "sports" and "bus" drops "buses", but "sport" keeps
+    "transport" and "sportsman".
+    """
+    words = word_tokens(term)
+    if not words:
+        return None
+    return re.compile(" " + " ".join(re.escape(w) + "(?:e?s)?" for w in words) + " ")
+
+
 def passes_exclude(item: dict, exclude: list[str], substring: bool = False, index: dict | None = None) -> bool:
     if not exclude:
         return True
@@ -377,8 +412,8 @@ def passes_exclude(item: dict, exclude: list[str], substring: bool = False, inde
             if kw and kw in index["legacy"]:
                 return False
         else:
-            words = word_tokens(term)
-            if words and has_phrase(index, words):
+            pattern = exclude_pattern(term)
+            if pattern and pattern.search(index["words"]):
                 return False
     return True
 
