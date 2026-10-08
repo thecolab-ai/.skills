@@ -45,8 +45,12 @@ def main():
                     assert data['results'][0]['count']>0
                     detail=f"count={data['results'][0]['count']} latest_data={meta['latest_data']}"
                 else:
-                    assert data['type']=='FeatureCollection' and data['feature_count']==5
-                    assert len({f['id'] for f in data['features']})==5
+                    assert data['type']=='FeatureCollection'
+                    if data['feature_count']==0:
+                        print(f'[SKIP] live {name} {mode}: no current features in bbox')
+                        continue
+                    assert 1<=data['feature_count']<=5
+                    assert len({f['id'] for f in data['features']})==data['feature_count']
                     assert all(f['geometry'] and f['properties'] for f in data['features'])
                     geometry=data['features'][0]['geometry']
                     points=list(coordinate_pairs(geometry['coordinates']))
@@ -55,7 +59,7 @@ def main():
                     assert min(p[0] for p in points)<=xmax and max(p[0] for p in points)>=xmin
                     assert min(p[1] for p in points)<=ymax and max(p[1] for p in points)>=ymin
                     point=points[0]
-                    detail=f"features=5 geometry={geometry['type']} first_id={data['features'][0]['id']} point={point} truncated={data['truncated']}"
+                    detail=f"features={data['feature_count']} geometry={geometry['type']} first_id={data['features'][0]['id']} point={point} truncated={data['truncated']}"
                 print(f'[PASS] live {name} {mode}: {detail}')
             except Exception as exc:
                 print(f'[FAIL] live {name} {mode}: {exc}')

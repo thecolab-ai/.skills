@@ -29,6 +29,7 @@ TAGS = {'F1': 'flooding/flow paths', 'T1': 'congestion', 'T2': 'near-miss safety
 ACTIVE_BUDGET = None
 SERVER_TYPES = {'FeatureServer', 'MapServer', 'ImageServer'}
 FIELD = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*$')
+UNKNOWN_LICENCE = re.compile(r'not stated|^not specified\b|does not state|no .*licen[cs]e', re.I)
 
 
 class ClientError(Exception):
@@ -50,7 +51,7 @@ def provenance(url, org, metadata=None):
     info = REGISTRY[org]
     record = next((r for r in CURATED if r['source_url'] == url), {})
     licence = record.get('licence') if record else info.get('licence')
-    if licence and re.search(r'not stated|no .*licen[cs]e', licence, re.I):
+    if licence and UNKNOWN_LICENCE.search(licence):
         licence = None
     result = make_provenance(url, info['publisher'], licence=licence)
     metadata = metadata or {}
@@ -112,12 +113,12 @@ class RequestBudget:
     """Per-command bounds, shared by metadata, discovery and feature requests."""
     def __init__(self, timeout=10):
         self.timeout = timeout
-        self.deadline = time.monotonic() + 120
+        self.deadline = time.monotonic() + 55
         self.bytes = 0
 
     def check(self):
         if time.monotonic() >= self.deadline:
-            raise ClientError('command exceeded 120-second deadline', 6, 'resource_limit')
+            raise ClientError('command exceeded 55-second deadline', 6, 'resource_limit')
         if self.bytes >= 64 * 1024 * 1024:
             raise ClientError('command exceeded 64 MiB aggregate response bound', 6, 'resource_limit')
 
@@ -153,8 +154,10 @@ def fetch(url, params=None, kind='layer', query=False, timeout=None):
     except urllib.error.HTTPError as exc:
         raise ClientError(f'network error: HTTP {exc.code}', upstream_code(exc.code), 'upstream_http_failure', retry_after=exc.headers.get('Retry-After')) from None
     except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        budget.check()
         reason = exc.reason if isinstance(exc, urllib.error.URLError) else exc
-        message = f'upstream timed out after {seconds}s; narrow --bbox/--where or raise --timeout' if isinstance(reason, TimeoutError) else f'network error: upstream unavailable ({type(reason).__name__})'
+        hint = 'narrow --bbox/--where or raise --timeout' if query else 'raise --timeout or retry later' if kind == 'layer' else 'retry later'
+        message = f'upstream timed out after {seconds}s; {hint}' if isinstance(reason, TimeoutError) else f'network error: upstream unavailable ({type(reason).__name__})'
         raise ClientError(message, 5, 'upstream_http_failure') from None
     try:
         data = json.loads(body)
@@ -170,7 +173,7 @@ def fetch(url, params=None, kind='layer', query=False, timeout=None):
         parts = [str(error.get('message') or '')]
         if isinstance(details, list):
             parts.extend(d for d in details if isinstance(d, str))
-        message = '; '.join(p for p in parts if p).strip() or 'unknown failure'
+        message = '; '.join(dict.fromkeys(p.strip() for p in parts if p.strip())) or 'unknown failure'
         raise ClientError('ArcGIS error: ' + message[:300], upstream_code(error.get('code')), 'upstream_arcgis_failure')
     return data
 
@@ -247,6 +250,12 @@ def failure(url, exc):
     return dict(source_url=url, type=ERROR_TYPES[exc.code], message=str(exc))
 
 
+def tolerable_discovery_error(exc):
+    return (exc.code in {4, 5, 6}
+            or (exc.code == 2 and exc.category in {'upstream_http_failure', 'upstream_arcgis_failure'})
+            or exc.category == 'blocked_redirect')
+
+
 def discover(org, budget, root_index=None):
     roots = REGISTRY[org]['roots']
     if root_index is not None:
@@ -288,7 +297,7 @@ def discover(org, budget, root_index=None):
             rows.extend(collected)
             pending.extend(children)
         except ClientError as exc:
-            if exc.code not in {4, 5, 6}:
+            if not tolerable_discovery_error(exc):
                 raise
             failed.append(failure(url, exc))
             if depth == 0:
@@ -346,8 +355,6 @@ def query_layer(args, url, metadata):
                 ids = []
             if not isinstance(ids, list):
                 raise ClientError('source schema failure: invalid objectIds', 6)
-            if len(ids) > args.limit + 1000:
-                raise ClientError('ID selection exceeds limit plus 1,000-ID margin; narrow --bbox/--where or raise --limit')
             if any(type(i) is not int for i in ids) or len(set(ids)) != len(ids):
                 raise ClientError('source schema failure: invalid objectIds', 6)
             if data.get('exceededTransferLimit'):
@@ -399,6 +406,8 @@ def query_layer(args, url, metadata):
         key = 'properties' if fmt == 'geojson' else 'attributes'
         features.sort(key=lambda f: f[key].get(oid, f.get('id')))
     result = dict(features=features, spatial_reference={'wkid': 4326}, geometry_type=metadata.get('geometryType'), feature_count=len(features), truncated=truncated, incomplete=incomplete, result_offsets=offsets, limit=args.limit, ordering='object_id' if oid else 'unordered')
+    if total is not None:
+        result['matched_count'] = total
     if oid:
         result['missing_object_ids_count'] = missing
     else:
@@ -472,7 +481,7 @@ def execute(args):
                 try:
                     layers = service_layers(row['source_url'])
                 except ClientError as exc:
-                    if exc.code not in {4, 5, 6}:
+                    if not tolerable_discovery_error(exc):
                         raise
                     failed.append(failure(row['source_url'], exc))
                     if exc.category == 'resource_limit':
@@ -499,6 +508,8 @@ def execute(args):
     metadata = fetch(url)
     if metadata.get('type') not in {'Feature Layer', 'Table'}:
         raise ClientError(f"not a queryable feature layer (type {metadata.get('type')})", 7)
+    if getattr(args, 'bbox', None) and (metadata.get('type') == 'Table' or not metadata.get('geometryType')):
+        raise ClientError('bbox not supported on tables; use --where')
     source = provenance(url, org, metadata)
     if command == 'describe':
         oid = metadata.get('objectIdField') or metadata.get('objectIdFieldName')

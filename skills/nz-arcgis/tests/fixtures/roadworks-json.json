@@ -158,7 +158,6 @@
         "OBJECTID": 1,
         "WorksiteCode": "AT-W224807",
         "Status": "Active",
-        "PrincipalOrganisation": "CHORUS NEW ZEALAND LIMITED",
         "ProjectStartDate": 1771891200000,
         "WorkCompletionDate": null
       },
@@ -306,7 +305,6 @@
         "OBJECTID": 2,
         "WorksiteCode": "AT-W230910",
         "Status": "Active",
-        "PrincipalOrganisation": "Ryman Health Care LTD",
         "ProjectStartDate": 1789862400000,
         "WorkCompletionDate": null
       },
@@ -502,7 +500,6 @@
         "OBJECTID": 3,
         "WorksiteCode": "AT-W237646",
         "Status": "Active",
-        "PrincipalOrganisation": "MD PROJECTS NZ LIMITED",
         "ProjectStartDate": 1783987200000,
         "WorkCompletionDate": null
       },
@@ -630,7 +627,6 @@
         "OBJECTID": 4,
         "WorksiteCode": "AT-W237972",
         "Status": "Active",
-        "PrincipalOrganisation": "Auckland Transport",
         "ProjectStartDate": 1789171200000,
         "WorkCompletionDate": null
       },
@@ -826,7 +822,6 @@
         "OBJECTID": 5,
         "WorksiteCode": "AT-W234002",
         "Status": "Active",
-        "PrincipalOrganisation": "Mohammad Afjaur Rahman",
         "ProjectStartDate": 1781395200000,
         "WorkCompletionDate": null
       },

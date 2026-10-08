@@ -56,10 +56,26 @@ def run():
         return data
     with patch.object(cli,'fetch',drop): result=cli.query_layer(args,AT,m)
     assert result['feature_count']==4 and result['truncated'] and result['incomplete'] and result['missing_object_ids_count']==1
-    with patch.object(cli,'fetch',return_value={'objectIds':list(range(args.limit+1001))}):
-        try: cli.query_layer(args,AT,m)
-        except cli.ClientError as e: assert e.code==2 and 'narrow --bbox' in str(e)
-        else: raise AssertionError('unbounded ID selection accepted')
+    # Synthetic dense selection: a small sample must work without a bbox.
+    for fmt in ['json', 'geojson', 'csv']:
+        dense_args=cli.parser().parse_args(['query',AT,'--limit','5','--format',fmt,'--json'])
+        def dense(url,params,**kwargs):
+            if params.get('returnIdsOnly'):
+                assert 'geometry' not in params
+                return dict(objectIds=list(range(1,2440)),objectIdFieldName='OBJECTID')
+            ids=set(map(int,params['objectIds'].split(',')))
+            fixture=read('roadworks-'+('geojson' if fmt=='geojson' else 'json'))
+            return dict(fixture,features=[f for f in fixture['features'] if (f['id'] if fmt=='geojson' else f['attributes']['OBJECTID']) in ids])
+        with patch.object(cli,'fetch',dense): result=cli.query_layer(dense_args,AT,m)
+        assert result['feature_count']==dense_args.limit and result['truncated'] and not result['incomplete']
+        assert result['matched_count']==2439 and result['missing_object_ids_count']==0
+        def capped_ids(url,params,**kwargs):
+            data=dense(url,params,**kwargs)
+            if params.get('returnIdsOnly'): data['exceededTransferLimit']=True
+            return data
+        with patch.object(cli,'fetch',capped_ids): result=cli.query_layer(dense_args,AT,m)
+        assert result['feature_count']==5 and result['truncated'] and result['incomplete']
+        assert 'server truncated object ID selection' in result['truncation_reasons']
     csv_args=cli.parser().parse_args(['query',AT,'--limit','5','--format','csv','--json'])
     recorded.clear()
     with patch.object(cli,'fetch',page): csv_result=cli.query_layer(csv_args,AT,m)
@@ -138,14 +154,38 @@ def run():
     assert len(partial['failed_directories'])==1
     assert partial['failed_directories'][0]['source_url'].endswith('/AllInOne')
     search_args=cli.parser().parse_args(['search','road','--org','at','--max-services','1','--json'])
-    with patch.object(cli,'discover',return_value=partial), patch.object(cli,'service_layers',side_effect=cli.ClientError('ArcGIS error: Token Required',4,'access_blocked')):
+    with patch.object(cli,'discover',return_value=dict(partial)), patch.object(cli,'service_layers',side_effect=cli.ClientError('ArcGIS error: Token Required',4,'access_blocked')):
         search=cli.execute(search_args)
     assert search['truncated'] and search['scanned_services']==1 and len(search['failed_services'])==1
+    for error in [cli.ClientError('HTTP 404',2,'upstream_http_failure'),
+                  cli.ClientError('Invalid URL',2,'upstream_arcgis_failure'),
+                  cli.ClientError('redirect refused',7,'blocked_redirect')]:
+        def stale_directory(url,params=None,**kwargs):
+            if url==cli.REGISTRY['at']['roots'][0]: return dict(read('at-root'),folders=['Stale'])
+            raise error
+        with patch.object(cli,'fetch',stale_directory): stale=cli.discover('at',2,0)
+        assert stale['services'] and stale['truncated'] and len(stale['failed_directories'])==1
+        with patch.object(cli,'discover',return_value=dict(stale)), patch.object(cli,'service_layers',side_effect=error):
+            search=cli.execute(search_args)
+        assert search['truncated'] and len(search['failed_services'])==1
+    with patch.object(cli,'discover',return_value=dict(partial)), patch.object(cli,'service_layers',side_effect=cli.ClientError('invalid local route',2)):
+        try: cli.execute(search_args)
+        except cli.ClientError as e: assert e.code==2
+        else: raise AssertionError('local invalid input tolerated')
     print('[PASS] fixture gated discovery reports partial results with provenance')
     assert all(not restricts_reuse(r) for r in cli.CURATED)
     assert {'S0470','S0723','S0777'} <= {r['catalogue_id'] for r in cli.CURATED}
     assert 'nema' not in cli.REGISTRY
-    assert all(not r.get('licence') or not cli.re.search(r'not stated|no .*licen[cs]e', r['licence'], cli.re.I) for r in cli.CURATED)
+    assert all(not r.get('licence') or not cli.UNKNOWN_LICENCE.search(r['licence']) for r in cli.CURATED)
+    assert not cli.UNKNOWN_LICENCE.search('Creative Commons Attribution (version not specified on MfE page)')
+    for note in ['Not specified; source credit is Example Council', 'Metadata does not state a licence', 'No explicit licence', 'No open reuse license', 'No specific licence']:
+        assert cli.UNKNOWN_LICENCE.search(note)
+    for catalogue_id in ['C0094','S2235']:
+        record=next(r for r in cli.CURATED if r['catalogue_id']==catalogue_id)
+        assert record['licence_note'] and 'licence' not in cli.provenance(record['source_url'],record['org'])
+    assert all(r['org']!='nema' for r in cli.VERIFICATION)
+    for fmt,key in [('json','attributes'),('geojson','properties')]:
+        assert all('PrincipalOrganisation' not in f[key] for f in read('roadworks-'+fmt)['features'])
     assert all(r['retrieved_at']==next(x['retrieved_at'] for x in cli.CURATED if x['source_url']==r['source_url']) for r in selected['results'])
     registry=cli.execute(cli.parser().parse_args(['orgs','--json']))
     assert registry['meta']['source_url'].endswith('/references/orgs.json')
@@ -180,6 +220,18 @@ def run():
         try: cli.fetch(AT,query=True)
         except cli.ClientError as e: assert e.code==5 and 'after 30s' in str(e) and 'narrow --bbox' in str(e)
         else: raise AssertionError('timeout accepted')
+        for url,kind in [(cli.REGISTRY['at']['roots'][0],'directory'),(AT.rsplit('/',1)[0],'service')]:
+            try: cli.fetch(url,kind=kind)
+            except cli.ClientError as e: assert e.code==5 and 'retry later' in str(e) and '--' not in str(e)
+            else: raise AssertionError('directory/service timeout accepted')
+    response=io.BytesIO(json.dumps({'error':{'code':499,'message':'Token Required','details':['Token Required','Token Required']}}).encode())
+    with patch.object(cli.urllib.request,'build_opener') as opener:
+        opener.return_value.open.return_value=response
+        try: cli.fetch(AT)
+        except cli.ClientError as e: assert str(e)=='ArcGIS error: Token Required'
+        else: raise AssertionError('ArcGIS error accepted')
+    now=time.monotonic()
+    assert now+54 < cli.RequestBudget().deadline <= time.monotonic()+55
     for bound in ['bytes','deadline']:
         cli.ACTIVE_BUDGET=cli.RequestBudget()
         if bound=='bytes': cli.ACTIVE_BUDGET.bytes=64*1024*1024
@@ -220,6 +272,14 @@ def run():
         out=io.StringIO()
         with contextlib.redirect_stdout(out): code=cli.main(['describe',AT,'--json'])
         assert code==7 and json.loads(out.getvalue())['error']['type']=='unsupported_operation'
+    for metadata in [{'type':'Table'},{'type':'Feature Layer','geometryType':None}]:
+        for command in ['count','query']:
+            with patch.object(cli,'fetch',return_value=metadata) as fetch:
+                out=io.StringIO()
+                with contextlib.redirect_stdout(out): code=cli.main([command,AT,'--bbox','174,-37,175,-36','--json'])
+                data=json.loads(out.getvalue())
+                assert code==2 and data['error']['message']=='bbox not supported on tables; use --where'
+                assert fetch.call_count==1
     for argv in [['count',AT,'--json'],['query',AT,'--format','geojson']]:
         with patch.object(cli,'execute',side_effect=cli.ClientError('bad field',2)):
             out,err=io.StringIO(),io.StringIO()

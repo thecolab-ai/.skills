@@ -443,13 +443,5 @@
     "ok": true,
     "service_count": 1,
     "folders": []
-  },
-  {
-    "org": "nema",
-    "source_url": "https://services5.arcgis.com/cJn6oR1QqErYBL5d/arcgis/rest/services",
-    "verified_at": "2026-10-08T01:09:30Z",
-    "ok": true,
-    "service_count": 7,
-    "folders": []
   }
 ]

@@ -11,7 +11,7 @@ import cli
 
 # Keep non-commercial, BY-ND and NZTA commercial terms visible; exclude permission gates.
 RESTRICTED = re.compile(r'internal (?:\w+\s+)?use|not (?:suitable|intended) for public|permission required|data[- ]sharing agreement|viewer use only|restricted|terms (?:limit|restrict) (?:use|reuse)|consent (?:required|for)|requires? (?:prior written )?consent', re.I)
-UNKNOWN_LICENCE = re.compile(r'not stated|no .*licen[cs]e', re.I)
+UNKNOWN_LICENCE = cli.UNKNOWN_LICENCE
 
 
 def restricts_reuse(record):
