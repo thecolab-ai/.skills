@@ -1,0 +1,1213 @@
+{
+  "schema_version": "1",
+  "publisher": "TheColab",
+  "source_url": "https://github.com/thecolab-ai/.skills",
+  "licence": null,
+  "retrieved_at": "2026-10-08T01:09:43Z",
+  "latest_data": null,
+  "built_from": "Existing skills/SKILL.md source/auth metadata and catalogue endpoint host/organisation IDs; curated capability restrictions.",
+  "rules": [
+    {
+      "skill": "nzta-highway-info",
+      "status": "existing",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "trafficnz.info",
+          "www.trafficnz.info"
+        ],
+        "url_contains": [
+          "/traffic/rest/4/"
+        ]
+      },
+      "skill_source_url": "https://catalogue.data.govt.nz/dataset/nzta-highway-information1"
+    },
+    {
+      "skill": "nzta-highway-info",
+      "status": "existing",
+      "relationship": "related",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services.arcgis.com"
+        ],
+        "url_contains": [
+          "/NZTA_Highway_Information/",
+          "/LiveCamerasNZTA_Public_View/"
+        ]
+      },
+      "skill_source_url": "https://catalogue.data.govt.nz/dataset/nzta-highway-information1",
+      "note": "Fetches the equivalent Traffic and Travel v4 feeds; does not accept this ArcGIS URL."
+    },
+    {
+      "skill": "nzta-highway-info",
+      "status": "existing",
+      "relationship": "related",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "trafficnz.info",
+          "www.trafficnz.info"
+        ],
+        "url_contains": [
+          "/traffic-conditions/"
+        ]
+      },
+      "skill_source_url": "https://catalogue.data.govt.nz/dataset/nzta-highway-information1",
+      "note": "Provides travel-time signs and highway events; the traffic-conditions congestion endpoint is outside its commands."
+    },
+    {
+      "skill": "at-transport",
+      "status": "existing",
+      "relationship": "exact",
+      "auth": "api-key",
+      "match": {
+        "hosts": [
+          "api.at.govt.nz"
+        ]
+      },
+      "skill_source_url": "https://api.at.govt.nz",
+      "note": "Existing real-time skill requires a user-supplied AT API key; this catalogue does not read credentials."
+    },
+    {
+      "skill": "gtfs-nz",
+      "status": "planned",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "gtfs.at.govt.nz"
+        ]
+      }
+    },
+    {
+      "skill": "nz-traffic-counts",
+      "status": "planned",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services2.arcgis.com"
+        ],
+        "url_contains": [
+          "/JkPEgZJGxhSjYOo0/arcgis/rest/services/TrafficService/FeatureServer/0"
+        ]
+      }
+    },
+    {
+      "skill": "nz-traffic-counts",
+      "status": "planned",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services.arcgis.com"
+        ],
+        "url_contains": [
+          "/TMS_Telemetry_Sites/",
+          "/Assets_SHTrafficMonitoringSites/"
+        ]
+      }
+    },
+    {
+      "skill": "nz-traffic-counts",
+      "status": "planned",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "at.govt.nz",
+          "www.at.govt.nz",
+          "www.hotcity.co.nz"
+        ],
+        "name_contains": [
+          "traffic count",
+          "pedestrian count"
+        ]
+      }
+    },
+    {
+      "skill": "nz-traffic-counts",
+      "status": "planned",
+      "relationship": "related",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "www.arcgis.com"
+        ],
+        "url_contains": [
+          "39cdaa422dbd45c4b41e0e59b49e79e2"
+        ]
+      },
+      "note": "Historical bulk archive: confirm supported download bounds with the planned engine."
+    },
+    {
+      "skill": "akl-rainfall",
+      "status": "planned",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "environmentauckland.org.nz"
+        ],
+        "nz_only": true
+      }
+    },
+    {
+      "skill": "nz-stac",
+      "status": "planned",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "nz-elevation.s3.ap-southeast-2.amazonaws.com",
+          "nz-imagery.s3.ap-southeast-2.amazonaws.com"
+        ]
+      }
+    },
+    {
+      "skill": "nz-stac",
+      "status": "planned",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "url_contains": [
+          "s3://nz-elevation/",
+          "s3://nz-imagery/"
+        ]
+      }
+    },
+    {
+      "skill": "nz-ogc-records",
+      "status": "planned",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "data.vector.co.nz",
+          "data-aucklandcouncil.opendata.arcgis.com",
+          "data-atgis.opendata.arcgis.com",
+          "opendata-nzta.opendata.arcgis.com",
+          "data-niwa.opendata.arcgis.com"
+        ],
+        "url_contains": [
+          "/api/search/v1/collections/"
+        ]
+      }
+    },
+    {
+      "skill": "nz-recycling-locator",
+      "status": "planned",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "www.recyclemap.co.nz",
+          "www.recycling.kiwi.nz",
+          "www.repairnetworkaotearoa.org.nz",
+          "www.tyrewise.co.nz"
+        ],
+        "nz_only": true
+      }
+    },
+    {
+      "skill": "nz-recycling-locator",
+      "status": "planned",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "www.aucklandcouncil.govt.nz"
+        ],
+        "url_contains": [
+          "get-rid-unwanted-items",
+          "where-does-it-go"
+        ]
+      }
+    },
+    {
+      "skill": "nz-recycling-locator",
+      "status": "planned",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "www.google.com"
+        ],
+        "url_contains": [
+          "1ncyWOEWbXMSiycgz48swYqMj4aHJnSE"
+        ]
+      },
+      "note": "WasteMINZ household battery collection map only; other Google Maps links are not covered."
+    },
+    {
+      "skill": "nzta-crash-data-nz",
+      "status": "existing",
+      "relationship": "related",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services.arcgis.com"
+        ],
+        "url_contains": [
+          "/CAS_Data_Public/"
+        ]
+      },
+      "skill_source_url": "https://services.arcgis.com/CXBb7LAjgIIdcsPt/arcgis/rest/services/",
+      "note": "Existing skill fetches public CAS CSV and regional filters, rather than this ArcGIS endpoint."
+    },
+    {
+      "skill": "linz-data-service",
+      "status": "existing",
+      "relationship": "catalogue",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "data.linz.govt.nz"
+        ]
+      },
+      "skill_source_url": "https://data.linz.govt.nz/services/api/v1/",
+      "note": "Searches LINZ catalogue metadata; inspect its current commands before attempting feature retrieval."
+    },
+    {
+      "skill": "data-govt-nz",
+      "status": "existing",
+      "relationship": "catalogue",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "catalogue.data.govt.nz"
+        ]
+      },
+      "skill_source_url": "https://catalogue.data.govt.nz/api/3/action/",
+      "note": "CKAN metadata and datastore previews; downloads may need a source-specific skill."
+    },
+    {
+      "skill": "nz-schools",
+      "status": "existing",
+      "relationship": "related",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "catalogue.data.govt.nz",
+          "www.educationcounts.govt.nz"
+        ],
+        "name_contains": [
+          "directory of nz schools",
+          "schools directory",
+          "list of nz schools"
+        ]
+      },
+      "skill_source_url": "https://www.educationcounts.govt.nz/directories/list-of-nz-schools",
+      "note": "Fetches the official NZ schools directory."
+    },
+    {
+      "skill": "geonet-nz",
+      "status": "existing",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "api.geonet.org.nz",
+          "tilde.geonet.org.nz"
+        ]
+      },
+      "skill_source_url": "https://api.geonet.org.nz/"
+    },
+    {
+      "skill": "nz-emergency-alerts",
+      "status": "existing",
+      "relationship": "related",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "alerts.metservice.com"
+        ]
+      },
+      "skill_source_url": "https://www.civildefence.govt.nz/about/news-and-events/news-and-events/cap-feed-for-emergency-mobile-alert-is-now-live",
+      "note": "Public MetService warning feeds; read the existing skill for feed coverage."
+    },
+    {
+      "skill": "safeswim-nz",
+      "status": "existing",
+      "relationship": "related",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "safeswim.org.nz",
+          "www.safeswim.org.nz"
+        ]
+      },
+      "skill_source_url": "https://safeswim.org.nz/api"
+    },
+    {
+      "skill": "lawa-nz",
+      "status": "existing",
+      "relationship": "related",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "www.lawa.org.nz"
+        ]
+      },
+      "skill_source_url": "https://www.lawa.org.nz",
+      "note": "Water-quality site lookups; source pages may cover other LAWA subjects."
+    },
+    {
+      "skill": "gwrc-hilltop-nz",
+      "status": "existing",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "hilltop.gw.govt.nz",
+          "data.hbrc.govt.nz",
+          "hydro.marlborough.govt.nz",
+          "hilltop.nrc.govt.nz",
+          "envdata.tasman.govt.nz"
+        ]
+      },
+      "skill_source_url": "https://hilltop.gw.govt.nz/data.hts"
+    },
+    {
+      "skill": "searise-nz",
+      "status": "existing",
+      "relationship": "related",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "zenodo.org"
+        ],
+        "name_contains": [
+          "searise"
+        ]
+      },
+      "skill_source_url": "https://zenodo.org/records/14722058",
+      "note": "Supported NZ SeaRise projection/site files; not a general Zenodo fetcher."
+    },
+    {
+      "skill": "deprivation-nz",
+      "status": "existing",
+      "relationship": "related",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services6.arcgis.com"
+        ],
+        "url_contains": [
+          "/ZVM1rEuVZjtC1Wwk/"
+        ],
+        "name_contains": [
+          "deprivation",
+          "nzdep"
+        ]
+      },
+      "skill_source_url": "https://services6.arcgis.com/ZVM1rEuVZjtC1Wwk/arcgis/rest/services/"
+    },
+    {
+      "skill": "statsnz-building-consents",
+      "status": "existing",
+      "relationship": "related",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "www.stats.govt.nz",
+          "stats.govt.nz",
+          "datainfoplus.stats.govt.nz"
+        ],
+        "name_contains": [
+          "building consent"
+        ]
+      },
+      "skill_source_url": "https://datainfoplus.stats.govt.nz/item/nz.govt.stats/ee083b32-8c10-4ccf-b1ee-a4990b27273c"
+    },
+    {
+      "skill": "wcc-arcgis-nz",
+      "status": "existing",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services.arcgis.com",
+          "services1.arcgis.com",
+          "services2.arcgis.com"
+        ],
+        "url_contains": [
+          "/CPYspmTk3abe6d7i/",
+          "/RS7BXJAO6ksvblJm/"
+        ]
+      },
+      "skill_source_url": "https://data-wcc.opendata.arcgis.com/"
+    },
+    {
+      "skill": "wcc-arcgis-nz",
+      "status": "existing",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "gis.wcc.govt.nz",
+          "giswebprd.gw.govt.nz",
+          "mapping.gw.govt.nz",
+          "mapping1.gw.govt.nz",
+          "maps.gw.govt.nz",
+          "gis.wellingtonwater.co.nz"
+        ]
+      },
+      "skill_source_url": "https://data-wcc.opendata.arcgis.com/"
+    },
+    {
+      "skill": "niwa-coastal-nz",
+      "status": "existing",
+      "relationship": "related",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services.arcgis.com",
+          "services3.arcgis.com"
+        ],
+        "url_contains": [
+          "/fp1tibNcN9mbExhG/"
+        ]
+      },
+      "skill_source_url": "https://data-niwa.opendata.arcgis.com/",
+      "note": "Existing NIWA coastal skill covers its approved services; check subject and layer support."
+    },
+    {
+      "skill": "niwa-coastal-nz",
+      "status": "existing",
+      "relationship": "related",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "gis.niwa.co.nz"
+        ]
+      },
+      "skill_source_url": "https://data-niwa.opendata.arcgis.com/"
+    },
+    {
+      "skill": "osm-nz",
+      "status": "existing",
+      "relationship": "related",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "overpass-api.de",
+          "www.openstreetmap.org"
+        ]
+      },
+      "skill_source_url": "https://overpass-api.de/api/interpreter",
+      "note": "OSM categories supported by the installed CLI; arbitrary tags may require the parallel extension."
+    },
+    {
+      "skill": "gns-hazards-nz",
+      "status": "existing",
+      "relationship": "related",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "gis.gns.cri.nz",
+          "shakinglayers.geonet.org.nz"
+        ]
+      },
+      "skill_source_url": "https://shakinglayers.geonet.org.nz/api/v1/events"
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "planned",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services1.arcgis.com"
+        ],
+        "url_contains": [
+          "/1lLaMWUudPsf6JuN/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "planned",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services1.arcgis.com"
+        ],
+        "url_contains": [
+          "/3JjYDyG3oajxU6HO/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "planned",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services7.arcgis.com"
+        ],
+        "url_contains": [
+          "/8G10QCd84QpdcTJ9/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "planned",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services6.arcgis.com"
+        ],
+        "url_contains": [
+          "/8RWEO35G1ALMME0I/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "planned",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services1.arcgis.com"
+        ],
+        "url_contains": [
+          "/9YyqaQtDdDR8tupG/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "planned",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services6.arcgis.com"
+        ],
+        "url_contains": [
+          "/ALxeDxaeNjQo1Mf0/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "planned",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services.arcgis.com"
+        ],
+        "url_contains": [
+          "/CXBb7LAjgIIdcsPt/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "planned",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services9.arcgis.com"
+        ],
+        "url_contains": [
+          "/DUYVFPAJ5YcaFDs0/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "planned",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services.arcgis.com"
+        ],
+        "url_contains": [
+          "/Fv0Tvc98QEDvQyjL/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "planned",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services1.arcgis.com"
+        ],
+        "url_contains": [
+          "/ISqEHdhr3detVO9I/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "planned",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services2.arcgis.com"
+        ],
+        "url_contains": [
+          "/J8errK5dyxu7Xjf7/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "planned",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services2.arcgis.com"
+        ],
+        "url_contains": [
+          "/JkPEgZJGxhSjYOo0/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "planned",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services.arcgis.com"
+        ],
+        "url_contains": [
+          "/MMPHUPU6MnEt0lEK/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "planned",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services5.arcgis.com"
+        ],
+        "url_contains": [
+          "/PnnKqtqi3qfxnaPc/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "planned",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services1.arcgis.com"
+        ],
+        "url_contains": [
+          "/R6s0QqCMQdwKY6yp/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "planned",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services.arcgis.com"
+        ],
+        "url_contains": [
+          "/XTtANUDT8Va4DLwI/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "planned",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services1.arcgis.com"
+        ],
+        "url_contains": [
+          "/Y4k7lyf2XTGeQC6V/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "planned",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services2.arcgis.com"
+        ],
+        "url_contains": [
+          "/Z0aWguFDHESYteHT/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "planned",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services6.arcgis.com"
+        ],
+        "url_contains": [
+          "/ZVM1rEuVZjtC1Wwk/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "planned",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services5.arcgis.com"
+        ],
+        "url_contains": [
+          "/cJn6oR1QqErYBL5d/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "planned",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services3.arcgis.com"
+        ],
+        "url_contains": [
+          "/fp1tibNcN9mbExhG/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "planned",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services1.arcgis.com"
+        ],
+        "url_contains": [
+          "/ligOmcZkuYGDjlNm/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "planned",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services1.arcgis.com"
+        ],
+        "url_contains": [
+          "/n4yPwebTjJCmXB6W/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "planned",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services.arcgis.com"
+        ],
+        "url_contains": [
+          "/pA2nEVnB6tquxgOW/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "planned",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services1.arcgis.com"
+        ],
+        "url_contains": [
+          "/sswNXkUiRoWtrx0t/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "planned",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services2.arcgis.com"
+        ],
+        "url_contains": [
+          "/vKb0s8tBIA3bdocZ/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "planned",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services7.arcgis.com"
+        ],
+        "url_contains": [
+          "/vkPf8weODt71Prmb/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "planned",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services.arcgis.com"
+        ],
+        "url_contains": [
+          "/xdsHIIxuCWByZiCB/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "planned",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services9.arcgis.com"
+        ],
+        "url_contains": [
+          "/ygJ1AFEQ1sNGJz4H/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "planned",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "mahere.at.govt.nz",
+          "mapspublic.aucklandcouncil.govt.nz",
+          "mapspublic.aklc.govt.nz"
+        ],
+        "nz_only": true
+      }
+    },
+    {
+      "skill": "charities-services-nz",
+      "status": "existing",
+      "relationship": "exact",
+      "auth": "none",
+      "skill_source_url": "https://www.odata.charities.govt.nz/",
+      "match": {
+        "hosts": [
+          "www.odata.charities.govt.nz"
+        ]
+      }
+    },
+    {
+      "skill": "nz-road-closures",
+      "status": "existing",
+      "relationship": "related",
+      "auth": "none",
+      "skill_source_url": "https://www.journeys.nzta.govt.nz",
+      "match": {
+        "hosts": [
+          "www.journeys.nzta.govt.nz"
+        ]
+      },
+      "note": "State-highway events, cameras and routes; read the current CLI for supported surfaces."
+    },
+    {
+      "skill": "nz-police-data",
+      "status": "existing",
+      "relationship": "related",
+      "auth": "none",
+      "skill_source_url": "https://www.police.govt.nz/about-us/publications-statistics/data-and-statistics/policedatanz",
+      "match": {
+        "hosts": [
+          "www.police.govt.nz",
+          "police.govt.nz"
+        ],
+        "name_contains": [
+          "victimisation",
+          "proceedings",
+          "offence",
+          "policedata"
+        ]
+      },
+      "note": "Supported anonymised statistics exports; does not promise every Police dataset or traffic alert."
+    },
+    {
+      "skill": "nz-healthpoint",
+      "status": "existing",
+      "relationship": "related",
+      "auth": "none",
+      "skill_source_url": "https://www.healthpoint.co.nz",
+      "match": {
+        "hosts": [
+          "www.healthpoint.co.nz"
+        ],
+        "name_contains": [
+          "Healthpoint"
+        ]
+      },
+      "note": "Health-service directory search; confirm disposal services in the returned provider details."
+    },
+    {
+      "skill": "nz-product-recalls",
+      "status": "existing",
+      "relationship": "exact",
+      "auth": "none",
+      "skill_source_url": "https://www.productsafety.govt.nz/recalls",
+      "match": {
+        "hosts": [
+          "www.productsafety.govt.nz"
+        ],
+        "name_contains": [
+          "recalled",
+          "recall"
+        ]
+      }
+    },
+    {
+      "skill": "statsnz-classifications-nz",
+      "status": "existing",
+      "relationship": "related",
+      "auth": "none",
+      "skill_source_url": "https://datainfoplus.stats.govt.nz",
+      "match": {
+        "hosts": [
+          "datainfoplus.stats.govt.nz"
+        ],
+        "name_contains": [
+          "classification",
+          "ANZSIC"
+        ]
+      },
+      "note": "Classification and code-list lookup through DataInfo+/Aria."
+    },
+    {
+      "skill": "rbnz-data",
+      "status": "existing",
+      "relationship": "related",
+      "auth": "none",
+      "skill_source_url": "https://www.rbnz.govt.nz/statistics",
+      "match": {
+        "hosts": [
+          "www.rbnz.govt.nz"
+        ],
+        "name_contains": [
+          "RBNZ",
+          "Reserve Bank"
+        ]
+      },
+      "note": "Public dataset metadata and supported resource/chart downloads."
+    },
+    {
+      "skill": "rental-bond-nz",
+      "status": "existing",
+      "relationship": "exact",
+      "auth": "none",
+      "skill_source_url": "https://www.tenancy.govt.nz/about-tenancy-services/data-and-statistics/rental-bond-data/",
+      "match": {
+        "hosts": [
+          "www.tenancy.govt.nz"
+        ],
+        "name_contains": [
+          "rental bond"
+        ]
+      }
+    },
+    {
+      "skill": "eeca-ev-chargers-nz",
+      "status": "existing",
+      "relationship": "related",
+      "auth": "none",
+      "skill_source_url": "https://www.eeca.govt.nz/insights/data-tools/public-ev-charger-dashboard/",
+      "match": {
+        "hosts": [
+          "www.eeca.govt.nz",
+          "catalogue.data.govt.nz"
+        ],
+        "name_contains": [
+          "EV charger",
+          "electric vehicle charg"
+        ]
+      },
+      "note": "Public charger dashboard CSVs and catalogue metadata; other EECA subjects are outside this skill."
+    },
+    {
+      "skill": "fyi-oia-nz",
+      "status": "existing",
+      "relationship": "catalogue",
+      "auth": "none",
+      "skill_source_url": "https://fyi.org.nz",
+      "match": {
+        "hosts": [
+          "fyi.org.nz"
+        ]
+      },
+      "note": "OIA/LGOIMA request metadata and timelines; inspect attachments separately."
+    },
+    {
+      "skill": "fenz-incidents-nz",
+      "status": "existing",
+      "relationship": "related",
+      "auth": "none",
+      "skill_source_url": "https://www.fireandemergency.nz/incidents-and-news/incident-reports/",
+      "match": {
+        "hosts": [
+          "www.fireandemergency.nz"
+        ],
+        "name_contains": [
+          "incident"
+        ]
+      },
+      "note": "Operational and annual incident commands; upstream failures remain possible."
+    },
+    {
+      "skill": "gets-procurement-nz",
+      "status": "existing",
+      "relationship": "exact",
+      "auth": "none",
+      "skill_source_url": "https://www.gets.govt.nz",
+      "match": {
+        "hosts": [
+          "www.gets.govt.nz"
+        ]
+      }
+    },
+    {
+      "skill": "heritage-list-nz",
+      "status": "existing",
+      "relationship": "related",
+      "auth": "none",
+      "skill_source_url": "https://www.heritage.org.nz/places",
+      "match": {
+        "hosts": [
+          "www.heritage.org.nz",
+          "hnzpt-prod-web.azurewebsites.net"
+        ],
+        "name_contains": [
+          "heritage",
+          "Rārangi"
+        ]
+      },
+      "note": "Fetches official Heritage List CSV rather than arbitrary heritage research documents."
+    },
+    {
+      "skill": "wcc-arcgis-nz",
+      "status": "existing",
+      "relationship": "exact",
+      "auth": "none",
+      "skill_source_url": "https://data-wcc.opendata.arcgis.com/",
+      "match": {
+        "hosts": [
+          "gis-snowflake-opendata-public-wcc-arcgis-prod.s3.ap-southeast-2.amazonaws.com"
+        ],
+        "name_contains": [
+          "countline"
+        ]
+      }
+    }
+  ]
+}
