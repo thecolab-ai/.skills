@@ -1,0 +1,53 @@
+[
+  {
+    "id": "C0002",
+    "source_url": "https://services2.arcgis.com/JkPEgZJGxhSjYOo0/arcgis/rest/services/TrafficService/FeatureServer/0/query?where=1%3D1&returnCountOnly=true&f=json",
+    "publisher": "Auckland Transport",
+    "licence": "CC BY 4.0",
+    "retrieved_at": "2026-10-08T01:10:48Z",
+    "latest_data": "2026",
+    "http_status": 200,
+    "content_type": "application/json; charset=utf-8",
+    "body": {
+      "count": 14108
+    },
+    "trimmed": false
+  },
+  {
+    "id": "C0064",
+    "source_url": "https://nz-elevation.s3.ap-southeast-2.amazonaws.com/auckland/auckland-part-1_2024/dsm_1m/2193/collection.json",
+    "publisher": "LINZ / Auckland Council",
+    "licence": "CC BY 4.0",
+    "retrieved_at": "2026-10-08T01:10:48Z",
+    "latest_data": "2024",
+    "http_status": 200,
+    "content_type": "application/json",
+    "body": {
+      "type": "Collection",
+      "id": "01JRGTZFNHFZ24R8TY7J519K41",
+      "stac_version": "1.0.0",
+      "license": "CC-BY-4.0",
+      "extent": {
+        "spatial": {
+          "bbox": [
+            [
+              174.3677505,
+              -37.3346925,
+              175.0281809,
+              -36.5514359
+            ]
+          ]
+        },
+        "temporal": {
+          "interval": [
+            [
+              "2024-04-29T12:00:00Z",
+              "2024-06-26T12:00:00Z"
+            ]
+          ]
+        }
+      }
+    },
+    "trimmed": true
+  }
+]
