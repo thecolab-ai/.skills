@@ -1,0 +1,25 @@
+Incidents for the North region, Wednesday
+Incident number
+F4558395
+Date and time
+07/10/2026 00:01:18
+Location
+Auckland Central, Auckland
+Duration
+00:00:00
+Attending Stations/Brigades
+Auckland City
+Call Type
+Minor
+Incident number
+F4558397
+Date and time
+07/10/2026 00:13:23
+Location
+Henderson, Auckland
+Duration
+00:24:54
+Attending Stations/Brigades
+Henderson, Te Atatu, Auckland City
+Call Type
+Sprinkler Investigation

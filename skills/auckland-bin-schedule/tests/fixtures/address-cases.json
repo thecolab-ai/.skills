@@ -1,0 +1,165 @@
+{
+  "fixture": "synthetic-address-matching-regressions; ids are test identifiers, not Council ids",
+  "cases": [
+    {
+      "query": "1 Dominion Road, Mount Eden",
+      "addresses": [
+        "1A Dominion Street, Takapuna"
+      ],
+      "selected": null
+    },
+    {
+      "query": "1 Dominion Road, Mount Eden",
+      "addresses": [
+        "1A Dominion Street, Takapuna",
+        "1 Dominion Road, Mount Eden"
+      ],
+      "selected": 1
+    },
+    {
+      "query": "1 Dominion Road, Mount Eden",
+      "addresses": [
+        "1A Dominion Road, Mount Eden",
+        "10 Dominion Road, Mount Eden",
+        "1 Dominion Road, Takapuna"
+      ],
+      "selected": null
+    },
+    {
+      "query": "1A Dominion Rd, Mt Eden",
+      "addresses": [
+        "1 Dominion Road, Mount Eden",
+        "1A Dominion Road, Mount Eden"
+      ],
+      "selected": 1
+    },
+    {
+      "query": "12 Tawa Road Onehunga",
+      "addresses": [
+        "12 Tawa Road, Onehunga, Auckland 1061"
+      ],
+      "selected": 0
+    },
+    {
+      "query": "1 Dominion Road",
+      "addresses": [
+        "1 Dominion Road, Mount Eden",
+        "1 Dominion Road, Takapuna"
+      ],
+      "selected": null
+    },
+    {
+      "query": "12 Tawa Road Onehunga",
+      "addresses": [
+        "1/12 Tawa Road, Onehunga",
+        "2/12 Tawa Road, Onehunga"
+      ],
+      "selected": null
+    },
+    {
+      "query": "2/12 Tawa Road Onehunga",
+      "addresses": [
+        "1/12 Tawa Road, Onehunga",
+        "2/12 Tawa Road, Onehunga"
+      ],
+      "selected": 1
+    },
+    {
+      "query": "12 Tawa Road Onehunga",
+      "addresses": [
+        "1/12 Tawa Road, Onehunga"
+      ],
+      "selected": null
+    },
+    {
+      "query": "Dominion Road Mount Eden",
+      "addresses": [
+        "1 Dominion Road, Mount Eden"
+      ],
+      "selected": null
+    },
+    {
+      "query": "1 Dominion",
+      "addresses": [
+        "1 Dominion Road, Mount Eden"
+      ],
+      "selected": null
+    },
+    {
+      "query": "1 Dominion Road, Mount Eden",
+      "addresses": [],
+      "selected": null
+    },
+    {
+      "query": "1 Dominion Road, Mount Eden",
+      "addresses": [
+        "1 Dominion Road, Mount Eden",
+        "1 Dominion Road, Mount Eden"
+      ],
+      "selected": null
+    },
+    {
+      "query": "1-3 Dominion Road, Mount Eden",
+      "addresses": [
+        "1-3 Dominion Road, Mount Eden"
+      ],
+      "selected": null
+    },
+    {
+      "query": "12 Synthetic Road, St Heliers",
+      "addresses": [
+        "12 Synthetic Road, St Heliers"
+      ],
+      "selected": 0
+    },
+    {
+      "query": "12 Synthetic Road",
+      "addresses": [
+        "12 Synthetic Road, St Heliers"
+      ],
+      "selected": 0
+    },
+    {
+      "query": "12 Synthetic Road, Saint Johns",
+      "addresses": [
+        "12 Synthetic Road, St Johns"
+      ],
+      "selected": 0
+    },
+    {
+      "query": "12 Synthetic Road, St Marys Bay",
+      "addresses": [
+        "12 Synthetic Road, St Marys Bay"
+      ],
+      "selected": 0
+    },
+    {
+      "query": "12 Mt Eden Rd, Mt Eden",
+      "addresses": [
+        "12 Mount Eden Road, Mount Eden"
+      ],
+      "selected": 0
+    },
+    {
+      "query": "12 St Johns Rd, St Johns",
+      "addresses": [
+        "12 Saint Johns Road, Saint Johns"
+      ],
+      "selected": 0
+    },
+    {
+      "query": "12 Tawa Rd, Onehunga, Auckland 1061",
+      "addresses": [
+        "12 Tawa Road, Onehunga"
+      ],
+      "selected": 0
+    },
+    {
+      "query": "12 Synthetic St Onehunga",
+      "addresses": [
+        "12 Synthetic Street, Onehunga"
+      ],
+      "selected": 0
+    }
+  ]
+}

@@ -8,11 +8,13 @@ import pathlib
 import re
 import sys
 import urllib.parse
+import unicodedata
 from html.parser import HTMLParser
 from typing import Any
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
 import nzfetch  # noqa: E402
+from result_contract import utc_now  # noqa: E402
 
 SEARCH_PAGE = "https://www.aucklandcouncil.govt.nz/en/rubbish-recycling/rubbish-recycling-collections/rubbish-recycling-collection-days.html"
 PROPERTY_API = "https://experience.aucklandcouncil.govt.nz/nextapi/property"
@@ -40,27 +42,36 @@ class VisibleText(HTMLParser):
         if text:
             self.parts.append(text)
 
-def fetch_text(url: str, headers: dict[str, str] | None = None, timeout: int = 30) -> str:
+def fetch_text(url: str, headers: dict[str, str] | None = None, timeout: int = 10) -> str:
     try:
-        return nzfetch.fetch_text(url, headers=headers, timeout=timeout)
-    except nzfetch.Blocked as e:
-        raise RuntimeError(f"network error: {e}") from e
-    except nzfetch.FetchError as e:
-        raise RuntimeError(str(e)) from e
+        return nzfetch.fetch_text(url, headers=headers, timeout=timeout,
+                                  allowed_hosts={"www.aucklandcouncil.govt.nz", "experience.aucklandcouncil.govt.nz"})
+    except nzfetch.FetchError as exc:
+        exc.source_url = url
+        raise
 
-def fetch_json(url: str, headers: dict[str, str] | None = None, timeout: int = 30) -> Any:
+
+def fetch_json(url: str, headers: dict[str, str] | None = None, timeout: int = 10) -> Any:
     try:
-        return nzfetch.fetch_json(url, headers=headers, timeout=timeout)
-    except nzfetch.Blocked as e:
-        raise RuntimeError(f"network error: {e}") from e
-    except nzfetch.FetchError as e:
-        raise RuntimeError(str(e)) from e
+        return nzfetch.fetch_json(url, headers=headers, timeout=timeout,
+                                  allowed_hosts={"www.aucklandcouncil.govt.nz", "experience.aucklandcouncil.govt.nz"})
+    except nzfetch.FetchError as exc:
+        exc.source_url = url
+        raise
+
+
+def provenance(url: str) -> dict[str, Any]:
+    return {"source_url": url, "publisher": "Auckland Council",
+            "retrieved_at": utc_now()}
+
 
 def current_public_token() -> str:
     html = fetch_text(SEARCH_PAGE)
     match = re.search(r"eyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+", html)
     if not match:
-        raise RuntimeError("Could not find Auckland Council public API bearer token in the collection-day page")
+        exc = ValueError("Source schema failure: no public API token in the collection-day page")
+        exc.source_url = SEARCH_PAGE
+        raise exc
     return match.group(0)
 
 def api_headers(token: str) -> dict[str, str]:
@@ -71,11 +82,30 @@ def api_headers(token: str) -> dict[str, str]:
         "Referer": "https://www.aucklandcouncil.govt.nz/",
     }
 
+def normalised_query(query: str) -> str:
+    address = parse_address(query)
+    if address is None:
+        return query
+    prefix = address["unit"] + "/" if address["unit"] else ""
+    return (f"{prefix}{address['number']}{address['suffix']} {address['street']} "
+            f"{address['type']} {address['suburb']}").strip()
+
+
+def property_url(query: str, limit: int) -> str:
+    return PROPERTY_API + "?" + urllib.parse.urlencode({"query": normalised_query(query).lower(), "pageSize": str(limit)})
+
+
 def lookup_properties(query: str, limit: int = 10) -> list[dict[str, str]]:
     token = current_public_token()
-    url = PROPERTY_API + "?" + urllib.parse.urlencode({"query": query.lower(), "pageSize": str(limit)})
+    url = property_url(query, limit)
     data = fetch_json(url, headers=api_headers(token))
-    return data.get("items", [])
+    if not isinstance(data, dict) or not isinstance(data.get("items"), list):
+        raise ValueError("Source schema failure: property response has no items array")
+    items = data["items"]
+    if not all(isinstance(item, dict) and isinstance(item.get("id"), str)
+               and isinstance(item.get("address"), str) for item in items):
+        raise ValueError("Source schema failure: property items need id and address strings")
+    return [{**item, **provenance(url)} for item in items]
 
 def visible_lines(html: str) -> list[str]:
     parser = VisibleText()
@@ -155,7 +185,7 @@ def get_schedule(property_id: str) -> dict[str, Any]:
         candidates = [i for i, line in enumerate(lines[:household_idx]) if line == "Your collection day"]
         idx = candidates[-1]
     except (ValueError, IndexError):
-        raise RuntimeError("Could not parse collection-day page; page shape changed")
+        raise ValueError("Source schema failure: could not parse collection-day page")
     street = lines[idx + 1] if idx + 1 < len(lines) else ""
     suburb = lines[idx + 2] if idx + 2 < len(lines) else ""
     return {
@@ -165,17 +195,90 @@ def get_schedule(property_id: str) -> dict[str, Any]:
         "household": parse_section(lines, "Household collection"),
         "commercial": parse_section(lines, "Commercial collection"),
         "source": "Auckland Council collection-day page",
+        **provenance(url),
     }
 
-def choose_property(items: list[dict[str, str]], query: str) -> dict[str, str]:
-    if not items:
-        raise RuntimeError(f"No Auckland Council property matches found for: {query}")
-    normalized = re.sub(r"\W+", " ", query.lower()).strip()
+STREET_TYPES = {
+    "rd": "road", "road": "road", "st": "street", "street": "street",
+    "ave": "avenue", "av": "avenue", "avenue": "avenue", "dr": "drive", "drive": "drive",
+    "pl": "place", "place": "place", "cres": "crescent", "crescent": "crescent",
+    "ct": "court", "court": "court", "ln": "lane", "lane": "lane",
+    "tce": "terrace", "terrace": "terrace", "pde": "parade", "parade": "parade",
+    "way": "way", "cl": "close", "close": "close", "hwy": "highway", "highway": "highway",
+    "gr": "grove", "grove": "grove", "rise": "rise", "esplanade": "esplanade",
+    "mews": "mews", "walk": "walk", "circuit": "circuit", "square": "square",
+}
+
+
+def normalise_words(value: str) -> str:
+    value = "".join(c for c in unicodedata.normalize("NFKD", value.casefold())
+                    if not unicodedata.combining(c))
+    value = value.replace("’", "").replace("'", "")
+    return " ".join(re.sub(r"[^a-z0-9/]+", " ", value).split())
+
+
+def normalise_name(words: list[str]) -> str:
+    words = list(words)
+    if words:
+        words[0] = {"mt": "mount", "saint": "st"}.get(words[0], words[0])
+    return " ".join(words)
+
+
+def parse_address(value: str) -> dict[str, str] | None:
+    """Parse only number[/unit], suffix, street type and optional suburb; never fuzzy match."""
+    if re.search(r"\d\s*[-–]\s*\d", value):
+        return None  # A number range is not an exact individual property address.
+    value = normalise_words(value)
+    match = re.fullmatch(r"(?:unit )?(?:(\d+[a-z]?)/)?(\d+)([a-z]?) (.+)", value)
+    if not match:
+        return None
+    unit, number, suffix, tail = match.groups()
+    words = tail.split()
+    # A suburb's leading St is a name prefix, not the street-type boundary.
+    saint_suburbs = {("st", "heliers"), ("st", "johns"), ("st", "marys"), ("st", "lukes")}
+    positions = [i for i, word in enumerate(words) if i > 0 and word in STREET_TYPES
+                 and tuple(words[i:i + 2]) not in saint_suburbs]
+    if not positions:
+        return None
+    index = positions[-1]
+    suburb = words[index + 1:]
+    if suburb and re.fullmatch(r"\d{4}", suburb[-1]):
+        suburb.pop()
+    if suburb and suburb[-1] == "auckland":
+        suburb.pop()
+    return {"unit": unit or "", "number": str(int(number)), "suffix": suffix,
+            "street": normalise_name(words[:index]), "type": STREET_TYPES[words[index]],
+            "suburb": normalise_name(suburb)}
+
+
+def exact_properties(items: list[dict[str, str]], query: str) -> list[dict[str, str]]:
+    wanted = parse_address(query)
+    if wanted is None:
+        return []
+    matches = []
     for item in items:
-        addr = re.sub(r"\W+", " ", item.get("address", "").lower()).strip()
-        if normalized and normalized in addr:
-            return item
-    return items[0]
+        found = parse_address(item.get("address", ""))
+        if found is None:
+            continue
+        if not all(found[key] == wanted[key] for key in ("number", "suffix", "street", "type")):
+            continue
+        if wanted["unit"] and found["unit"] != wanted["unit"]:
+            continue
+        if wanted["suburb"] and found["suburb"] != wanted["suburb"]:
+            continue
+        matches.append(item)
+    return list({item["id"]: item for item in matches}.values())
+
+
+def choose_property(items: list[dict[str, str]], query: str) -> dict[str, str] | None:
+    matches = exact_properties(items, query)
+    if len(matches) != 1:
+        return None
+    wanted, found = parse_address(query), parse_address(matches[0]["address"])
+    if not wanted["unit"] and found["unit"]:
+        return None
+    return matches[0]
+
 
 def print_human(result: dict[str, Any], alternatives: list[dict[str, str]]) -> None:
     print(f"{result['address']}")
@@ -198,42 +301,101 @@ def print_human(result: dict[str, Any], alternatives: list[dict[str, str]]) -> N
         for item in alternatives[:5]:
             print(f"  {item['id']}: {item['address']}")
 
-def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="Check Auckland Council rubbish, recycling and food scraps collection schedules.")
-    ap.add_argument("address", nargs="*", help="Auckland property address to search, e.g. '12 Tawa Road Onehunga'")
-    ap.add_argument("--property-id", help="Auckland Council property/rating account id, if already known")
-    ap.add_argument("--json", action="store_true", help="Emit JSON")
-    ap.add_argument("--list", action="store_true", help="List matching properties only")
-    ap.add_argument("--limit", type=int, default=10, help="Address lookup result limit")
-    args = ap.parse_args(argv)
+class InvalidInput(ValueError):
+    pass
 
+
+class ContractParser(argparse.ArgumentParser):
+    def error(self, message):
+        raise InvalidInput(message)
+
+
+def emit_error(json_mode: bool, code: int, message: str, url: str, retry_after=None) -> int:
+    error = {"code": code, "type": {2: "invalid_input", 4: "blocked", 5: "upstream_unavailable",
+             6: "schema_failure"}[code], "message": message}
+    if retry_after is not None:
+        error["retry_after"] = retry_after
+    if json_mode:
+        print(json.dumps({"meta": provenance(url), "results": [], "error": error}))
+    else:
+        print(f"bin-schedule: {message}", file=sys.stderr)
+    return code
+
+
+def build_parser() -> argparse.ArgumentParser:
+    ap = ContractParser(description=__doc__)
+    commands = ap.add_subparsers(dest="command", required=True)
+    for name in ("schedule", "lookup"):
+        child = commands.add_parser(name)
+        child.add_argument("address", nargs="*", help="Exact address, e.g. '12 Tawa Road Onehunga'")
+        child.add_argument("--property-id", help="Known Auckland Council property/rating account id")
+        child.add_argument("--json", action="store_true", help="Emit JSON with source provenance")
+        child.add_argument("--list", action="store_true", help="List candidates only (legacy lookup alias)")
+        child.add_argument("--limit", type=int, default=10, help="Search limit, 1–20 (Council cap); a full page requires refinement")
+    return ap
+
+
+def main(argv: list[str] | None = None) -> int:
+    argv = list(sys.argv[1:] if argv is None else argv)
+    # Preserve the established address/--list/--property-id invocation.
+    if argv and argv[0] not in {"schedule", "lookup", "--help", "-h"}:
+        argv.insert(0, "schedule")
+    ap = build_parser()
+    source_url = SEARCH_PAGE
     try:
+        args = ap.parse_args(argv)
         query = " ".join(args.address).strip()
+        if not 1 <= args.limit <= 20:
+            ap.error("--limit must be between 1 and 20")
+        if args.property_id and not re.fullmatch(r"[0-9]+", args.property_id):
+            ap.error("--property-id must contain digits only")
+        if args.property_id and (query or args.command == "lookup" or args.list):
+            ap.error("--property-id is for a schedule without an address or --list")
+        if not args.property_id and not query:
+            ap.error("provide an address or --property-id")
+    except InvalidInput as exc:
+        return emit_error("--json" in argv, 2, str(exc), source_url)
+    try:
         if args.property_id:
-            chosen = {"id": args.property_id, "address": args.property_id}
-            matches: list[dict[str, str]] = []
+            chosen = {"id": args.property_id, **provenance(DETAIL_URL.format(property_id=args.property_id))}
+            matches = []
         else:
-            if not query:
-                ap.error("provide an address or --property-id")
+            source_url = property_url(query, args.limit)
             matches = lookup_properties(query, args.limit)
-            if args.list:
-                print(json.dumps({"query": query, "matches": matches}, indent=2) if args.json else "\n".join(f"{m['id']}\t{m['address']}" for m in matches))
+            exact = exact_properties(matches, query)
+            chosen = choose_property(matches, query) if len(matches) < args.limit else None
+            if args.command == "lookup" or args.list or chosen is None:
+                status = ("search_limit" if len(matches) >= args.limit else
+                          "ambiguous" if exact and chosen is None else
+                          "exact" if chosen else "no_exact_match")
+                result = {"query": query, "status": status, "matches": matches,
+                          "exact_matches": exact}
+                if args.json:
+                    print(json.dumps({"meta": provenance(source_url), "results": [result]}, indent=2, ensure_ascii=False))
+                else:
+                    print(f"Address search: {status}. Refine the address or use a confirmed --property-id.")
+                    for item in matches:
+                        print(f"{item['id']}\t{item['address']}")
                 return 0
-            chosen = choose_property(matches, query)
+        source_url = DETAIL_URL.format(property_id=chosen["id"])
         result = get_schedule(chosen["id"])
         result["matched_property"] = chosen
         alternatives = [m for m in matches if m.get("id") != chosen.get("id")]
         if args.json:
-            print(json.dumps({**result, "alternatives": alternatives}, indent=2, ensure_ascii=False))
+            print(json.dumps({"meta": provenance(source_url), "results": [{**result, "status": "exact", "alternatives": alternatives}]}, indent=2, ensure_ascii=False))
         else:
             print_human(result, alternatives)
         return 0
-    except Exception as e:
-        if args.json:
-            print(json.dumps({"error": str(e)}, indent=2), file=sys.stderr)
-        else:
-            print(f"bin-schedule: {e}", file=sys.stderr)
-        return 1
+    except nzfetch.RateLimited as exc:
+        return emit_error(args.json, 4, str(exc), getattr(exc, "source_url", source_url), exc.retry_after)
+    except nzfetch.Blocked as exc:
+        return emit_error(args.json, 4, str(exc), getattr(exc, "source_url", source_url))
+    except nzfetch.FetchError as exc:
+        code = 6 if re.search(r"HTTP (?:400|401|404|405|410|422)\b", str(exc), re.I) else 5
+        return emit_error(args.json, code, str(exc), getattr(exc, "source_url", source_url))
+    except (ValueError, IndexError) as exc:
+        return emit_error(args.json, 6, str(exc), getattr(exc, "source_url", source_url))
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

@@ -1,4 +1,5 @@
 import tempfile
+import os
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -31,6 +32,19 @@ metadata:
         smoke = skill / "scripts" / "smoke_test.py"
         smoke.write_text("#!/usr/bin/env python3\n" + script, encoding="utf-8")
         return skill
+
+    def test_summary_log_and_skips_are_redacted_before_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            skill = self.make_skill(Path(tmp),
+                "import os\nprint('[SKIP] error ' + os.environ['SYNTHETIC_API_KEY'])\n"
+                "print('Bearer synthetic-auth eyJfake.part.signature ?token=synthetic-query')\n")
+            with mock.patch.dict(os.environ, {"SYNTHETIC_API_KEY": "FAKE-ARTIFACT-SECRET"}), \
+                 mock.patch("run_smoke_tests.smoke_command", side_effect=lambda p: [sys.executable, str(p)]):
+                result = run_one(skill, 10)
+            for value in ("FAKE-ARTIFACT-SECRET", "synthetic-auth", "eyJfake.part.signature", "synthetic-query"):
+                self.assertNotIn(value, result["log"])
+                self.assertNotIn(value, " ".join(result["skips"]))
+            self.assertIn("***", result["log"])
 
     def test_network_error_cannot_mask_a_fixture_parser_failure(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

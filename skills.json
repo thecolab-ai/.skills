@@ -162,7 +162,7 @@
         "experience.aucklandcouncil.govt.nz",
         "www.aucklandcouncil.govt.nz"
       ],
-      "last_verified": "2026-07-19",
+      "last_verified": "2026-10-08",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
@@ -1032,8 +1032,8 @@
       "allowed_domains": [
         "www.fireandemergency.nz"
       ],
-      "last_verified": "2026-07-19",
-      "health": "degraded",
+      "last_verified": "2026-10-08",
+      "health": "healthy",
       "maintainer": "@adam91holt"
     },
     {

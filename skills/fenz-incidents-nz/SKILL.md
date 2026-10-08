@@ -19,8 +19,8 @@ metadata:
   thecolab.pack: "nz-public-data"
   thecolab.source_url: "https://www.fireandemergency.nz/incidents-and-news/incident-reports/"
   thecolab.allowed_domains: "www.fireandemergency.nz"
-  thecolab.last_verified: "2026-07-19"
-  thecolab.health: "degraded"
+  thecolab.last_verified: "2026-10-08"
+  thecolab.health: "healthy"
   thecolab.maintainer: "@adam91holt"
 ---
 
@@ -49,6 +49,15 @@ python3 scripts/cli.py trend --region VALUE --json
 ```
 
 Add `--limit N` (1–100) to bound any command. Human output is the default.
+Operational commands default to **yesterday in Pacific/Auckland**, across North, Central and
+South. Use `--day Wednesday` to choose a published weekday from the rolling seven-day archive,
+and `--report-region north|central|south|all` to bound requests. FENZ requires both `day` and
+numeric `region` URL parameters; the unparameterised incidents URL is not a feed.
+If `--day` is today's NZ weekday, the source returns today's **partial** feed, not last week's.
+Blank optional fields are retained with `incomplete_fields`; only incident number and time are required.
+An upstream/schema failure in any requested region fails the whole command (no partial result).
+Results are sorted newest first within the selected day. `region NAME` filters published
+locations; `--report-region` selects FENZ's broad operational region.
 
 ## Coverage and interpretation
 
@@ -56,6 +65,13 @@ Add `--limit N` (1–100) to bound any command. Human output is the default.
 - Preliminary operational labels are not final classifications.
 - Absence from the public feed does not prove no incident occurred.
 - No notification or dispatch function is provided.
+- FENZ says this ICAD extract is incomplete and unsuitable for statistical analysis; use annual
+  datasets for statistics. A selected day is not an exhaustive search of the seven-day archive.
+- Direct requests can be blocked by Incapsula. A blocked response is reported explicitly and
+  cannot count as a successful live assertion.
+- JSON uses `meta` provenance and a `results` array; errors add `error: {code, type, message}`.
+- JSON envelopes and records carry `source_url`, `publisher`, `licence`, `retrieved_at`, and
+  source-stated `latest_data`. Website material defaults to CC BY-NC-ND 4.0; check dataset terms.
 
 The CLI parses FENZ's labelled seven-day incident records and marks them preliminary. `annual`
 discovers an official financial-year download and aggregates its tab-delimited exposure rows by
@@ -68,5 +84,8 @@ Every annual result retains dataset URL, metadata context, financial year and ro
 - `scripts/test_contract.py` — deterministic repository contract audit
 - `scripts/smoke_test.py` — parser fixture and bounded live probe
 - `tests/fixtures/incidents.html`, `annual-resources.html` and `annual.tsv` — source fixtures
+- `tests/fixtures/incomplete-synthetic.html` — synthetic blank-Location regression shaped like F4557313
+- `tests/fixtures/incidents-live-visible.txt` — two real published records, captured as visible
+  text; `blocked-live.html` — the direct HTTP challenge response
 - `references/source-profile.json` — command schema, source allowlist and warnings
 - `references/source-notes.md` — feasibility, provenance and source limits

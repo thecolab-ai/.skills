@@ -6,28 +6,86 @@ import zipfile
 from html.parser import HTMLParser
 from html import unescape
 from urllib.parse import urljoin, urlparse
-class P(HTMLParser):
- def __init__(self):super().__init__(convert_charrefs=True);self.tag=None;self.buf=[];self.pairs=[];self.pending=None
- def handle_starttag(self,t,a):
-  if t in {"dt","dd","th","td"}:self.tag=t;self.buf=[]
- def handle_data(self,d):
-  if self.tag:self.buf.append(d)
- def handle_endtag(self,t):
-  if t==self.tag:
-   x=" ".join("".join(self.buf).split());self.tag=None
-   if t in {"dt","th"}:self.pending=x
-   elif self.pending:self.pairs.append((self.pending,x));self.pending=None
-def parse_incidents(text,source,at):
- p=P();p.feed(text);out=[];row={}
- for k,v in p.pairs:
-  key=re.sub(r"[^a-z0-9]+","_",k.lower()).strip("_")
-  if key=="incident_number" and row:out.append(row);row={}
-  if key:row[key]=v
- if row:out.append(row)
- out=[r for r in out if r.get("incident_number")]
- for r in out:r.update({"classification_status":"preliminary operational report","source_url":source,"retrieved_at":at})
- if not out:raise ValueError("FENZ page contained no labelled incident records")
- return out
+PUBLISHER = "Fire and Emergency New Zealand"
+LICENCE = "CC BY-NC-ND 4.0"
+LABELS = {
+    "Incident number": "incident_number", "Date and time": "date_and_time",
+    "Location": "location", "Duration": "duration",
+    "Attending Stations/Brigades": "attending_stations_brigades", "Stations": "stations",
+    "Call Type": "call_type", "Call type": "call_type",
+}
+
+
+class IncidentText(HTMLParser):
+    """Preserve visible labelled cells across dl and table page layouts."""
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.parts = []
+        self.buffer = []
+        self.skip = 0
+
+    def flush(self):
+        value = " ".join("".join(self.buffer).split())
+        if value:
+            self.parts.append(value)
+        self.buffer = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag in {"script", "style", "noscript"}:
+            self.skip += 1
+        if tag in {"dt", "dd", "th", "td", "div", "p", "li", "h1", "h2", "h3", "br"}:
+            self.flush()
+
+    def handle_data(self, data):
+        if not self.skip:
+            self.buffer.append(data)
+
+    def handle_endtag(self, tag):
+        if tag in {"script", "style", "noscript"} and self.skip:
+            self.skip -= 1
+        if tag in {"dt", "dd", "th", "td", "div", "p", "li", "h1", "h2", "h3"}:
+            self.flush()
+
+
+def parse_incident_lines(lines, source, at):
+    lines = [" ".join(line.split()) for line in lines if line.strip()]
+    out, row = [], {}
+    for index, label in enumerate(lines):
+        key = LABELS.get(label)
+        if key is None:
+            continue
+        if key == "incident_number":
+            if row:
+                out.append(row)
+            row = {}
+        value = lines[index + 1] if index + 1 < len(lines) else ""
+        if value in LABELS:
+            value = ""
+        if key == "incident_number" or row:
+            row[key] = value
+    if row:
+        out.append(row)
+    if not out:
+        raise ValueError("FENZ page contained no labelled incident records")
+    for row in out:
+        if not all(row.get(key) for key in ("incident_number", "date_and_time")):
+            raise ValueError("FENZ incident record is missing required fields")
+        for key in ("location", "call_type"):
+            row.setdefault(key, "")
+        row["incomplete_fields"] = [key for key, value in row.items() if not value]
+        row.update({"classification_status": "preliminary operational report", "source_url": source,
+                    "publisher": PUBLISHER, "licence": LICENCE, "retrieved_at": at})
+        date = re.match(r"(\d{2})/(\d{2})/(\d{4})", row["date_and_time"])
+        if date:
+            row["latest_data"] = f"{date[3]}-{date[2]}-{date[1]}"
+    return out
+
+
+def parse_incidents(text, source, at):
+    parser = IncidentText()
+    parser.feed(text)
+    parser.flush()
+    return parse_incident_lines(parser.parts, source, at)
 
 
 def parse_annual_resources(document, source_url, retrieved_at):
@@ -37,7 +95,7 @@ def parse_annual_resources(document, source_url, retrieved_at):
   if not match:continue
   url=urljoin(source_url,unescape(href))
   if urlparse(url).hostname!=host:continue
-  rows.append({"financial_year":f"{match.group(1)}-{match.group(2)}","title":title,"download_url":url,"source_url":source_url,"retrieved_at":retrieved_at})
+  rows.append({"financial_year":f"{match.group(1)}-{match.group(2)}","title":title,"download_url":url,"source_url":source_url,"publisher":PUBLISHER,"licence":LICENCE,"retrieved_at":retrieved_at})
  rows=list({row["financial_year"]:row for row in rows}.values())
  if not rows:raise ValueError("FENZ annual data page contained no incident dataset links")
  return sorted(rows,key=lambda row:row["financial_year"])
@@ -73,5 +131,5 @@ def aggregate_annual(body, dataset_url, retrieved_at, financial_year, *, region=
   if incident:group["incidents"].add(incident)
  output=[]
  for (area,kind),counts in groups.items():
-  output.append({"financial_year":financial_year,"regional_council":area,"incident_type":kind,"exposures":counts["exposures"],"incidents":len(counts["incidents"]),"unit_note":"source has one row per exposure; incidents are distinct Incident ID values","dataset_url":dataset_url,"metadata_url":metadata_url,"source_url":dataset_url,"retrieved_at":retrieved_at,"provenance":"FENZ annual tab-delimited incident table"})
+  output.append({"financial_year":financial_year,"regional_council":area,"incident_type":kind,"exposures":counts["exposures"],"incidents":len(counts["incidents"]),"unit_note":"source has one row per exposure; incidents are distinct Incident ID values","dataset_url":dataset_url,"metadata_url":metadata_url,"source_url":dataset_url,"publisher":PUBLISHER,"licence":LICENCE,"latest_data":financial_year,"retrieved_at":retrieved_at,"provenance":"FENZ annual tab-delimited incident table"})
  return sorted(output,key=lambda row:(-row["incidents"],row["regional_council"],row["incident_type"]))

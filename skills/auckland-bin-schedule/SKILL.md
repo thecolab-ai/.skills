@@ -19,7 +19,7 @@ metadata:
   thecolab.pack: "nz-public-data"
   thecolab.source_url: "https://www.aucklandcouncil.govt.nz/en/rubbish-recycling/rubbish-recycling-collections/rubbish-recycling-collection-days.html"
   thecolab.allowed_domains: "experience.aucklandcouncil.govt.nz,www.aucklandcouncil.govt.nz"
-  thecolab.last_verified: "2026-07-19"
+  thecolab.last_verified: "2026-10-08"
   thecolab.health: "healthy"
   thecolab.maintainer: "@adam91holt"
 ---
@@ -46,8 +46,8 @@ Query live Auckland Council household and commercial rubbish, recycling, and foo
 
 ## Preferred workflow
 
-1. Run `scripts/cli.py` with the exact address when known
-2. Use `--list` if multiple units/properties may match or the first match looks wrong
+1. Run `scripts/cli.py schedule` with the exact address when known
+2. Use `lookup` (or the legacy `--list`) to inspect candidates when the address is unresolved
 3. Use `--property-id` when an Auckland Council property/rating id is already known
 4. Use `--json` for agent chaining, comparisons, alerts, or structured reports
 5. Summarise household collection first unless the user asks about commercial collection
@@ -58,7 +58,8 @@ Query live Auckland Council household and commercial rubbish, recycling, and foo
 Run with:
 
 ```bash
-python3 skills/auckland-bin-schedule/scripts/cli.py <address...> [flags]
+python3 skills/auckland-bin-schedule/scripts/cli.py schedule <address...> [flags]
+python3 skills/auckland-bin-schedule/scripts/cli.py lookup <address...> --json
 ```
 
 ### Commands / flags
@@ -66,7 +67,7 @@ python3 skills/auckland-bin-schedule/scripts/cli.py <address...> [flags]
 - `<address...>` — Auckland property address to search, e.g. `12 Tawa Road Onehunga`
 - `--list` — list matching properties only
 - `--property-id <id>` — fetch a known Auckland Council property/rating id directly
-- `--limit <N>` — address lookup result limit
+- `--limit <N>` — address lookup result limit (1–20, the Council cap); a full page requires refinement
 - `--json` — emit JSON
 
 Examples:
@@ -81,7 +82,10 @@ python3 skills/auckland-bin-schedule/scripts/cli.py --property-id 12343300679 --
 ## Resources
 
 - CLI entrypoint: `scripts/cli.py`
+- Deterministic matching/CLI tests: `scripts/test_contract.py`
 - Live smoke test: `scripts/smoke_test.py`
+- Fixtures: `tests/fixtures/address-cases.json` (explicitly synthetic regressions) and
+  `tests/fixtures/blocked-live.html` (real HTTP 406 response)
 - API and stability notes: `references/api-notes.md`
 
 ## Notes
@@ -90,3 +94,15 @@ python3 skills/auckland-bin-schedule/scripts/cli.py --property-id 12343300679 --
 - The CLI fetches the current public bearer token from Auckland Council's collection-day page at runtime
 - Treat dates as live current Council snapshots, not historical facts
 - Some properties show private service or property-manager messages instead of Council collection dates
+- Auto-selection requires an exact number and suffix, street name and type, and suburb when
+  supplied. Common street abbreviations, Mt/Mount and leading St/Saint names are normalised.
+  Parsed queries sent upstream omit commas, city and postcode. Units remain
+  distinct; an unspecified unit requires confirmation even if one unit is returned.
+- Multiple exact candidates, incomplete addresses, no exact match, and a full result page return
+  `matches` and `exact_matches` with `status` (`ambiguous`, `no_exact_match`, or `search_limit`).
+  The CLI fetches no schedule in these states. Refine the address or use a confirmed property id.
+- The previous address-only and `--list` invocations remain supported.
+- JSON uses `meta` provenance and a `results` array. Candidate `status`, `matches` and
+  `exact_matches` sit in `results[0]`; errors use empty `results` and `error: {code, type, message}`.
+  Council data licence is unconfirmed and omitted; collection dates are future service dates,
+  not data update dates.
