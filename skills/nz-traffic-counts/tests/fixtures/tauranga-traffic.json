@@ -1,0 +1,19 @@
+{
+  "features": [
+    {
+      "attributes": {
+        "OBJECTID": 901,
+        "id": "00000000-1111-2222-3333-444444444444",
+        "road_id": "Synthetic Street",
+        "count_date": "2024-02-03T00:00:00",
+        "ADT": 123.5,
+        "PcHeavy": 2,
+        "direction": "Both lanes"
+      },
+      "geometry": {
+        "x": 176.17,
+        "y": -37.69
+      }
+    }
+  ]
+}

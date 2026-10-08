@@ -82,7 +82,15 @@ def main():
         print(f'[FAIL] fixture parser checks: {exc}')
         return 1
     checks = [
-        ('sources registry', ['sources'], lambda d: d['meta']['count'] == 6),
+        ('sources registry', ['sources'], lambda d: d['meta']['count'] == len(cli.SOURCES)),
+        ('Hamilton annual traffic', ['counts','--source','hamilton-traffic','--site','2893','--from','2023-01-01','--to','2023-12-31'], lambda d: len(d['results']) == 1 and d['results'][0]['count'] == 17000 and d['results'][0]['date'] == '2023'),
+        ('Hamilton spatial sites', ['nearest','--source','hamilton-traffic','--near','175.27,-37.77','--radius-km','0.5','--format','geojson','--limit','2'], lambda d: d['features'] and d['features'][0]['geometry']['type'] == 'Point'),
+        ('Tauranga latest survey', ['counts','--source','tauranga-traffic','--site','411d227d-8458-4677-88d2-6cb552094cc1'], lambda d: d['results'] and d['results'][0]['adt'] == 18290 and d['results'][0]['date'] == '2005-11-11' and d['meta']['latest_data'] == '2005-11-11'),
+        ('Tauranga spatial sites', ['sites','--source','tauranga-traffic','--bbox','176.12,-37.74,176.13,-37.73','--format','geojson','--limit','2'], lambda d: d['features'] and d['features'][0]['geometry']['type'] == 'Point'),
+        ('Christchurch cycle snapshot', ['counts','--source','christchurch-cycle','--site','100045582'], lambda d: d['results'] and isinstance(d['results'][0]['count'], (int,float)) and 'date' not in d['results'][0] and 'latest_data' not in d['meta']),
+        ('Christchurch nearby counters', ['nearest','--source','christchurch-cycle','--near','172.6277,-43.5335','--radius-km','0.1','--format','geojson','--limit','2'], lambda d: d['features'] and d['features'][0]['properties']['distance_km'] < 0.1),
+        ('Wellington countline geometry', ['nearest','--source','wellington-sensors','--near','174.7754,-41.3199','--radius-km','0.1','--format','geojson','--limit','2'], lambda d: d['features'] and d['features'][0]['geometry']['type'] == 'MultiLineString' and d['meta']['latest_data'] is None and d['meta']['latest_data_note'] in d['meta']['warnings']),
+        ('Wellington September hourly counts', ['counts','--source','wellington-sensors','--site','48346','--from','2026-09-01','--to','2026-09-01','--limit','2'], lambda d: d['results'] and d['results'][0]['date'] == '2026-09-01' and d['results'][0]['hour'] == 0 and d['results'][0]['count'] == 0 and d['meta']['latest_data'] == '2026-09-01'),
         ('AT traffic workbook', ['sites','--source','at-traffic','--limit','2'], lambda d: d['meta']['matched_count'] > 20000 and d['results'][0]['name'] == 'Access Road #2'),
         ('AT traffic survey values', ['counts','--source','at-traffic','--site','6f28d534b38283b7'], lambda d: d['results'] and d['results'][0]['adt_7_day'] == 1603.4285714285716),
         ('AT ADT survey values', ['counts','--source','at-adt','--site','23788:522'], lambda d: d['results'] and any(r['adt'] == 451 for r in d['results'])),

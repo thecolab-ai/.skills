@@ -1,0 +1,63 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "feature": "ecocounter",
+        "name": "Synthetic Path north",
+        "count": "0",
+        "oid": 901,
+        "direction": "one",
+        "installed_on": "2024-01-01",
+        "hide": 0,
+        "popup": "Synthetic Path north"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          172.63,
+          -43.53
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "feature": "ecocounter",
+        "name": "Synthetic Path south",
+        "count": null,
+        "oid": 902,
+        "direction": "one",
+        "installed_on": "2024-01-01",
+        "hide": 0,
+        "popup": "Synthetic Path south"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          172.631,
+          -43.531
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "feature": "ecocounter",
+        "total": true,
+        "name": "Total",
+        "count": 9,
+        "oid": "total",
+        "popup": "Total"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          172.6,
+          -43.4
+        ]
+      }
+    }
+  ]
+}
