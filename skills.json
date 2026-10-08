@@ -2,7 +2,7 @@
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
   "last_verified": "2026-10-08",
-  "skill_count": 158,
+  "skill_count": 159,
   "skills": [
     {
       "name": "airnz-flights",
@@ -88,6 +88,33 @@
       ],
       "last_verified": "2026-10-08",
       "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "akl-transport-performance",
+      "description": "Query Auckland Transport patronage by mode and route, monthly punctuality and reliability, car park facility inventory with undated availability, and Wellington Metlink daily bus performance. Use for keyless public transport and parking performance comparisons.",
+      "path": "skills/akl-transport-performance",
+      "category": "transport",
+      "source_owner": "Auckland Transport; Greater Wellington Regional Council / Metlink",
+      "source_type": "official",
+      "source_url": "https://at.govt.nz/about-us/reports-publications/at-metro-patronage-report/",
+      "auth": "none",
+      "access_mode": "public-download",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "24h",
+      "schema_version": "1",
+      "skill_type": "public-download",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "at.govt.nz",
+        "www.metlink.org.nz",
+        "services2.arcgis.com"
+      ],
+      "last_verified": "2026-10-08",
+      "health": "degraded",
       "maintainer": "@adam91holt"
     },
     {
