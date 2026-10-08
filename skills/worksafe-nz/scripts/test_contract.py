@@ -30,13 +30,19 @@ def fixture_checks():
     assert legacy[0]['industry_level2'] == 'Synthetic industry two' and legacy[0]['classification'] == ''
     assert cli.aggregate(rows, 'industry') == [{'industry': 'Construction', 'count': 11}, {'industry': 'Manufacturing', 'count': 2}]
     assert cli.aggregate(rows, 'year') == [{'year': 2024, 'count': 10}, {'year': 2025, 'count': 3}]
-    assert sum(r['count'] for r in cli.filter_rows(rows, 'CONSTRUCT', 'auck', '2024-02', '2025-01')) == 3
-    assert len(cli.filter_rows(rows, 'synthetic industry three')) == 4
+    assert sum(r['count'] for r in cli.filter_rows(rows, 'cOnStRuCtIoN', 'auck', '2024-02', '2025-01')) == 3
+    assert cli.filter_rows(rows, 'CONSTRUCT') == []
+    assert cli.filter_rows(rows, 'synthetic industry three') == []
+    assert len(cli.filter_rows(rows, 'synthetic industry three', industry_match='any-level')) == 4
+    assert sum(r['count'] for r in cli.filter_rows(rows, 'Construction')) == 11
+    assert sum(r['count'] for r in cli.filter_rows(rows, 'CONSTRUCT', industry_match='any-level')) == 13
     assert cli.filter_rows(rows, region='operational') == []
     fatal_rows = cli.parse_csv(fatal, 'fatalities')
     grouped = cli.aggregate(fatal_rows, 'fatalities')
-    assert sum(r['count'] for r in grouped) == 4 and len(grouped) == 3
+    assert sum(r['count'] for r in grouped) == 6 and len(grouped) == 5
     assert all(set(r) == {'year', 'industry', 'region', 'count'} for r in grouped)
+    assert sum(r['count'] for r in cli.filter_rows(fatal_rows, 'Construction')) == 3
+    assert sum(r['count'] for r in cli.filter_rows(fatal_rows, 'Construction', industry_match='any-level')) == 6
     print('[PASS] fixture CSV formats, weighted counts, filters and grouped fatalities')
 
     with patch.object(cli, 'fetch_cached', return_value=(page, STAMP)):
@@ -88,9 +94,28 @@ def fixture_checks():
                 assert payload['meta']['matched_count'] == 13 and payload['meta']['truncated']
             if args[0] == 'datasets':
                 assert all(r['retrieved_at'] == STAMP and r['latest_data'] == '2025-01' for r in payload['results'])
+        # Construction in a lower-level or AFF2017 group must not inflate sector totals.
+        for command in (['incidents', '--limit', '0'], ['fatalities'],
+                        ['summary', '--by', 'industry'], ['summary', '--dataset', 'fatalities', '--by', 'industry']):
+            expected_exact = 3 if 'fatalities' in command else 11
+            expected_broad = 6 if 'fatalities' in command else 13
+            for mode, expected_count in (([], expected_exact), (['--industry-match', 'top-level'], expected_exact),
+                                         (['--industry-match', 'any-level'], expected_broad)):
+                out = io.StringIO()
+                with contextlib.redirect_stdout(out):
+                    assert cli.main([*command, '--industry', 'cOnStRuCtIoN', *mode, '--json']) == 0
+                payload = json.loads(out.getvalue())
+                assert payload['meta']['matched_count'] == expected_count
+                assert sum(r['count'] for r in payload['results']) == expected_count
+                industries = {r['industry'] for r in payload['results']}
+                assert industries == ({'Construction'} if expected_count == expected_exact else
+                                      {'Construction', 'Manufacturing', 'Mining', 'Wholesale Trade'} if 'fatalities' in command else
+                                      {'Construction', 'Manufacturing'})
+    print('[PASS] exact top-level industry and opt-in any-level command counts')
     invalid = [['--bad-option'], ['summary', '--by', 'bad'], ['incidents', '--from', '2025-13'],
                ['incidents', '--from', '2025-02', '--to', '2024-01'], ['incidents', '--limit', '-1'],
-               ['sources', '--max-age', 'nan'], ['fatalities', '--year', '0']]
+               ['sources', '--max-age', 'nan'], ['fatalities', '--year', '0'],
+               ['incidents', '--industry-match', 'invalid']]
     with patch.object(cli, 'fetch_cached', side_effect=AssertionError('Invalid input made a network call')):
         for args in invalid:
             out = io.StringIO()
@@ -110,6 +135,7 @@ def fixture_checks():
         url = 'https://' + cli.S3_HOST + '/synthetic.csv'
         with patch.object(cli.nzfetch, 'fetch_bytes', return_value=(b'synthetic response', 'text/csv', url)) as network:
             first = cli.fetch_cached(url, 86400, cache)
+            network.assert_called_once_with(url, timeout=10, allowed_hosts=(cli.S3_HOST,))
             second = cli.fetch_cached(url, 86400, cache)
             assert first == second and network.call_count == 1
             cli.fetch_cached(url, 0, cache)
@@ -117,6 +143,10 @@ def fixture_checks():
             next(cache.glob('*.json')).write_text('corrupt')
             cli.fetch_cached(url, 86400, cache)
             assert network.call_count == 3
+        page_url = cli.ROOT_URL + 'graph/summary/incidents'
+        with patch.object(cli.nzfetch, 'fetch_bytes', return_value=(b'synthetic page', 'text/html', page_url)) as network:
+            cli.fetch_cached(page_url, 0, cache)
+            network.assert_called_once_with(page_url, timeout=10, allowed_hosts=('data.worksafe.govt.nz',))
         with patch.object(cli.nzfetch, 'fetch_bytes', side_effect=cli.nzfetch.FetchError('synthetic outage')):
             try:
                 cli.fetch_cached(url, 0, cache)
@@ -124,7 +154,7 @@ def fixture_checks():
                 assert exc.code == 5
             else:
                 raise AssertionError('Expired cache served on outage')
-    print('[PASS] fixture cache reuse, forced refresh, corruption and outage expiry')
+    print('[PASS] fixture cache reuse, forced refresh, corruption, outage expiry and request host allowlists')
 
 
 def main():

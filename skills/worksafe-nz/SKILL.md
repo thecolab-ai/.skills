@@ -38,6 +38,7 @@ python3 skills/worksafe-nz/scripts/cli.py incidents --dataset concerns --industr
 python3 skills/worksafe-nz/scripts/cli.py incidents --dataset injuries_serious_harm --json
 python3 skills/worksafe-nz/scripts/cli.py incidents --dataset serious_harm --json
 python3 skills/worksafe-nz/scripts/cli.py fatalities --year 2025 --industry Construction --json
+python3 skills/worksafe-nz/scripts/cli.py fatalities --industry Construction --industry-match any-level --json
 python3 skills/worksafe-nz/scripts/cli.py summary --by industry --region Auckland --json
 python3 skills/worksafe-nz/scripts/cli.py summary --dataset fatalities --by year --json
 ```
@@ -56,8 +57,12 @@ python3 skills/worksafe-nz/scripts/cli.py summary --dataset fatalities --by year
   for one `--dataset` (default `incidents`), with optional industry, region and
   inclusive `--from YYYY-MM --to YYYY-MM` filters.
 
-Industry filters match substrings without case sensitivity across industry
-levels and AFF2017 groups. Region filters use local government regions, not
+Industry filters match the exact top-level industry name without case sensitivity
+by default (`--industry-match top-level`). Use `--industry-match any-level` on
+`incidents`, `fatalities` or `summary` to search substrings across all industry
+levels and AFF2017 groups. This broader search can include other sectors, such
+as Mining's Construction Material Mining, in a search for Construction.
+Region filters use local government regions, not
 WorkSafe operational zones. Construction provides W1 C&D sector safety context;
 these exports contain no material inventories or building locations.
 

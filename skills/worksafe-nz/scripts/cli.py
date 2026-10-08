@@ -53,9 +53,7 @@ def fetch_cached(url, max_age, cache_dir=CACHE_DIR):
     except (OSError, ValueError, KeyError, TypeError):
         pass
     try:
-        body, _, final_url = nzfetch.fetch_bytes(url, timeout=10)
-        if urlsplit(final_url).hostname != urlsplit(url).hostname:
-            raise SkillError('Source redirected outside its declared host', 6, url)
+        body, _, _ = nzfetch.fetch_bytes(url, timeout=10, allowed_hosts=(urlsplit(url).hostname,))
         text = body.decode('utf-8-sig')
     except nzfetch.RateLimited as exc:
         raise SkillError('network error: source rate-limited', 4, url, exc.retry_after) from exc
@@ -189,9 +187,12 @@ def load_dataset(dataset, max_age):
     return rows, meta, info
 
 
-def filter_rows(rows, industry=None, region=None, from_period=None, to_period=None, year=None):
+def filter_rows(rows, industry=None, region=None, from_period=None, to_period=None, year=None,
+                industry_match='top-level'):
     return [row for row in rows
-            if (not industry or any(industry.casefold() in row[key].casefold() for key in ('industry', 'industry_level2', 'industry_level3', 'industry_level4', 'aff2017', 'aff2017_level2')))
+            if (not industry or (industry.casefold() == row['industry'].casefold()
+                if industry_match == 'top-level' else
+                any(industry.casefold() in row[key].casefold() for key in ('industry', 'industry_level2', 'industry_level3', 'industry_level4', 'aff2017', 'aff2017_level2'))))
             and (not region or region.casefold() in row['region'].casefold())
             and (not from_period or row['period'] >= from_period)
             and (not to_period or row['period'] <= to_period)
@@ -225,9 +226,12 @@ def build_parser():
         p = sub.add_parser(command)
         p.add_argument('--json', action='store_true', help='print provenance and results as JSON')
         p.add_argument('--max-age', type=float, default=86400, help='maximum cache age in seconds; 0 refreshes (default 86400)')
+        if command in ('incidents', 'fatalities', 'summary'):
+            p.add_argument('--industry', help='case-insensitive exact top-level industry name by default')
+            p.add_argument('--industry-match', choices=('top-level', 'any-level'), default='top-level',
+                           help='top-level: exact name (default); any-level: substring across industry levels and AFF2017 groups')
         if command in ('incidents', 'summary'):
             p.add_argument('--dataset', choices=DATASETS if command == 'summary' else DATASETS[:-1], default='incidents')
-            p.add_argument('--industry', help='case-insensitive substring across industry levels')
             p.add_argument('--region', help='case-insensitive substring of local government region')
             p.add_argument('--from', dest='from_period', type=period)
             p.add_argument('--to', dest='to_period', type=period)
@@ -235,7 +239,6 @@ def build_parser():
             p.add_argument('--limit', type=int, default=100, help='maximum rows; 0 returns all (default 100)')
         if command == 'fatalities':
             p.add_argument('--year', type=int)
-            p.add_argument('--industry')
         if command == 'summary':
             p.add_argument('--by', choices=('industry', 'region', 'year'), required=True)
     return parser
@@ -263,7 +266,8 @@ def execute(args):
     dataset = 'fatalities' if args.command == 'fatalities' else args.dataset
     rows, meta, _ = load_dataset(dataset, args.max_age)
     selected = filter_rows(rows, getattr(args, 'industry', None), getattr(args, 'region', None),
-                           getattr(args, 'from_period', None), getattr(args, 'to_period', None), getattr(args, 'year', None))
+                           getattr(args, 'from_period', None), getattr(args, 'to_period', None), getattr(args, 'year', None),
+                           args.industry_match)
     meta.update(dataset=dataset, matched_rows=len(selected), matched_count=sum(r['count'] for r in selected))
     if args.command == 'summary':
         result = aggregate(selected, args.by)
