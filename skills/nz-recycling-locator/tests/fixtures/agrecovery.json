@@ -1,0 +1,37 @@
+[
+  {
+    "id": 1,
+    "title": {
+      "rendered": "Example Agricultural Collection"
+    },
+    "acf": {
+      "ag_site_active": true,
+      "ag_site_address": "70 Sample Road, Sampletown",
+      "ag_site_lon": "174.76",
+      "ag_site_lat": "-36.85",
+      "ag_site_schemes": [
+        "small-bags"
+      ],
+      "ag_site_notes": "Programme packaging only",
+      "ag_site_region": "Auckland",
+      "ag_site_mon_hours": "9am to 4pm",
+      "ag_site_sat_status": "closed"
+    }
+  },
+  {
+    "id": 2,
+    "title": {
+      "rendered": "Example Inactive Collection"
+    },
+    "acf": {
+      "ag_site_active": false
+    }
+  },
+  {
+    "id": 3,
+    "title": {
+      "rendered": "Example No Fields"
+    },
+    "acf": false
+  }
+]

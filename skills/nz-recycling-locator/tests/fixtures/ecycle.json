@@ -1,0 +1,16 @@
+[
+  {
+    "id": 1,
+    "store": "Example Electronic Recovery Hub",
+    "address": "60 Sample Road",
+    "address2": "",
+    "city": "Sampletown",
+    "zip": "1000",
+    "lng": "174.76",
+    "lat": "-36.85",
+    "hours": "<p>Monday 9am to 4pm</p><p>Tuesday Closed</p>",
+    "description": "Confirm charges for electronics",
+    "fax": "Polystyrene accepted",
+    "url": ""
+  }
+]

@@ -1,0 +1,66 @@
+{
+  "scene": {
+    "sections": {
+      "example-one": {
+        "name": "Example Community Recycling Centre",
+        "address": "80 Sample Road, Sampletown",
+        "mapView": {
+          "center": {
+            "lng": 174.76,
+            "lat": -36.85
+          }
+        },
+        "description": "<p>Hours: Wednesday 9am to 4pm</p><p>Restrictions: confirm charges</p>",
+        "callToAction": {
+          "url": ""
+        }
+      },
+      "example-two": {
+        "name": "Example Reuse Centre",
+        "address": "90 Sample Road, Sampletown",
+        "mapView": {
+          "center": {
+            "lng": 174.77,
+            "lat": -36.84
+          }
+        },
+        "description": "<p>Hours: Monday 9am to 4pm</p>",
+        "callToAction": {
+          "url": ""
+        }
+      },
+      "example-three": {
+        "name": "Example Material Centre",
+        "address": "100 Sample Road, Sampletown",
+        "mapView": {
+          "center": {
+            "lng": 174.78,
+            "lat": -36.83
+          }
+        },
+        "description": "<p>Opening hours unknown.</p>",
+        "callToAction": {
+          "url": ""
+        }
+      },
+      "draft": {
+        "name": ""
+      }
+    },
+    "categories": {
+      "household": {
+        "name": "Household batteries",
+        "sections": [
+          "example-one"
+        ]
+      },
+      "reuse": {
+        "name": "Reuse",
+        "sections": [
+          "example-two",
+          "example-three"
+        ]
+      }
+    }
+  }
+}

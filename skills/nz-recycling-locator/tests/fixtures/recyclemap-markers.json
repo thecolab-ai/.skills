@@ -1,0 +1,42 @@
+[
+  {
+    "id": 1,
+    "map_id": 1,
+    "title": "Example Automotive Collection",
+    "address": "10 Sample Road, Sampletown",
+    "lng": "174.75",
+    "lat": "-36.85",
+    "approved": "1",
+    "categories": [
+      1
+    ],
+    "description": "<p>Hours: Monday - Friday 0800-1600</p><p>Accepts car batteries only</p>",
+    "link": ""
+  },
+  {
+    "id": 2,
+    "map_id": 2,
+    "title": "Example Household Collection",
+    "address": "20 Sample Road, Sampletown",
+    "lng": "174.76",
+    "lat": "-36.84",
+    "approved": "1",
+    "categories": [
+      1
+    ],
+    "description": "<p>Opening hours</p><p>Monday to Friday 9am to 5pm</p><p>Restrictions: confirm battery condition</p>",
+    "link": ""
+  },
+  {
+    "id": 3,
+    "map_id": 3,
+    "title": "Example Glass Collection",
+    "address": "30 Sample Road, Sampletown",
+    "lng": "174.77",
+    "lat": "-36.83",
+    "approved": "1",
+    "categories": [],
+    "description": "<p>Opening hours unknown.</p><p>Website unknown.</p>",
+    "link": ""
+  }
+]

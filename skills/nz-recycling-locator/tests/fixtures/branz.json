@@ -1,0 +1,52 @@
+{
+  "features": [
+    {
+      "attributes": {
+        "OBJECTID": 1,
+        "Facility": "Example Concrete Recovery",
+        "Address": "40 Sample Road, Sampletown",
+        "Concrete": "Yes",
+        "Glass": "No",
+        "Status": "Existing",
+        "Facility_Type": "Facility",
+        "Region": "Auckland",
+        "Description": "Confirm public drop-off hours",
+        "Accepted_Waste_Streams": "Concrete only",
+        "URL": ""
+      },
+      "geometry": {
+        "x": 174.76,
+        "y": -36.85
+      }
+    },
+    {
+      "attributes": {
+        "OBJECTID": 2,
+        "Facility": "Example Planned Facility",
+        "Address": "50 Sample Road, Sampletown",
+        "Glass": "Yes",
+        "Status": "Planned",
+        "Facility_Type": "Facility"
+      },
+      "geometry": {
+        "x": 174.77,
+        "y": -36.84
+      }
+    },
+    {
+      "attributes": {
+        "OBJECTID": 3,
+        "Facility": "Example Service Contractor",
+        "Concrete": "Yes",
+        "Status": null,
+        "Facility_Type": "Service",
+        "Description": "Commercial service only"
+      },
+      "geometry": {
+        "x": 174.75,
+        "y": -36.86
+      }
+    }
+  ],
+  "exceededTransferLimit": false
+}
