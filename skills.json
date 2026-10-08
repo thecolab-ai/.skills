@@ -2,7 +2,7 @@
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
   "last_verified": "2026-10-08",
-  "skill_count": 159,
+  "skill_count": 160,
   "skills": [
     {
       "name": "airnz-flights",
@@ -4811,6 +4811,38 @@
       ],
       "last_verified": "2026-07-19",
       "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "nz-utility-outages",
+      "description": "Query Watercare Auckland water faults and planned shutdowns, Wellington electricity outages, KiwiRail Auckland work notices and the published rail closure calendar. Use for utility interruptions, maintenance windows and nearby outage searches; report Vector and other unavailable source limits explicitly.",
+      "path": "skills/nz-utility-outages",
+      "category": "utilities",
+      "source_owner": "Watercare, Vector, KiwiRail and NZ electricity networks",
+      "source_type": "official",
+      "source_url": "https://www.watercare.co.nz/home/faults-and-outages",
+      "auth": "none",
+      "access_mode": "public-api and bounded public HTML/PDF",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "none",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "www.watercare.co.nz",
+        " webapi.watercare.co.nz",
+        " help.vector.co.nz",
+        " www.welectricity.co.nz",
+        " www.kiwirail.co.nz",
+        " powernet.co.nz",
+        " api.integration.countiesenergy.co.nz",
+        " app.countiesenergy.co.nz"
+      ],
+      "last_verified": "2026-10-08",
+      "health": "degraded",
       "maintainer": "@adam91holt"
     },
     {
