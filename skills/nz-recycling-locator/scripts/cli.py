@@ -25,7 +25,7 @@ from provenance import result_envelope, error_envelope, geojson_envelope
 
 ROOT = Path(__file__).resolve().parents[1]
 CACHE = Path(os.environ.get('XDG_CACHE_HOME') or Path.home() / '.cache') / 'nz-recycling-locator'
-PARSER_VERSION = 3
+PARSER_VERSION = 4
 TTL = 86400
 PRIMARY_URL = 'https://www.recyclemap.co.nz/'
 RM = 'https://www.recyclemap.co.nz/wp-json/wpgmza/v1/'
@@ -47,8 +47,9 @@ SOURCES = {
     'crc': {'url': 'https://www.makingzerowastework.org.nz/find-your-local-crc', 'publisher': 'Zero Waste Tāmaki Makaurau Trust', 'kind': 'HTML directory', 'licence': None},
     'techcollect': {'url': 'https://techcollect.nz/', 'publisher': 'TechCollect NZ', 'kind': 'unsupported', 'licence': None},
 }
-DEFAULT_SOURCES = [s for s in SOURCES if s not in ('council', 'techcollect')]
-FETCH_HOSTS = {urlparse(SOURCES[s]['url']).hostname for s in DEFAULT_SOURCES}
+DEFAULT_SOURCES = [s for s in SOURCES if s not in ('council', 'techcollect', 'trow')]
+FETCH_HOSTS = {urlparse(spec['url']).hostname for source, spec in SOURCES.items()
+               if source not in ('council', 'techcollect')}
 
 
 class SourceError(Exception):
@@ -297,6 +298,10 @@ def parse_trow(data, retrieved):
         if item['status'] == 'sold':
             continue
         location = clean(item['location'])
+        # These two publisher labels refer to the same yard. Keep other and
+        # unspecified locations separate rather than guessing from locality.
+        if location.casefold() in ('trow group yard, ranui', 'trow yard - ranui. auckland 0612'):
+            location = 'Trow Group Yard, Ranui'
         group = groups.setdefault(location, {'materials': set(), 'available': 0, 'pre-sale': 0, 'dates': []})
         group['materials'].add(clean(item['category']))
         group[item['status']] += 1
@@ -713,9 +718,12 @@ def command_sources(args):
     statuses = []
     sources = list(dict.fromkeys(args.source or SOURCES))
     with ThreadPoolExecutor(max_workers=4) as pool:
-        futures = [pool.submit(load_uncached, source, probe=True) for source in sources]
+        futures = [None if source == 'trow' and not args.source else
+                   pool.submit(load_uncached, source, probe=True) for source in sources]
         for source, future in zip(sources, futures):
             try:
+                if future is None:
+                    raise SourceError('TROW is explicit-only: use --source trow; its internal endpoint returns personal seller/account fields.', 7)
                 rows = future.result()
                 url = SOURCES[source]['url'] if source == 'repair' else rows[0]['source_url']
                 statuses.append({'source': source, 'status': 'ok', 'count': len(rows), 'kind': SOURCES[source]['kind'],
@@ -741,13 +749,13 @@ def fail_if_empty(rows, health):
 def command_data(args):
     skipped = []
     if not args.source and (args.command == 'find' or getattr(args, 'bbox', None)):
-        skipped = ['repair', 'tyrewise', 'trow', 'crc']
+        skipped = ['repair', 'tyrewise', 'crc']
         args.source = [s for s in DEFAULT_SOURCES if s not in skipped]
     rows, health = combined(args)
     warnings = ['Listings may be stale; confirm material restrictions, charges and opening times with the operator.',
                 'Records remain separate across sources; counts are directory entries, not unique physical sites.']
     if skipped:
-        warnings.append('repair, tyrewise, trow and crc listings have no verified coordinates; use search <town> for them.')
+        warnings.append('repair, tyrewise and crc listings have no verified coordinates; use search <town> for them. TROW requires --source trow and has no verified coordinates.')
     if any(r['source'] == 'trow' for r in rows):
         warnings.append('TROW lists locations of available/pre-sale stock, not confirmed donation drop-offs; unspecified locations remain unlocated.')
     if any(r['source'] == 'zerowaste' for r in rows):

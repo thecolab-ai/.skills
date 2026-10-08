@@ -136,6 +136,76 @@ class Parsers(unittest.TestCase):
             with self.assertRaises(cli.SourceError):
                 cli.parse_trow(data, STAMP)
 
+    def test_trow_ranui_aliases_merge_without_merging_other_locations(self):
+        data = fixture('trow')
+        data[0]['location'] = 'Trow Group Yard, Ranui'
+        data[1]['location'] = 'TROW Yard - Ranui. Auckland 0612'
+        data.append({**data[0], 'location': 'Other Yard, Ranui', 'category': 'metal'})
+        rows = cli.parse_trow(data, STAMP)
+        self.assertEqual(len(rows), 3)  # One Ranui yard, another yard and unspecified.
+        yard = next(r for r in rows if r['address'] == 'Trow Group Yard, Ranui')
+        self.assertEqual((yard['available_items'], yard['pre_sale_items']), (1, 1))
+        self.assertEqual(yard['materials'], ['Reuse', 'Salvaged building materials', 'doors', 'timber'])
+        self.assertEqual(yard['latest_data'], data[1]['updated_date'])
+        self.assertEqual(cli.parse_trow(list(reversed(data)), STAMP), rows)
+        self.assertTrue(any(r['address'] == 'Other Yard, Ranui' for r in rows))
+        self.assertTrue(any(r['address'] is None for r in rows))
+
+    def test_trow_private_fields_never_reach_outputs_or_cache(self):
+        private = {'seller_email': 'synthetic-private@example.invalid',
+                   'seller_name': 'SYNTHETIC PRIVATE SELLER',
+                   'created_by': 'synthetic-private-account'}
+        data = [{**item, **private} for item in fixture('trow')]
+        with tempfile.TemporaryDirectory() as temp, patch.object(cli, 'CACHE', Path(temp)), \
+                patch.object(cli, 'get', return_value=data) as fetch:
+            rows, cached = cli.load('trow', refresh=True)
+            self.assertFalse(cached)
+            fetch.assert_called_once_with(cli.SOURCES['trow']['url'], True)
+            saved_path = Path(temp) / 'trow.json'
+            outputs = [json.dumps(rows), saved_path.read_text()]
+            for argv in (['search', 'TROW', '--json'],
+                         ['search', 'TROW', '--format', 'geojson'],
+                         ['search', 'TROW'], ['materials', '--json'],
+                         ['sources', '--json']):
+                with redirect_stdout(io.StringIO()) as out:
+                    self.assertEqual(cli.main(argv + ['--source', 'trow']), 0)
+                outputs.append(out.getvalue())
+            for output in outputs:
+                for key, value in private.items():
+                    self.assertNotIn(key, output)
+                    self.assertNotIn(value, output)
+            # Old cache entries must not bypass the new grouping parser.
+            saved = json.loads(saved_path.read_text())
+            saved['version'] = 3
+            saved['records'][0]['name'] = 'obsolete unmerged yard'
+            saved_path.write_text(json.dumps(saved))
+            reloaded, cached = cli.load('trow')
+            self.assertFalse(cached)
+            self.assertEqual(reloaded, rows)
+
+    def test_trow_requires_explicit_selection_in_queries_and_probes(self):
+        self.assertNotIn('trow', cli.DEFAULT_SOURCES)
+        self.assertIn('base44.app', cli.FETCH_HOSTS)
+        rows = cli.parse_trow(fixture('trow'), STAMP)
+        for argv in (['materials', '--json'], ['search', 'TROW', '--json'],
+                     ['find', '--material', 'reuse', '--near=174.76,-36.85', '--json'],
+                     ['search', 'TROW', '--bbox=174,-37,175,-36', '--json']):
+            with patch.object(cli, 'load', return_value=(rows, True)) as load, \
+                    redirect_stdout(io.StringIO()):
+                self.assertEqual(cli.main(argv), 0)
+            self.assertNotIn('trow', [c.args[0] for c in load.call_args_list])
+        with patch.object(cli, 'load_uncached', return_value=rows) as load, \
+                redirect_stdout(io.StringIO()) as out:
+            self.assertEqual(cli.main(['sources', '--json']), 0)
+        self.assertNotIn('trow', [c.args[0] for c in load.call_args_list])
+        status = next(s for s in json.loads(out.getvalue())['source_status'] if s['source'] == 'trow')
+        self.assertEqual(status['status'], 'skipped')
+        self.assertIn('--source trow', status['error'])
+        with patch.object(cli, 'load_uncached', return_value=rows) as load, \
+                redirect_stdout(io.StringIO()):
+            self.assertEqual(cli.main(['sources', '--source', 'trow', '--json']), 0)
+        load.assert_called_once_with('trow', probe=True)
+
     def test_christchurch_flags_dates_wgs84_and_truncation(self):
         data = fixture('christchurch')
         rows = cli.parse_christchurch(data, STAMP)

@@ -2,9 +2,11 @@
 """Bounded live source/schema and CLI probes; outages skip, parser failures fail."""
 import json
 from concurrent.futures import ThreadPoolExecutor
+import os
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import cli  # noqa: E402
@@ -49,6 +51,9 @@ def source_check(source):
     if source == 'trow':
         assert all(r['lon'] is None for r in rows)
         assert sum(r['available_items'] + r['pre_sale_items'] for r in rows) > 0
+        assert all(key not in json.dumps(rows) for key in ('seller_email', 'seller_name', 'created_by'))
+        assert sum(r['address'] == 'Trow Group Yard, Ranui' for r in rows) == 1
+        assert not any(r['address'] == 'TROW Yard - Ranui. Auckland 0612' for r in rows)
     if source == 'habitat':
         assert all('Op Shops' in r['materials'] for r in rows)
     if source == 'zerowaste':
@@ -98,6 +103,36 @@ def council_check():
     print('[PASS] contract Council item guidance is explicitly unsupported')
 
 
+def trow_cli_check():
+    with tempfile.TemporaryDirectory() as cache:
+        env = {**os.environ, 'XDG_CACHE_HOME': cache}
+        commands = [(['search', 'Ranui', '--refresh'], 'results'),
+                    (['search', 'Ranui', '--format', 'geojson'], 'features'),
+                    (['materials'], 'results'), (['sources'], 'results')]
+        for args, field in commands:
+            result = subprocess.run([sys.executable, str(Path(cli.__file__)), *args,
+                                     '--source', 'trow', '--json'],
+                                    env=env, capture_output=True, text=True, timeout=20)
+            payload = json.loads(result.stdout)
+            if result.returncode:
+                error = payload['error']
+                raise cli.SourceError(error['message'], error['code'])
+            assert payload[field]
+            if args[0] == 'search':
+                assert len(payload[field]) == 1
+                row = payload[field][0] if field == 'results' else payload[field][0]['properties']
+                assert row['address'] == 'Trow Group Yard, Ranui'
+                if field == 'features':
+                    assert payload[field][0]['geometry'] is None
+            for key in ('seller_email', 'seller_name', 'created_by'):
+                assert key not in result.stdout
+        saved = (Path(cache) / 'nz-recycling-locator' / 'trow.json').read_text()
+        assert json.loads(saved)['version'] == cli.PARSER_VERSION
+        assert sum(r['address'] == 'Trow Group Yard, Ranui' for r in json.loads(saved)['records']) == 1
+        assert all(key not in saved for key in ('seller_email', 'seller_name', 'created_by'))
+    print('  TROW explicit search, GeoJSON, materials and sources; one Ranui yard; personal fields absent from output/cache')
+
+
 def main():
     fixtures = Path(cli.ROOT) / 'tests' / 'fixtures'
     sentinel = json.loads((fixtures / 'contract.json').read_text())
@@ -133,6 +168,7 @@ def main():
         results = list(pool.map(lambda s: probe(s, lambda: source_check(s)), sources))
     results.append(probe('repair café sitemap and Auckland detail', repair_check))
     results.append(probe('find Auckland batteries with GeoJSON', cli_find_check))
+    results.append(probe('TROW CLI grouping and output/cache privacy', trow_cli_check))
     try:
         council_check()
     except cli.SourceError as exc:

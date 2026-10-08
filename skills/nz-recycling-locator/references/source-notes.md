@@ -16,7 +16,7 @@ an open reuse licence. `SKILL.md`'s MIT licence covers the skill code only.
 | `ecycle` | E-Cycle: `https://www.e-cycle.co.nz/wp-admin/admin-ajax.php?action=store_search&lat=-36.8485&lng=174.7633&max_results=1000&search_radius=5000&autoload=1` | 17 nationwide partners | Without `autoload=1`, the same request returned only one site; acceptance varies and charges may apply |
 | `agrecovery` | Agrecovery: `https://agrecovery.co.nz/wp-json/wp/v2/ag_site?per_page=100&page=1&acf_format=standard&_fields=id,title,acf&orderby=title&order=asc` | 241 active sites across three pages | Programme-specific agricultural packaging; raw scheme labels retained rather than general plastic acceptance |
 | `beautification` | Beautification Trust: `https://api.mapme.com/api/stories/aggregated/af29690b-4cd0-484f-a211-8f3e12fa51b4` | 144 sections, 140 named entries; 43 categories | South and East Auckland focus; four unlabelled sections skipped; no source-stated dataset date |
-| `trow` | TROW Group: `https://base44.app/api/apps/68e5846a599cc4e55639725b/entities/Item?sort=-created_date&limit=1000` | 88 stock items, grouped into two unsold location records; 54 available, three pre-sale, 31 sold excluded | One blank location; no verified coordinates, street addresses, donation acceptance or opening hours |
+| `trow` (explicit-only) | TROW Group: `https://base44.app/api/apps/68e5846a599cc4e55639725b/entities/Item?sort=-created_date&limit=1000` | 88 stock items, grouped into two unsold location records; 54 available, three pre-sale, 31 sold excluded | Undocumented internal Base44 endpoint returns personal seller/account fields; excluded from defaults. One blank location; no verified coordinates, street addresses, donation acceptance or opening hours |
 | `christchurch` | Christchurch City Council: `https://gis.ccc.govt.nz/server/rest/services/OpenData/SiteUtility/FeatureServer/9` | 16 CollectionDepot point features via `/query?where=1%3D1&outFields=*&returnGeometry=true&outSR=4326&f=json` | Broad refuse/recycling/green-waste flags; no street addresses or individual-material acceptance; latest feature edit 2020-09-02T21:55:46.000Z |
 | `zerowaste` | Zero Waste Aotearoa: `https://zerowaste.co.nz/wp-json/wpgmza/v1/markers?map_id=2` | 296 upstream markers across maps 2, 6 and 7; 170 approved member-map records after local filtering | Member directory, not verified drop-offs; category API returned 403; some coordinates conflict with addresses |
 | `habitat` | Habitat for Humanity New Zealand: `https://www.habitat.org.nz/op-shops` | 24 store cards, 21 with valid coordinates | Pre-loved-goods stores; three unlocated shops; confirm store-specific donation acceptance and hours |
@@ -58,15 +58,23 @@ those links. This avoids guessing a street address from a territory or presentin
 - Beautification Trust joins `scene.sections` keys to category `sections`
   membership. Coordinates use each section's `mapView.center`; descriptions,
   addresses and operator links are retained. No map-style settings are cached.
-- TROW reads the public ReStore stock endpoint linked by the catalogue; its
-  primary marketplace is `https://trowrestore.com/`. Available and pre-sale
-  items are grouped by exact visible `location` label. Sold items are excluded;
+- TROW requires explicit `--source trow`, including live `sources` probes.
+  The catalogue-linked ReStore stock endpoint is an undocumented internal
+  Base44 app endpoint that returns `seller_email`, `seller_name` and `created_by`
+  for every record. Privacy is the reason it is excluded from default queries
+  and probes, even though it needs no authentication. Its primary marketplace
+  is `https://trowrestore.com/`. Available and pre-sale items are grouped by
+  visible `location` label, with the known aliases “Trow Group Yard, Ranui” and
+  “TROW Yard - Ranui. Auckland 0612” merged as “Trow Group Yard, Ranui”. Counts,
+  categories and stock-edit dates combine across both labels. Other labels are
+  kept separate. Sold items are excluded;
   blank location labels remain separate, with null address/coordinates. Materials
   combine the publisher's stock categories with explicit reuse/salvage labels;
   these describe stock, not accepted donations. The 1,000-item request cap was
   verified live; reaching it fails rather than returning an incomplete directory.
-  Only grouped location/category/count fields are cached: no seller emails,
-  account identifiers, images, prices or complete stock payloads. `latest_data`
+  Only normalised location/category/count fields and provenance are output or
+  cached: no seller emails, seller names, creator/account identifiers, images,
+  prices or complete stock payloads. `latest_data`
   is the maximum `updated_date` of unsold items (observed
   `2026-09-27T23:59:39.631000`). The upstream omits a timezone, so it is preserved
   exactly and is not relabelled as UTC. It is a stock-edit date, not a yard date.
@@ -160,11 +168,13 @@ synthetic or appropriately licensed fixtures; no item taxonomy is guessed.
 
 Only normalised directory records are cached for 24 hours under
 `$XDG_CACHE_HOME/nz-recycling-locator` (fallback `~/.cache/nz-recycling-locator`).
-Parser version 3 invalidates old shapes; writes use unique temporary files and
+Parser version 4 invalidates older records, including unmerged Ranui labels;
+writes use unique temporary files and
 atomic replacement so concurrent runs do not share a temporary path. Cache data
 contains public site information and retains source retrieval timestamps.
 `--refresh` never substitutes stale cache after failure. `sources` always
-fetches live and distinguishes record counts from repair sitemap URL counts.
+fetches live and distinguishes record counts from repair sitemap URL counts;
+TROW is reported as skipped without a request unless `--source trow` is supplied.
 
 A combined query continues with working sources and returns `result_status: partial`
 plus per-source errors. If every selected source fails, or filtering leaves no

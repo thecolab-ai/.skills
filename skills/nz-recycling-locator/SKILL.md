@@ -47,7 +47,8 @@ python3 scripts/cli.py search "Onehunga" --source crc --json
 python3 scripts/cli.py item "battery" --json
 ```
 
-1. Check `sources` for **live** status. It reports blocked/skipped sources without
+1. Check `sources` for **live** status. TROW is skipped unless `--source trow`
+   is supplied. It reports blocked/skipped sources without
    pretending they are empty directories. Repair status counts sitemap URLs;
    search fetches the linked café detail pages.
 2. Use `materials` to inspect publisher labels. `find` accepts common aliases
@@ -70,8 +71,11 @@ python3 scripts/cli.py item "battery" --json
 Repeat `--source` to combine selected feeds: `recyclemap`, `wasteminz`, `repair`,
 `tyrewise`, `ecycle`, `branz`, `agrecovery`, `beautification`, `council`,
 `techcollect`, `trow`, `christchurch`, `zerowaste`, `habitat`, `crc`. Defaults include
-the thirteen working directories; Council and
-TechCollect are explicit selections. Council guidance is not implemented;
+the twelve other working directories. TROW requires explicit `--source trow`
+for all commands: its undocumented internal Base44 endpoint returns
+`seller_email`, `seller_name` and `created_by` for every stock record.
+These personal fields are discarded; they never appear in output or cache.
+Council and TechCollect are also explicit selections. Council guidance is not implemented;
 TechCollect has no verified script-accessible feed. They return exit 7 when they
 are the only selected sources; with a working source they appear in
 `source_status` and warnings with `result_status: partial`
@@ -90,8 +94,9 @@ from one source. `source_status` and `warnings` expose source failures;
 `result_status: partial` indicates incomplete results. If no matching records
 remain and any selected source failed, the query returns that failure.
 
-TROW groups available and pre-sale stock by publisher location label; sold stock
-is excluded. It has no verified coordinates, street addresses or opening hours.
+TROW groups available and pre-sale stock by publisher location label, merging
+“Trow Group Yard, Ranui” and “TROW Yard - Ranui. Auckland 0612” into one Ranui
+yard; sold stock is excluded. It has no verified coordinates, street addresses or opening hours.
 Use text search and arrange collection; these are not confirmed donation sites.
 The `crc` source provides Auckland CRC addresses without verified coordinates;
 use text search. The `reuse` alias also matches Beautification’s “Rehome” label.
