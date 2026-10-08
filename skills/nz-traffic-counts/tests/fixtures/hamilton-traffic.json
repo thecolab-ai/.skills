@@ -1,0 +1,19 @@
+{
+  "features": [
+    {
+      "attributes": {
+        "OBJECTID": 901,
+        "Site_Number": "SYN-01",
+        "Site_Name": "Synthetic Road",
+        "Direction": "Both",
+        "Year2000": null,
+        "Year2022": 125,
+        "Year2023": 0
+      },
+      "geometry": {
+        "x": 175.28,
+        "y": -37.78
+      }
+    }
+  ]
+}

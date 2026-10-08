@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+<IsTruncated>false</IsTruncated>
+<Contents><Key>transport_sensors/countline_mobility/csv/2026/09/countline_mobility_2026_09.csv</Key></Contents>
+<Contents><Key>transport_sensors/countline_mobility/csv/2026/countline_mobility_2026.csv</Key></Contents>
+</ListBucketResult>

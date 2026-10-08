@@ -18,6 +18,8 @@ FIXTURES = Path(__file__).resolve().parents[1] / 'tests' / 'fixtures'
 
 
 def run():
+    from city_tests import run as city_tests
+    city_tests()
     traffic_body = (FIXTURES/'C0032-trimmed.xlsx').read_bytes()
     name, traffic, epoch = next(cli.sheets(traffic_body))
     assert name == 'July 2012 to June 2026'
@@ -316,7 +318,7 @@ def regressions(cycle, at_row):
     assert validate_result_envelope(wrapped) == [] and wrapped['ok'] and wrapped['data']['results'][0]['adt'] == 451
     p = subprocess.run([sys.executable, str(runner_path), 'nz-traffic-counts', 'sources'], capture_output=True, text=True, timeout=15)
     result = json.loads(p.stdout)
-    assert p.returncode == 0 and result['ok'] and len(result['data']['results']) == 6
+    assert p.returncode == 0 and result['ok'] and len(result['data']['results']) == len(cli.SOURCES)
     assert validate_result_envelope(result) == []
     print('[PASS] fixture result contract and network-free canonical sources command')
 

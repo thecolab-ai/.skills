@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import calendar
+import csv
 from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
 import hashlib
@@ -18,6 +19,8 @@ import sys
 import time
 import tempfile
 from urllib.parse import unquote, urlencode, urljoin, urlparse
+from urllib.error import HTTPError, URLError
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 import xml.etree.ElementTree as ET
 import zipfile
 from zoneinfo import ZoneInfo
@@ -34,7 +37,15 @@ CYCLE_PAGE = 'https://at.govt.nz/cycling-walking/research-monitoring/monthly-cyc
 CYCLE = 'https://at.govt.nz/media/zj0lgcmg/at-daily-cycle-count-data-july-2026.xlsx'
 HOT_PAGE = 'https://www.hotcity.co.nz/city-centre/results-and-statistics/pedestrian-counts'
 HOT = 'https://www.hotcity.co.nz/sites/20180201.prod.hotcity.co.nz/files/2026-10/All%20pedestrian%20data%20day%20by%20hour%202026%20-%20September.xlsx'
-ALLOWED = {'at.govt.nz', 'www.hotcity.co.nz', 'services.arcgis.com', 'services2.arcgis.com'}
+HAMILTON = 'https://services1.arcgis.com/R6s0QqCMQdwKY6yp/arcgis/rest/services/Hamilton%20City%20Traffic%20Counts/FeatureServer/0'
+TAURANGA = 'https://cemeteryaws.tauranga.govt.nz/server/rest/services/Mapi_Transportation/MapServer/17'
+CHCH = 'https://smartview.ccc.govt.nz/app/router/map_features.php?feat=ecocounter'
+WCC = 'https://gis.wcc.govt.nz/arcgis/rest/services/Transportation/Transport_Sensors/FeatureServer/0'
+WCC_FILES = 'https://gis-snowflake-opendata-public-wcc-arcgis-prod.s3.ap-southeast-2.amazonaws.com/'
+CITY_SOURCES = ('hamilton-traffic', 'tauranga-traffic', 'christchurch-cycle', 'wellington-sensors')
+ALLOWED = {'at.govt.nz', 'www.hotcity.co.nz', 'services.arcgis.com', 'services2.arcgis.com',
+           'services1.arcgis.com', 'cemeteryaws.tauranga.govt.nz', 'smartview.ccc.govt.nz',
+           'gis.wcc.govt.nz', urlparse(WCC_FILES).hostname}
 SOURCES = {
     'at-traffic': dict(url=TRAFFIC, publisher='Auckland Transport', licence='AT terms: individual use; republication requires AT approval', latest_data='2026-06-30', spatial=False, granularity='survey ADT', catalogue_id='C0032'),
     'at-adt': dict(url=AT, publisher='Auckland Transport', licence='CC BY 4.0', latest_data='2026-06-23', spatial=True, granularity='survey ADT', catalogue_id='C0002'),
@@ -42,6 +53,10 @@ SOURCES = {
     'at-cycle-monthly': dict(url=CYCLE, publisher='Auckland Transport', licence='CC BY 4.0', latest_data='2026-07-31', spatial=False, granularity='monthly sum of published daily observations', catalogue_id='S0182'),
     'nzta-tms': dict(url=TMS, publisher='NZ Transport Agency Waka Kotahi', licence='CC BY 4.0', latest_data='2026', spatial=True, granularity='daily by lane/direction/vehicle class', catalogue_id='C0018'),
     'hotcity': dict(url=HOT, publisher='Heart of the City', licence='CC BY 4.0', latest_data='2026-09-30', spatial=False, granularity='hourly camera series', catalogue_id='C0033'),
+    'hamilton-traffic': dict(url=HAMILTON, publisher='Hamilton City Council', licence='CC BY 4.0', latest_data='2023', spatial=True, granularity='published annual traffic values', catalogue_id='S1098'),
+    'tauranga-traffic': dict(url=TAURANGA, publisher='Tauranga City Council and Bay of Plenty Regional Council', licence='Council copyright; no open reuse licence stated', latest_data='2026', spatial=True, granularity='latest survey ADT', catalogue_id='S1373'),
+    'christchurch-cycle': dict(url=CHCH, publisher='Christchurch City Council / Smart Christchurch', licence=None, latest_data=None, spatial=True, granularity='snapshot; observation period not supplied', catalogue_id='S2160'),
+    'wellington-sensors': dict(url=WCC, publisher='Wellington City Council', licence='WCC terms: open urban mobility use; contact WCC for other purposes', latest_data='2026', spatial=True, granularity='hourly by transport class and direction', catalogue_id='S1096;S2741'),
 }
 NS = {'s': 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
 REL = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
@@ -126,7 +141,43 @@ def remember(args, meta):
     args._provenances.append(meta)
 
 
-def fetch(url, args, binary=False):
+def fetch_wcc_export(url):
+    """Bounded S3 CSV read: the shared helper's 32 MiB wire cap is too small."""
+    if not url.startswith(WCC_FILES+'transport_sensors/countline_mobility/csv/'):
+        raise SkillError('Large CSV downloads are restricted to the WCC public export path', 7)
+
+    class NoRedirect(HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):
+            return None
+
+    try:
+        request = Request(url, headers={'Accept': 'text/csv', 'Accept-Encoding': 'identity',
+                                       'User-Agent': 'TheColab-nz-traffic-counts/1'})
+        with build_opener(NoRedirect()).open(request, timeout=10) as response:
+            if response.status != 200:
+                raise SkillError('network error: unexpected WCC export status', 5)
+            length = response.headers.get('Content-Length')
+            expected = int(length) if length is not None else None
+            if expected is not None and expected > 64 * 1024 * 1024:
+                raise SkillError('network error: WCC monthly CSV exceeds the 64 MiB limit', 5)
+            chunks, size = [], 0
+            while chunk := response.read(65536):
+                size += len(chunk)
+                if size > 64 * 1024 * 1024:
+                    raise SkillError('network error: WCC monthly CSV exceeds the 64 MiB limit', 5)
+                chunks.append(chunk)
+            if expected is not None and size != expected:
+                raise SkillError('network error: WCC monthly CSV download was truncated', 5)
+            return b''.join(chunks)
+    except HTTPError as exc:
+        raise SkillError(f'network error: WCC export HTTP {exc.code}',
+                         4 if exc.code in (403, 429, 451) else 5,
+                         exc.headers.get('Retry-After') if exc.code == 429 else None) from exc
+    except (URLError, TimeoutError, OSError) as exc:
+        raise SkillError('network error: WCC export unavailable: ' + str(exc), 5) from exc
+
+
+def fetch(url, args, binary=False, max_bytes=32 * 1024 * 1024):
     if urlparse(url).hostname not in ALLOWED:
         raise SkillError('source host is outside the declared allowlist', 7)
     root = args.cache_dir / 'nz-traffic-counts-v1'
@@ -141,8 +192,11 @@ def fetch(url, args, binary=False):
         except (OSError, ValueError, KeyError, TypeError):
             pass
     try:
-        body, _ct, _final = nzfetch.fetch_bytes(url, timeout=10, expect_json=not binary,
-                                               max_bytes=32 * 1024 * 1024, allowed_hosts=ALLOWED)
+        if max_bytes > 32 * 1024 * 1024:
+            body = fetch_wcc_export(url)
+        else:
+            body, _ct, _final = nzfetch.fetch_bytes(url, timeout=10, expect_json=not binary,
+                                                   max_bytes=max_bytes, allowed_hosts=ALLOWED)
     except nzfetch.RateLimited as exc:
         raise SkillError('network error: rate_limited', 4, exc.retry_after) from exc
     except nzfetch.Blocked as exc:
@@ -584,6 +638,226 @@ def at_site_id(a):
     return f"{a['carr_way_no']}:{a['location']}"
 
 
+def city_spatial(row, geometry):
+    """Keep WCC countlines intact; nearest uses their vertex-mean centre."""
+    if not geometry:
+        return row
+    if 'paths' in geometry:
+        paths = geometry['paths']
+        points = [p for path in paths for p in path]
+        if not points or any(len(path) < 2 for path in paths):
+            raise SkillError('Empty or incomplete countline geometry')
+        if any(len(p) != 2 or not all(math.isfinite(v) for v in p)
+               or not (-180 <= p[0] <= 180 and -90 <= p[1] <= 90) for p in points):
+            raise SkillError('Countline vertices are outside WGS84 bounds')
+        row['geometry'] = dict(type='MultiLineString', coordinates=paths)
+        x, y = (sum(p[i] for p in points)/len(points) for i in (0, 1))
+    else:
+        x, y = geometry['x'], geometry['y']
+    if not all(math.isfinite(v) for v in (x, y)) or not (-180 <= x <= 180 and -90 <= y <= 90):
+        raise SkillError('Source geometry is outside WGS84 bounds')
+    row.update(longitude=x, latitude=y)
+    return row
+
+
+def parse_city_arc(feature, source, url, stamp):
+    a = feature['attributes']
+    if source == 'hamilton-traffic':
+        if not {'OBJECTID', 'Site_Number', 'Site_Name', 'Year2023'} <= a.keys():
+            raise SkillError('Hamilton annual traffic fields changed')
+        row = dict(site_id=str(a['OBJECTID']), site_number=a['Site_Number'], name=a['Site_Name'],
+                   direction=a.get('Direction'), raw=a)
+    elif source == 'tauranga-traffic':
+        if not {'id', 'road_id', 'count_date', 'ADT'} <= a.keys():
+            raise SkillError('Tauranga traffic fields changed')
+        try:
+            day = date.fromisoformat(a['count_date'][:10]).isoformat() if a['count_date'] else None
+        except ValueError as exc:
+            raise SkillError('Invalid Tauranga count_date') from exc
+        row = dict(site_id=a['id'], name=a['road_id'], date=day, adt=numeric(a['ADT']),
+                   direction=a.get('direction'), heavy_vehicle_percent=numeric(a.get('PcHeavy')), raw=a)
+    else:
+        if not {'COUNTLINE_ID', 'Status'} <= a.keys():
+            raise SkillError('Wellington countline fields changed')
+        row = dict(site_id=str(a['COUNTLINE_ID']), name='Countline ' + str(a['COUNTLINE_ID']),
+                   status=a['Status'], raw=a)
+    return city_spatial(dict(row, **provenance(source, url, stamp)), feature.get('geometry'))
+
+
+def hamilton_years(row, args):
+    years = sorted((k[4:], v) for k, v in row['raw'].items() if re.fullmatch(r'Year\d{4}', k))
+    return [dict(row, date=year, period_start=year+'-01-01', period_end=year+'-12-31',
+                 count=numeric(value), granularity='annual source value') for year, value in years
+            if (not args.date_from or year+'-12-31' >= args.date_from)
+            and (not args.date_to or year+'-01-01' <= args.date_to)]
+
+
+def parse_chch(data, url, stamp):
+    if data.get('type') != 'FeatureCollection' or not isinstance(data.get('features'), list):
+        raise SkillError('Christchurch response is not a GeoJSON FeatureCollection')
+    rows = []
+    for feature in data['features']:
+        a, g = feature['properties'], feature.get('geometry')
+        if a.get('total') is True and a.get('oid') == 'total':
+            continue  # The source's network total has a display coordinate, not a counter site.
+        if not {'oid', 'name', 'count', 'direction'} <= a.keys() or not g or g.get('type') != 'Point':
+            raise SkillError('Christchurch counter fields or point geometry changed')
+        row = dict(site_id=str(a['oid']), name=a['name'], count=numeric(a['count']),
+                   direction=a['direction'], installed_on=a.get('installed_on'), raw=a,
+                   **provenance('christchurch-cycle', url, stamp))
+        rows.append(city_spatial(row, dict(zip(('x', 'y'), g['coordinates']))))
+    return rows
+
+
+def city_sites(args, bbox=None, site=None):
+    source = args.source
+    if source == 'christchurch-cycle':
+        if args.date_from or args.date_to:
+            raise SkillError('Christchurch snapshot supplies no observation date or period; date filters are unsupported', 7)
+        body, stamp = fetch(CHCH, args)
+        rows = parse_chch(json.loads(body), CHCH, stamp)
+        if len(rows) > args.max_records:
+            raise SkillError('Christchurch inventory exceeds --max-records; increase the bound', 7)
+        if bbox:
+            rows = [r for r in rows if bbox[0] <= r['longitude'] <= bbox[2] and bbox[1] <= r['latitude'] <= bbox[3]]
+        if site is not None:
+            rows = [r for r in rows if r['site_id'] == site]
+        remember(args, provenance(source, CHCH, stamp))
+        return rows, ['Christchurch snapshot has no observation timestamp or count period; do not interpret it as a daily count.']
+    base = SOURCES[source]['url']
+    where = '1=1'
+    if site is not None:
+        if source == 'tauranga-traffic':
+            if not re.fullmatch(r'[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}', site):
+                raise SkillError('Tauranga site must be the UUID from sites', 2)
+            where = f"id='{site}'"
+        else:
+            if not re.fullmatch(r'\d{1,12}', site):
+                raise SkillError('Site must be the numeric identifier from sites', 2)
+            field = 'OBJECTID' if source == 'hamilton-traffic' else 'COUNTLINE_ID'
+            where = f'{field}={int(site)}'
+    if source == 'wellington-sensors' and (args.date_from or args.date_to) and args.command != 'counts':
+        raise SkillError('Wellington inventory has no observation dates; apply date filters to counts', 7)
+    raw, warnings = arc_rows(base, args, where, bbox)
+    rows = [parse_city_arc(f, source, u, t) for f, u, t in raw]
+    remember(args, provenance(source, base, min((t for _, _, t in raw), default=utc_now())))
+    if source == 'tauranga-traffic' and site is None:
+        rows = [r for r in rows if (r['date'] is not None or not (args.date_from or args.date_to))
+                and in_range(r['date'], args.date_from, args.date_to)]
+    if source == 'hamilton-traffic' and site is None:
+        for row in rows:
+            observed = [r for r in hamilton_years(row, args) if r['count'] is not None]
+            row['date'] = observed[-1]['date'] if observed else None
+        if args.date_from or args.date_to:
+            rows = [r for r in rows if r['date']]
+    return rows, warnings
+
+
+def wcc_months(body):
+    root = ET.fromstring(body)
+    if root.tag.rsplit('}', 1)[-1] != 'ListBucketResult':
+        raise SkillError('Wellington file listing schema changed')
+    if any(e.text == 'true' for e in root.iter() if e.tag.rsplit('}', 1)[-1] == 'IsTruncated'):
+        raise SkillError('Wellington file listing is truncated; archive discovery is incomplete', 7)
+    months = {}
+    for element in root.iter():
+        if element.tag.rsplit('}', 1)[-1] != 'Key':
+            continue
+        match = re.fullmatch(r'transport_sensors/countline_mobility/csv/(\d{4})/(\d{2})/countline_mobility_\1_\2.csv', element.text or '')
+        if match:
+            months[match[1]+'-'+match[2]] = WCC_FILES + element.text
+    if not months:
+        raise SkillError('No Wellington monthly CSV exports found')
+    return months
+
+
+def parse_wcc_csv(body, wanted_site, start=None, end=None):
+    reader = csv.DictReader(io.TextIOWrapper(io.BytesIO(body), encoding='utf-8-sig', newline=''))
+    fields = {'COUNTLINE_ID', 'COUNTLINE_DATE', 'COUNTLINE_HOUR', 'DIRECTION_COUNT', 'COUNTLINE_TRANSPORT_CLASS', 'DIRECTION'}
+    if not reader.fieldnames or not fields <= set(reader.fieldnames):
+        raise SkillError('Wellington CSV fields changed')
+    rows, latest, seen = [], None, False
+    for a in reader:
+        try:
+            day = date.fromisoformat(a['COUNTLINE_DATE']).isoformat()
+        except (TypeError, ValueError) as exc:
+            raise SkillError('Invalid Wellington observation date') from exc
+        latest = max(latest or day, day)
+        if a['COUNTLINE_ID'] != wanted_site:
+            continue
+        seen = True
+        if not in_range(day, start, end):
+            continue
+        hour = int(a['COUNTLINE_HOUR'])
+        if not 0 <= hour <= 23:
+            raise SkillError('Wellington observation hour is outside 0..23')
+        rows.append(dict(site_id=wanted_site, date=day, hour=hour, count=numeric(a['DIRECTION_COUNT']),
+                         transport_class=a['COUNTLINE_TRANSPORT_CLASS'], direction=a['DIRECTION'],
+                         granularity='hourly', raw=a))
+    if latest is None:
+        raise SkillError('Wellington monthly CSV has no observations')
+    return rows, latest, seen
+
+
+def city_counts(args):
+    # Validate the site independently of spatial/date filtering, so no matches is meaningful.
+    sites, warnings = city_sites(args, site=args.site)
+    if not sites and args.source != 'wellington-sensors':
+        raise SkillError(f'Unknown site {args.site}; use sites --source to find an identifier', 2)
+    if args.source == 'hamilton-traffic':
+        rows = [r for site in sites for r in hamilton_years(site, args)]
+        warnings.append('Annual source values retain their year precision; null annual values are not zero-filled.')
+    elif args.source == 'tauranga-traffic':
+        rows = [r for r in sites if (r['date'] is not None or not (args.date_from or args.date_to))
+                and in_range(r['date'], args.date_from, args.date_to)]
+    elif args.source == 'christchurch-cycle':
+        rows = sites
+    else:
+        inventory_meta = args._provenances.pop()
+        listing = WCC_FILES + '?' + urlencode({'list-type': '2', 'prefix': 'transport_sensors/countline_mobility/csv/'})
+        body, _ = fetch(listing, args, binary=True)
+        months = wcc_months(body)
+        start = args.date_from[:7] if args.date_from else (args.date_to[:7] if args.date_to else max(months))
+        end = args.date_to[:7] if args.date_to else (datetime.now(NZ).date().isoformat()[:7] if args.date_from else start)
+        expected = []
+        current = date.fromisoformat(start+'-01')
+        while current.isoformat()[:7] <= end:
+            expected.append(current.isoformat()[:7])
+            if len(expected) > 3:
+                raise SkillError('Wellington counts allow at most three monthly CSV downloads; narrow the dates', 7)
+            current = (current.replace(day=28)+timedelta(days=4)).replace(day=1)
+        missing = [m for m in expected if m not in months]
+        if missing:
+            raise SkillError('No Wellington monthly export for: ' + ', '.join(missing), 7)
+        rows, seen = [], False
+        for month in expected:
+            url = months[month]
+            try:
+                body, stamp = fetch(url, args, binary=True, max_bytes=64 * 1024 * 1024)
+                parsed, latest, found = parse_wcc_csv(body, args.site, args.date_from, args.date_to)
+            except SkillError as exc:
+                exc.meta = provenance(args.source, url)
+                raise
+            meta = provenance(args.source, url, stamp, latest)
+            remember(args, meta)
+            rows.extend(dict(r, **meta) for r in parsed)
+            seen = seen or found
+        remember(args, inventory_meta)
+        if not sites and not seen:
+            raise SkillError('Site is absent from the Wellington inventory and selected monthly exports', 2)
+        if sites:
+            geometry = {k: sites[0][k] for k in ('geometry', 'longitude', 'latitude') if k in sites[0]}
+            rows = [dict(r, **geometry, geometry_source_url=sites[0]['source_url']) for r in rows]
+        warnings.append('Wellington classes and directions remain separate; gaps are not zero-filled. Nearest measures countline centres.')
+    bbox = getattr(args, 'bbox', None)
+    if bbox:
+        candidates, extra = city_sites(args, bbox=bbox)
+        allowed = {r['site_id'] for r in candidates}
+        rows = [r for r in rows if r['site_id'] in allowed]
+        warnings.extend(extra)
+    return rows, warnings
+
+
 def arc_normalise(feature, source, url, stamp, sites=False):
     a, geom = feature['attributes'], feature.get('geometry')
     if source == 'at-adt':
@@ -611,6 +885,8 @@ def arc_normalise(feature, source, url, stamp, sites=False):
 
 
 def get_sites(args, bbox=None):
+    if args.source in CITY_SOURCES:
+        return city_sites(args, bbox)
     if args.source in ('at-adt', 'nzta-tms'):
         base = TMS_SITES if args.source == 'nzta-tms' else AT
         where = "latest='Yes'" if args.source == 'at-adt' else '1=1'
@@ -628,7 +904,7 @@ def get_sites(args, bbox=None):
                                   '2025' if args.source == 'nzta-tms' else None))
     else:
         if bbox:
-            raise SkillError('This workbook has no coordinates; --bbox is available for at-adt and nzta-tms', 7)
+            raise SkillError('This workbook has no coordinates; choose a spatial source from sources', 7)
         rows, warnings = workbook_records(args), []
     unique = {}
     for row in rows:
@@ -645,6 +921,10 @@ def get_sites(args, bbox=None):
 
 
 def get_counts(args):
+    if args.source in CITY_SOURCES:
+        return city_counts(args)
+    if getattr(args, 'bbox', None) or getattr(args, 'format', 'json') == 'geojson':
+        raise SkillError('Spatial counts output is available for the city sources; use sites for existing sources', 7)
     if args.source not in ('at-adt', 'nzta-tms'):
         rows = workbook_records(args)
         rows = [r for r in rows if r['site_id'] == args.site]
@@ -743,7 +1023,9 @@ def envelope(rows, args, warnings):
     downloads = getattr(args, '_provenances', [])
     if downloads:
         meta.update(downloads[0])
-        meta['latest_data'] = max(p['latest_data'] for p in downloads)
+        latest = [p['latest_data'] for p in downloads if p.get('latest_data')]
+        if latest:
+            meta['latest_data'] = max(latest)
         meta['retrieved_at'] = min(p['retrieved_at'] for p in downloads)
         meta['downloads'] = downloads
     warnings = list(dict.fromkeys(warnings + getattr(args, '_warnings', [])))
@@ -753,8 +1035,8 @@ def envelope(rows, args, warnings):
                        if k != 'cache_dir' and not k.startswith('_')}, warnings=warnings,
                 count=min(len(rows), args.limit), matched_count=len(rows))
     if getattr(args, 'format', None) == 'geojson':
-        features = [dict(type='Feature', geometry=(dict(type='Point', coordinates=[r['longitude'], r['latitude']])
-                    if 'longitude' in r else None), properties=r) for r in rows[:args.limit]]
+        features = [dict(type='Feature', geometry=r.get('geometry', (dict(type='Point', coordinates=[r['longitude'], r['latitude']])
+                    if 'longitude' in r else None)), properties=r) for r in rows[:args.limit]]
         return geojson_envelope(features, meta)
     return result_envelope(rows[:args.limit], meta)
 
@@ -769,11 +1051,11 @@ def build_parser():
         p.add_argument('--max-records', type=bounded_records, default=10000, help='maximum ArcGIS rows queried')
         p.add_argument('--max-age', type=nonnegative, default=86400, help='cache max age in seconds; 0 bypasses cache')
         p.add_argument('--cache-dir', type=Path, default=Path(__file__).resolve().parents[1]/'.cache')
+        p.add_argument('--source', choices=tuple(SOURCES), required=name != 'sources')
         if name != 'sources':
-            p.add_argument('--source', choices=tuple(SOURCES), required=True)
             p.add_argument('--from', dest='date_from', type=iso_date)
             p.add_argument('--to', dest='date_to', type=iso_date)
-        if name in ('sites', 'nearest'):
+        if name in ('sites', 'nearest', 'counts'):
             p.add_argument('--bbox', type=lambda s: coordinates(s, True))
             p.add_argument('--format', choices=('json', 'geojson'), default='json')
         if name == 'counts':
@@ -791,7 +1073,8 @@ def execute(args):
     warnings = []
     if args.command == 'sources':
         rows = [dict(source_id=k, **{**{x: v for x, v in s.items() if x != 'url' and v is not None}, **provenance(k)},
-                     sites_url=TMS_SITES if k == 'nzta-tms' else s['url']) for k, s in SOURCES.items()]
+                     sites_url=TMS_SITES if k == 'nzta-tms' else s['url']) for k, s in SOURCES.items()
+                if not args.source or k == args.source]
         warnings.append('Sources is the verified catalogue, not a live health probe. Active-mode defaults discover the latest workbook; date filters select archives.')
     elif args.command == 'counts':
         rows, warnings = get_counts(args)
@@ -799,13 +1082,13 @@ def execute(args):
         rows, warnings = get_sites(args, args.bbox)
     else:
         if not SOURCES[args.source]['spatial']:
-            raise SkillError('This workbook has no coordinates; nearest supports at-adt and nzta-tms', 7)
+            raise SkillError('This workbook has no coordinates; choose a spatial source from sources', 7)
         lon, lat = args.near
         dy = args.radius_km/110.0
         dx = min(180.0, dy/max(0.01, math.cos(math.radians(lat))))
         bounds = args.bbox or (max(-180, lon-dx), max(-90, lat-dy), min(180, lon+dx), min(90, lat+dy))
         rows, warnings = get_sites(args, bounds)
-        if warnings:
+        if any(w.startswith('Result capped') for w in warnings):
             raise SkillError('Nearest query exceeded --max-records; narrow --radius-km or increase --max-records', 7)
         rows = [dict(r, distance_km=round(distance(lon, lat, r['longitude'], r['latitude']), 6))
                 for r in rows if 'longitude' in r]
@@ -822,6 +1105,9 @@ def resolve_dates(args):
     if args.source == 'nzta-tms' and args.command == 'counts':
         end = end or today.isoformat()
         start = start or (date.fromisoformat(end)-timedelta(days=30)).isoformat()
+    elif args.source == 'wellington-sensors' and args.command == 'counts' and (start or end):
+        end = end or today.isoformat()
+        start = start or end[:7]+'-01'
     elif args.source in ('hotcity', 'at-cycle-daily', 'at-cycle-monthly') and (start or end):
         end = end or today.isoformat()
         start = start or (end[:4] + '-01-01' if args.source == 'hotcity' else end[:7] + '-01')

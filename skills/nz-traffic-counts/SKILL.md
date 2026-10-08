@@ -1,11 +1,11 @@
 ---
 name: nz-traffic-counts
-description: "Query NZ traffic, cycle and pedestrian count sites and time series, starting with Auckland Transport, NZTA TMS and Heart of the City. Use for historical volumes, active-mode monitoring and nearby count sites."
+description: "Query NZ traffic, cycle and pedestrian count sites and time series, from Auckland Transport, NZTA TMS, Heart of the City, Hamilton, Christchurch, Wellington and Tauranga. Use for historical volumes, active-mode monitoring and nearby count sites."
 license: MIT
 compatibility: "Requires Python 3.10+ and network access for live data"
 metadata:
   thecolab.category: "transport"
-  thecolab.source_owner: "Auckland Transport; NZ Transport Agency; Heart of the City"
+  thecolab.source_owner: "Auckland Transport; NZ Transport Agency; Heart of the City; Hamilton City Council; Christchurch City Council; Wellington City Council; Tauranga City Council"
   thecolab.source_type: "mixed"
   thecolab.auth: "none"
   thecolab.access_mode: "public-download"
@@ -18,7 +18,7 @@ metadata:
   thecolab.skill_type: "public-download"
   thecolab.pack: "nz-public-data"
   thecolab.source_url: "https://at.govt.nz/about-us/reports-publications/traffic-counts"
-  thecolab.allowed_domains: "at.govt.nz,www.hotcity.co.nz,services.arcgis.com,services2.arcgis.com"
+  thecolab.allowed_domains: "at.govt.nz,www.hotcity.co.nz,services.arcgis.com,services2.arcgis.com,services1.arcgis.com,cemeteryaws.tauranga.govt.nz,smartview.ccc.govt.nz,gis.wcc.govt.nz,gis-snowflake-opendata-public-wcc-arcgis-prod.s3.ap-southeast-2.amazonaws.com"
   thecolab.last_verified: "2026-10-08"
   thecolab.health: "healthy"
   thecolab.maintainer: "@adam91holt"
@@ -32,6 +32,12 @@ then obtain the exact site identifier with `sites` before querying `counts`.
 
 ```bash
 python3 scripts/cli.py sources --json
+python3 scripts/cli.py sources --source wellington-sensors --json
+python3 scripts/cli.py sites --source hamilton-traffic --limit 2 --json
+python3 scripts/cli.py counts --source hamilton-traffic --site 2893 --from 2023-01-01 --to 2023-12-31 --json
+python3 scripts/cli.py counts --source christchurch-cycle --site 100045582 --format geojson
+python3 scripts/cli.py nearest --source wellington-sensors --near 174.7754,-41.3199 --limit 2 --format geojson
+python3 scripts/cli.py counts --source wellington-sensors --site 48346 --from 2026-09-01 --to 2026-09-01 --json
 python3 scripts/cli.py sites --source at-adt --bbox 174.74,-36.87,174.79,-36.83 --format geojson --json
 python3 scripts/cli.py counts --source at-adt --site 23788:522 --json
 python3 scripts/cli.py sites --source at-traffic --limit 5 --json
@@ -66,12 +72,31 @@ python3 scripts/cli.py nearest --near 174.76,-36.85 --source at-adt --radius-km 
   column labels, including spelling and line breaks. The 2026 workbook has
   24 camera series after three additions to the earlier network.
 
-Only `at-adt` and `nzta-tms` supply coordinates for `--bbox` and `nearest`.
-Filtering is upstream ArcGIS envelope intersection (`esriSpatialRelIntersects`).
+The four city sources also support `--bbox`, `nearest` and GeoJSON, including
+spatial `counts` output. Filtering is upstream ArcGIS envelope intersection
+(`esriSpatialRelIntersects`), except Christchurch point containment applied locally.
+Wellington GeoJSON preserves countlines; nearest measures their vertex-mean centres.
 Nearest searches within `--radius-km` (default 10 km), using straight-line
 WGS84 distance; an empty result means no site in that radius. A supplied bbox
 further defines the search area. Workbook `sites --format geojson` emits null
 geometries, since those downloads do not supply coordinates.
+
+- `hamilton-traffic`: annual `Year2000`–`Year2023` fields, preserving nulls.
+  Site IDs use ArcGIS OBJECTID; `site_number` preserves the council label. Date
+  filters use overlap with the whole year; `date` retains year precision.
+- `tauranga-traffic`: latest survey ADT per UUID site, with heavy-vehicle percentage.
+  Survey dates can be decades old even though the layer is refreshed.
+- `christchurch-cycle`: per-direction counter snapshot, keyed by `oid`. No
+  observation date or period is supplied; date filters fail explicitly.
+- `wellington-sensors`: monthly public CSV exports discovered from the S3 file
+  listing, latest month by default. Counts remain separate by hour, class and
+  direction. Queries may span at most three published months (64 MiB each);
+  missing months fail explicitly. Sites are countlines, with no observation-date
+  filtering. Historical CSV sites absent from the inventory retain null geometry.
+
+Hamilton pedestrian API S2745 is currently unavailable (timeout/HTTP 502); no
+unverified response parser is bundled. No Dunedin-specific counter was found in
+the assessed catalogue. NZTA inventory remains available nationally.
 
 Every data command supports `--json`, emitting `meta` and `results`; errors add
 an `error` object with code, type and message. GeoJSON carries `meta` as a foreign
@@ -87,7 +112,7 @@ for 24 hours. Set `--max-age SECONDS`, `--cache-dir PATH`, or `--max-age 0` to
 refresh. Cache hits preserve the original retrieval time. `--limit` bounds
 output (default 100); `--max-records` bounds ArcGIS retrieval (default 10,000, maximum 50,000),
 with explicit truncation warnings. Requests use 10-second network timeouts and
-32 MiB download caps. Never fetch the NZTA 1.7 GB quarter-hourly ZIP.
+32 MiB download caps (64 MiB for Wellington monthly CSVs). Never fetch the NZTA 1.7 GB quarter-hourly ZIP.
 
 Read [references/source-notes.md](references/source-notes.md) for catalogue URLs,
 reuse limits, archive coverage and interpretation. XLSX parsing uses `zipfile`
