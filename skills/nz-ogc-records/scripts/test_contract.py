@@ -107,7 +107,7 @@ class RecordsTests(unittest.TestCase):
     def test_partial_search_reports_blocked_ckan_without_crashing(self):
         def fetch(url):
             if urlsplit(url).hostname == urlsplit(cli.CATALOGUES['data-govt-nz']['source_url']).hostname:
-                raise cli.SourceError('network error: blocked', 4, 'blocked')
+                raise cli.SourceError('network error: blocked', 4)
             return fixture('niwa.json')
         code, p = self.invoke(['search', 'water', '--catalogue', 'niwa', '--catalogue',
                               'data-govt-nz', '--json'], fetch)
@@ -129,7 +129,7 @@ class RecordsTests(unittest.TestCase):
             for cat, meta in cli.CATALOGUES.items():
                 if url.startswith(meta['source_url']):
                     if cat == 'data-govt-nz':
-                        raise cli.SourceError('network error: blocked', 4, 'blocked')
+                        raise cli.SourceError('network error: blocked', 4)
                     return fixture(cat + '.json')
             self.fail('Unknown outbound catalogue')
         code, p = self.invoke(['catalogues', '--json'], fetch)
@@ -181,7 +181,7 @@ class RecordsTests(unittest.TestCase):
         raw = fixture('data-govt-nz.json')
         rows, count, _ = cli.ckan_result(raw)
         self.assertEqual(count, raw['result']['count'])
-        self.assertEqual(len(rows), 2)
+        self.assertEqual(len(rows), 3)
         url = cli.query_url('data-govt-nz', 'water', [174, -37, 175, -36], 2)
         r = cli.normalise_ckan(rows[0], 'data-govt-nz', url, STAMP)
         self.assertEqual(r['publisher'], rows[0]['organization']['title'])
@@ -198,10 +198,23 @@ class RecordsTests(unittest.TestCase):
         for spatial in (json.loads(rows[0]['spatial']), None):
             mutated = dict(rows[0], spatial=spatial)
             self.assertEqual(cli.normalise_ckan(mutated, 'data-govt-nz', url, STAMP)['geometry'], spatial)
-        for spatial in ('{bad', '', '[]', {}, {'type': 4}, ['Polygon']):
+        for spatial in ('', '  \t\n'):
+            record = cli.normalise_ckan(dict(rows[0], spatial=spatial), 'data-govt-nz', url, STAMP)
+            self.assertIsNone(record['geometry'])
+            self.assertNotIn('geometry_warning', record)
+        for spatial in ('{bad', '[]', {}, {'type': 4}, ['Polygon']):
             with self.assertRaises(cli.SourceError) as caught:
                 cli.normalise_ckan(dict(rows[0], spatial=spatial), 'data-govt-nz', url, STAMP)
             self.assertEqual(caught.exception.code, 6)
+        record = cli.normalise_ckan(rows[2], 'data-govt-nz', url, STAMP)
+        self.assertIsNone(record['geometry'])
+        self.assertEqual(record['publisher'], 'data.govt.nz')
+        self.assertNotIn('licence', record)
+        self.assertNotIn('licence', record['distributions'][0])
+        self.assertEqual(record['distributions'][0]['updated_at'], '2026-10-02T03:04:05Z')
+        blank_date = cli.normalise_ckan(rows[1], 'data-govt-nz', url, STAMP)
+        self.assertIsNone(blank_date['geometry'])
+        self.assertIsNone(blank_date['distributions'][0]['updated_at'])
         calls = []
         def fetch(url):
             calls.append(url)
@@ -214,11 +227,32 @@ class RecordsTests(unittest.TestCase):
         next_url = p['meta']['catalogues'][0]['next_urls'][0]
         self.assertEqual(parse_qs(urlsplit(next_url).query),
                          {'q': ['water'], 'rows': ['2'], 'start': ['2'], 'ext_bbox': ['174.0,-37.0,175.0,-36.0']})
-        code, p = self.invoke(['get', 'data-govt-nz', rows[0]['name'], '--json'],
+        code, p = self.invoke(['get', 'data-govt-nz', rows[2]['name'], '--json'],
                              lambda url, **kwargs: fixture('data-govt-nz-get.json'))
         self.assertEqual(code, 0)
-        self.assertEqual(p['results'][0]['id'], rows[0]['id'])
+        self.assertEqual(p['results'][0]['id'], rows[2]['id'])
+        self.assertIsNone(p['results'][0]['geometry'])
+        self.assertNotIn('licence', p['meta'])
         self.assertEqual(len(p['results']), 1)
+
+    def test_ckan_malformed_coverage_preserves_search_page_but_get_fails(self):
+        for spatial in ('{bad', '[]', {}, {'type': 4}):
+            raw = fixture('data-govt-nz.json')
+            raw['result']['results'][1]['spatial'] = spatial
+            code, payload = self.invoke(['search', 'water', '--catalogue', 'data-govt-nz', '--json'],
+                                        lambda url, **kwargs: raw)
+            self.assertEqual(code, 0)
+            self.assertEqual(len(payload['results']), 3)
+            self.assertFalse(payload['meta']['partial'])
+            self.assertTrue(payload['meta']['catalogues'][0]['available'])
+            self.assertIsNotNone(payload['results'][0]['geometry'])
+            self.assertIsNone(payload['results'][1]['geometry'])
+            self.assertIn('geometry_warning', payload['results'][1])
+            self.assertIn(raw['result']['results'][1]['id'], payload['meta']['warnings'][0])
+            code, payload = self.invoke(['get', 'data-govt-nz', 'record', '--json'],
+                                        lambda url, **kwargs: {'success': True, 'result': raw['result']['results'][1]})
+            self.assertEqual(code, 6)
+            self.assertEqual(payload['error']['type'], 'schema_failure')
 
     def test_shared_runner_accepts_success_and_error_shapes(self):
         spec = importlib.util.spec_from_file_location('records_run_skill', SKILL_DIR.parents[1] / 'scripts/run_skill.py')
@@ -284,9 +318,14 @@ class RecordsTests(unittest.TestCase):
         for marker in ('custom', 'none', ''):
             f = fixture('auckland-council-get.json')
             f['properties']['license'] = marker
-            f['properties']['licenseInfo'] = '<p>Terms &amp; conditions ' + 'x' * 350 + '</p>'
+            f['properties']['licenseInfo'] = '<p>Terms &amp; conditions ' + 'licence clause ' * 30 + '</p>'
             r = cli.normalise_ogc(f, 'auckland-council', 'https://example.invalid/', STAMP)
-            self.assertEqual(r['licence'], r['licence_info'][:300])
+            self.assertTrue(r['licence_info'].startswith(r['licence'][:-1]))
+            self.assertTrue(r['licence'].endswith('licence…'))
+            self.assertLessEqual(len(r['licence']), 301)
+            self.assertTrue(r['licence'].endswith('…'))
+            self.assertFalse(r['licence'][:-1].endswith(' '))
+            self.assertGreater(len(r['licence_info']), 300)
             self.assertNotIn('<p>', r['licence'])
             f['properties'].pop('licenseInfo')
             r = cli.normalise_ogc(f, 'auckland-council', 'https://example.invalid/', STAMP)
@@ -295,6 +334,8 @@ class RecordsTests(unittest.TestCase):
                 self.assertNotIn('licence', d)
         self.assertEqual(cli.iso_date('2022-03-05T02:19:21.805308'), '2022-03-05T02:19:21Z')
         self.assertEqual(cli.iso_date('2022-03-05T03:19:21+01:00'), '2022-03-05T02:19:21Z')
+        for value in (None, '', ' \t\n'):
+            self.assertIsNone(cli.iso_date(value))
         with self.assertRaises(cli.SourceError):
             cli.iso_date('invalid date')
 
@@ -312,6 +353,25 @@ class RecordsTests(unittest.TestCase):
                 self.assertEqual(smoke_test.main(), 1)
             self.assertIn('[FAIL] CLI GeoJSON:', out.getvalue())
             self.assertIn('synthetic traceback tail', out.getvalue())
+
+    def test_live_ckan_smoke_fetches_detail_and_searches_twenty_rows(self):
+        raw = fixture('data-govt-nz.json')
+        records = [cli.normalise_ckan(r, 'data-govt-nz', cli.query_url('data-govt-nz'), STAMP)
+                   for r in raw['result']['results']]
+        # Put blank coverage first so the smoke detail parser must accept it.
+        records = [records[2], *records[:2]]
+        with patch.object(cli, 'catalogue_request', return_value=({'available': True, 'number_matched': 3}, records)) as search, \
+             patch.object(cli, 'fetch_json', return_value=fixture('data-govt-nz-get.json')) as get:
+            result = smoke_test.live('data-govt-nz', 'roads')
+        search.assert_called_once_with('data-govt-nz', 'roads', None, 20)
+        get.assert_called_once_with(cli.query_url('data-govt-nz', record_id=records[0]['id']))
+        self.assertIn('[PASS] live data-govt-nz get:', result)
+        for code in (4, 5):
+            with patch.object(cli, 'catalogue_request', return_value=({'available': True, 'number_matched': 3}, records)), \
+                 patch.object(cli, 'fetch_json', side_effect=cli.SourceError('network error', code)):
+                result = smoke_test.live('data-govt-nz', 'roads')
+            self.assertIn('[PASS] live data-govt-nz search:', result)
+            self.assertIn('[SKIP] data-govt-nz get:', result)
 
     def test_input_rejected_before_network(self):
         for argv in (['search', 'x', '--limit', '0'], ['search', 'x', '--limit', '101'],

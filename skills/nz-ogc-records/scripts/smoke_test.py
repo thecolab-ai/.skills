@@ -13,7 +13,9 @@ PROVENANCE = {'source_url', 'publisher', 'retrieved_at'}
 
 
 def live(cat, term):
-    status, records = cli.catalogue_request(cat, term, [174.4, -37.2, 175.3, -36.4], 2)
+    ckan = cli.CATALOGUES[cat]['kind'] == 'ckan'
+    status, records = cli.catalogue_request(cat, term, None if ckan else [174.4, -37.2, 175.3, -36.4],
+                                            20 if ckan else 2)
     if not status['available']:
         if status.get('error_code') in (4, 5):
             return f"[SKIP] {cat}: {status['error']}"
@@ -29,7 +31,8 @@ def live(cat, term):
         if exc.code in (4, 5):
             return f"[PASS] live {cat} search: {status['number_matched']} matched\n[SKIP] {cat} get: {exc}"
         raise
-    detail = cli.normalise_ogc(raw, cat, url, cli.now())
+    detail = (cli.normalise_ckan(cli.ckan_result(raw, detail=True), cat, url, cli.now())
+              if ckan else cli.normalise_ogc(raw, cat, url, cli.now()))
     assert detail['title'] == records[0]['title']
     assert detail['distribution_urls']
     assert PROVENANCE <= detail.keys()
@@ -48,7 +51,7 @@ def main():
         print(f'[PASS] fixture {cat}: Records response shape and distributions')
     ckan_fixture = json.loads((FIXTURES / 'data-govt-nz.json').read_text())
     rows, count, _ = cli.ckan_result(ckan_fixture)
-    assert count == ckan_fixture['result']['count'] and len(rows) == 2
+    assert count == ckan_fixture['result']['count'] and len(rows) == 3
     record = cli.normalise_ckan(rows[0], 'data-govt-nz', cli.query_url('data-govt-nz'), cli.now())
     assert PROVENANCE <= record.keys() and record['distribution_urls']
     assert record['publisher'] == rows[0]['organization']['title']
@@ -56,13 +59,21 @@ def main():
     assert record['geometry'] == json.loads(rows[0]['spatial'])
     assert 'latest_data' not in record
     print('[PASS] fixture data-govt-nz: synthetic CKAN search, provenance and geometry')
+    optional = cli.normalise_ckan(rows[2], 'data-govt-nz', cli.query_url('data-govt-nz'), cli.now())
+    assert optional['geometry'] is None and 'licence' not in optional
+    assert optional['publisher'] == 'data.govt.nz' and 'licence' not in optional['distributions'][0]
+    assert optional['distributions'][0]['updated_at'] == '2026-10-02T03:04:05Z'
+    blank = cli.normalise_ckan(rows[1], 'data-govt-nz', cli.query_url('data-govt-nz'), cli.now())
+    assert blank['geometry'] is None and blank['distributions'][0]['updated_at'] is None
+    print('[PASS] fixture data-govt-nz optional metadata: blank coverage/date, unknown licence and dated resource')
     ckan_detail = json.loads((FIXTURES / 'data-govt-nz-get.json').read_text())
     detail = cli.normalise_ckan(cli.ckan_result(ckan_detail, detail=True), 'data-govt-nz',
-                                cli.query_url('data-govt-nz', record_id=rows[0]['id']), cli.now())
-    assert detail['id'] == rows[0]['id'] and detail['distribution_urls'] == record['distribution_urls']
+                                cli.query_url('data-govt-nz', record_id=rows[2]['id']), cli.now())
+    assert detail['id'] == rows[2]['id'] and detail['distribution_urls'] == optional['distribution_urls']
+    assert detail['geometry'] is None and 'licence' not in detail
     print('[PASS] fixture data-govt-nz get: synthetic CKAN detail and distributions')
     jobs = [('auckland-council', 'flood'), ('auckland-transport', 'Future Connect'),
-            ('waka-kotahi', 'traffic'), ('niwa', 'bathymetry')]
+            ('waka-kotahi', 'traffic'), ('niwa', 'bathymetry'), ('data-govt-nz', 'roads')]
     failed = False
     with ThreadPoolExecutor(max_workers=4) as pool:
         futures = [(cat, pool.submit(live, cat, term)) for cat, term in jobs]
@@ -91,15 +102,6 @@ def main():
             failed = True
         else:
             print('[PASS] live CLI GeoJSON: provenance and catalogue coverage geometry')
-    ckan, records = cli.catalogue_request('data-govt-nz', limit=1)
-    if ckan['available']:
-        assert records and PROVENANCE <= records[0].keys()
-        print(f"[PASS] live CKAN: {ckan['number_matched']} matched")
-    elif ckan.get('error_code') in (4, 5):
-        print(f"[SKIP] data-govt-nz: {ckan['error']}")
-    else:
-        print(f"[FAIL] schema CKAN: {ckan['error']}")
-        failed = True
     return int(failed)
 
 

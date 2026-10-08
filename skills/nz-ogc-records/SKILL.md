@@ -57,10 +57,10 @@ python3 skills/nz-ogc-records/scripts/cli.py get auckland-transport eeb0839fbd59
 
 ## Workflow and interpretation
 
-1. Check `catalogues` when selecting a source. On 8 October 2026 Hawk verified
-   CKAN search/get live; this lane's curl and nzfetch recheck received a bot
-   challenge. Access varies by network. CKAN fixtures are clearly marked
-   synthetic; the four OGC catalogues are live-verified here.
+1. Check `catalogues` when selecting a source. CKAN search/get and the four OGC
+   catalogues were verified live on 8 October 2026 from an NZ network. Some
+   overseas networks receive an Incapsula bot challenge, reported as `blocked`
+   (exit 4); nzfetch proxy fallback applies. CKAN fixtures are marked synthetic.
 2. Search relevant catalogues, inspect `catalogues`, `partial`, and `warnings`,
    and use returned IDs with `get` to review the record.
 3. Check each record's `licence`, `licence_info`, attribution, description and
@@ -76,7 +76,8 @@ returns an array. `meta` carries `source_url`, `publisher`, and `retrieved_at`
 (UTC), plus catalogue statuses, query settings, `partial` and `warnings`.
 Mixed-source records and distributions carry their own provenance. `licence`
 and `latest_data` are omitted when unknown. `custom`/`none` Hub licence markers
-use up to 300 characters of plain-text licence terms when present; inspect
+use a plain-text excerpt of licence terms, cut at a word boundary within 300
+characters with an ellipsis when truncated; inspect
 `licence_info` for the full terms. GeoJSON uses `meta` as a foreign member.
 Failures use `meta`, `results: []`, and `error` with numeric `code`, contract
 `type` and `message`; rate limits preserve `retry_after`. No keys or sign-in are
@@ -84,6 +85,9 @@ used. Linked distributions are surfaced, not fetched or checked for their own
 availability or authentication requirements. Search may succeed with partial
 results; all unavailable catalogues produce a non-zero search or catalogues exit.
 Empty results from available sources are valid. `--format json` implies JSON.
+Blank CKAN coverage and dates are treated as absent. Malformed CKAN coverage
+on search retains the record with `geometry: null`, `geometry_warning` and a
+metadata warning; fetching that record with `get` reports schema failure.
 
 Read [references/source-notes.md](references/source-notes.md) for endpoint,
 fixture and parser details. Run `scripts/test_contract.py` for deterministic

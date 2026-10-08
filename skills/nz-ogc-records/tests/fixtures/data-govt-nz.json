@@ -1,5 +1,5 @@
 {
-  "_fixture_note": "Entirely synthetic CKAN parser fixture. Live capture of package_search?q=water&rows=2 was blocked by Incapsula on 2026-10-08; count, IDs and metadata are examples, not observed data.",
+  "_fixture_note": "Entirely synthetic CKAN parser fixture modelling valid, blank and absent coverage, optional organisation/licence fields and resource dates. All counts, IDs and metadata are examples, not observed data.",
   "success": true,
   "result": {
     "count": 3,
@@ -43,10 +43,25 @@
             "url": "https://example.invalid/synthetic-water.csv",
             "format": "CSV",
             "name": "Synthetic CSV",
-            "last_modified": null
+            "last_modified": ""
           }
-        ],
-        "spatial": "{\"type\": \"Polygon\", \"coordinates\": [[[174, -37], [175, -37], [175, -36], [174, -36], [174, -37]]]}"
+        ]
+      },
+      {
+        "id": "synthetic-no-coverage-id",
+        "name": "synthetic-no-coverage",
+        "title": "Synthetic dataset without coverage or stated licence",
+        "notes": "<p>Synthetic optional metadata example.</p>",
+        "metadata_modified": "2026-10-03T01:09:41",
+        "spatial": "",
+        "resources": [
+          {
+            "url": "https://example.invalid/synthetic-no-coverage.csv",
+            "format": "CSV",
+            "name": "Synthetic dated CSV",
+            "last_modified": "2026-10-02T03:04:05.123456"
+          }
+        ]
       }
     ]
   }

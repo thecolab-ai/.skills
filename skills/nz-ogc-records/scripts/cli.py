@@ -45,7 +45,7 @@ ALLOWED_HOSTS = {urlsplit(c['source_url']).hostname for c in CATALOGUES.values()
 
 
 class SourceError(Exception):
-    def __init__(self, message, code=6, category='schema_failure', retry_after=None):
+    def __init__(self, message, code=6, retry_after=None):
         super().__init__(message)
         self.code = code
         self.category = ERROR_TYPES[code]
@@ -78,7 +78,7 @@ def text(value):
 
 
 def iso_date(value):
-    if value is None:
+    if value is None or (isinstance(value, str) and not value.strip()):
         return None
     if isinstance(value, (int, float)) and not isinstance(value, bool):
         try:
@@ -101,22 +101,22 @@ def fetch_json(url, *, record_catalogue=None):
         data = nzfetch.fetch_json(url, timeout=10, allowed_hosts=ALLOWED_HOSTS,
                                   max_bytes=8_000_000)
     except nzfetch.RateLimited as exc:
-        raise SourceError('network error: rate limited', 4, 'rate_limited', exc.retry_after) from exc
+        raise SourceError('network error: rate limited', 4, retry_after=exc.retry_after) from exc
     except nzfetch.Blocked as exc:
-        raise SourceError('network error: public endpoint blocked this request', 4, 'blocked') from exc
+        raise SourceError('network error: public endpoint blocked this request', 4) from exc
     except nzfetch.FetchError as exc:
         if record_catalogue and isinstance(exc.__cause__, HTTPError) and exc.__cause__.code in (404, 410):
-            raise SourceError('record not found in ' + record_catalogue, 2, 'invalid_input') from exc
+            raise SourceError('record not found in ' + record_catalogue, 2) from exc
         if isinstance(exc.__cause__, json.JSONDecodeError):
             raise SourceError('Source did not return valid JSON') from exc
         # Do not print proxy details or unexpected upstream bodies.
-        raise SourceError('network error: upstream unavailable', 5, 'upstream_unavailable') from exc
+        raise SourceError('network error: upstream unavailable', 5) from exc
     except ValueError as exc:
         raise SourceError('Source did not return valid JSON') from exc
     if not isinstance(data, dict):
         raise SourceError('Expected a JSON object from the catalogue')
     if 'error' in data:
-        raise SourceError('Catalogue returned an API error', 5, 'upstream_error')
+        raise SourceError('Catalogue returned an API error', 5)
     return data
 
 
@@ -220,7 +220,11 @@ def normalise_ogc(feature, cat, request_url, retrieved_at):
                               'format': p['type'], 'rel': 'download', 'derived': True})
     licence = p.get('license')
     if not licence or licence.lower() in ('none', 'custom'):
-        licence = (text(p.get('licenseInfo')) or '')[:300] or None
+        licence = text(p.get('licenseInfo')) or None
+        if licence and len(licence) > 300:
+            prefix = licence[:300]
+            # Avoid presenting a partial word as complete licence terms.
+            licence = (prefix.rsplit(' ', 1)[0] if ' ' in prefix else '').rstrip() + '…'
     # ArcGIS `modified` describes the catalogue item, not the data vintage.
     prov = provenance(request_url, p.get('source') or CATALOGUES[cat]['publisher'],
                       retrieved_at, licence, p.get('latest_data'))
@@ -234,7 +238,7 @@ def normalise_ogc(feature, cat, request_url, retrieved_at):
                 distribution_urls=list(dict.fromkeys(d['url'] for d in distributions)))
 
 
-def normalise_ckan(pkg, cat, request_url, retrieved_at):
+def normalise_ckan(pkg, cat, request_url, retrieved_at, *, tolerate_geometry=False):
     if not isinstance(pkg, dict) or not pkg.get('id') or not isinstance(pkg.get('title'), str):
         raise SourceError('Expected a CKAN dataset with id and title')
     org = pkg.get('organization') or {}
@@ -254,20 +258,29 @@ def normalise_ckan(pkg, cat, request_url, retrieved_at):
                       'title': r.get('name'), 'updated_at': iso_date(r.get('last_modified'))}
                      for r in resources if isinstance(r, dict) and public_url(r.get('url'))]
     geometry = pkg.get('spatial')
-    if isinstance(geometry, str):
-        try:
+    geometry_warning = None
+    try:
+        if isinstance(geometry, str) and not geometry.strip():
+            geometry = None
+        elif isinstance(geometry, str):
             geometry = json.loads(geometry)
-        except ValueError as exc:
+        if geometry is not None and (not isinstance(geometry, dict) or not isinstance(geometry.get('type'), str)):
+            raise ValueError('Expected a coverage geometry object')
+    except ValueError as exc:
+        if not tolerate_geometry:
             raise SourceError('Malformed CKAN coverage geometry') from exc
-    if geometry is not None and (not isinstance(geometry, dict) or not isinstance(geometry.get('type'), str)):
-        raise SourceError('Malformed CKAN coverage geometry')
+        geometry = None
+        geometry_warning = 'Malformed CKAN coverage geometry; coverage omitted'
     prov = provenance(request_url, publisher or CATALOGUES[cat]['publisher'], retrieved_at,
                       pkg.get('license_title') or pkg.get('license_id'), pkg.get('latest_data'))
     distributions = [dict(prov, **d) for d in distributions]
-    return dict(prov, catalogue=cat, id=pkg['id'], name=pkg.get('name'), title=pkg['title'],
+    record = dict(prov, catalogue=cat, id=pkg['id'], name=pkg.get('name'), title=pkg['title'],
                 description=text(pkg.get('notes')), updated_at=iso_date(pkg.get('metadata_modified')),
                 geometry=geometry, formats=list(dict.fromkeys(d['format'] for d in distributions if d['format'])),
                 links=[], distributions=distributions, distribution_urls=[d['url'] for d in distributions])
+    if geometry_warning:
+        record['geometry_warning'] = geometry_warning
+    return record
 
 
 def catalogue_request(cat, query=None, bbox=None, limit=1, probe=False):
@@ -281,9 +294,12 @@ def catalogue_request(cat, query=None, bbox=None, limit=1, probe=False):
         if CATALOGUES[cat]['kind'] == 'ckan' and count > limit:
             next_urls = [query_url(cat, query, bbox, limit, start=limit)]
         normaliser = normalise_ogc if CATALOGUES[cat]['kind'] == 'ogc-records' else normalise_ckan
-        records = [normaliser(f, cat, url, stamp) for f in features[:limit]]
+        options = {'tolerate_geometry': True} if CATALOGUES[cat]['kind'] == 'ckan' else {}
+        records = [normaliser(f, cat, url, stamp, **options) for f in features[:limit]]
+        warnings = [cat + ': ' + r['id'] + ': ' + r['geometry_warning']
+                    for r in records if 'geometry_warning' in r]
         return dict(status, available=True, status='available', number_matched=count,
-                    returned=0 if probe else len(records), next_urls=next_urls), [] if probe else records
+                    returned=0 if probe else len(records), next_urls=next_urls, warnings=warnings), [] if probe else records
     except SourceError as exc:
         return dict(status, available=False, status='unavailable', error=str(exc),
                     error_category=exc.category, error_code=exc.code, retry_after=exc.retry_after), []
@@ -392,6 +408,7 @@ def main(argv=None):
             meta['catalogues'] = [r[0] for r in replies]
             failures = [c for c in meta['catalogues'] if not c['available']]
             meta['warnings'] = [c['catalogue'] + ': ' + c['error'] for c in failures]
+            meta['warnings'].extend(w for c in meta['catalogues'] for w in c.get('warnings', []))
             meta['partial'] = bool(failures)
             records = []
             if args.command == 'search':

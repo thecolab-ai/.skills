@@ -13,13 +13,13 @@ for blocked requests; this skill does not inspect or print proxy configuration.
 | auckland-transport | Auckland Transport | https://data-atgis.opendata.arcgis.com/api/search/v1/collections/dataset/items | 14 |
 | waka-kotahi | NZ Transport Agency Waka Kotahi | https://opendata-nzta.opendata.arcgis.com/api/search/v1/collections/dataset/items | 21 |
 | niwa | Earth Sciences New Zealand (NIWA) | https://data-niwa.opendata.arcgis.com/api/search/v1/collections/dataset/items | 43 |
-| data-govt-nz | data.govt.nz | https://catalogue.data.govt.nz/api/3/action/package_search | Hawk: 32884; lane recheck blocked |
+| data-govt-nz | data.govt.nz | https://catalogue.data.govt.nz/api/3/action/package_search | 32884 (NZ network) |
 
-Counts are observations on 8 October 2026, not hard-coded runtime totals. Hawk
-live-verified CKAN search/get on that date; this lane's direct curl and nzfetch
-rechecks received an Incapsula challenge. Health remains degraded for this
-network, and CKAN parser coverage uses synthetic fixtures instead of a claimed
-live capture. A later probe may succeed from a different network.
+Counts are observations on 8 October 2026, not hard-coded runtime totals.
+CKAN search/get was verified live from an NZ network on that date. Some overseas
+networks receive an Incapsula bot challenge, reported as `blocked` (exit 4);
+nzfetch proxy fallback applies. Health remains degraded because access varies
+by network. CKAN parser fixtures are synthetic and are not live captures.
 
 The NIWA catalogue HTML still has the title "National Institute of Water and
 Atmospheric Research". The [current owner's announcement](https://earthsciences.nz/about-us)
@@ -28,18 +28,23 @@ Earth Sciences New Zealand (NIWA); record-level upstream `source` is preserved.
 
 Search uses Hub `q`, `bbox`, `limit`, and CKAN `q`, `rows`, `ext_bbox`. Both
 filter upstream by coverage intersection, not containment. Broad national
-coverage can intersect a small box. This lane confirmed three Waka Kotahi traffic
-records for Fiordland `166,-47.5,166.5,-47`. Hawk observed CKAN water counts of
-4503 without bbox versus 1025 for `174,-37,175,-36`; these CKAN observations
-could not be repeated on this lane's blocked network. Get uses a URL-encoded record ID.
+coverage can intersect a small box. Live checks returned three Waka Kotahi traffic
+records for Fiordland `166,-47.5,166.5,-47`. CKAN water counts from an NZ network
+were 4503 without bbox versus 1025 for `174,-37,175,-36`.
+Get uses a URL-encoded record ID.
 One bounded page is returned; `next_urls` exposes Hub next links or CKAN's next
 `start=rows` URL, retaining the query/bbox. No hidden pagination occurs.
 
 OGC `features`, `numberMatched`, record `id`, `properties.title`, property types
 and geometry shape are checked. CKAN validates `success`, `result.results`,
 `count`, `resources`, `organization`, and parses `spatial` JSON into coverage
-geometry. Malformed responses and invalid JSON are `schema_failure` (6), never
-empty successful datasets. Get HTTP 404/410 means `invalid_input` (2); the same
+geometry. Missing or blank/whitespace-only coverage and timestamps are absent.
+Malformed coverage on search is isolated to the record: geometry becomes null,
+`geometry_warning` explains the omission, and catalogue/meta warnings identify
+the record. Other records and pagination remain available. Get keeps malformed
+coverage as `schema_failure` (6). Other malformed responses and invalid JSON
+are `schema_failure` (6), never empty successful datasets.
+Get HTTP 404/410 means `invalid_input` (2); the same
 HTTP status on a collection/search endpoint means `upstream_unavailable` (5).
 
 Fixture provenance and licences: OGC factual metadata captured 2026-10-08 from
@@ -59,6 +64,9 @@ AT illustrates item-to-layer `_0` resolution. `data-govt-nz.json` and
 `data-govt-nz-get.json` are entirely synthetic CKAN responses, clearly marked
 inside each file; their counts, publishers, IDs, resources and geometry are
 examples and were never claimed as observed datasets.
+They cover valid and blank spatial strings, absent organisation/licence fields,
+blank resource dates and a populated resource modification timestamp. The detail
+fixture matches the blank-coverage search record.
 
 `properties.url` and explicit data/download links supply distributions. For
 Hub ZIP records without links, the CLI derives the ArcGIS item data endpoint
@@ -70,7 +78,8 @@ fetches linked services or downloads; their hosts are outside its outbound list.
 
 Formats are catalogue types plus visible Hub download keys, not guaranteed
 exports. Hub licence markers `custom`, `none`, and empty are unstated: use up to
-300 plain-text characters of `licenseInfo`, or omit `licence`. `licence_info`
+300 plain-text characters of `licenseInfo`, truncating at a word boundary and
+appending an ellipsis when needed, or omit `licence`. `licence_info`
 retains complete live source prose. Unknown `licence`/`latest_data` are omitted
 from meta, records and distributions. `updated_at` describes catalogue metadata
 modification, normalised to UTC Z (naive CKAN dates are interpreted as UTC), not
