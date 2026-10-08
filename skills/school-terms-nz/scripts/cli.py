@@ -15,7 +15,9 @@ from typing import Any, NoReturn
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "lib"))
 import nzfetch
 
-SOURCE_URL = "https://www.education.govt.nz/school/school-terms-and-holidays"
+# The former /school/school-terms-and-holidays path now answers browser-shaped
+# requests with an in-body Next.js redirect (HTTP 307, no Location header).
+SOURCE_URL = "https://www.education.govt.nz/school-terms-and-holidays-dates"
 ALLOWED_HOSTS = {"www.education.govt.nz"}
 DEFAULT_TIMEOUT = 10
 MAX_TIMEOUT = 120
@@ -462,6 +464,14 @@ def fetch_years(timeout: int) -> tuple[list[dict[str, Any]], str, str]:
     except nzfetch.Blocked as exc:
         raise SkillError(str(exc), exit_code=4, error_type="blocked") from exc
     except nzfetch.FetchError as exc:
+        if re.match(r"HTTP 3\d\d\b", str(exc)):
+            # A redirect nzfetch could not follow (no Location header) means
+            # the page moved; report it as a source change, not an outage.
+            raise SkillError(
+                f"Ministry page moved ({exc}); update SOURCE_URL",
+                exit_code=6,
+                error_type="source_schema",
+            ) from exc
         raise SkillError(str(exc), exit_code=5, error_type="upstream_unavailable") from exc
     return parse_school_terms(body.decode("utf-8", "replace"), final_url), final_url, fetched_at()
 

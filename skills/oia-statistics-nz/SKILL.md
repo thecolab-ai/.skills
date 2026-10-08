@@ -72,7 +72,7 @@ python3 skills/oia-statistics-nz/scripts/cli.py <command> [flags]
 - Network timeout and upstream-unavailable handling are built in for blocked upstreams.
 - CSV remains preferred. If its reporting dates are invalid, `scripts/oia_workbooks.py` reads dated release workbooks using stdlib ZIP/XML.
 - Release downloads have a 24-hour cache in `.cache/` inside the skill. Cached provenance retains the original retrieval time.
-- Recovery never infers dates from CSV row order. Unmatched historical records remain undated and are excluded from period totals. Published ID conflicts remain explicit warnings; use exact agency names for affected records.
+- Recovery never infers dates from CSV row order. Every agency record in a dated release workbook counts toward that period, so period totals equal the workbook. Release records with no exact CSV match keep `org_id: null` and an `identity_warning`. CSV rows that match no release record remain undated and are excluded from period totals. Published ID conflicts remain explicit warnings; use exact agency names for affected records.
 
 ## Resources
 

@@ -14,13 +14,13 @@ from urllib.parse import urlparse
 SKILL_DIR = Path(__file__).resolve().parents[1]
 CLI = SKILL_DIR / "scripts" / "cli.py"
 FIXTURE = SKILL_DIR / "tests" / "fixtures" / "source-sample.html"
-SOURCE_URL = "https://www.education.govt.nz/school/school-terms-and-holidays"
+SOURCE_URL = "https://www.education.govt.nz/school-terms-and-holidays-dates"
 
 
 def valid_source_url(url):
     parsed = urlparse(url)
-    return parsed.scheme == 'https' and parsed.hostname == 'www.education.govt.nz' and parsed.path.rstrip('/') in {
-        '/school/school-terms-and-holidays', '/en/school/school-terms-and-holidays'}
+    return (parsed.scheme == 'https' and parsed.hostname == 'www.education.govt.nz'
+            and parsed.path.rstrip('/') == '/school-terms-and-holidays-dates')
 
 
 def load_cli():
@@ -381,6 +381,16 @@ def error_contract() -> None:
         else:
             raise AssertionError("failed fetch did not map to exit 5")
 
+        # The former page path answers with HTTP 307 and no Location header.
+        module.nzfetch.fetch_bytes = lambda *args, **kwargs: (_ for _ in ()).throw(
+            module.nzfetch.FetchError(f"HTTP 307 from {SOURCE_URL}"))
+        try:
+            module.fetch_years(1)
+        except module.SkillError as exc:
+            assert exc.exit_code == 6 and exc.error_type == "source_schema"
+        else:
+            raise AssertionError("unfollowable redirect did not map to exit 6")
+
         module.nzfetch.fetch_bytes = original
         original_build_opener = module.nzfetch.urllib.request.build_opener
 
@@ -403,7 +413,7 @@ def error_contract() -> None:
         module.nzfetch.fetch_bytes = original
 
 
-results.append(check("fixture errors map schema, blocked and unavailable failures to exits 6, 4 and 5", error_contract))
+results.append(check("fixture errors map schema/moved-page, blocked and unavailable failures to exits 6, 4 and 5", error_contract))
 
 
 def malformed_content_encodings_fail_closed_end_to_end() -> None:
@@ -695,11 +705,12 @@ def live_probe_contract():
         return subprocess.CompletedProcess([], 6, '{}', '')
     assert live_probe(schema_error).returncode == 6 and len(calls) == 1
     assert valid_source_url(SOURCE_URL)
-    assert valid_source_url('https://www.education.govt.nz/en/school/school-terms-and-holidays')
-    assert not valid_source_url('https://example.org/school/school-terms-and-holidays')
+    assert not valid_source_url('https://www.education.govt.nz/school/school-terms-and-holidays')
+    assert not valid_source_url('https://www.education.govt.nz/en/school-terms-and-holidays-dates')
+    assert not valid_source_url('https://example.org/school-terms-and-holidays-dates')
     assert not valid_source_url('https://www.education.govt.nz/unrelated')
 
-results.append(check('live retry bound and official language redirects retain strict source identity', live_probe_contract))
+results.append(check('live retry bound and strict canonical source identity', live_probe_contract))
 
 
 if not all(results):

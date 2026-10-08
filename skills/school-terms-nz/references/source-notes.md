@@ -3,7 +3,7 @@
 ## Provenance
 
 - Owner: New Zealand Ministry of Education
-- Canonical page: https://www.education.govt.nz/school/school-terms-and-holidays
+- Canonical page: https://www.education.govt.nz/school-terms-and-holidays-dates
 - Declared outbound host: `www.education.govt.nz`
 - Access: public HTML over HTTPS; no account or browser required
 - Authentication: none
@@ -46,4 +46,4 @@ The CLI therefore returns explicit `certainty` and `caveat` fields rather than i
 
 Valid commands use the repository `nzfetch` helper with a 10-second default timeout and an exact outbound-host allowlist; malformed local date inputs fail before that request. HTTP blocks/rate limits are exit 4; transport/upstream errors are exit 5; malformed source content is exit 6. Do not add unofficial mirrors, historical datasets, school-directory data or browser automation without a separate reviewed scope and updated metadata.
 
-The live probe retries exits 4/5 once and accepts the canonical Ministry page or its official `/en/` language path. It still rejects other pages and parser errors. On 8 October, the source returned HTTP 307 without a Location header; this is reported as upstream unavailable.
+The live probe retries exits 4/5 once and accepts only the canonical Ministry page; other final URLs and parser errors fail. On 8 October 2026 the former path `https://www.education.govt.nz/school/school-terms-and-holidays` answered browser-shaped requests with HTTP 307 and no Location header (an in-body Next.js redirect to `/school-terms-and-holidays-dates`). The canonical page above returned HTTP 200 and parsed 2025-2028. A redirect `nzfetch` cannot follow is reported as a source change (exit 6, `source_schema`), not an outage, so a future page move fails the smoke test instead of being skipped.

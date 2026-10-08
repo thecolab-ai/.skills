@@ -10,4 +10,4 @@ Discovery now uses the official `ReportsApi/GetReports` index to resolve the cur
 
 ERO changed its school report format in 2026, so historical framework and report headings remain as published. Closed institutions may no longer appear online. Access challenges are explicit blocked states and user-configured proxy routing remains supported.
 
-Current reports place the signed publication date inside the h3/h4 body beneath a school/month h2. The parser finds it only within that report, excludes Other Reports/footer dates, and handles HTML void elements without corrupting heading depth. Empty unrecognisable report pages fail as schema errors.
+Current reports place the signed publication date inside the h3/h4 body beneath a school/month h2. The parser finds it only within that report, excludes Other/Past Reports listing blocks and "Page updated:" footer dates (8 October 2026: institution 280 otherwise reported a "Past Reports" block dated by its 28 September 2026 footer), and handles HTML void elements without corrupting heading depth. Empty unrecognisable report pages fail as schema errors.

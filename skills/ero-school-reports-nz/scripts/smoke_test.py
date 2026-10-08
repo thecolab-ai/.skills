@@ -57,6 +57,53 @@ assert [part['heading'] for part in dated_reports[0]['sections']] == [
 assert 'Other Reports' not in str(dated_reports)
 print('[PASS] fixture current ERO dated report body, void HTML tags and footer boundaries')
 
+# Regression (institution 280): a "Past Reports" listing block holding the
+# "Page updated:" footer must not become the latest report or its date.
+past_html = (S / "tests/fixtures/past_reports_footer.html").read_text()
+past_url = "https://www.ero.govt.nz/institution/280/synthetic-collegiate-school"
+past_reports = report_sections(parse_page(past_html, past_url, "2026-10-08T00:00:00Z"))
+assert [(r["report_type"], r["published_on"]) for r in past_reports] == [
+    ("Synthetic Collegiate School - February 2026", "2026-02-25")]
+assert "2026-09-28" not in json.dumps(past_reports)
+# Without a listing block the footer falls inside the body; the footer date
+# alone must not turn an undated, non-report heading into a dated report.
+undated_html = (past_html.replace("<p>25 February 2026</p>", "").replace("<h2>Past Reports</h2>", "")
+                .replace("<p>Synthetic Collegiate School 12 April 2021</p>", ""))
+assert "Page updated: 12:21AM 28 September 2026" in undated_html
+undated_reports = report_sections(parse_page(undated_html, past_url, "2026-10-08T00:00:00Z"))
+assert undated_reports == []
+# A report-type heading stays a candidate but remains undated.
+typed_reports = report_sections(parse_page(
+    undated_html.replace("Synthetic Collegiate School - February 2026", "Synthetic Collegiate School Evaluation Report"),
+    past_url, "2026-10-08T00:00:00Z"))
+assert [(r["report_type"], r["published_on"]) for r in typed_reports] == [
+    ("Synthetic Collegiate School Evaluation Report", None)]
+latest_probe = subprocess.run(
+    [
+        sys.executable,
+        "-c",
+        (
+            "import sys; from pathlib import Path; "
+            f"S = Path({str(S)!r}); "
+            "sys.path.insert(0, str(S / 'scripts')); "
+            "import cli as ero_cli; "
+            f"ero_cli.resolve_institution_url = lambda *a, **k: {past_url!r}; "
+            "ero_cli.nzfetch.fetch_text = lambda *a, **k: (S / 'tests/fixtures/past_reports_footer.html').read_text(); "
+            "sys.argv = ['cli.py', 'latest', '280', '--json']; "
+            "raise SystemExit(ero_cli.main())"
+        ),
+    ],
+    capture_output=True,
+    text=True,
+    timeout=45,
+    check=False,
+)
+assert latest_probe.returncode == 0, latest_probe.stderr
+latest_env = json.loads(latest_probe.stdout)
+assert latest_env["meta"]["latest_data"] == "2026-02-25"
+assert latest_env["data"][0]["report_type"] == "Synthetic Collegiate School - February 2026"
+print('[PASS] fixture Past Reports listing and Page updated footer are excluded from report candidates and meta.latest_data')
+
 payload = json.loads((S / "tests/fixtures/reports_api.json").read_text())
 api_rows = report_organisation_rows(payload, "2026-07-19T00:00:00Z", "54")
 assert api_rows == [

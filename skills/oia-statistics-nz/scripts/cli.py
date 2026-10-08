@@ -38,6 +38,10 @@ CACHE_DIR = pathlib.Path(__file__).resolve().parents[1] / ".cache"
 CACHE_TTL = 24 * 60 * 60
 RECOVERY_WARNINGS = []
 RECOVERY_SOURCES = {}
+UNMATCHED_IDENTITY_WARNING = ('No stable PSC OrgID: this official release record did not match the all-data CSV; '
+                              'counts and date come from the release workbook. Use the exact agency name.')
+
+
 class UpstreamUnavailable(RuntimeError):
     """Raised when PSC upstream cannot be reached in a blocking/outage state."""
 
@@ -235,7 +239,11 @@ def row_enriched(row: dict[str, str]) -> dict[str, object]:
 
 
 def is_agency_row(row: dict[str, str]) -> bool:
-    return bool(_as_int(_first(row, "OrgID"))) and _first(row, "Agency_Type").lower() != "agency type totals"
+    if _first(row, "Agency_Type").lower() == "agency type totals":
+        return False
+    # Release-workbook records (parse_release already drops total rows) count
+    # even when no stable OrgID could be matched from the all-data CSV.
+    return bool(_as_int(_first(row, "OrgID"))) or bool(row.get("_source_url") and _first(row, "Agency"))
 
 
 def agency_rows(rows: list[dict[str, str]]) -> list[dict[str, str]]:
@@ -411,12 +419,11 @@ def recover_release_periods(rows, releases):
     for period, url, stamp, records in releases:
         for record in records:
             signature = tuple(_as_int(record.get(key)) for key in count_fields[:3])
-            if None in signature:
-                continue
-            candidates = [row for row in index.get(signature, [])
-                          if all(_as_int(record.get(key)) is None
-                                 or _as_int(row.get(key)) == _as_int(record[key])
-                                 for key in count_fields[3:])]
+            candidates = [] if None in signature else [
+                row for row in index.get(signature, [])
+                if all(_as_int(record.get(key)) is None
+                       or _as_int(row.get(key)) == _as_int(record[key])
+                       for key in count_fields[3:])]
             identity_rows = [row for row in agency_identities.values() if name_matches(row, record['Agency'])]
             if len(identity_rows) == 1:
                 resolved = identity_rows[0]
@@ -436,11 +443,18 @@ def recover_release_periods(rows, releases):
                     if key not in {'Agency', 'Agency_Type', 'OrgID'} and not key.startswith('_')})
                 restored.update(Agency=record['Agency'], _source_url=url, _retrieved_at=stamp)
                 recovered.append(restored)
-            elif record.get('OrgID'):
-                recovered.append(dict(record, _source_url=url, _retrieved_at=stamp))
+            else:
+                # Every release record is dated and counted by its official
+                # workbook, so it always contributes to that period. Without a
+                # CSV match it simply has no stable OrgID.
+                kept = dict(record, _source_url=url, _retrieved_at=stamp)
+                if not kept.get('OrgID'):
+                    kept['_identity_warning'] = kept.get('_identity_warning') or UNMATCHED_IDENTITY_WARNING
+                recovered.append(kept)
     identities = defaultdict(list)
     for row in recovered:
-        identities[(row.get('OrgID'), row['SurveyPeriodEndDate'])].append(row)
+        if row.get('OrgID'):
+            identities[(row['OrgID'], row['SurveyPeriodEndDate'])].append(row)
     for group in identities.values():
         if len(group) > 1:
             for row in group:
@@ -471,8 +485,10 @@ def load_rows(timeout: int) -> tuple[list[dict[str, str]], str]:
     repaired = recover_release_periods(rows, releases)
     RECOVERY_SOURCES.update({period: (url, stamp) for period, url, stamp, records in releases})
     undated = sum(not _norm_period(row.get('SurveyPeriodEndDate')) for row in agency_rows(repaired))
+    unmatched = sum(1 for row in repaired if row.get('_source_url') and not _as_int(_first(row, 'OrgID')))
     RECOVERY_WARNINGS[:] = [f'The all-data CSV has lost its reporting dates. Official release workbooks restore exact agency/count matches; {undated} historical agency rows remain undated.',
-                           'Published tables and the CSV contain conflicting or reused IDs and some missing counts. Dates use the dated releases; use exact agency names where identity_warning is present. Undated records are excluded from period totals.']
+                           'Published tables and the CSV contain conflicting or reused IDs and some missing counts. Dates use the dated releases; use exact agency names where identity_warning is present. Undated records are excluded from period totals.',
+                           f'{unmatched} official release records have no CSV match; they are included in their release period with org_id null so period totals equal the release workbooks.']
     return repaired, source
 
 

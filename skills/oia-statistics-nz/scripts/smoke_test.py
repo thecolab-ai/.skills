@@ -92,19 +92,72 @@ def main() -> int:
             archive.writestr(f'xl/worksheets/sheet{index}.xml', ET.tostring(sheet))
         archive.writestr('xl/workbook.xml', ET.tostring(workbook))
         archive.writestr('xl/_rels/workbook.xml.rels', ET.tostring(relations))
-    parsed = parse_release(body.getvalue(), '2026-06-30')
-    assert len(parsed) == 2 and parsed[0]['OIA_extension'] == '4'
+    workbook_body = body.getvalue()
+    parsed = parse_release(workbook_body, '2026-06-30')
+    assert len(parsed) == 3 and parsed[0]['OIA_extension'] == '4'
     assert parsed[0]['Ombudsman_Complaints'] == '3' and parsed[0]['OIA_refused'] == '10'
     assert 'OrgID' not in parsed[0] and parsed[0]['_identity_warning']
+    assert parsed[2]['Agency'] == 'Unmatched Police' and 'OrgID' not in parsed[2]
+    # The CSV row for the unmatched agency has a different name and different
+    # counts, so it cannot be joined and must stay undated (no double count).
+    unmatched_csv = dict(parsed[2], OrgID='77', Agency='New Zealand Police', OIA_RequestsHandled='499',
+                         SurveyPeriodEndDate='00:00.0')
     raw = [dict(parsed[0], OrgID='42', SurveyPeriodEndDate='00:00.0'),
            dict(parsed[1], SurveyPeriodEndDate='00:00.0'),
-           dict(parsed[1], SurveyPeriodEndDate='00:00.0')]
+           dict(parsed[1], SurveyPeriodEndDate='00:00.0'),
+           unmatched_csv]
     repaired = module.recover_release_periods(raw, [('2026-06-30', 'https://www.publicservice.govt.nz/assets/synthetic.xlsx', '2026-10-08T00:00:00Z', parsed)])
     assert repaired[0]['SurveyPeriodEndDate'] == '2026-06-30'
     assert repaired[-1]['SurveyPeriodEndDate'] == '00:00.0'
-    assert len(module._rows_by_period(repaired)['2026-06-30']) == 2
-    assert module.periods_summary(repaired)[0]['period_end'] == '2026-06-30'
+    period_rows = module.agency_rows(module._rows_by_period(repaired)['2026-06-30'])
+    assert len(period_rows) == 3
+    summary = module.periods_summary(repaired)[0]
+    assert summary['period_end'] == '2026-06-30'
+    # Period totals equal the release workbook: 200 + 20 + 500, not 220.
+    assert summary['requests_handled'] == 720 and summary['rows'] == 3 and summary['agency_count'] == 3
     assert module.row_enriched(repaired[0])['source_url'].endswith('synthetic.xlsx')
+    kept = next(module.row_enriched(row) for row in period_rows if row['Agency'] == 'Unmatched Police')
+    assert kept['org_id'] is None and kept['requests_handled'] == 500 and kept['complaints'] == 30
+    assert kept['identity_warning'] == module.UNMATCHED_IDENTITY_WARNING
+    assert not any(row.get('_identity_warning', '').startswith('The published sources reuse') for row in period_rows)
+    print('[PASS] fixture unmatched no-OrgID release record is kept and period totals equal the workbook')
+
+    # cached_release: fetch once, serve the validated cache, refetch when stale,
+    # and fail closed on a non-XLSX body. No network: fetch_bytes is stubbed.
+    import os
+    import tempfile
+    calls = []
+    responses = [workbook_body]
+
+    def fake_fetch(url, **kwargs):
+        calls.append(url)
+        return responses[-1], 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', url
+
+    original_fetch, original_cache = module.nzfetch.fetch_bytes, module.CACHE_DIR
+    url = 'https://www.publicservice.govt.nz/assets/synthetic.xlsx'
+    try:
+        with tempfile.TemporaryDirectory() as cache_dir:
+            module.CACHE_DIR = Path(cache_dir)
+            module.nzfetch.fetch_bytes = fake_fetch
+            first, _stamp = module.cached_release(url, 5)
+            second, _stamp = module.cached_release(url, 5)
+            assert first == second == workbook_body and len(calls) == 1
+            cached = next(Path(cache_dir).glob('*.xlsx'))
+            os.utime(cached, (0, 0))
+            module.cached_release(url, 5)
+            assert len(calls) == 2
+            os.utime(cached, (0, 0))
+            responses.append(b'<html>not a workbook</html>')
+            try:
+                module.cached_release(url, 5)
+            except ValueError:
+                pass
+            else:
+                raise AssertionError('non-XLSX release download must fail closed')
+            assert cached.read_bytes() == workbook_body
+    finally:
+        module.nzfetch.fetch_bytes, module.CACHE_DIR = original_fetch, original_cache
+    print('[PASS] fixture cached_release reuses fresh cache, refetches stale entries and rejects non-XLSX bodies')
     assert module._norm_period('2026-99-99') == ''
     assert module._norm_period('00:00.0') == ''
     assert module.infer_period_from_text('OIA Statistics: 1 January to 30 June 2026(XLSX)') == '2026-06-30'
@@ -211,7 +264,10 @@ def main() -> int:
         return 1
     complaints_data = parse_json_output(complaints)
     records = complaints_data.get("records", [])
-    if any((r.get("org_id") in (0, None)) or r.get("agency_type") == "Agency Type Totals" for r in records):
+    # Release-only records may legitimately have org_id null (see identity_warning);
+    # CSV-only rows still need an ID; aggregate rows are excluded by type.
+    if any(r.get("agency_type") == "Agency Type Totals"
+           or (r.get("org_id") in (0, None) and not r.get("source_url")) for r in records):
         print("FAIL: complaints includes aggregate rows", file=sys.stderr)
         return 1
     counts = [r.get("complaints", 0) for r in records]

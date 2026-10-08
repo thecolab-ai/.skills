@@ -14,6 +14,14 @@ import nzfetch
 
 ALLOWED_HOSTS = {"ero.govt.nz", "www.ero.govt.nz"}
 REPORTS_API_URL = "https://www.ero.govt.nz/api/ReportsApi/GetReports"
+# Blocks that only list or link to other reports; they are never reports.
+LISTING_HEADING = re.compile(r"^(?:other|past|previous|earlier|older) reports?$|^reports for ", re.IGNORECASE)
+# Page-maintenance footer ("Print Page updated: 12:21AM 28 September 2026"),
+# which is not a report publication date.
+PAGE_UPDATED = re.compile(
+    r"\bpage\s+updated:?\s*(?:\d{1,2}:\d{2}\s*[ap]\.?m\.?\s+)?\d{1,2}\s+[a-z]+\s+\d{4}",
+    re.IGNORECASE,
+)
 VOID_TAGS = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"}
 
 
@@ -208,10 +216,10 @@ def report_sections(page):
                     if sections[cursor]["level"] <= 2), len(sections))
         # The current site puts the signed date after the h3/h4 report body,
         # rather than immediately after the h2 school/month heading.
-        text = " ".join(f"{item['heading']} {item['text']}" for item in sections[index:end])
+        text = PAGE_UPDATED.sub(" ", " ".join(f"{item['heading']} {item['text']}" for item in sections[index:end]))
         heading_has_date = re.search(date_pattern, section["heading"], re.IGNORECASE)
         text_has_date = re.search(date_pattern, text, re.IGNORECASE)
-        is_report_marker = section["level"] == 2 and heading != "other reports" and not heading.startswith("reports for ") and (
+        is_report_marker = section["level"] == 2 and not LISTING_HEADING.search(heading) and (
             "report" in heading or any(key in heading for key in ("evaluation", "assurance", "profile")) or heading_has_date or text_has_date
         )
         if is_report_marker:
