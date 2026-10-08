@@ -161,6 +161,16 @@
     ],
     "service_allowlist": [
       "flooded_nz_gdb_v2_202603181308"
+    ],
+    "field_allowlist": [
+      "objectid",
+      "obs_date",
+      "impact",
+      "impact_items",
+      "obs_depth",
+      "obs_depth_v2",
+      "historic",
+      "status"
     ]
   }
 }
