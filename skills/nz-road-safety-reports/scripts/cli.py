@@ -11,7 +11,7 @@ import re
 import sys
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
-from datetime import date
+from datetime import date, datetime
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import urlencode, urljoin, urlparse
@@ -26,13 +26,13 @@ BIKE = 'https://bikemaps.org/'
 CAMERAS = 'https://nzta.govt.nz/travelling-on-our-roads/safety-cameras/about-safety-cameras/fixed-safety-camera-locations'
 RELEASE = 'https://www.nzta.govt.nz/about-us/our-data-and-official-information/official-information-act/proactive-releases'
 POLICE = 'https://www.police.govt.nz/rss/alerts'
-ZONES = 'https://raw.githubusercontent.com/PaulAtKeyboard/OpenCCTV/master/data-speed-cameras-auckland.csv'
+ZONES = 'https://raw.githubusercontent.com/PaulAtKeyboard/OpenCCTV/47788874df0dac6e56f0f5f3aba55ad54b0ae293/data-speed-cameras-auckland.csv'
 NZTA = 'NZ Transport Agency Waka Kotahi'
 SOURCES = {
     'bikemaps-nearmiss': (BIKE + 'nearmiss.json', 'BikeMaps.org', 'GeoJSON', 'Self-reported; sparse and biased; reuse licence unknown.'),
     'bikemaps-collision': (BIKE + 'collisions.json', 'BikeMaps.org', 'GeoJSON', 'Self-reported collisions; use nzta-crash-data-nz for CAS.'),
-    'nzta-cameras': (CAMERAS, NZTA, 'HTML table', 'Blocked from the verification network; parser uses published table columns.'),
-    'nzta-infringements': (RELEASE, NZTA, 'XLSX release listing', 'To 31 May 2026; download and schema unverified. Filtering is gated.'),
+    'nzta-cameras': (CAMERAS, NZTA, 'HTML table', 'Access depends on the requesting host; parser uses published table columns.'),
+    'nzta-infringements': (RELEASE, NZTA, 'XLSX release listing', 'Discovers the latest dated release; workbook schema unverified. Filtering is gated.'),
     'police-alerts': (POLICE, 'New Zealand Police', 'RSS 2.0', 'Recent national alerts only; no coordinates; cannot spatially filter.'),
     'at-camera-zones': (ZONES, 'Auckland Transport; PaulAtKeyboard/OpenCCTV mirror', 'CSV', 'Historical 2014–2018 camera zones; not current fixed camera locations; licence unknown.'),
 }
@@ -155,7 +155,9 @@ def parse_cameras(html, meta, bbox=None):
     if not headers:
         fail_schema('NZTA camera table columns missing', meta)
     update = re.search(r'Last update:\s*(\d{1,2}\s+\w+\s+\d{4})', ' '.join(page.text))
-    if update: meta['latest_data'] = update.group(1)
+    if update:
+        try: meta['latest_data'] = datetime.strptime(update.group(1), '%d %B %Y').date().isoformat()
+        except ValueError: fail_schema('NZTA camera update date invalid', meta)
     results = []
     for region, row in page.rows:
         if not row or row[0] in ('Suburb', 'Latitude', 'Longitude'): continue
@@ -257,27 +259,30 @@ def alerts():
 
 def infringement_link(html, meta):
     page = Page(); page.feed(html)
-    matches = [urljoin(RELEASE, href) for href, label in page.links
-               if 'safety camera infringement data to 31 may 2026' in label.lower()
-               and urlparse(href).path.lower().endswith('.xlsx')]
-    if len(matches) != 1: fail_schema('Expected May 2026 infringement workbook link missing or ambiguous', meta)
-    url = matches[0]
+    matches = []
+    for href, label in page.links:
+        match = re.search(r'\bsafety camera infringement data to\s+(\d{1,2}\s+[A-Za-z]+\s+\d{4})\b', label, re.I)
+        if not match or not urlparse(href).path.lower().endswith('.xlsx'): continue
+        try: released_to = datetime.strptime(match.group(1), '%d %B %Y').date()
+        except ValueError: fail_schema('Infringement release date invalid', meta)
+        matches.append((released_to, urljoin(RELEASE, href)))
+    if not matches: fail_schema('Dated infringement workbook link missing', meta)
+    latest = max(released_to for released_to, _ in matches)
+    urls = {url for released_to, url in matches if released_to == latest}
+    if len(urls) != 1: fail_schema('Latest infringement workbook link ambiguous', meta)
+    url = urls.pop()
     parsed = urlparse(url)
     if parsed.scheme != 'https' or parsed.hostname not in ('nzta.govt.nz', 'www.nzta.govt.nz') or parsed.username or parsed.password:
         fail_schema('Infringement download is outside the declared NZTA hosts', meta)
+    meta['latest_data'] = latest.isoformat()
     return url
 
 
 def infringements():
-    try:
-        html, meta = fetch(RELEASE, NZTA)
-    except SourceError as exc:
-        exc.meta['latest_data'] = '2026-05-31'
-        raise
-    meta['latest_data'] = '2026-05-31'
+    html, meta = fetch(RELEASE, NZTA)
     url = infringement_link(html, meta)
     # No invented workbook schema or counts: enable only after a real workbook inspection.
-    raise SourceError(7, 'May 2026 workbook schema has not been verified; camera/date filtering unavailable. Official download: ' + url, meta)
+    raise SourceError(7, 'Infringement workbook schema has not been verified; camera/date filtering unavailable. Official download: ' + url, meta)
 
 
 def near(value):
@@ -329,7 +334,7 @@ def corridor(centre, metres):
     with ThreadPoolExecutor(max_workers=5) as pool:
         for name, response, error in pool.map(run, jobs):
             if error:
-                if error.code == 6: raise error
+                if error.code == 6 and name != 'nzta-infringements': raise error
                 status = {**error.meta, 'source': name, 'status': 'unavailable',
                           'error': error_envelope(error.code, str(error), error.meta, retry_after=error.retry_after)['error']}
             else:
@@ -384,7 +389,6 @@ def main(argv=None):
         if args.command == 'sources':
             meta = provenance(BIKE, 'Multiple road safety publishers')
             records = [{'id': k, 'format': v[2], 'caveat': v[3], **provenance(v[0], v[1])} for k, v in SOURCES.items()]
-            records[3]['latest_data'] = '2026-05-31'
             records[3]['status'] = 'gated'
         elif args.command == 'incidents': records, meta = incidents(args.kind, args.bbox or AUCKLAND)
         elif args.command == 'cameras': records, meta = cameras(args.bbox)

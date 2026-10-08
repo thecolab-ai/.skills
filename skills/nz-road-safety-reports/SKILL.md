@@ -1,6 +1,6 @@
 ---
 name: nz-road-safety-reports
-description: "Query keyless NZ cycling near-miss and collision reports, fixed safety camera locations and camera infringements. Use for Auckland corridor screening and road safety evidence; use nzta-crash-data-nz for CAS crashes."
+description: "Query keyless NZ cycling near-miss and collision reports and fixed safety camera locations; discover official camera infringement releases with workbook extraction gated. Use for Auckland corridor screening and road safety evidence; use nzta-crash-data-nz for CAS crashes."
 license: MIT
 compatibility: "Requires Python 3.10+ and network access for live data"
 metadata:
@@ -40,8 +40,8 @@ reuse limits, spatial semantics and the NZTA access limitations.
 |---|---|
 | `sources` | Six source URLs, publishers, formats and caveats; no live health probe |
 | `incidents --source bikemaps --kind nearmiss|collision` | Bounded BikeMaps GeoJSON; Auckland bbox by default |
-| `cameras [--bbox ...]` | NZTA fixed camera points, national by default; currently blocked from the verification network |
-| `infringements [--camera ...] [--from YYYY-MM-DD --to YYYY-MM-DD]` | Attempts the May 2026 release page; filters are **gated** until the real workbook schema can be verified |
+| `cameras [--bbox ...]` | NZTA fixed camera points, national by default; access depends on the requesting host |
+| `infringements [--camera ...] [--from YYYY-MM-DD --to YYYY-MM-DD]` | Discovers the newest dated release on the official listing; filters are **gated** until the real workbook schema can be verified |
 | `alerts` | Recent national Police traffic RSS items; no spatial filter |
 | `camera-zones [--bbox ...]` | Historical Auckland CSV zones as straight endpoint segments |
 | `corridor --near lon,lat --radius m` | BikeMaps reports, NZTA cameras and historical zones within a radius; reports unavailable sources and the infringement gate |
@@ -71,8 +71,9 @@ Police RSS has no coordinates and appears as `not_spatial` in `source_status`;
 use `alerts` for national context, without claiming those alerts are nearby.
 
 Corridor output always sets `complete: false` and lists source status and
-warnings. Access failures can coexist with useful records; parser/schema errors
-fail the command. Empty nearby results do not mean the corridor is safe.
+warnings. Access failures and infringement release discovery/schema failures can
+coexist with useful records; spatial source parser/schema errors fail the command.
+Empty nearby results do not mean the corridor is safe.
 
 Direct JSON uses `meta` and a `results` array. Mixed sources carry provenance
 in each feature's properties. Unknown data licences are omitted; public access
@@ -81,8 +82,8 @@ identifiers and demographic fields. Every network call uses a 10-second timeout
 and the shared `nzfetch` blocked/rate-limit handling. No credentials are needed.
 
 `infringements` is an explicit access/schema gate, **not a working infringement
-row extractor**: current network blocks return code 4; if the listing becomes
-accessible, code 7 gives the discovered official download URL. Camera/date
+row extractor**: blocked requests return code 4; when the listing is accessible,
+code 7 gives the discovered official download URL. Camera/date
 options are validated but never silently ignored in a successful result.
 Do not invent workbook headers, counts, camera joins or date filtering.
 

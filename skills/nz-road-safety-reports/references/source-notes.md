@@ -37,25 +37,28 @@ Published table columns are Suburb, Location, Camera type, GPS coordinates
 (Latitude, Longitude), with region headings. A two-row header is supported;
 latitude/longitude are converted to GeoJSON longitude/latitude. Trailing commas
 in numeric cells are tolerated. Other schema changes fail closed. Source text
-`Last update:` becomes `latest_data`, with its stated precision preserved.
+`Last update:` becomes `latest_data` as an ISO date (`YYYY-MM-DD`).
 
-Official search-index evidence shows an update of 1 October 2026, but direct
-requests returned an Incapsula challenge/403. The synthetic HTML fixture uses
-those published columns; it is not a copied NZTA table. No current camera count
-or successful direct table retrieval is claimed. NZTA robots.txt excludes search
-results, change lists and secure assets; these pages are outside those rules.
+Access depends on the requesting host: the table is accessible from some hosts,
+while the 8 October 2026 live re-check from this verification host returned a
+blocked request on both NZTA hostnames. This does not establish a general access
+block. The synthetic HTML fixture uses the published columns and an update of
+1 October 2026; it is not a copied NZTA table or proof of the current update date.
+No current camera count is claimed. NZTA robots.txt excludes search results,
+change lists and secure assets; these pages are outside those rules.
 
 ## NZTA infringement release: gated
 
 `https://www.nzta.govt.nz/about-us/our-data-and-official-information/official-information-act/proactive-releases`
 
-The official listing states **Safety camera infringement data to 31 May 2026**,
-XLSX, 563 KB. The direct listing is blocked from this network and neither the
-workbook URL nor workbook schema was verified. Runtime discovery follows only
-an XLSX link with that exact release label on the official listing, and only
-accepts the declared NZTA hosts. It does not guess asset paths or substitute an
-older workbook. On access failure it returns code 4/5. On successful discovery
-it returns code 7 with the URL because workbook extraction remains unverified.
+Runtime discovery matches XLSX links labelled **Safety camera infringement data
+to <date>**, selects the newest valid release date, and accepts only the declared
+NZTA hosts. The discovered date becomes ISO `latest_data`; unavailable listings
+do not supply a release date. It does not guess asset paths or substitute an
+older workbook. The 8 October 2026 live re-check of the listing was blocked from
+this verification host; the current workbook URL and schema remain unverified.
+On access failure it returns code 4/5. On successful discovery it returns code 7
+with the URL because workbook extraction remains unverified.
 
 Follow-up: retrieve the real workbook on a permitted network, inspect sheets,
 headers, time precision and camera identifiers, then add a tested stdlib XLSX
@@ -79,9 +82,10 @@ feed more often than that; a CLI invocation performs one request.
 
 ## Historical Auckland speed-camera zones
 
-`https://raw.githubusercontent.com/PaulAtKeyboard/OpenCCTV/master/data-speed-cameras-auckland.csv`
+`https://raw.githubusercontent.com/PaulAtKeyboard/OpenCCTV/47788874df0dac6e56f0f5f3aba55ad54b0ae293/data-speed-cameras-auckland.csv`
 
-This keyless mirror contains 23 historical LGOIMA rows. Verified columns:
+This keyless mirror is pinned to commit `47788874df0dac6e56f0f5f3aba55ad54b0ae293`
+and contains 23 historical LGOIMA rows. Verified columns:
 `Street`, `Locality (* indicates existing sites)`, `Start of camera zone`,
 `End of camera zone`, `Go-live Date`. Coordinates are latitude,longitude strings;
 the CLI reverses them to WGS84 and builds straight two-point LineStrings. These
@@ -100,4 +104,6 @@ schema/parser failure, 7 unsupported operation. JSON errors have provenance,
 an empty `results` array and `error`; rate limits preserve `retry_after`.
 Corridor runs bounded independent requests concurrently, retains successful
 spatial evidence and records each unavailable source explicitly. It never
-substitutes the historical CSV for the NZTA fixed-camera table.
+substitutes the historical CSV for the NZTA fixed-camera table. Infringement
+discovery/schema failures are unavailable in corridor output, retaining the
+underlying error code; spatial source schema failures still fail the command.
