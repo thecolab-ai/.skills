@@ -137,12 +137,5 @@
     "roots": [
       "https://services-ap1.arcgis.com/0380iqO8xVVhk66v/arcgis/rest/services"
     ]
-  },
-  "nema": {
-    "publisher": "National Emergency Management Agency",
-    "licence": null,
-    "roots": [
-      "https://services5.arcgis.com/cJn6oR1QqErYBL5d/arcgis/rest/services"
-    ]
   }
 }

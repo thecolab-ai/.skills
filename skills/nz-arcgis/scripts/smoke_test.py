@@ -9,6 +9,14 @@ from fixture_checks import AKL, AT, run
 CLI = Path(__file__).with_name('cli.py')
 
 
+def coordinate_pairs(coords):
+    if len(coords)>=2 and all(isinstance(v,(int,float)) for v in coords[:2]):
+        yield coords[:2]
+    else:
+        for child in coords:
+            yield from coordinate_pairs(child)
+
+
 def main():
     try:
         run()
@@ -16,33 +24,37 @@ def main():
         print(f'[FAIL] fixture captured responses: {exc}')
         return 1
     failures=0
-    for name,url in [('AT roadworks',AT),('Council stormwater pipe',AKL)]:
+    for name,url,box in [('AT roadworks',AT,'174.738,-36.895,174.741,-36.888'),('Council stormwater pipe',AKL,'174.919,-37.024,174.922,-37.021')]:
         for mode in ['count','query']:
             args=[mode,url,'--json']
-            if mode=='query': args+=['--bbox','174.60,-37.05,174.95,-36.70','--limit','5','--format','geojson']
+            if mode=='query': args+=['--bbox',box,'--limit','5','--format','geojson']
             try:
                 result=subprocess.run([sys.executable,str(CLI),*args],capture_output=True,text=True,timeout=35,check=False)
                 if result.returncode:
-                    error=json.loads(result.stderr)['error']
-                    if error['code'] in {4,5} and error['category'] in {'upstream_http_failure','rate_limited','access_blocked'}:
+                    error=json.loads(result.stdout)['error']
+                    if result.returncode in {4,5}:
                         print(f"[SKIP] live {name} {mode}: {error['message']}")
                         continue
-                    raise AssertionError(result.stderr.strip())
+                    raise AssertionError(result.stdout.strip() or result.stderr.strip())
                 data=json.loads(result.stdout)
-                assert data['source_url']==url and data['publisher']
-                assert data['retrieved_at'].endswith('Z') and data['latest_data'].endswith('Z')
-                assert 'licence' in data
+                meta=data['meta']
+                assert meta['source_url']==url and meta['publisher']
+                assert meta['retrieved_at'].endswith('Z') and meta['latest_data'].endswith('Z')
+                assert 'licence' in meta
                 if mode=='count':
-                    assert data['count']>0
-                    detail=f"count={data['count']} latest_data={data['latest_data']}"
+                    assert data['results'][0]['count']>0
+                    detail=f"count={data['results'][0]['count']} latest_data={meta['latest_data']}"
                 else:
                     assert data['type']=='FeatureCollection' and data['feature_count']==5
                     assert len({f['id'] for f in data['features']})==5
                     assert all(f['geometry'] and f['properties'] for f in data['features'])
                     geometry=data['features'][0]['geometry']
-                    coords=geometry['coordinates']
-                    point=coords[0][0] if geometry['type']=='Polygon' else coords[0]
-                    assert 174.60<=point[0]<=174.95 and -37.05<=point[1]<=-36.70
+                    points=list(coordinate_pairs(geometry['coordinates']))
+                    assert points
+                    xmin,ymin,xmax,ymax=map(float,box.split(','))
+                    assert min(p[0] for p in points)<=xmax and max(p[0] for p in points)>=xmin
+                    assert min(p[1] for p in points)<=ymax and max(p[1] for p in points)>=ymin
+                    point=points[0]
                     detail=f"features=5 geometry={geometry['type']} first_id={data['features'][0]['id']} point={point} truncated={data['truncated']}"
                 print(f'[PASS] live {name} {mode}: {detail}')
             except Exception as exc:

@@ -11,6 +11,8 @@ import math
 from pathlib import Path
 import re
 import sys
+import time
+from provenance import provenance as make_provenance, result_envelope, geojson_envelope, error_envelope, ERROR_TYPES
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -18,6 +20,13 @@ import urllib.request
 ROOT = Path(__file__).resolve().parents[1]
 REGISTRY = json.loads((ROOT / 'references/orgs.json').read_text())
 CURATED = json.loads((ROOT / 'references/layers-auckland.json').read_text()) if (ROOT / 'references/layers-auckland.json').exists() else []
+CATALOGUE = CURATED if isinstance(CURATED, dict) else {'layers': CURATED}
+CURATED = CATALOGUE['layers']
+VERIFICATION = json.loads((ROOT / 'references/verification.json').read_text())
+PUBLISHERS = 'New Zealand public-sector and utility ArcGIS publishers'
+REPO_URL = 'https://github.com/thecolab-ai/.skills/blob/main/skills/nz-arcgis/references/'
+TAGS = {'F1': 'flooding/flow paths', 'T1': 'congestion', 'T2': 'near-miss safety', 'T3': 'incidents/roadworks', 'W1': 'construction and demolition materials', 'W2': 'reuse/repair/recycling', 'W3': 'illegal dumping'}
+ACTIVE_BUDGET = None
 SERVER_TYPES = {'FeatureServer', 'MapServer', 'ImageServer'}
 FIELD = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*$')
 
@@ -39,13 +48,23 @@ def timestamp(value=None):
 
 def provenance(url, org, metadata=None):
     info = REGISTRY[org]
-    licence = next((r['licence'] for r in CURATED if r['source_url'] == url), None)
-    result = dict(source_url=url, publisher=info['publisher'], licence=licence or info['licence'], retrieved_at=timestamp())
+    record = next((r for r in CURATED if r['source_url'] == url), {})
+    licence = record.get('licence') if record else info.get('licence')
+    if licence and re.search(r'not stated|no .*licen[cs]e', licence, re.I):
+        licence = None
+    result = make_provenance(url, info['publisher'], licence=licence)
     metadata = metadata or {}
-    edited = metadata.get('editingInfo', {}).get('lastEditDate')
+    edited = (metadata.get('editingInfo') or {}).get('lastEditDate')
     if edited is not None:
         result['latest_data'] = timestamp(edited)
+    for key in ('caveat', 'licence_note'):
+        if record.get(key):
+            result[key] = record[key]
     return result
+
+
+def cached_meta(filename, retrieved_at):
+    return make_provenance(REPO_URL + filename, 'TheColab', retrieved_at=retrieved_at)
 
 
 def validate_url(url, kind='layer'):
@@ -55,9 +74,11 @@ def validate_url(url, kind='layer'):
         invalid = p.scheme != 'https' or p.username is not None or p.password is not None or p.port is not None or p.query or p.fragment
     except ValueError:
         invalid = True
+    if 'p' in locals() and (p.query or p.path.rstrip('/').endswith('/query')):
+        raise ClientError('remove ?f=json / query suffix from the copied URL', 7, 'blocked_url')
     if invalid:
         raise ClientError('use an exact allowlisted HTTPS ArcGIS REST URL without query, fragment or credentials', 7, 'blocked_url')
-    raw = p.path
+    raw = p.path.removesuffix('/')
     parts = [urllib.parse.unquote(s) for s in raw.split('/')[1:]]
     if not raw.startswith('/') or any(not s or s in {'.', '..'} or any(c in s for c in '/\\%?#') or any(ord(c) < 32 or ord(c) == 127 for c in s) for s in parts):
         raise ClientError('unsafe ArcGIS path', 7, 'blocked_url')
@@ -87,20 +108,54 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         raise ClientError('upstream redirect refused; use the verified canonical route', 7, 'blocked_redirect')
 
 
-def fetch(url, params=None, kind='layer', query=False):
+class RequestBudget:
+    """Per-command bounds, shared by metadata, discovery and feature requests."""
+    def __init__(self, timeout=10):
+        self.timeout = timeout
+        self.deadline = time.monotonic() + 120
+        self.bytes = 0
+
+    def check(self):
+        if time.monotonic() >= self.deadline:
+            raise ClientError('command exceeded 120-second deadline', 6, 'resource_limit')
+        if self.bytes >= 64 * 1024 * 1024:
+            raise ClientError('command exceeded 64 MiB aggregate response bound', 6, 'resource_limit')
+
+
+def upstream_code(code):
+    return 2 if code in {400, 404} else 4 if code in {403, 406, 429, 451, 498, 499} else 5
+
+
+def fetch(url, params=None, kind='layer', query=False, timeout=None):
     _, url = validate_url(url, kind)
+    budget = ACTIVE_BUDGET or RequestBudget(timeout or 10)
+    budget.check()
+    seconds = timeout or budget.timeout
     request_url = url + ('/query' if query else '') + '?' + urllib.parse.urlencode({'f': 'json', **(params or {})})
+    if len(request_url.encode()) >= 8192:
+        raise ClientError('query URL exceeds 8 KB; reduce fields or where expression')
     request = urllib.request.Request(request_url, headers={'User-Agent': 'TheColab-nz-arcgis/1.0', 'Accept': 'application/json'})
     try:
-        with urllib.request.build_opener(NoRedirect).open(request, timeout=10) as response:
-            body = response.read(32 * 1024 * 1024 + 1)
-            if len(body) > 32 * 1024 * 1024:
-                raise ClientError('source response exceeds 32 MiB', 6, 'malformed_response')
+        with urllib.request.build_opener(NoRedirect).open(request, timeout=min(seconds, max(0.1, budget.deadline-time.monotonic()))) as response:
+            chunks, size = [], 0
+            while True:
+                budget.check()
+                chunk = response.read1(min(65536, 32 * 1024 * 1024 + 1 - size))
+                budget.bytes += len(chunk)
+                size += len(chunk)
+                if size > 32 * 1024 * 1024:
+                    raise ClientError('source response exceeds 32 MiB', 6, 'resource_limit')
+                budget.check()
+                if not chunk:
+                    break
+                chunks.append(chunk)
+            body = b''.join(chunks)
     except urllib.error.HTTPError as exc:
-        code = 4 if exc.code in {403, 406, 429, 451} else 5
-        raise ClientError(f'network error: HTTP {exc.code}', code, 'rate_limited' if exc.code == 429 else 'upstream_http_failure', retry_after=exc.headers.get('Retry-After')) from None
+        raise ClientError(f'network error: HTTP {exc.code}', upstream_code(exc.code), 'upstream_http_failure', retry_after=exc.headers.get('Retry-After')) from None
     except (urllib.error.URLError, TimeoutError, OSError) as exc:
-        raise ClientError(f'network error: upstream unavailable ({exc.reason if isinstance(exc, urllib.error.URLError) else type(exc).__name__})', 5, 'upstream_http_failure') from None
+        reason = exc.reason if isinstance(exc, urllib.error.URLError) else exc
+        message = f'upstream timed out after {seconds}s; narrow --bbox/--where or raise --timeout' if isinstance(reason, TimeoutError) else f'network error: upstream unavailable ({type(reason).__name__})'
+        raise ClientError(message, 5, 'upstream_http_failure') from None
     try:
         data = json.loads(body)
     except (ValueError, UnicodeError):
@@ -109,8 +164,14 @@ def fetch(url, params=None, kind='layer', query=False):
         raise ClientError('source schema failure: expected an object', 6, 'malformed_response')
     if data.get('error'):
         error = data['error']
-        category = 'access_blocked' if error.get('code') in {403, 498, 499} else 'upstream_arcgis_failure'
-        raise ClientError('ArcGIS error: ' + str(error.get('message', 'unknown failure')), 4 if category == 'access_blocked' else 5, category)
+        if not isinstance(error, dict):
+            raise ClientError('source schema failure: invalid ArcGIS error', 6)
+        details = error.get('details', [])
+        parts = [str(error.get('message') or '')]
+        if isinstance(details, list):
+            parts.extend(d for d in details if isinstance(d, str))
+        message = '; '.join(p for p in parts if p).strip() or 'unknown failure'
+        raise ClientError('ArcGIS error: ' + message[:300], upstream_code(error.get('code')), 'upstream_arcgis_failure')
     return data
 
 
@@ -182,6 +243,10 @@ def service_layers(url):
     return rows
 
 
+def failure(url, exc):
+    return dict(source_url=url, type=ERROR_TYPES[exc.code], message=str(exc))
+
+
 def discover(org, budget, root_index=None):
     roots = REGISTRY[org]['roots']
     if root_index is not None:
@@ -189,7 +254,7 @@ def discover(org, budget, root_index=None):
             raise ClientError('root index is outside this organisation registry')
         roots = [roots[root_index]]
     pending = [(r, r, 0) for r in roots]
-    rows, seen, requests, inaccessible = [], set(), 0, []
+    rows, seen, requests, failed, root_failures = [], set(), 0, [], []
     while pending and requests < budget:
         url, root, depth = pending.pop(0)
         if url in seen:
@@ -198,79 +263,149 @@ def discover(org, budget, root_index=None):
         requests += 1
         try:
             data = fetch(url, kind='directory')
+            collected = []
+            for row in list_value(data, 'services'):
+                if row.get('type') not in SERVER_TYPES:
+                    continue
+                name = row.get('name')
+                if not isinstance(name, str) or not name:
+                    raise ClientError('source schema failure: invalid service name', 6)
+                path = name if depth == 0 or '/' in name else urllib.parse.unquote(url[len(root)+1:]) + '/' + name
+                service_url = root + '/' + '/'.join(urllib.parse.quote(s, safe='-_.()') for s in path.split('/')) + '/' + row['type']
+                owner, service_url = validate_url(service_url, 'service')
+                if owner != org:
+                    raise ClientError('source schema failure: service changed organisation', 6)
+                collected.append(dict(name=name, type=row['type'], **provenance(service_url, org)))
+            folders = data.get('folders', [])
+            if not isinstance(folders, list) or not all(isinstance(f, str) for f in folders):
+                raise ClientError('source schema failure: invalid folders', 6)
+            children = []
+            for folder in folders:
+                child = root + '/' + '/'.join(urllib.parse.quote(s, safe='-_.()') for s in folder.split('/'))
+                validate_url(child, 'directory')
+                if depth < 2 and child not in seen:
+                    children.append((child, root, depth+1))
+            rows.extend(collected)
+            pending.extend(children)
         except ClientError as exc:
-            if depth == 0 or exc.category != 'access_blocked':
+            if exc.code not in {4, 5, 6}:
                 raise
-            inaccessible.append(dict(error=str(exc), **provenance(url, org)))
-            continue
-        for row in list_value(data, 'services'):
-            if row.get('type') not in SERVER_TYPES:
-                continue
-            name = row.get('name')
-            if not isinstance(name, str) or not name:
-                raise ClientError('source schema failure: invalid service name', 6, 'malformed_response')
-            # Enterprise listings usually include the folder in name; AGOL may not.
-            path = name if depth == 0 or '/' in name else urllib.parse.unquote(url[len(root)+1:]) + '/' + name
-            service_url = root + '/' + '/'.join(urllib.parse.quote(s, safe='-_.()') for s in path.split('/')) + '/' + row['type']
-            owner, service_url = validate_url(service_url, 'service')
-            if owner != org:
-                raise ClientError('source schema failure: service changed organisation', 6, 'malformed_response')
-            rows.append(dict(name=name, type=row['type'], **provenance(service_url, org)))
-        folders = data.get('folders', [])
-        if not isinstance(folders, list) or not all(isinstance(f, str) for f in folders):
-            raise ClientError('source schema failure: invalid folders', 6, 'malformed_response')
-        for folder in folders:
-            child = root + '/' + '/'.join(urllib.parse.quote(s, safe='-_.()') for s in folder.split('/'))
-            validate_url(child, 'directory')
-            if depth < 2 and child not in seen:
-                pending.append((child, root, depth+1))
-    return dict(services=rows, requests=requests, truncated=bool(pending or inaccessible), pending_directories=[u for u, _, _ in pending], inaccessible_directories=inaccessible)
+            failed.append(failure(url, exc))
+            if depth == 0:
+                root_failures.append(exc)
+            if exc.category == 'resource_limit':
+                break
+    if len(root_failures) == len(roots):
+        raise root_failures[0]
+    return dict(services=rows, requests=requests, truncated=bool(pending or failed), pending_directories=[u for u, _, _ in pending], failed_directories=failed)
 
 
 def query_layer(args, url, metadata):
-    params = {**filter_params(args), 'outFields': args.fields, 'returnGeometry': 'true', 'outSR': 4326}
+    params = {**filter_params(args), 'outFields': args.fields, 'returnGeometry': 'false' if args.format == 'csv' else 'true', 'outSR': 4326}
     oid = metadata.get('objectIdField') or metadata.get('objectIdFieldName')
-    if oid and FIELD.fullmatch(oid):
-        params['orderByFields'] = oid + ' ASC'
-        if args.fields != '*' and oid.lower() not in {s.strip().lower() for s in args.fields.split(',')}:
-            params['outFields'] += ',' + oid
-    supports = metadata.get('advancedQueryCapabilities', {}).get('supportsPagination', False)
-    page_size = min(1000, metadata.get('maxRecordCount') or 1000, args.limit)
-    if not isinstance(page_size, int) or page_size < 1:
-        raise ClientError('source schema failure: invalid record limit', 6, 'malformed_response')
-    features, offsets, truncated, seen = [], [], False, set()
-    for _ in range(20):
-        offset = len(features)
-        wanted = min(page_size, args.limit - offset)
-        fmt = 'geojson' if args.format == 'geojson' else 'json'
-        page = fetch(url, dict(params, f=fmt, resultOffset=offset, resultRecordCount=wanted), query=True)
+    if not oid:
+        oid = next((f['name'] for f in metadata.get('fields', []) if f.get('type') == 'esriFieldTypeOID'), None)
+    if oid and not FIELD.fullmatch(oid):
+        raise ClientError('source schema failure: invalid object ID field', 6)
+    if oid and args.fields != '*' and oid.lower() not in {s.strip().lower() for s in args.fields.split(',')}:
+        params['outFields'] += ',' + oid
+    page_size = metadata.get('maxRecordCount') or 1000
+    if isinstance(page_size, bool) or not isinstance(page_size, int) or page_size < 1:
+        raise ClientError('source schema failure: invalid record limit', 6)
+    page_size = min(200, page_size, args.limit)
+    fmt = 'geojson' if args.format == 'geojson' else 'json'
+    features, offsets, seen, reasons = [], [], set(), []
+    missing = 0
+    expected = None
+    total = None
+    truncated = False
+    incomplete = False
+    def add_page(page, requested=None):
         if fmt == 'geojson' and page.get('type') != 'FeatureCollection':
-            raise ClientError('source schema failure: expected a GeoJSON FeatureCollection', 6, 'malformed_response')
+            raise ClientError('source schema failure: expected a GeoJSON FeatureCollection', 6)
         batch = list_value(page, 'features')
-        offsets.append(offset)
-        if len(batch) > wanted:
-            truncated = True
-            batch = batch[:wanted]
         for feature in batch:
             attributes = feature.get('properties' if fmt == 'geojson' else 'attributes')
             if not isinstance(attributes, dict):
-                raise ClientError('source schema failure: feature has no attributes/properties', 6, 'malformed_response')
-            identity = feature.get('id') if fmt == 'geojson' else attributes.get(oid) if oid else None
-            if identity is not None and identity in seen:
-                raise ClientError('source paging repeated an object ID; refusing a misleading extract', 6, 'paging_failure')
+                raise ClientError('source schema failure: feature has no attributes/properties', 6)
+            identity = attributes.get(oid, feature.get('id')) if oid else None
+            if oid and (type(identity) is not int or identity in seen or (requested is not None and identity not in requested)):
+                raise ClientError('source paging repeated, omitted or returned an unexpected object ID', 6, 'paging_failure')
             if identity is not None:
                 seen.add(identity)
+        if len(features) + len(batch) > args.limit:
+            raise ClientError('source paging exceeded requested feature limit', 6, 'paging_failure')
         features.extend(batch)
-        more = bool(page.get('exceededTransferLimit') or page.get('properties', {}).get('exceededTransferLimit')) or len(batch) == wanted
-        if not more:
-            break
-        if len(features) >= args.limit or not supports or not batch:
-            truncated = True
-            break
+        return batch
+    try:
+        if oid:
+            # No outSR on the ID selection: reprojection must not remove IDs.
+            data = fetch(url, {**filter_params(args), 'returnIdsOnly': 'true', 'returnGeometry': 'false'}, query=True)
+            ids = data.get('objectIds')
+            if ids is None and data.get('objectIdFieldName'):
+                ids = []
+            if not isinstance(ids, list):
+                raise ClientError('source schema failure: invalid objectIds', 6)
+            if len(ids) > args.limit + 1000:
+                raise ClientError('ID selection exceeds limit plus 1,000-ID margin; narrow --bbox/--where or raise --limit')
+            if any(type(i) is not int for i in ids) or len(set(ids)) != len(ids):
+                raise ClientError('source schema failure: invalid objectIds', 6)
+            if data.get('exceededTransferLimit'):
+                incomplete = True
+                reasons.append('server truncated object ID selection')
+            total = len(ids)
+            expected = sorted(ids)[:args.limit]
+            truncated = incomplete or total > args.limit
+            index = 0
+            while index < len(expected):
+                wanted = expected[index:index+page_size]
+                # Keep even large 64-bit ID batches below the 8 KB URL bound.
+                while len((url + '/query?' + urllib.parse.urlencode(dict(params, f=fmt, objectIds=','.join(map(str, wanted))))).encode()) >= 8192 and len(wanted) > 1:
+                    wanted = wanted[:len(wanted)//2]
+                offsets.append(index)
+                page = fetch(url, dict(params, f=fmt, objectIds=','.join(map(str, wanted))), query=True)
+                add_page(page, set(wanted))
+                index += len(wanted)
+            missing = len(set(expected) - seen)
+            if missing:
+                incomplete = truncated = True
+                reasons.append('server omitted requested object IDs (possibly during reprojection)')
+        else:
+            supports = metadata.get('advancedQueryCapabilities', {}).get('supportsPagination', False)
+            for _ in range(50):
+                offset = len(features)
+                wanted = min(page_size, args.limit-offset)
+                if wanted <= 0:
+                    break
+                offsets.append(offset)
+                page = fetch(url, dict(params, f=fmt, resultOffset=offset, resultRecordCount=wanted), query=True)
+                batch = add_page(page)
+                more = bool(page.get('exceededTransferLimit') or (page.get('properties') or {}).get('exceededTransferLimit')) or len(batch) == wanted
+                if not more or not supports or not batch:
+                    break
+            total = record_count(url, filter_params(args))
+            if len(features) < min(total, args.limit):
+                incomplete = True
+                reasons.append('returned fewer features than the count selection')
+            truncated = incomplete or total > len(features)
+    except ClientError as exc:
+        if exc.category != 'resource_limit':
+            raise
+        incomplete = truncated = True
+        reasons.append(str(exc))
+        if expected is not None:
+            missing = len(set(expected)-seen)
+    if oid:
+        key = 'properties' if fmt == 'geojson' else 'attributes'
+        features.sort(key=lambda f: f[key].get(oid, f.get('id')))
+    result = dict(features=features, spatial_reference={'wkid': 4326}, geometry_type=metadata.get('geometryType'), feature_count=len(features), truncated=truncated, incomplete=incomplete, result_offsets=offsets, limit=args.limit, ordering='object_id' if oid else 'unordered')
+    if oid:
+        result['missing_object_ids_count'] = missing
     else:
-        truncated = True
-    return dict(features=features, spatial_reference={'wkid': 4326}, geometry_type=metadata.get('geometryType'), feature_count=len(features), truncated=truncated, result_offsets=offsets, limit=args.limit,
-                **({'type': 'FeatureCollection'} if args.format == 'geojson' else {}))
+        result['warnings'] = ['No object ID field; ordering and duplicate detection are unavailable.']
+    if reasons:
+        result['truncation_reasons'] = reasons
+    return result
 
 
 class Parser(argparse.ArgumentParser):
@@ -292,9 +427,10 @@ def parser():
         if command == 'layers':
             q.add_argument('service', nargs='?', help='service name including FeatureServer/MapServer/ImageServer, or allowlisted service URL')
             q.add_argument('--curated', choices=['akl'])
-            q.add_argument('--problem', choices=['F1', 'T1', 'T2', 'T3', 'W1', 'W2', 'W3'])
+            q.add_argument('--problem', choices=list(TAGS), help='; '.join(k + ': ' + v for k, v in TAGS.items()))
         if command in {'describe', 'query', 'count'}:
             q.add_argument('layer_url')
+            q.add_argument('--timeout', type=bounded(60), default=10, metavar='SECONDS', help='request timeout 1–60 seconds (default 10)')
         if command in {'query', 'count'}:
             q.add_argument('--where', default='1=1', help='ArcGIS read-only SQL attribute filter')
             q.add_argument('--bbox', type=bbox, help='minLon,minLat,maxLon,maxLat (WGS84)')
@@ -310,36 +446,45 @@ def parser():
 
 
 def execute(args):
+    global ACTIVE_BUDGET
+    ACTIVE_BUDGET = RequestBudget(getattr(args, 'timeout', 10))
     command = args.command
     if command == 'orgs':
-        records = [dict(org=k, roots=v['roots'], **provenance(v['roots'][0], k)) for k, v in REGISTRY.items()]
-        return dict(dict(orgs=records, **provenance(REGISTRY['akl']['roots'][0], 'akl')), publisher='New Zealand public-sector ArcGIS publishers')
+        verified = max(r['verified_at'] for r in VERIFICATION if r['org'] in REGISTRY and r.get('ok'))
+        records = [dict(org=k, roots=v['roots'], publisher=v['publisher']) for k, v in REGISTRY.items()]
+        return result_envelope(records, cached_meta('orgs.json', verified))
     if command == 'layers' and args.curated:
         if args.org or args.service:
             raise ClientError('use layers --curated akl without organisation or service arguments')
-        rows = [dict(r, retrieved_at=timestamp()) for r in CURATED if not args.problem or args.problem in r['problem_tags']]
-        return dict(dict(layers=rows, curated='akl', problem=args.problem, **provenance(REGISTRY['akl']['roots'][0], 'akl')), publisher='New Zealand public-sector ArcGIS publishers')
+        rows = [dict(r) for r in CURATED if not args.problem or args.problem in r['problem_tags']]
+        meta = cached_meta('layers-auckland.json', CATALOGUE.get('verified_at') or max(r['verified_at'] for r in CURATED))
+        return dict(result_envelope(rows, meta), curated='akl', problem=args.problem, tags=TAGS)
     if command in {'services', 'search'}:
         result = discover(args.org, args.max_requests, args.root)
+        rows = result.pop('services')
         if command == 'search':
             text = args.text.casefold()
-            matches = [dict(r, kind='service') for r in result['services'] if text in r['name'].casefold()]
-            examined, inaccessible = 0, []
-            ordered = sorted(result['services'], key=lambda r: text not in r['name'].casefold())
+            matches = [dict(r, kind='service') for r in rows if text in r['name'].casefold()]
+            examined, failed = 0, []
+            ordered = sorted(rows, key=lambda r: text not in r['name'].casefold())
             for row in ordered[:args.max_services]:
                 examined += 1
                 try:
                     layers = service_layers(row['source_url'])
                 except ClientError as exc:
-                    if exc.category != 'access_blocked':
+                    if exc.code not in {4, 5, 6}:
                         raise
-                    inaccessible.append(dict(error=str(exc), **provenance(row['source_url'], args.org)))
+                    failed.append(failure(row['source_url'], exc))
+                    if exc.category == 'resource_limit':
+                        break
                     continue
                 for layer in layers:
                     if text in str(layer.get('name', '')).casefold():
                         matches.append(layer)
-            result = dict(matches=matches, scanned_services=examined, total_discovered_services=len(ordered), directory_requests=result['requests'], truncated=result['truncated'] or examined < len(ordered) or bool(inaccessible), pending_directories=result['pending_directories'], inaccessible_directories=result['inaccessible_directories'], inaccessible_services=inaccessible)
-        return dict(result, **provenance(REGISTRY[args.org]['roots'][0], args.org))
+            result.update(scanned_services=examined, total_discovered_services=len(ordered), failed_services=failed, truncated=result['truncated'] or examined < len(ordered) or bool(failed))
+            rows = matches
+        root = REGISTRY[args.org]['roots'][args.root or 0]
+        return dict(result_envelope(rows, provenance(root, args.org)), **result)
     if command == 'layers':
         if args.problem:
             raise ClientError('--problem requires --curated akl')
@@ -349,82 +494,139 @@ def execute(args):
         org, url = validate_url(url, 'service')
         if org != args.org:
             raise ClientError('service does not belong to the selected organisation', 7, 'blocked_organisation')
-        return dict(layers=service_layers(url), **provenance(url, org))
+        return result_envelope(service_layers(url), provenance(url, org))
     org, url = validate_url(args.layer_url)
     metadata = fetch(url)
+    if metadata.get('type') not in {'Feature Layer', 'Table'}:
+        raise ClientError(f"not a queryable feature layer (type {metadata.get('type')})", 7)
     source = provenance(url, org, metadata)
     if command == 'describe':
-        return dict(name=metadata.get('name'), fields=list_value(metadata, 'fields'), geometry_type=metadata.get('geometryType'), object_id_field=metadata.get('objectIdField'), record_count=record_count(url), editingInfo=metadata.get('editingInfo'), max_record_count=metadata.get('maxRecordCount'), supports_pagination=metadata.get('advancedQueryCapabilities', {}).get('supportsPagination', False), **source)
+        oid = metadata.get('objectIdField') or metadata.get('objectIdFieldName')
+        row = dict(name=metadata.get('name'), fields=list_value(metadata, 'fields'), geometry_type=metadata.get('geometryType'), object_id_field=oid, record_count=record_count(url), editingInfo=metadata.get('editingInfo'), max_record_count=metadata.get('maxRecordCount'), supports_pagination=metadata.get('advancedQueryCapabilities', {}).get('supportsPagination', False))
+        result = result_envelope([row], source)
+        if not oid:
+            result.update(ordering='unordered', warnings=['No object ID field; ordering and duplicate detection are unavailable.'])
+        return result
     if command == 'count':
-        return dict(count=record_count(url, filter_params(args)), **source)
-    return dict(query_layer(args, url, metadata), **source)
+        return result_envelope([dict(count=record_count(url, filter_params(args)))], source)
+    data = query_layer(args, url, metadata)
+    features = data.pop('features')
+    envelope = geojson_envelope(features, source) if args.format == 'geojson' else result_envelope(features, source)
+    return dict(envelope, **data)
+
+
+def safe_cell(value):
+    return "'" + value if isinstance(value, str) and value.lstrip().startswith(('=', '+', '-', '@')) else value
 
 
 def csv_output(result):
-    rows = [f['attributes'] for f in result['features']]
+    rows = [f['attributes'] for f in result['results']]
     keys = list(dict.fromkeys(k for row in rows for k in row))
-    provenance_keys = [k for k in ['source_url', 'publisher', 'licence', 'retrieved_at', 'latest_data'] if k in result]
+    meta = result['meta']
+    provenance_keys = [k for k in ['source_url', 'publisher', 'licence', 'retrieved_at', 'latest_data'] if k in meta]
     output = io.StringIO()
-    writer = csv.DictWriter(output, fieldnames=keys + ['provenance_' + k for k in provenance_keys])
+    writer = csv.DictWriter(output, fieldnames=[safe_cell(k) for k in keys] + ['provenance_' + k for k in provenance_keys])
     writer.writeheader()
     for row in rows:
-        writer.writerow({**row, **{'provenance_' + k: result[k] for k in provenance_keys}})
+        values = {**{safe_cell(k): v for k, v in row.items()}, **{'provenance_' + k: meta[k] for k in provenance_keys}}
+        writer.writerow({k: safe_cell(v) for k, v in values.items()})
     return output.getvalue()
 
 
+def print_terms(record):
+    print(f"  Licence: {record.get('licence', 'unknown')}")
+    if record.get('licence_note'):
+        print(f"  Licence note: {record['licence_note']}")
+    if record.get('caveat'):
+        print(f"  Caveat: {record['caveat']}")
+
 
 def human_output(command, result):
+    rows = result['results']
+    meta = result['meta']
     if command == 'orgs':
-        for row in result['orgs']:
+        for row in rows:
             print(f"{row['org']}: {row['publisher']}")
             for i, root in enumerate(row['roots']):
                 print(f"  [{i}] {root}")
     elif command in {'services', 'layers', 'search'}:
-        rows = result.get('services', result.get('layers', result.get('matches', [])))
         for row in rows:
             print(f"{row.get('name', '')} ({row.get('kind', row.get('type', 'layer'))})")
             print(f"  {row['source_url']}")
-            if row.get('caveat'):
-                print(f"  Caveat: {row['caveat']}")
+            print_terms(row)
         print(f"Returned {len(rows)} records.")
         if result.get('truncated'):
-            print('Coverage is incomplete; inspect --json for unvisited or inaccessible entries.')
+            print('Coverage is incomplete; inspect --json for failed or unvisited entries.')
     elif command == 'describe':
-        print(f"{result['name']}: {result['geometry_type'] or 'table'}; {result['record_count']} records")
-        if result.get('latest_data'):
-            print(f"Latest published edit: {result['latest_data']}")
-        for field in result['fields']:
+        row = rows[0]
+        print(f"{row['name']}: {row['geometry_type'] or 'table'}; {row['record_count']} records")
+        print_terms(meta)
+        for field in row['fields']:
             print(f"  {field['name']}: {field['type']} ({field.get('alias', '')})")
     elif command == 'count':
-        print(f"Count: {result['count']}")
+        print(f"Count: {rows[0]['count']}")
     else:
-        print(json.dumps(result, ensure_ascii=False, indent=2))
-    if command != 'query':
-        print(f"Source: {result['publisher']} — {result['source_url']}")
+        print(f"Returned {len(rows)} features; truncated={result['truncated']}; incomplete={result['incomplete']}")
+        print_terms(meta)
+        for row in rows[:5]:
+            print('  ' + json.dumps(row['attributes'], ensure_ascii=False))
+    print(f"Source: {meta['publisher']} — {meta['source_url']}")
+
+
+def error_meta(args):
+    if args and getattr(args, 'layer_url', None):
+        try:
+            org, url = validate_url(args.layer_url)
+            return provenance(url, org)
+        except ClientError:
+            pass
+    if args and getattr(args, 'org', None) in REGISTRY:
+        org = args.org
+        root = REGISTRY[org]['roots'][getattr(args, 'root', None) or 0] if (getattr(args, 'root', None) or 0) < len(REGISTRY[org]['roots']) else REGISTRY[org]['roots'][0]
+        service = getattr(args, 'service', None)
+        if service:
+            try:
+                url = service if service.startswith('https://') else root + '/' + service
+                owner, url = validate_url(url, 'service')
+                if owner == org:
+                    return provenance(url, org)
+            except ClientError:
+                pass
+        return provenance(root, org)
+    return make_provenance(REPO_URL + 'orgs.json', PUBLISHERS)
 
 
 def main(argv=None):
+    args = None
+    raw = list(sys.argv[1:] if argv is None else argv)
+    machine = '--json' in raw or '--format=geojson' in raw or any(
+        raw[i:i+2] == ['--format', 'geojson'] for i in range(len(raw))
+    )
     try:
-        args = parser().parse_args(argv)
+        args = parser().parse_args(raw)
         result = execute(args)
         if args.command == 'query' and args.format == 'csv':
             rendered = csv_output(result)
             if args.json:
-                print(json.dumps({k: v for k, v in result.items() if k != 'features'} | {'format': 'csv', 'csv': rendered}, ensure_ascii=False))
+                print(json.dumps({k: v for k, v in result.items() if k != 'results'} | {'results': [{'format': 'csv', 'csv': rendered}]}, ensure_ascii=False))
             else:
                 print(rendered, end='')
                 print(f"Returned {result['feature_count']} rows; truncated={result['truncated']}", file=sys.stderr)
-        elif args.json or (args.command == 'query' and args.format == 'geojson'):
+        elif machine:
             print(json.dumps(result, ensure_ascii=False))
         else:
             human_output(args.command, result)
         return 0
-    except ClientError as exc:
-        print(json.dumps(dict(ok=False, source_url=None, publisher=None, licence=None, retrieved_at=timestamp(), error=dict(category=exc.category, code=exc.code, message=str(exc), **exc.details))), file=sys.stderr)
+    except (ClientError, KeyError, TypeError, AttributeError, ValueError) as exc:
+        if not isinstance(exc, ClientError):
+            exc = ClientError('source schema failure: ' + str(exc), 6)
+        if machine:
+            error = error_envelope(exc.code, str(exc), error_meta(args), retry_after=exc.details.get('retry_after'))
+            error['error']['reason'] = exc.category
+            print(json.dumps(error))
+        else:
+            print(str(exc).replace('\n', ' '), file=sys.stderr)
         return exc.code
-    except (KeyError, TypeError, AttributeError, ValueError) as exc:
-        print(json.dumps(dict(ok=False, source_url=None, publisher=None, licence=None, retrieved_at=timestamp(), error=dict(category='malformed_response', code=6, message='source schema failure: ' + str(exc)))), file=sys.stderr)
-        return 6
 
 
 if __name__ == '__main__':
