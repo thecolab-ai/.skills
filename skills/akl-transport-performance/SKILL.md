@@ -1,6 +1,6 @@
 ---
 name: akl-transport-performance
-description: "Query Auckland Transport patronage by mode and route, monthly punctuality and reliability, live city car park spaces, and Metlink daily bus performance. Use for keyless public transport and parking performance comparisons."
+description: "Query Auckland Transport patronage by mode and route, monthly punctuality and reliability, car park facility inventory with undated availability, and Wellington Metlink daily bus performance. Use for keyless public transport and parking performance comparisons."
 license: MIT
 compatibility: "Requires Python 3.10+ and network access for live data"
 metadata:

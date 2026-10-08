@@ -85,6 +85,21 @@ def check_fixtures():
         assert spatial['type'] == 'FeatureCollection' and len(spatial['features']) == 1
         assert spatial['features'][0]['geometry']['coordinates'] == [174.76, -36.85]
     print('[PASS] fixture full command filters, monthly interval intersection, cached provenance and GeoJSON containment')
+    def load_archive(kind, max_age, archive):
+        assert kind == 'daily' and archive
+        for filename in ('daily.xlsx', 'epoch1904.xlsx'):
+            yield (FIXTURES / filename).read_bytes(), cli.meta_for(
+                'https://at.govt.nz/' + filename, stamp=stamp)
+    with patch.object(cli, 'load_download', load_archive):
+        payload = run(['patronage', '--mode', 'bus', '--to', '2026-09', '--json'])
+        assert {r['period'] for r in payload['results']} == {'1904-01-01', '2026-09-26', '2026-09-27'}
+        assert payload['meta']['coverage_from'] == '1904-01-01'
+        assert len(payload['meta']['queried_sources']) == 2
+        for upper_bound in ([], ['--to', '2026-09']):
+            payload = run(['patronage', '--mode', 'bus', '--from', '2026-09-26', *upper_bound, '--json'])
+            assert {r['period'] for r in payload['results']} == {'2026-09-26', '2026-09-27'}
+            assert len(payload['meta']['queried_sources']) == 1
+    print('[PASS] fixture upper-bound-only patronage includes older workbooks; lower bounds stop when covered')
     for args in [ ['patronage', '--mode', 'bus', '--route', '007', '--frequency', 'daily'],
                   ['patronage', '--mode', 'bus', '--from', '2026-09', '--to', '2026-08'],
                   ['punctuality', '--month', '2026-99'], ['metlink', '--date', 'bad'],

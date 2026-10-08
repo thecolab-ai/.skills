@@ -264,11 +264,11 @@ def execute(args):
             if identity not in seen:
                 seen.add(identity)
                 results.append(row)
-        # Do not download older fiscal years if the query is covered already.
+        # Stop only when a lower bound is covered; --to alone needs older years.
         if archive:
             earliest = bounds(meta['coverage_from'])
-            target = (start or end) if args.command == 'patronage' else bounds(args.month)
-            if earliest <= target:
+            target = start if args.command == 'patronage' else bounds(args.month)
+            if target is not None and earliest <= target:
                 break
     meta = dict(metas[0])
     meta['coverage_from'] = min(m['coverage_from'] for m in metas)
