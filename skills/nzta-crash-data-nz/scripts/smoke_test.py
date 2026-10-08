@@ -121,12 +121,36 @@ def test_crash_record_fixture() -> bool | None:
     return report("fixture crash feature normalisation", "FAIL", str(record))
 
 
+def test_spatial_fixture() -> bool | None:
+    from spatial_contract import run_spatial_tests
+    try:
+        run_spatial_tests()
+    except Exception as exc:
+        return report("fixture spatial contract", "FAIL", str(exc))
+    return True
+
+
+def test_spatial_live() -> bool | None:
+    for flags in (["--bbox", "174.735,-36.905,174.745,-36.875"],
+                  ["--near", "174.740,-36.890", "--radius", "500"]):
+        result = run(["crashes", "--source", "arcgis", "--from", "2025-01-01", "--to", "2025-12-31", "--limit", "3", "--format", "geojson", *flags])
+        if result.returncode:
+            return report("CAS spatial query", "SKIP" if is_upstream_failure(result) else "FAIL", result.stderr[:300])
+        data = json.loads(result.stdout)
+        if data.get("type") != "FeatureCollection" or len(data.get("features", [])) != 3 or not data.get("latest_data"):
+            return report("CAS spatial query", "FAIL", "expected three GeoJSON points with provenance")
+        report("CAS spatial query", "PASS", f"{flags[0]} total={data['total_matching']}; sample object_id={data['features'][0]['id']}")
+    return True
+
+
 tests = [
     test_help,
     test_datasets_json,
     test_road_toll_json,
     test_invalid_date_edge_case,
     test_crash_record_fixture,
+    test_spatial_fixture,
+    test_spatial_live,
 ]
 
 results = [test() for test in tests]

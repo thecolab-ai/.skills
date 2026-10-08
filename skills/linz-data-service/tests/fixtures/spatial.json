@@ -1,0 +1,468 @@
+{
+  "source_url": "https://services.arcgis.com/xdsHIIxuCWByZiCB/arcgis/rest/services/",
+  "bbox": "174.735,-36.905,174.745,-36.875",
+  "datasets": {
+    "primary-parcels": {
+      "source_url": "https://services.arcgis.com/xdsHIIxuCWByZiCB/arcgis/rest/services/LINZ_NZ_Primary_Parcels/FeatureServer/0",
+      "metadata": {
+        "name": "LINZ NZ Primary Parcels",
+        "geometryType": "esriGeometryPolygon",
+        "objectIdField": "OBJECTID",
+        "maxRecordCount": 2000,
+        "editingInfo": {
+          "lastEditDate": 1791277230260,
+          "schemaLastEditDate": 1784177213256,
+          "dataLastEditDate": 1791277230260
+        }
+      },
+      "count": {
+        "count": 4410
+      },
+      "response": {
+        "type": "FeatureCollection",
+        "crs": {
+          "type": "name",
+          "properties": {
+            "name": "EPSG:4326"
+          }
+        },
+        "properties": {
+          "exceededTransferLimit": true
+        },
+        "features": [
+          {
+            "type": "Feature",
+            "id": 2776678,
+            "geometry": {
+              "type": "Polygon",
+              "coordinates": [
+                [
+                  [
+                    174.741632733,
+                    -36.8843494320939
+                  ],
+                  [
+                    174.74168575,
+                    -36.8841955490939
+                  ],
+                  [
+                    174.742118317,
+                    -36.8842885990939
+                  ],
+                  [
+                    174.74210465,
+                    -36.8843306990939
+                  ],
+                  [
+                    174.74207375,
+                    -36.8844233660939
+                  ],
+                  [
+                    174.742068083,
+                    -36.8844403820939
+                  ],
+                  [
+                    174.7418504,
+                    -36.8843948990939
+                  ],
+                  [
+                    174.741808533,
+                    -36.8843862990939
+                  ],
+                  [
+                    174.741632733,
+                    -36.8843494320939
+                  ]
+                ]
+              ]
+            },
+            "properties": {
+              "OBJECTID": 2776678,
+              "id": 4835491,
+              "appellation": "Part Allot 142 Sec 10 SBRS OF Auckland",
+              "affected_surveys": "SO 674",
+              "parcel_intent": "DCDB",
+              "topology_type": "Primary",
+              "statutory_actions": null,
+              "land_district": "North Auckland",
+              "titles": "NA550/207",
+              "survey_area": 733,
+              "calc_area": 703,
+              "Shape__Area": 703.3193359375,
+              "Shape__Length": 115.15802210749374
+            }
+          },
+          {
+            "type": "Feature",
+            "id": 2777138,
+            "geometry": {
+              "type": "Polygon",
+              "coordinates": [
+                [
+                  [
+                    174.741615367,
+                    -36.8844682820939
+                  ],
+                  [
+                    174.741595433,
+                    -36.8844640160939
+                  ],
+                  [
+                    174.741608283,
+                    -36.8844245320939
+                  ],
+                  [
+                    174.741628733,
+                    -36.8844289160939
+                  ],
+                  [
+                    174.74177715,
+                    -36.8844608820939
+                  ],
+                  [
+                    174.74178385,
+                    -36.8844622990939
+                  ],
+                  [
+                    174.74177445,
+                    -36.8844913490939
+                  ],
+                  [
+                    174.741771067,
+                    -36.8845017990939
+                  ],
+                  [
+                    174.7417638,
+                    -36.8845002490939
+                  ],
+                  [
+                    174.741615367,
+                    -36.8844682820939
+                  ]
+                ]
+              ]
+            },
+            "properties": {
+              "OBJECTID": 2777138,
+              "id": 8860331,
+              "appellation": "Lot 6 DP 620602",
+              "affected_surveys": "DP 620602",
+              "parcel_intent": "Fee Simple Title",
+              "topology_type": "Primary",
+              "statutory_actions": null,
+              "land_district": "North Auckland",
+              "titles": "1251501",
+              "survey_area": 73,
+              "calc_area": 73,
+              "Shape__Area": 73.3671875,
+              "Shape__Length": 41.46539239741159
+            }
+          },
+          {
+            "type": "Feature",
+            "id": 2777230,
+            "geometry": {
+              "type": "Polygon",
+              "coordinates": [
+                [
+                  [
+                    174.7396495,
+                    -36.8832575320939
+                  ],
+                  [
+                    174.739737367,
+                    -36.8832761320939
+                  ],
+                  [
+                    174.739749733,
+                    -36.8832787490939
+                  ],
+                  [
+                    174.7397877,
+                    -36.8832867820939
+                  ],
+                  [
+                    174.739764983,
+                    -36.8833559660939
+                  ],
+                  [
+                    174.739727017,
+                    -36.8833479320939
+                  ],
+                  [
+                    174.73971465,
+                    -36.8833453160939
+                  ],
+                  [
+                    174.739626783,
+                    -36.8833266990939
+                  ],
+                  [
+                    174.739599667,
+                    -36.8833209660939
+                  ],
+                  [
+                    174.739622383,
+                    -36.8832517820939
+                  ],
+                  [
+                    174.7396495,
+                    -36.8832575320939
+                  ]
+                ]
+              ]
+            },
+            "properties": {
+              "OBJECTID": 2777230,
+              "id": 8743318,
+              "appellation": "Lot 4 DP 608826",
+              "affected_surveys": "DP 608826",
+              "parcel_intent": "Fee Simple Title",
+              "topology_type": "Primary",
+              "statutory_actions": null,
+              "land_district": "North Auckland",
+              "titles": "1201812",
+              "survey_area": 121,
+              "calc_area": 121,
+              "Shape__Area": 120.982421875,
+              "Shape__Length": 46.35741850578443
+            }
+          }
+        ]
+      }
+    },
+    "building-outlines": {
+      "source_url": "https://services.arcgis.com/xdsHIIxuCWByZiCB/arcgis/rest/services/LINZ_NZ_Building_Outlines/FeatureServer/0",
+      "metadata": {
+        "name": "LINZ NZ Building Outlines",
+        "geometryType": "esriGeometryPolygon",
+        "objectIdField": "OBJECTID",
+        "maxRecordCount": 2000,
+        "editingInfo": {
+          "lastEditDate": 1787741041504,
+          "schemaLastEditDate": 1777594258142,
+          "dataLastEditDate": 1787741041504
+        }
+      },
+      "count": {
+        "count": 5180
+      },
+      "response": {
+        "type": "FeatureCollection",
+        "crs": {
+          "type": "name",
+          "properties": {
+            "name": "EPSG:4326"
+          }
+        },
+        "properties": {
+          "exceededTransferLimit": true
+        },
+        "features": [
+          {
+            "type": "Feature",
+            "id": 6654,
+            "geometry": {
+              "type": "Polygon",
+              "coordinates": [
+                [
+                  [
+                    174.735071823686,
+                    -36.8794355923986
+                  ],
+                  [
+                    174.735083152226,
+                    -36.8793890337667
+                  ],
+                  [
+                    174.735076034006,
+                    -36.8793879159917
+                  ],
+                  [
+                    174.735089467675,
+                    -36.8793327055257
+                  ],
+                  [
+                    174.735105465185,
+                    -36.8793352176159
+                  ],
+                  [
+                    174.735112300563,
+                    -36.8793071251279
+                  ],
+                  [
+                    174.735276930839,
+                    -36.8793329768963
+                  ],
+                  [
+                    174.735265157653,
+                    -36.8793786146013
+                  ],
+                  [
+                    174.735251777197,
+                    -36.8793763869295
+                  ],
+                  [
+                    174.735245315961,
+                    -36.8794014332931
+                  ],
+                  [
+                    174.735201381897,
+                    -36.8793941188312
+                  ],
+                  [
+                    174.735194036388,
+                    -36.8794225929045
+                  ],
+                  [
+                    174.735217703276,
+                    -36.8794265331423
+                  ],
+                  [
+                    174.735208245145,
+                    -36.8794631965773
+                  ],
+                  [
+                    174.735071823686,
+                    -36.8794355923986
+                  ]
+                ]
+              ]
+            },
+            "properties": {
+              "OBJECTID": 6654,
+              "building_id": 3935754,
+              "name": null,
+              "use_": "Unknown",
+              "suburb_locality": "Morningside",
+              "town_city": "Auckland",
+              "territorial_authority": "Auckland",
+              "capture_method": "Feature Extraction",
+              "capture_source_group": "NZ Aerial Imagery",
+              "capture_source_id": 1014,
+              "capture_source_name": "Auckland 0.075m Urban Aerial Photos (2017)",
+              "capture_source_from": 1489536000000,
+              "capture_source_to": 1494028800000,
+              "last_modified": 1553731200000,
+              "GlobalID": "1750026a-3e69-4724-a2e9-c05967054251",
+              "Shape__Area": 204.962890625,
+              "Shape__Length": 67.04013778212435
+            }
+          },
+          {
+            "type": "Feature",
+            "id": 6655,
+            "geometry": {
+              "type": "Polygon",
+              "coordinates": [
+                [
+                  [
+                    174.734887417038,
+                    -36.8792292002221
+                  ],
+                  [
+                    174.735019925064,
+                    -36.8792574601088
+                  ],
+                  [
+                    174.734983833137,
+                    -36.879366677915
+                  ],
+                  [
+                    174.73485132494,
+                    -36.8793384179826
+                  ],
+                  [
+                    174.734887417038,
+                    -36.8792292002221
+                  ]
+                ]
+              ]
+            },
+            "properties": {
+              "OBJECTID": 6655,
+              "building_id": 3935755,
+              "name": null,
+              "use_": "Unknown",
+              "suburb_locality": "Morningside",
+              "town_city": "Auckland",
+              "territorial_authority": "Auckland",
+              "capture_method": "Feature Extraction",
+              "capture_source_group": "NZ Aerial Imagery",
+              "capture_source_id": 1014,
+              "capture_source_name": "Auckland 0.075m Urban Aerial Photos (2017)",
+              "capture_source_from": 1489536000000,
+              "capture_source_to": 1494028800000,
+              "last_modified": 1553731200000,
+              "GlobalID": "2bffe9c6-face-4492-97fb-8e0ac497baad",
+              "Shape__Area": 153.2421875,
+              "Shape__Length": 49.52058403800652
+            }
+          },
+          {
+            "type": "Feature",
+            "id": 6656,
+            "geometry": {
+              "type": "Polygon",
+              "coordinates": [
+                [
+                  [
+                    174.734976199099,
+                    -36.8790486237271
+                  ],
+                  [
+                    174.735116728828,
+                    -36.8790753265818
+                  ],
+                  [
+                    174.735101947407,
+                    -36.8791255308901
+                  ],
+                  [
+                    174.735178464124,
+                    -36.8791400701928
+                  ],
+                  [
+                    174.735158453,
+                    -36.8792080370193
+                  ],
+                  [
+                    174.734941406291,
+                    -36.8791667947994
+                  ],
+                  [
+                    174.734976199099,
+                    -36.8790486237271
+                  ]
+                ]
+              ]
+            },
+            "properties": {
+              "OBJECTID": 6656,
+              "building_id": 3935756,
+              "name": null,
+              "use_": "Unknown",
+              "suburb_locality": "Morningside",
+              "town_city": "Auckland",
+              "territorial_authority": "Auckland",
+              "capture_method": "Feature Extraction",
+              "capture_source_group": "NZ Aerial Imagery",
+              "capture_source_id": 1014,
+              "capture_source_name": "Auckland 0.075m Urban Aerial Photos (2017)",
+              "capture_source_from": 1489536000000,
+              "capture_source_to": 1494028800000,
+              "last_modified": 1553731200000,
+              "GlobalID": "0fa91847-fcd2-4474-adf9-092de52ec725",
+              "Shape__Area": 227.77734375,
+              "Shape__Length": 66.71307624751812
+            }
+          }
+        ]
+      }
+    },
+    "directory_services": [
+      "LINZ_NZ_Primary_Parcels"
+    ]
+  },
+  "captured_at": "2026-10-08T01:09:19.121939Z"
+}

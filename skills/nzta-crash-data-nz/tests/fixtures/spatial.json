@@ -1,0 +1,851 @@
+{
+  "source_url": "https://services.arcgis.com/CXBb7LAjgIIdcsPt/arcgis/rest/services/CAS_Data_Public/FeatureServer/0",
+  "bbox": "174.735,-36.905,174.745,-36.875",
+  "metadata": {
+    "name": "CAS_Data_public",
+    "geometryType": "esriGeometryPoint",
+    "editingInfo": {
+      "lastEditDate": 1791188914053,
+      "schemaLastEditDate": 1791188914053,
+      "dataLastEditDate": 1791188914053
+    },
+    "objectIdField": "OBJECTID",
+    "maxRecordCount": 2000
+  },
+  "count": {
+    "count": 55
+  },
+  "response": {
+    "objectIdFieldName": "OBJECTID",
+    "uniqueIdField": {
+      "name": "OBJECTID",
+      "isSystemMaintained": true
+    },
+    "globalIdFieldName": "",
+    "geometryType": "esriGeometryPoint",
+    "spatialReference": {
+      "wkid": 4326,
+      "latestWkid": 4326
+    },
+    "fields": [
+      {
+        "name": "OBJECTID",
+        "type": "esriFieldTypeOID",
+        "alias": "OBJECTID",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "advisorySpeed",
+        "type": "esriFieldTypeSmallInteger",
+        "alias": "Advisory Speed",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "areaUnitID",
+        "type": "esriFieldTypeInteger",
+        "alias": "Area Unit ID",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "bicycle",
+        "type": "esriFieldTypeInteger",
+        "alias": "Bicycle",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "bridge",
+        "type": "esriFieldTypeInteger",
+        "alias": "Bridge",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "bus",
+        "type": "esriFieldTypeInteger",
+        "alias": "Bus",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "carStationWagon",
+        "type": "esriFieldTypeInteger",
+        "alias": "Car Station Wagon",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "cliffBank",
+        "type": "esriFieldTypeInteger",
+        "alias": "Cliff Bank",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "crashDirectionDescription",
+        "type": "esriFieldTypeString",
+        "alias": "Crash Direction Description",
+        "sqlType": "sqlTypeOther",
+        "length": 50,
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "crashFinancialYear",
+        "type": "esriFieldTypeString",
+        "alias": "Crash Financial Year",
+        "sqlType": "sqlTypeOther",
+        "length": 20,
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "crashLocation1",
+        "type": "esriFieldTypeString",
+        "alias": "Crash Location 1",
+        "sqlType": "sqlTypeOther",
+        "length": 255,
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "crashLocation2",
+        "type": "esriFieldTypeString",
+        "alias": "Crash Location 2",
+        "sqlType": "sqlTypeOther",
+        "length": 255,
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "crashRoadSideRoad",
+        "type": "esriFieldTypeInteger",
+        "alias": "Crash Road Side Road",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "crashSeverity",
+        "type": "esriFieldTypeString",
+        "alias": "Crash Severity",
+        "sqlType": "sqlTypeOther",
+        "length": 50,
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "crashSHDescription",
+        "type": "esriFieldTypeString",
+        "alias": "Crash SH Description",
+        "sqlType": "sqlTypeOther",
+        "length": 255,
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "crashYear",
+        "type": "esriFieldTypeInteger",
+        "alias": "Crash Year",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "debris",
+        "type": "esriFieldTypeInteger",
+        "alias": "Debris",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "directionRoleDescription",
+        "type": "esriFieldTypeString",
+        "alias": "Direction Role Description",
+        "sqlType": "sqlTypeOther",
+        "length": 50,
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "ditch",
+        "type": "esriFieldTypeInteger",
+        "alias": "Ditch",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "fatalCount",
+        "type": "esriFieldTypeInteger",
+        "alias": "Fatal Count",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "fence",
+        "type": "esriFieldTypeInteger",
+        "alias": "Fence",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "flatHill",
+        "type": "esriFieldTypeString",
+        "alias": "Flat Hill",
+        "sqlType": "sqlTypeOther",
+        "length": 50,
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "guardRail",
+        "type": "esriFieldTypeInteger",
+        "alias": "Guard Rail",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "holiday",
+        "type": "esriFieldTypeString",
+        "alias": "Holiday",
+        "sqlType": "sqlTypeOther",
+        "length": 50,
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "houseOrBuilding",
+        "type": "esriFieldTypeInteger",
+        "alias": "House Or Building",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "intersection",
+        "type": "esriFieldTypeInteger",
+        "alias": "Intersection",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "kerb",
+        "type": "esriFieldTypeInteger",
+        "alias": "Kerb",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "light",
+        "type": "esriFieldTypeString",
+        "alias": "Light",
+        "sqlType": "sqlTypeOther",
+        "length": 50,
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "meshblockId",
+        "type": "esriFieldTypeInteger",
+        "alias": "Meshblock ID",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "minorInjuryCount",
+        "type": "esriFieldTypeInteger",
+        "alias": "Minor Injury Count",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "moped",
+        "type": "esriFieldTypeInteger",
+        "alias": "Moped",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "motorcycle",
+        "type": "esriFieldTypeInteger",
+        "alias": "Motorcycle",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "NumberOfLanes",
+        "type": "esriFieldTypeSmallInteger",
+        "alias": "Number Of Lanes",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "objectThrownOrDropped",
+        "type": "esriFieldTypeInteger",
+        "alias": "Object Thrown Or Dropped",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "otherObject",
+        "type": "esriFieldTypeInteger",
+        "alias": "Other Object",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "otherVehicleType",
+        "type": "esriFieldTypeInteger",
+        "alias": "Other Vehicle Type",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "overBank",
+        "type": "esriFieldTypeInteger",
+        "alias": "Over Bank",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "parkedVehicle",
+        "type": "esriFieldTypeInteger",
+        "alias": "Parked Vehicle",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "pedestrian",
+        "type": "esriFieldTypeInteger",
+        "alias": "Pedestrian",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "phoneBoxEtc",
+        "type": "esriFieldTypeInteger",
+        "alias": "Phone Box Etc",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "postOrPole",
+        "type": "esriFieldTypeInteger",
+        "alias": "Post Or Pole",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "region",
+        "type": "esriFieldTypeString",
+        "alias": "Region",
+        "sqlType": "sqlTypeOther",
+        "length": 255,
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "roadCharacter",
+        "type": "esriFieldTypeString",
+        "alias": "Road Character",
+        "sqlType": "sqlTypeOther",
+        "length": 50,
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "roadLane",
+        "type": "esriFieldTypeString",
+        "alias": "Road Lane",
+        "sqlType": "sqlTypeOther",
+        "length": 50,
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "roadSurface",
+        "type": "esriFieldTypeString",
+        "alias": "Road Surface",
+        "sqlType": "sqlTypeOther",
+        "length": 50,
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "roadworks",
+        "type": "esriFieldTypeInteger",
+        "alias": "Road works",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "schoolBus",
+        "type": "esriFieldTypeInteger",
+        "alias": "School Bus",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "seriousInjuryCount",
+        "type": "esriFieldTypeInteger",
+        "alias": "Serious Injury Count",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "slipOrFlood",
+        "type": "esriFieldTypeInteger",
+        "alias": "Slip Or Flood",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "speedLimit",
+        "type": "esriFieldTypeSmallInteger",
+        "alias": "Speed Limit",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "strayAnimal",
+        "type": "esriFieldTypeInteger",
+        "alias": "Stray Animal",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "streetLight",
+        "type": "esriFieldTypeString",
+        "alias": "Street Light",
+        "sqlType": "sqlTypeOther",
+        "length": 50,
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "suv",
+        "type": "esriFieldTypeInteger",
+        "alias": "SUV",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "taxi",
+        "type": "esriFieldTypeInteger",
+        "alias": "Taxi",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "temporarySpeedLimit",
+        "type": "esriFieldTypeSmallInteger",
+        "alias": "Temporary Speed Limit",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "tlaId",
+        "type": "esriFieldTypeInteger",
+        "alias": "TLA ID",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "tlaName",
+        "type": "esriFieldTypeString",
+        "alias": "TLA Name",
+        "sqlType": "sqlTypeOther",
+        "length": 255,
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "trafficControl",
+        "type": "esriFieldTypeString",
+        "alias": "Traffic Control",
+        "sqlType": "sqlTypeOther",
+        "length": 50,
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "trafficIsland",
+        "type": "esriFieldTypeInteger",
+        "alias": "Traffic Island",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "trafficSign",
+        "type": "esriFieldTypeInteger",
+        "alias": "Traffic Sign",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "train",
+        "type": "esriFieldTypeInteger",
+        "alias": "Train",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "tree",
+        "type": "esriFieldTypeInteger",
+        "alias": "Tree",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "truck",
+        "type": "esriFieldTypeInteger",
+        "alias": "Truck",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "unknownVehicleType",
+        "type": "esriFieldTypeInteger",
+        "alias": "Unknown Vehicle Type",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "urban",
+        "type": "esriFieldTypeString",
+        "alias": "Urban",
+        "sqlType": "sqlTypeOther",
+        "length": 50,
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "vanOrUtility",
+        "type": "esriFieldTypeInteger",
+        "alias": "Van Or Utility",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "vehicle",
+        "type": "esriFieldTypeInteger",
+        "alias": "Vehicle",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "waterRiver",
+        "type": "esriFieldTypeInteger",
+        "alias": "Water River",
+        "sqlType": "sqlTypeOther",
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "weatherA",
+        "type": "esriFieldTypeString",
+        "alias": "Weather A",
+        "sqlType": "sqlTypeOther",
+        "length": 50,
+        "domain": null,
+        "defaultValue": null
+      },
+      {
+        "name": "weatherB",
+        "type": "esriFieldTypeString",
+        "alias": "Weather B",
+        "sqlType": "sqlTypeOther",
+        "length": 50,
+        "domain": null,
+        "defaultValue": null
+      }
+    ],
+    "exceededTransferLimit": true,
+    "features": [
+      {
+        "attributes": {
+          "OBJECTID": 203373,
+          "advisorySpeed": null,
+          "areaUnitID": 518803,
+          "bicycle": 0,
+          "bridge": null,
+          "bus": 0,
+          "carStationWagon": 1,
+          "cliffBank": null,
+          "crashDirectionDescription": "Null",
+          "crashFinancialYear": "2025/2026",
+          "crashLocation1": "MAY ROAD",
+          "crashLocation2": "GIFFORD AVENUE",
+          "crashRoadSideRoad": null,
+          "crashSeverity": "Non-Injury Crash",
+          "crashSHDescription": "No",
+          "crashYear": 2025,
+          "debris": null,
+          "directionRoleDescription": "South",
+          "ditch": null,
+          "fatalCount": 0,
+          "fence": null,
+          "flatHill": "Null",
+          "guardRail": null,
+          "holiday": null,
+          "houseOrBuilding": null,
+          "intersection": null,
+          "kerb": null,
+          "light": "Bright sun",
+          "meshblockId": 580000,
+          "minorInjuryCount": 0,
+          "moped": 0,
+          "motorcycle": 0,
+          "NumberOfLanes": 2,
+          "objectThrownOrDropped": null,
+          "otherObject": null,
+          "otherVehicleType": 0,
+          "overBank": null,
+          "parkedVehicle": null,
+          "pedestrian": null,
+          "phoneBoxEtc": null,
+          "postOrPole": null,
+          "region": "Auckland Region",
+          "roadCharacter": "Nil",
+          "roadLane": "2-way",
+          "roadSurface": "Sealed",
+          "roadworks": null,
+          "schoolBus": 0,
+          "seriousInjuryCount": 0,
+          "slipOrFlood": null,
+          "speedLimit": 50,
+          "strayAnimal": null,
+          "streetLight": "Null",
+          "suv": 1,
+          "taxi": 0,
+          "temporarySpeedLimit": null,
+          "tlaId": 76,
+          "tlaName": "Auckland",
+          "trafficControl": "Stop",
+          "trafficIsland": null,
+          "trafficSign": null,
+          "train": null,
+          "tree": null,
+          "truck": 0,
+          "unknownVehicleType": 0,
+          "urban": "Urban",
+          "vanOrUtility": 0,
+          "vehicle": null,
+          "waterRiver": null,
+          "weatherA": "Fine",
+          "weatherB": "Null"
+        },
+        "geometry": {
+          "x": 174.7393017288602,
+          "y": -36.904073874555685
+        }
+      },
+      {
+        "attributes": {
+          "OBJECTID": 185290,
+          "advisorySpeed": null,
+          "areaUnitID": 517500,
+          "bicycle": 0,
+          "bridge": null,
+          "bus": 0,
+          "carStationWagon": 1,
+          "cliffBank": null,
+          "crashDirectionDescription": "East",
+          "crashFinancialYear": "2025/2026",
+          "crashLocation1": "MCDONALD STREET",
+          "crashLocation2": "MORNINGSIDE DRIVE",
+          "crashRoadSideRoad": null,
+          "crashSeverity": "Serious Crash",
+          "crashSHDescription": "No",
+          "crashYear": 2025,
+          "debris": null,
+          "directionRoleDescription": "West",
+          "ditch": null,
+          "fatalCount": 0,
+          "fence": null,
+          "flatHill": "Flat",
+          "guardRail": null,
+          "holiday": null,
+          "houseOrBuilding": null,
+          "intersection": null,
+          "kerb": null,
+          "light": "Overcast",
+          "meshblockId": 532101,
+          "minorInjuryCount": 0,
+          "moped": 0,
+          "motorcycle": 1,
+          "NumberOfLanes": 2,
+          "objectThrownOrDropped": null,
+          "otherObject": null,
+          "otherVehicleType": 0,
+          "overBank": null,
+          "parkedVehicle": null,
+          "pedestrian": null,
+          "phoneBoxEtc": null,
+          "postOrPole": null,
+          "region": "Auckland Region",
+          "roadCharacter": "Nil",
+          "roadLane": "2-way",
+          "roadSurface": "Sealed",
+          "roadworks": null,
+          "schoolBus": 0,
+          "seriousInjuryCount": 1,
+          "slipOrFlood": null,
+          "speedLimit": 50,
+          "strayAnimal": null,
+          "streetLight": "Off",
+          "suv": 0,
+          "taxi": 0,
+          "temporarySpeedLimit": null,
+          "tlaId": 76,
+          "tlaName": "Auckland",
+          "trafficControl": "Nil",
+          "trafficIsland": null,
+          "trafficSign": null,
+          "train": null,
+          "tree": null,
+          "truck": 0,
+          "unknownVehicleType": 0,
+          "urban": "Urban",
+          "vanOrUtility": 0,
+          "vehicle": null,
+          "waterRiver": null,
+          "weatherA": "Light rain",
+          "weatherB": "Null"
+        },
+        "geometry": {
+          "x": 174.73667907744976,
+          "y": -36.875278472070654
+        }
+      },
+      {
+        "attributes": {
+          "OBJECTID": 183626,
+          "advisorySpeed": null,
+          "areaUnitID": 517701,
+          "bicycle": 0,
+          "bridge": null,
+          "bus": 0,
+          "carStationWagon": 2,
+          "cliffBank": null,
+          "crashDirectionDescription": "Null",
+          "crashFinancialYear": "2025/2026",
+          "crashLocation1": "ST LUKES ROAD",
+          "crashLocation2": "CORNWALLIS STREET",
+          "crashRoadSideRoad": null,
+          "crashSeverity": "Non-Injury Crash",
+          "crashSHDescription": "No",
+          "crashYear": 2025,
+          "debris": null,
+          "directionRoleDescription": "East",
+          "ditch": null,
+          "fatalCount": 0,
+          "fence": null,
+          "flatHill": "Hill Road",
+          "guardRail": null,
+          "holiday": "Labour Weekend",
+          "houseOrBuilding": null,
+          "intersection": null,
+          "kerb": null,
+          "light": "Bright sun",
+          "meshblockId": 536200,
+          "minorInjuryCount": 0,
+          "moped": 0,
+          "motorcycle": 0,
+          "NumberOfLanes": 4,
+          "objectThrownOrDropped": null,
+          "otherObject": null,
+          "otherVehicleType": 0,
+          "overBank": null,
+          "parkedVehicle": null,
+          "pedestrian": null,
+          "phoneBoxEtc": null,
+          "postOrPole": null,
+          "region": "Auckland Region",
+          "roadCharacter": "Nil",
+          "roadLane": "2-way",
+          "roadSurface": "Sealed",
+          "roadworks": null,
+          "schoolBus": 0,
+          "seriousInjuryCount": 0,
+          "slipOrFlood": null,
+          "speedLimit": 50,
+          "strayAnimal": null,
+          "streetLight": "Off",
+          "suv": 0,
+          "taxi": 0,
+          "temporarySpeedLimit": null,
+          "tlaId": 76,
+          "tlaName": "Auckland",
+          "trafficControl": "Traffic Signals",
+          "trafficIsland": null,
+          "trafficSign": null,
+          "train": null,
+          "tree": null,
+          "truck": 0,
+          "unknownVehicleType": 0,
+          "urban": "Urban",
+          "vanOrUtility": 0,
+          "vehicle": null,
+          "waterRiver": null,
+          "weatherA": "Fine",
+          "weatherB": "Null"
+        },
+        "geometry": {
+          "x": 174.73532344534985,
+          "y": -36.88445403068581
+        }
+      }
+    ]
+  },
+  "captured_at": "2026-10-08T01:09:15.716709Z"
+}

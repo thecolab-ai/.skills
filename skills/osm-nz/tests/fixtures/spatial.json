@@ -1,0 +1,83 @@
+{
+  "source_url": "https://overpass-api.de/api/interpreter",
+  "bbox": "174.735,-36.905,174.745,-36.875",
+  "query": "[out:json][timeout:8][maxsize:8388608];nwr[\"barrier\"=\"fence\"](-36.905,174.735,-36.875,174.745);out center tags 6;",
+  "response": {
+    "version": 0.6,
+    "generator": "Overpass API 0.7.62.11 87bfad18",
+    "osm3s": {
+      "timestamp_osm_base": "2026-10-08T01:07:27Z",
+      "copyright": "The data included in this document is from www.openstreetmap.org. The data is made available under ODbL."
+    },
+    "elements": [
+      {
+        "type": "way",
+        "id": 165822068,
+        "center": {
+          "lat": -36.8745543,
+          "lon": 174.7422006
+        },
+        "tags": {
+          "barrier": "fence"
+        }
+      },
+      {
+        "type": "way",
+        "id": 165822070,
+        "center": {
+          "lat": -36.8753191,
+          "lon": 174.7426929
+        },
+        "tags": {
+          "barrier": "fence"
+        }
+      },
+      {
+        "type": "way",
+        "id": 165822071,
+        "center": {
+          "lat": -36.8753281,
+          "lon": 174.7432584
+        },
+        "tags": {
+          "barrier": "fence"
+        }
+      },
+      {
+        "type": "way",
+        "id": 888516306,
+        "center": {
+          "lat": -36.9043736,
+          "lon": 174.7375707
+        },
+        "tags": {
+          "barrier": "fence",
+          "fence_type": "net"
+        }
+      },
+      {
+        "type": "way",
+        "id": 1130577165,
+        "center": {
+          "lat": -36.8836864,
+          "lon": 174.7366285
+        },
+        "tags": {
+          "barrier": "fence"
+        }
+      },
+      {
+        "type": "way",
+        "id": 1275878928,
+        "center": {
+          "lat": -36.8861572,
+          "lon": 174.7368951
+        },
+        "tags": {
+          "barrier": "fence"
+        }
+      }
+    ]
+  },
+  "captured_at": "2026-10-08T01:09:19.504359Z"
+}

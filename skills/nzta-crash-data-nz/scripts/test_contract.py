@@ -9,4 +9,7 @@ sys.path.insert(0, str(REPO_ROOT / "lib"))
 from contract_test import run_contract_test  # noqa: E402
 
 if __name__ == "__main__":
+    from spatial_contract import run_spatial_tests
+
+    run_spatial_tests()
     raise SystemExit(run_contract_test(Path(__file__).resolve().parents[1]))
