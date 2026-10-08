@@ -66,13 +66,13 @@ def parser():
 
 def get_resources(url, stamp):
     return parse_resources(
-        nzfetch.fetch_text(url, timeout=30, allowed_hosts=ALLOWED), url, stamp
+        nzfetch.fetch_text(url, timeout=10, allowed_hosts=ALLOWED), url, stamp
     )
 
 
 def get_publications(stamp):
     rows = parse_publications(
-        nzfetch.fetch_text(CATALOGUE, timeout=30, allowed_hosts=ALLOWED),
+        nzfetch.fetch_text(CATALOGUE, timeout=10, allowed_hosts=ALLOWED),
         CATALOGUE,
         stamp,
     )
@@ -121,7 +121,7 @@ def main():
                 get_resources(publication["url"], stamp)
             )
             body, _, workbook_url = nzfetch.fetch_bytes(
-                workbook_record["url"], timeout=60, allowed_hosts=ALLOWED
+                workbook_record["url"], timeout=10, allowed_hosts=ALLOWED
             )
             records = parse_key_indicators(
                 body, publication, workbook_url, stamp
@@ -138,7 +138,7 @@ def main():
                 workbooks[0],
             )
             body, _, workbook_url = nzfetch.fetch_bytes(
-                workbook_record["url"], timeout=60, allowed_hosts=ALLOWED
+                workbook_record["url"], timeout=10, allowed_hosts=ALLOWED
             )
             query = args.query if args.command == "appropriation" else args.name
             data = search_appropriations(
@@ -182,10 +182,10 @@ def main():
                 get_resources(after["url"], stamp)
             )
             before_body, _, before_url = nzfetch.fetch_bytes(
-                before_workbook["url"], timeout=60, allowed_hosts=ALLOWED
+                before_workbook["url"], timeout=10, allowed_hosts=ALLOWED
             )
             after_body, _, after_url = nzfetch.fetch_bytes(
-                after_workbook["url"], timeout=60, allowed_hosts=ALLOWED
+                after_workbook["url"], timeout=10, allowed_hosts=ALLOWED
             )
             before_rows = parse_key_indicators(
                 before_body, before, before_url, stamp
@@ -196,7 +196,7 @@ def main():
         warnings = list(WARN)
         if args.command == "compare":
             warnings.append(
-                "Compare includes only exact shared Table 1 definitions, units, period basis and forecast periods; changed or ambiguous definitions fail closed."
+                "Compare includes only exact shared key-indicator definitions, units, period basis and forecast periods; changed or ambiguous definitions fail closed."
             )
         envelope = result_envelope(
             ok=True,
@@ -209,6 +209,10 @@ def main():
             warnings=warnings,
             blocked=False,
         )
+        envelope['meta'] = {'source_url': source_url, 'publisher': 'The Treasury',
+                            'licence': 'CC BY 4.0', 'retrieved_at': stamp}
+        if args.command == 'forecast' and data:
+            envelope['meta']['latest_data'] = data[0]['publication_title']
         print(
             json.dumps(
                 envelope if args.json else data, indent=2, ensure_ascii=False

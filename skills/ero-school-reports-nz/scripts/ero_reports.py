@@ -14,6 +14,15 @@ import nzfetch
 
 ALLOWED_HOSTS = {"ero.govt.nz", "www.ero.govt.nz"}
 REPORTS_API_URL = "https://www.ero.govt.nz/api/ReportsApi/GetReports"
+# Blocks that only list or link to other reports; they are never reports.
+LISTING_HEADING = re.compile(r"^(?:other|past|previous|earlier|older) reports?$|^reports for ", re.IGNORECASE)
+# Page-maintenance footer ("Print Page updated: 12:21AM 28 September 2026"),
+# which is not a report publication date.
+PAGE_UPDATED = re.compile(
+    r"\bpage\s+updated:?\s*(?:\d{1,2}:\d{2}\s*[ap]\.?m\.?\s+)?\d{1,2}\s+[a-z]+\s+\d{4}",
+    re.IGNORECASE,
+)
+VOID_TAGS = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"}
 
 
 class Extract(HTMLParser):
@@ -29,6 +38,10 @@ class Extract(HTMLParser):
         self.ignored = []
 
     def handle_starttag(self, tag, attrs):
+        if tag in VOID_TAGS:
+            if not self.ignored and tag == "br" and self.current:
+                self.current["parts"].append("\n")
+            return
         self.depth += 1
         attributes = dict(attrs)
         if tag in {"nav", "footer", "script", "style", "form"}:
@@ -54,6 +67,8 @@ class Extract(HTMLParser):
             self.active_link["parts"].append(data)
 
     def handle_endtag(self, tag):
+        if tag in VOID_TAGS:
+            return
         if self.ignored and self.ignored[-1] == (tag, self.depth):
             self.ignored.pop()
         if self.ignored:
@@ -70,6 +85,11 @@ class Extract(HTMLParser):
             self.heading = None
             self.heading_parts = []
         self.depth -= 1
+
+    def handle_startendtag(self, tag, attrs):
+        self.handle_starttag(tag, attrs)
+        if tag not in VOID_TAGS:
+            self.handle_endtag(tag)
 
 
 def _institution_title(title, url):
@@ -122,7 +142,7 @@ def school_id(value):
     return match.group(1) if match else None
 
 
-def fetch_reports_index(search_term, *, page_number=1, page_size=100, timeout=30):
+def fetch_reports_index(search_term, *, page_number=1, page_size=100, timeout=10):
     url = (
         f"{REPORTS_API_URL}?searchTerm={quote_plus(search_term)}"
         f"&pageNumber={page_number}&pageSize={page_size}"
@@ -176,7 +196,7 @@ def resolve_report_organisation_url(payload, query):
     raise ValueError("ERO institution ID was not present in the official reports index")
 
 
-def resolve_institution_url(query, *, timeout=30, page_size=100):
+def resolve_institution_url(query, *, timeout=10, page_size=100):
     search_term = school_id(query) or query
     payload = fetch_reports_index(search_term, page_size=page_size, timeout=timeout)
     return resolve_report_organisation_url(payload, query)
@@ -185,7 +205,6 @@ def resolve_institution_url(query, *, timeout=30, page_size=100):
 def report_sections(page):
     sections = page["sections"]
     out = []
-    current_date = None
     current_school = None
     markers = []
     date_pattern = r"\b(\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4})\b"
@@ -193,13 +212,18 @@ def report_sections(page):
         if section["level"] == 1:
             current_school = section["heading"]
         heading = section["heading"].casefold()
-        text = f"{section['heading']} {section['text']}"
+        end = next((cursor for cursor in range(index + 1, len(sections))
+                    if sections[cursor]["level"] <= 2), len(sections))
+        # The current site puts the signed date after the h3/h4 report body,
+        # rather than immediately after the h2 school/month heading.
+        text = PAGE_UPDATED.sub(" ", " ".join(f"{item['heading']} {item['text']}" for item in sections[index:end]))
         heading_has_date = re.search(date_pattern, section["heading"], re.IGNORECASE)
-        text_has_date = re.search(date_pattern, section["text"], re.IGNORECASE)
-        is_report_marker = section["level"] == 2 and heading != "other reports" and not heading.startswith("reports for ") and (
+        text_has_date = re.search(date_pattern, text, re.IGNORECASE)
+        is_report_marker = section["level"] == 2 and not LISTING_HEADING.search(heading) and (
             "report" in heading or any(key in heading for key in ("evaluation", "assurance", "profile")) or heading_has_date or text_has_date
         )
         if is_report_marker:
+            current_date = None
             date_match = heading_has_date or text_has_date or re.search(date_pattern, text, re.IGNORECASE)
             if date_match:
                 try:

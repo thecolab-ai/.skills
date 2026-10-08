@@ -711,14 +711,14 @@
       "writes": false,
       "browser": false,
       "risk": "medium",
-      "cache_ttl": "none",
+      "cache_ttl": "12h",
       "schema_version": "1",
       "skill_type": "public-download",
       "pack": "nz-public-data",
       "allowed_domains": [
         "www.customs.govt.nz"
       ],
-      "last_verified": "2026-09-02",
+      "last_verified": "2026-10-08",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
@@ -1009,7 +1009,7 @@
         "ero.govt.nz",
         " www.ero.govt.nz"
       ],
-      "last_verified": "2026-09-04",
+      "last_verified": "2026-10-08",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
@@ -4132,7 +4132,7 @@
         "www.interislander.co.nz",
         "www.sealink.co.nz"
       ],
-      "last_verified": "2026-07-19",
+      "last_verified": "2026-10-08",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
@@ -4347,7 +4347,7 @@
       "allowed_domains": [
         "www.beehive.govt.nz"
       ],
-      "last_verified": "2026-07-19",
+      "last_verified": "2026-10-08",
       "health": "gated",
       "maintainer": "@adam91holt"
     },
@@ -5057,7 +5057,7 @@
       "allowed_domains": [
         "www.publicservice.govt.nz"
       ],
-      "last_verified": "2026-07-19",
+      "last_verified": "2026-10-08",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
@@ -5593,7 +5593,7 @@
       "category": "education",
       "source_owner": "Ministry of Education",
       "source_type": "official",
-      "source_url": "https://www.education.govt.nz/school/school-terms-and-holidays",
+      "source_url": "https://www.education.govt.nz/school-terms-and-holidays-dates",
       "auth": "none",
       "access_mode": "html-readonly",
       "data_class": "public",
@@ -5607,7 +5607,7 @@
       "allowed_domains": [
         "www.education.govt.nz"
       ],
-      "last_verified": "2026-09-03",
+      "last_verified": "2026-10-08",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
@@ -5919,7 +5919,7 @@
         "www.treasury.govt.nz",
         "treasury.govt.nz"
       ],
-      "last_verified": "2026-07-19",
+      "last_verified": "2026-10-08",
       "health": "degraded",
       "maintainer": "@adam91holt"
     },

@@ -17,9 +17,9 @@ metadata:
   thecolab.schema_version: "1"
   thecolab.skill_type: "html-readonly"
   thecolab.pack: "nz-public-data"
-  thecolab.source_url: "https://www.education.govt.nz/school/school-terms-and-holidays"
+  thecolab.source_url: "https://www.education.govt.nz/school-terms-and-holidays-dates"
   thecolab.allowed_domains: "www.education.govt.nz"
-  thecolab.last_verified: "2026-09-03"
+  thecolab.last_verified: "2026-10-08"
   thecolab.health: "healthy"
   thecolab.maintainer: "@adam91holt"
 ---
@@ -89,13 +89,13 @@ All data commands accept `--timeout SECONDS` (integer range 1–120; default 10)
 - Exit 2: invalid ISO date, timeout outside the documented 1–120 second range, invalid timeout option/value or unpublished year.
 - Exit 4: source access blocked or rate-limited.
 - Exit 5: upstream source unavailable, including an upstream request timeout.
-- Exit 6: Ministry page schema changed or published sections are incomplete.
+- Exit 6: Ministry page schema changed, published sections are incomplete, or the page moved behind a redirect without a Location header.
 
 Errors are concise and emit structured JSON when `--json` is supplied. Date inputs are validated before any network request. The CLI never writes to the source or local user files.
 
 ## Source Attribution and Content Licence
 
-The date and opening-count facts come from the New Zealand Ministry of Education's [School terms and holidays](https://www.education.govt.nz/school/school-terms-and-holidays) page. Returned descriptions are independently generated from parsed dates and counts; source paragraphs and public-holiday prose are not redistributed.
+The date and opening-count facts come from the New Zealand Ministry of Education's [School terms and holidays](https://www.education.govt.nz/school-terms-and-holidays-dates) page. Returned descriptions are independently generated from parsed dates and counts; source paragraphs and public-holiday prose are not redistributed.
 
 The `license: MIT` field applies only to this skill's original code and documentation. Fetched Ministry content remains subject to the source site's terms, including its CC BY-NC 4.0 and Crown copyright notices; this skill does not relicense that source content. Every successful command includes this boundary in its `provenance` object and human-readable output.
 

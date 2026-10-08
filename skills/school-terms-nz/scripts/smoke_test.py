@@ -9,11 +9,18 @@ import subprocess
 import sys
 from contextlib import redirect_stdout
 from pathlib import Path
+from urllib.parse import urlparse
 
 SKILL_DIR = Path(__file__).resolve().parents[1]
 CLI = SKILL_DIR / "scripts" / "cli.py"
 FIXTURE = SKILL_DIR / "tests" / "fixtures" / "source-sample.html"
-SOURCE_URL = "https://www.education.govt.nz/school/school-terms-and-holidays"
+SOURCE_URL = "https://www.education.govt.nz/school-terms-and-holidays-dates"
+
+
+def valid_source_url(url):
+    parsed = urlparse(url)
+    return (parsed.scheme == 'https' and parsed.hostname == 'www.education.govt.nz'
+            and parsed.path.rstrip('/') == '/school-terms-and-holidays-dates')
 
 
 def load_cli():
@@ -185,7 +192,7 @@ def opening_window_response_envelope() -> None:
 
     assert set(payload) == {"status", "source_url", "fetched_at", "provenance", "kind", "date", "break"}
     assert payload["status"] == "ok"
-    assert payload["source_url"] == SOURCE_URL
+    assert valid_source_url(payload["source_url"])
     assert payload["fetched_at"] == "2026-09-03T00:00:00Z"
     assert payload["kind"] == "next_break"
     assert payload["date"] == "2026-02-01"
@@ -374,6 +381,16 @@ def error_contract() -> None:
         else:
             raise AssertionError("failed fetch did not map to exit 5")
 
+        # The former page path answers with HTTP 307 and no Location header.
+        module.nzfetch.fetch_bytes = lambda *args, **kwargs: (_ for _ in ()).throw(
+            module.nzfetch.FetchError(f"HTTP 307 from {SOURCE_URL}"))
+        try:
+            module.fetch_years(1)
+        except module.SkillError as exc:
+            assert exc.exit_code == 6 and exc.error_type == "source_schema"
+        else:
+            raise AssertionError("unfollowable redirect did not map to exit 6")
+
         module.nzfetch.fetch_bytes = original
         original_build_opener = module.nzfetch.urllib.request.build_opener
 
@@ -396,7 +413,7 @@ def error_contract() -> None:
         module.nzfetch.fetch_bytes = original
 
 
-results.append(check("fixture errors map schema, blocked and unavailable failures to exits 6, 4 and 5", error_contract))
+results.append(check("fixture errors map schema/moved-page, blocked and unavailable failures to exits 6, 4 and 5", error_contract))
 
 
 def malformed_content_encodings_fail_closed_end_to_end() -> None:
@@ -667,10 +684,39 @@ def oversized_timeout_is_safe() -> None:
 results.append(check("oversized timeout returns concise structured exit 2", oversized_timeout_is_safe))
 
 
+def live_probe(probe=run):
+    result = probe(['years', '--timeout', '10', '--json'], timeout=20)
+    if result.returncode in {4, 5}:
+        result = probe(['years', '--timeout', '10', '--json'], timeout=20)
+    return result
+
+
+
+
+def live_probe_contract():
+    calls = []
+    def unavailable(*args, **kwargs):
+        calls.append(args)
+        return subprocess.CompletedProcess([], 5, '{}', '')
+    assert live_probe(unavailable).returncode == 5 and len(calls) == 2
+    calls.clear()
+    def schema_error(*args, **kwargs):
+        calls.append(args)
+        return subprocess.CompletedProcess([], 6, '{}', '')
+    assert live_probe(schema_error).returncode == 6 and len(calls) == 1
+    assert valid_source_url(SOURCE_URL)
+    assert not valid_source_url('https://www.education.govt.nz/school/school-terms-and-holidays')
+    assert not valid_source_url('https://www.education.govt.nz/en/school-terms-and-holidays-dates')
+    assert not valid_source_url('https://example.org/school-terms-and-holidays-dates')
+    assert not valid_source_url('https://www.education.govt.nz/unrelated')
+
+results.append(check('live retry bound and strict canonical source identity', live_probe_contract))
+
+
 if not all(results):
     raise SystemExit(1)
 
-live = run(["years", "--timeout", "10", "--json"], timeout=20)
+live = live_probe()
 text = live.stdout or live.stderr
 try:
     payload = json.loads(text)
@@ -685,7 +731,7 @@ if live.returncode != 0:
     print(f"[FAIL] live source command failed with exit {live.returncode}: {payload}")
     raise SystemExit(1)
 assert payload["status"] == "ok"
-assert payload["source_url"] == SOURCE_URL
+assert valid_source_url(payload["source_url"])
 assert payload["fetched_at"].endswith("Z")
 assert payload["provenance"]["source_owner"] == "New Zealand Ministry of Education"
 assert "does not relicense source content" in payload["provenance"]["source_content_notice"]
