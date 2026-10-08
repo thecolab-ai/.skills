@@ -1,0 +1,73 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "regional_council_gen.synthetic-1",
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                174.6,
+                -37
+              ],
+              [
+                174.9,
+                -37
+              ],
+              [
+                174.9,
+                -36.7
+              ],
+              [
+                174.6,
+                -36.7
+              ],
+              [
+                174.6,
+                -37
+              ]
+            ],
+            [
+              [
+                174.7,
+                -36.95
+              ],
+              [
+                174.72,
+                -36.95
+              ],
+              [
+                174.72,
+                -36.93
+              ],
+              [
+                174.7,
+                -36.93
+              ],
+              [
+                174.7,
+                -36.95
+              ]
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "gid": 999,
+        "objectid": 999,
+        "regc2013": "02",
+        "regc2013_n": "Auckland Region",
+        "shape_leng": 1000.0,
+        "shape_area": 1000.0,
+        "land_area_": 1.0
+      }
+    }
+  ],
+  "totalFeatures": 1,
+  "numberMatched": 1,
+  "numberReturned": 1,
+  "timeStamp": "2026-02-03T00:00:00Z"
+}

@@ -2,7 +2,7 @@
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
   "last_verified": "2026-10-08",
-  "skill_count": 162,
+  "skill_count": 163,
   "skills": [
     {
       "name": "airnz-flights",
@@ -2052,6 +2052,34 @@
       ],
       "last_verified": "2026-07-26",
       "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "niwa-rivers-nz",
+      "description": "Query NIWA River Maps hydrology predictions, hourly station metadata, regional flood product coverage and Fish Passage surveys without keys. Use for NZ river flow and flood context, with explicit limits on account-gated observations and rasters.",
+      "path": "skills/niwa-rivers-nz",
+      "category": "environment",
+      "source_owner": "Earth Sciences New Zealand (NIWA)",
+      "source_type": "official",
+      "source_url": "https://data.niwa.co.nz/products/hydro-data-hourly",
+      "auth": "none",
+      "access_mode": "public-api",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "none",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "data.niwa.co.nz",
+        "shiny.niwa.co.nz",
+        "geoserver.niwa.co.nz",
+        "d17fc0a885.execute-api.ap-southeast-2.amazonaws.com"
+      ],
+      "last_verified": "2026-10-08",
+      "health": "degraded",
       "maintainer": "@adam91holt"
     },
     {
