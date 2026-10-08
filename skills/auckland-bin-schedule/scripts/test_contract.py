@@ -54,7 +54,7 @@ def test_cli():
     schedule.assert_called_once_with(item["id"])
     matched = json.loads(output.getvalue())["results"][0]["matched_property"]
     assert matched["id"] == item["id"] and matched["address"] == item["address"]
-    assert matched["match_score"] == 100 and matched["exact_match"]
+    assert matched["match_score"] == 100 and matched["exact_match"] and matched["auto_selectable"]
     print("[PASS] contract exact singleton selects schedule and legacy invocation works")
 
 
@@ -125,6 +125,7 @@ def test_scores_and_pick():
     assert [item["match_score"] for item in ranked] == [100, 90, 85, 75, 60]
     assert [item["candidate_number"] for item in ranked] == list(range(1, 6))
     assert [item["exact_match"] for item in ranked] == [True, False, False, False, False]
+    assert [item["auto_selectable"] for item in ranked] == [True, False, False, False, False]
     assert ranked[-1]["match_components"] == {
         "number": True, "suffix": False, "street": True, "type": False, "suburb": False, "unit": True}
     assert cli.rank_properties(list(reversed(items)), query) == ranked
@@ -164,8 +165,26 @@ def test_scores_and_pick():
         assert cli.main(["42 Example Road", "--json"]) == 0
     candidate = json.loads(out.getvalue())["results"][0]
     assert candidate["status"] == "ambiguous" and candidate["matches"][0]["match_score"] == 85
-    assert not candidate["matches"][0]["exact_match"]
+    assert candidate["matches"][0]["exact_match"]
+    assert not candidate["matches"][0]["auto_selectable"]
+    assert candidate["exact_matches"] == candidate["matches"]
     schedule.assert_not_called()
+    # Exactness reflects supplied components; auto-selection needs unit equality and an explicit suburb.
+    for address in ("42 Example Road, Mount Eden", "2/42 Example Road, Mount Eden",
+                    "42 Example Road, Takapuna"):
+        out = io.StringIO()
+        with patch.object(cli, "lookup_properties", return_value=[{"id": "synthetic", "address": address}]), \
+             patch.object(cli, "get_schedule") as schedule, redirect_stdout(out):
+            assert cli.main(["schedule", "42 Example Road", "--json"]) == 0
+        result = json.loads(out.getvalue())["results"][0]
+        assert result["status"] == "ambiguous"
+        assert result["exact_matches"] == result["matches"]
+        assert result["matches"][0]["exact_match"] and not result["matches"][0]["auto_selectable"]
+        schedule.assert_not_called()
+    unit = {"id": "synthetic", "address": "2/42 Example Road, Mount Eden"}
+    assert cli.rank_properties([unit], query)[0]["exact_match"]
+    assert not cli.rank_properties([unit], query)[0]["auto_selectable"]
+    assert cli.rank_properties([unit], "2/42 Example Road, Mount Eden")[0]["auto_selectable"]
     out = io.StringIO()
     with patch.object(cli, "lookup_properties", return_value=items), redirect_stdout(out):
         assert cli.main(["lookup", query]) == 0

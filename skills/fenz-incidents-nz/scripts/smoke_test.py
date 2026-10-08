@@ -16,7 +16,11 @@ annual=aggregate_annual((S/"tests/fixtures/annual.tsv").read_bytes(),resources[1
 invalid=subprocess.run([sys.executable,str(S/"scripts"/"cli.py"),"annual","--year","2024-25","--limit","101","--json"],capture_output=True,text=True);assert invalid.returncode==2
 invalid_year=subprocess.run([sys.executable,str(S/"scripts"/"cli.py"),"annual","--year","2026","--json"],capture_output=True,text=True);assert invalid_year.returncode==2
 print("[PASS] fixture annual resource discovery, TSV aggregation, region filter, provenance and limits")
-r=subprocess.run([sys.executable,str(S/"scripts"/"cli.py"),"region","Auckland","--report-region","north","--limit","2","--json"],capture_output=True,text=True,timeout=20)
+try:
+ r=subprocess.run([sys.executable,str(S/"scripts"/"cli.py"),"region","Auckland","--report-region","north","--limit","2","--json"],capture_output=True,text=True,timeout=20)
+except subprocess.TimeoutExpired as exc:
+ print(f"[SKIP] network FENZ query timed out after {exc.timeout}s")
+ raise SystemExit(0)
 if r.returncode==0:
  payload=json.loads(r.stdout);assert payload["results"]
  assert all("auckland" in row["location"].casefold() for row in payload["results"])

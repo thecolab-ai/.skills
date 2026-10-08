@@ -20,25 +20,33 @@ parsed = cli.parse_section(lines, "Household collection")
 assert parsed["next_dates"]["rubbish"] == "Friday, 1 August"
 assert parsed["frequency"]["rubbish"] == "Every week"
 print("[PASS] fixture household collection section")
-result = subprocess.run([sys.executable, str(S / "scripts/cli.py"), "schedule", "12 Tawa Road Onehunga", "--json"],
-                        capture_output=True, text=True, timeout=35)
-if result.returncode in {4, 5}:
-    print(f"[SKIP] network error Auckland Council unavailable: {(result.stdout or result.stderr).strip()}")
-elif result.returncode:
-    print(f"[FAIL] live schedule: {(result.stdout or result.stderr).strip()}")
-    raise SystemExit(1)
+try:
+    result = subprocess.run([sys.executable, str(S / "scripts/cli.py"), "schedule", "12 Tawa Road Onehunga", "--json"],
+                            capture_output=True, text=True, timeout=35)
+except subprocess.TimeoutExpired as exc:
+    print(f"[SKIP] network error Auckland Council schedule timed out after {exc.timeout}s")
 else:
-    envelope = json.loads(result.stdout)
-    payload = envelope["results"][0]
-    assert payload["matched_property"]["address"]
-    assert payload["household"] and payload["property_id"]
-    assert cli.parse_address(payload["matched_property"]["address"]) == cli.parse_address("12 Tawa Road Onehunga")
-    assert all(envelope["meta"].get(key) for key in ("source_url", "publisher", "retrieved_at"))
-    print(f"[PASS] live exact Onehunga schedule: {payload['address']} ({payload['property_id']})")
+    if result.returncode in {4, 5}:
+        print(f"[SKIP] network error Auckland Council unavailable: {(result.stdout or result.stderr).strip()}")
+    elif result.returncode:
+        print(f"[FAIL] live schedule: {(result.stdout or result.stderr).strip()}")
+        raise SystemExit(1)
+    else:
+        envelope = json.loads(result.stdout)
+        payload = envelope["results"][0]
+        assert payload["matched_property"]["address"]
+        assert payload["household"] and payload["property_id"]
+        assert cli.parse_address(payload["matched_property"]["address"]) == cli.parse_address("12 Tawa Road Onehunga")
+        assert all(envelope["meta"].get(key) for key in ("source_url", "publisher", "retrieved_at"))
+        print(f"[PASS] live exact Onehunga schedule: {payload['address']} ({payload['property_id']})")
 
-for address in ("1 Dominion Road, Mount Eden", "1 Queen Street, Auckland Central"):
-    result = subprocess.run([sys.executable, str(S / "scripts/cli.py"), "lookup", address, "--json"],
-                            capture_output=True, text=True, timeout=25)
+for address in ("1 Dominion Road, Mount Eden", "1 Queen Street, Auckland Central", "12 Tawa Road"):
+    try:
+        result = subprocess.run([sys.executable, str(S / "scripts/cli.py"), "lookup", address, "--json"],
+                                capture_output=True, text=True, timeout=25)
+    except subprocess.TimeoutExpired as exc:
+        print(f"[SKIP] network error Council lookup {address}: timed out after {exc.timeout}s")
+        continue
     if result.returncode in {4, 5}:
         print(f"[SKIP] network error Council lookup {address}: {(result.stdout or result.stderr).strip()}")
     elif result.returncode:
@@ -50,6 +58,8 @@ for address in ("1 Dominion Road, Mount Eden", "1 Queen Street, Auckland Central
         assert payload["query"] == address
         matches = payload["matches"]
         assert matches == cli.rank_properties(matches, address)
-        assert all(item["exact_match"] == (item["match_score"] == 100) for item in matches)
+        assert payload["exact_matches"] == cli.exact_properties(matches, address)
+        assert all(item["exact_match"] == (item in payload["exact_matches"]) for item in matches)
+        assert all(item["auto_selectable"] == (item["match_score"] == 100) for item in matches)
         assert all(envelope["meta"].get(key) for key in ("source_url", "publisher", "retrieved_at"))
         print(f"[PASS] live scored Council lookup {address}: {len(matches)} candidates ({payload['status']})")

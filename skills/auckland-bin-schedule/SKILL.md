@@ -106,7 +106,10 @@ python3 skills/auckland-bin-schedule/scripts/cli.py schedule "1 Dominion Road, M
   The CLI fetches no schedule in these states unless `--pick N` explicitly selects a candidate.
   Refine the address, choose a numbered candidate or use a confirmed property id.
 - Candidates include `candidate_number`, `match_score` (0–100), `match_components` and
-  `exact_match`. Scores are component equality weights, not probabilities. See API notes.
+  `exact_match` (membership in `exact_matches`) and `auto_selectable` (full component equality,
+  including an explicit suburb and matching unit). Automatic selection also requires a unique
+  exact candidate and a non-full result page. Scores are component equality weights, not probabilities.
+  See API notes for omitted suburb/unit matching.
   Picks can select a non-exact candidate and return `status: picked`; inspect its full address.
   Repeat the same query and limit when picking; live upstream changes can change the list.
 - The previous address-only and `--list` invocations remain supported.

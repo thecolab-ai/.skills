@@ -287,6 +287,7 @@ MATCH_WEIGHTS = {"number": 25, "suffix": 10, "street": 30, "type": 15,
 def rank_properties(items: list[dict[str, Any]], query: str) -> list[dict[str, Any]]:
     """Score component equality, not fuzzy similarity; 100 requires a full address."""
     wanted = parse_address(query)
+    exact_ids = {item["id"] for item in exact_properties(items, query)}
     ranked = []
     for item in {item["id"]: item for item in items}.values():
         found = parse_address(item["address"])
@@ -296,7 +297,8 @@ def rank_properties(items: list[dict[str, Any]], query: str) -> list[dict[str, A
                       for key in MATCH_WEIGHTS}
         score = sum(weight for key, weight in MATCH_WEIGHTS.items() if components[key])
         ranked.append({**item, "match_score": score, "match_components": components,
-                       "exact_match": all(components.values())})
+                       "exact_match": item["id"] in exact_ids,
+                       "auto_selectable": all(components.values())})
     ranked.sort(key=lambda item: (-item["match_score"], normalise_words(item["address"]), item["id"]))
     return [{**item, "candidate_number": i} for i, item in enumerate(ranked, 1)]
 
@@ -398,9 +400,8 @@ def main(argv: list[str] | None = None) -> int:
             matches = rank_properties(items, query)
             exact = exact_properties(matches, query)
             chosen = choose_property(matches, query) if len(items) < args.limit else None
-            wanted = parse_address(query)
-            if not wanted or not wanted["suburb"]:
-                chosen = None  # A suburb is required for unattended selection.
+            if chosen and not chosen["auto_selectable"]:
+                chosen = None  # Full component equality is required for unattended selection.
             if args.pick is not None:
                 if args.pick > len(matches):
                     return emit_error(args.json, 2, f"--pick {args.pick} is outside the {len(matches)} returned candidates", source_url)

@@ -37,11 +37,18 @@ No username, password, account cookie, API key, or private credential is require
 
 The M08 follow-up adds scored candidates and explicit selection. Component equality weights
 are number 25, suffix 10, street name 30, street type 15, suburb 15 and unit 5. A missing query
-suburb never earns suburb points or permits unattended selection; an unspecified unit matches
-only a candidate with no unit. Unparseable addresses score zero. A score is not a confidence
+suburb never earns suburb points or permits unattended selection; an unspecified unit earns
+unit points only for a candidate with no unit. Unparseable addresses score zero. A score is not a confidence
 probability. Only the strict match rules, a unique candidate and a non-full page permit automatic
 selection. Candidates are deduplicated by property id and sorted by score descending, then
 normalised address and id, with 1-based `candidate_number` values.
+
+`exact_match` means membership in `exact_matches`: number, suffix, street name and type must
+match, plus suburb and unit when supplied. An omitted suburb or unit does not exclude candidates
+from this list. `auto_selectable` requires equality of every component, including an explicitly
+supplied suburb and matching unit; it indicates candidate eligibility. Actual automatic selection
+also requires exactly one exact candidate and a non-full result page. An exact candidate can
+therefore score below 100 and require confirmation.
 
 `schedule ADDRESS --pick N` explicitly chooses that numbered result even if it is non-exact or
 the search page is full. `status: picked` and `matched_property` retain the selected candidate's
