@@ -49,9 +49,9 @@ python3 scripts/cli.py nearest --near 174.76,-36.85 --source at-adt --radius-km 
   the exact area, road, carriageway endpoints, location and direction labels.
 - `at-adt`: AT ArcGIS historic surveys. Site IDs are `carriageway:location`.
   Site listing uses `latest=Yes`; inspect each survey date because this flag
-  can refer to a very old count. Counts return all surveys for the site.
-- `at-cycle-daily`: published daily counter observations. Defaults to July 2026;
-  date filters discover matching monthly XLSX files on AT's download page.
+  can refer to a very old count. The current layer holds one survey per site.
+- `at-cycle-daily`: published daily counter observations. Discovers the latest monthly file;
+  date filters select matching monthly XLSX files on AT's download page.
 - `at-cycle-monthly`: sums those daily observations by site and calendar month,
   retaining observed, published and missing-day counts. Date filters select
   overlapping months; totals include the whole published month, even when
@@ -61,27 +61,31 @@ python3 scripts/cli.py nearest --near 174.76,-36.85 --source at-adt --radius-km 
   contains virtual and inactive sites that may have no daily observations.
   Counts default to the last 30 days; explicit dates are preferable. Returns
   lane, direction and vehicle-class rows separately, preserving duplicates.
-- `hotcity`: yearly hourly XLSX files; defaults to the September 2026 snapshot.
+- `hotcity`: yearly hourly XLSX files; discovers the latest yearly download.
   Date filters discover the relevant yearly downloads. Site IDs are exact
   column labels, including spelling and line breaks. The 2026 workbook has
   24 camera series after three additions to the earlier network.
 
 Only `at-adt` and `nzta-tms` supply coordinates for `--bbox` and `nearest`.
+Filtering is upstream ArcGIS envelope intersection (`esriSpatialRelIntersects`).
 Nearest searches within `--radius-km` (default 10 km), using straight-line
 WGS84 distance; an empty result means no site in that radius. A supplied bbox
 further defines the search area. Workbook `sites --format geojson` emits null
 geometries, since those downloads do not supply coordinates.
 
-Every data command supports `--json`. Outputs include provenance on the envelope
-and every record, exact query/download URLs, UTC retrieval times, source-stated
-licences and latest observation dates. Source listing is a verified registry,
+Every data command supports `--json`, emitting `meta` and `results`; errors add
+an `error` object with code, type and message. GeoJSON carries `meta` as a foreign
+member. Metadata includes UTC retrieval times, source-stated licences and source
+currency (`latest_data`); record `date` is its observation date. Each record
+references its exact query/download URL; workbook provenance appears once in
+`meta.downloads`. Source listing is a verified registry,
 not a health probe. Null counts are never converted to zero. Repeated NZTA daily
 keys are flagged with a warning; review UTC timestamps before any aggregation.
 
-Downloads and API queries cache inside this skill's ignored `.cache/` directory
+Downloads and API queries cache inside `nz-traffic-counts-v1/` under this skill's ignored `.cache/` directory
 for 24 hours. Set `--max-age SECONDS`, `--cache-dir PATH`, or `--max-age 0` to
 refresh. Cache hits preserve the original retrieval time. `--limit` bounds
-output (default 100); `--max-records` bounds ArcGIS retrieval (default 10,000),
+output (default 100); `--max-records` bounds ArcGIS retrieval (default 10,000, maximum 50,000),
 with explicit truncation warnings. Requests use 10-second network timeouts and
 32 MiB download caps. Never fetch the NZTA 1.7 GB quarter-hourly ZIP.
 

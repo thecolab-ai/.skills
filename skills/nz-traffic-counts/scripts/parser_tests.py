@@ -2,9 +2,14 @@
 """Deterministic assertions using trimmed public source responses."""
 import argparse
 import io
+import os
 import json
 from pathlib import Path
 import tempfile
+import subprocess
+import sys
+from unittest.mock import patch
+from contextlib import redirect_stdout, redirect_stderr
 import zipfile
 
 import cli
@@ -53,7 +58,7 @@ def run():
     row = cli.arc_normalise(at, 'at-adt', cli.AT, '2026-10-08T00:00:00Z')
     assert row['site_id'] == '23788:522' and row['adt'] == 451
     assert abs(row['longitude']-174.88287627714192) < 1e-10
-    assert {'source_url','publisher','licence','retrieved_at','latest_data'} <= row.keys()
+    assert row['source_url'] == cli.AT
     assert cli.distance(174.76,-36.85,174.76,-36.85) == 0
     print('[PASS] fixture AT site identity, WGS84 location and provenance')
     nzta_site = json.loads((FIXTURES/'nzta-sites.json').read_text())['features'][0]
@@ -89,14 +94,14 @@ def run():
     try:
         def fake_fetch(url, **kw):
             calls.append(url)
-            assert kw['timeout'] == 10 and kw['max_bytes'] == 32*1024*1024
+            assert kw['timeout'] == 10 and kw['max_bytes'] == 32*1024*1024 and kw['allowed_hosts'] == cli.ALLOWED
             return b'{}', 'application/json', url
         cli.nzfetch.fetch_bytes = fake_fetch
         with tempfile.TemporaryDirectory() as folder:
             a = argparse.Namespace(cache_dir=Path(folder),max_age=86400)
             first = cli.fetch(cli.AT,a)
             assert cli.fetch(cli.AT,a) == first and len(calls) == 1
-            meta = next(Path(folder).glob('*.json'))
+            meta = next((Path(folder)/'nz-traffic-counts-v1').glob('*.json'))
             d = json.loads(meta.read_text());d['fetched_epoch'] = 0;meta.write_text(json.dumps(d))
             cli.fetch(cli.AT,a);assert len(calls) == 2
             a.max_age = 0;cli.fetch(cli.AT,a);assert len(calls) == 3
@@ -114,6 +119,201 @@ def run():
         _,rows,epoch = next(cli.sheets(stream.getvalue()))
         assert rows == [{'D':'Rich text'}] and cli.excel_date('0',epoch) == '1904-01-01'
     print('[PASS] fixture sparse cells, rich shared strings and Excel 1904 epoch')
+    regressions(cycle, row)
+
+
+def synthetic_workbook(rows, name='test'):
+    """Synthetic cells only: exercise edge cases without redistributing restricted data."""
+    from xml.sax.saxutils import escape
+    with io.BytesIO() as stream:
+        with zipfile.ZipFile(stream, 'w') as z:
+            z.writestr('xl/workbook.xml', '<workbook xmlns="'+cli.NS['s']+'" xmlns:r="'+cli.REL+'"><sheets><sheet name="'+name+'" r:id="r1"/></sheets></workbook>')
+            z.writestr('xl/_rels/workbook.xml.rels','<Relationships><Relationship Id="r1" Target="worksheets/sheet1.xml"/></Relationships>')
+            cells = []
+            for index, row in enumerate(rows, 1):
+                cells.append('<row>' + ''.join('<c r="'+col+str(index)+'" t="inlineStr"><is><t>'+escape(str(value))+'</t></is></c>' for col, value in row.items()) + '</row>')
+            z.writestr('xl/worksheets/sheet1.xml','<worksheet xmlns="'+cli.NS['s']+'"><sheetData>'+''.join(cells)+'</sheetData></worksheet>')
+        return stream.getvalue()
+
+
+def regressions(cycle, at_row):
+    from datetime import datetime
+    epoch = datetime(1899, 12, 30)
+    def serial(day):
+        return str((datetime.fromisoformat(day) - epoch).days)
+    body = synthetic_workbook([
+        {'A': 'Date', 'B': 'Time', 'C': 'Wanted', 'D': 'Other'},
+        {'A': serial('2016-01-01'), 'B': '00:00', 'C': '-', 'D': '7'},
+        {'A': serial('2016-12-31'), 'B': '00:00', 'C': '12', 'D': '8'},
+        {'A': serial('2017-01-15'), 'B': '00:00', 'C': '3', 'D': '4'},
+    ])
+    info = {}
+    records = cli.parse_active(body, True, wanted_site='Wanted', nominal_year='2016', info=info)
+    assert len(records) == 3 and records[0]['count'] is None
+    assert records[2]['date_outside_file_year'] and records[2]['date'] == '2017-01-15'
+    assert info['latest'] == '2016-12-31' and '1 placeholder' in info['warnings'][0]
+    assert '2017-01-15' in info['warnings'][1]
+    filtered = cli.parse_active(body, True, wanted_site='Wanted', start='2016-12-31', end='2016-12-31')
+    assert len(filtered) == 1 and filtered[0]['count'] == 12
+    sites = cli.parse_active(body, True, sites_only=True)
+    assert len(sites) == 2 and next(r for r in sites if r['site_id'] == 'Wanted')['first_observed'] == '2016-12-31'
+    for value in ['–', 'n/a', 'NA', '']:
+        placeholder = synthetic_workbook([{'A': 'Date', 'B': 'Time', 'C': 'Wanted'}, {'A': serial('2016-01-01'), 'C': value}])
+        assert cli.parse_active(placeholder, True)[0]['count'] is None
+    invalid = synthetic_workbook([{'A': 'Date', 'B': 'Time', 'C': 'Wanted'}, {'A': serial('2016-01-01'), 'C': 'oops'}])
+    try:
+        cli.parse_active(invalid, True)
+    except cli.SkillError as exc:
+        assert exc.code == 6
+    else:
+        raise AssertionError('Unrecognised count must fail')
+    date_cycle = synthetic_workbook([{'A': 'Date', 'B': 'Synthetic cyclist'}, {'A': serial('2024-07-01'), 'B': '61'}])
+    assert cli.parse_active(date_cycle)[0]['count'] == 61
+    text_cycle = synthetic_workbook([{'A': 'Date', 'B': 'Synthetic cyclist'}, {'A': 'Wednesday, 1 July 2020', 'B': '9'}])
+    assert cli.parse_active(text_cycle)[0]['date'] == '2020-07-01'
+    shifted_cycle = synthetic_workbook([
+        {'A': 'Year', 'B': 'Month', 'C': 'Date', 'D': 'Date Check', 'E': 'Weekday', 'F': 'Weekend/Holiday', 'G': 'Date', 'H': 'Synthetic cyclist'},
+        {'A': '2024', 'B': 'August', 'C': serial('2024-08-01'), 'D': 'OK', 'E': '1', 'F': '0', 'G': serial('2024-08-01'), 'H': '64'}])
+    shifted = cli.parse_active(shifted_cycle)
+    assert len(shifted) == 1 and shifted[0]['date'] == '2024-08-01' and shifted[0]['count'] == 64
+    traffic = synthetic_workbook([
+        {'B': 'Road Name', 'G': 'Count Start Date', 'H': '5 Day ADT', 'I': '7 Day ADT'},
+        {'A': 'Synthetic area', 'B': 'Synthetic road', 'G': serial('2016-01-01'), 'H': '1.5', 'I': '2'},
+        {'A': 'Synthetic area', 'B': 'Synthetic road', 'G': serial('2016-01-01'), 'H': '1.5', 'I': '2'},
+    ], 'July 2012 synthetic')
+    duplicate_info = {}
+    duplicated = cli.parse_traffic(traffic, info=duplicate_info)
+    assert len(duplicated) == 2 and all(r['duplicate_row'] for r in duplicated)
+    assert duplicate_info['warnings'] and duplicated[0]['adt_5_day'] == 1.5
+    unrelated = synthetic_workbook([{'A': 'Date', 'B': 'Wanted', 'C': 'Other'}, {'A': serial('2024-07-01'), 'B': '61', 'C': 'z'}])
+    unrelated_info = {}
+    assert cli.parse_active(unrelated, wanted_site='Wanted', info=unrelated_info)[0]['count'] == 61
+    assert 'non-numeric cells' in unrelated_info['warnings'][0]
+    for huge in ('1e300', 'inf'):
+        try:
+            cli.excel_date(huge, epoch)
+        except cli.SkillError as exc:
+            assert exc.code == 6
+        else:
+            raise AssertionError('Huge dates must become schema failures')
+    print('[PASS] synthetic missing cells, nominal-year warnings and selective streaming parsers')
+
+    links = (FIXTURES/'cycle-links.html').read_bytes()
+    parser = cli.DownloadLinks(); parser.feed(links.decode())
+    assert {cli.download_period(link) for link in parser.links} == {f'{year}-{m:02d}' for year in (2024, 2025) for m in range(1, 13)}
+    assert cli.download_period('/january-2024/noncycle-may-sept-2025.xlsx') is None
+    assert cli.download_period('/january-2024/cycle-feb-2025.xlsx') == '2025-02'
+    assert cli.download_period('/cycle-2025/file-march-2025.xlsx') is None
+    args = cli.build_parser().parse_args(['counts', '--source', 'at-cycle-monthly', '--site', 'Wanted', '--from', '2025-01-01', '--to', '2025-12-31'])
+    with patch.object(cli, 'fetch', return_value=(links, '2026-10-08T00:00:00Z')):
+        assert len(cli.workbook_urls(args)) == 12
+    incomplete = links.decode().replace('cycle-movements-march-2025.xlsx', 'unsupported-march-2025.xlsx').encode()
+    with patch.object(cli, 'fetch', return_value=(incomplete, '2026-10-08T00:00:00Z')):
+        assert len(cli.workbook_urls(args)) == 11 and '2025-03' in args._warnings[0]
+    latest_args = cli.build_parser().parse_args(['sites', '--source', 'at-cycle-daily'])
+    with patch.object(cli, 'fetch', return_value=(links, '2026-10-08T00:00:00Z')):
+        assert cli.download_period(cli.workbook_urls(latest_args)[0]) == '2025-12'
+    hot_links = b'<a href="/files/All-pedestrian-2027-October.xlsx">new</a><a href="/files/All-pedestrian-2026.xlsx">old</a>'
+    latest_args.source = 'hotcity'
+    with patch.object(cli, 'fetch', return_value=(hot_links, '2026-10-08T00:00:00Z')):
+        assert cli.download_period(cli.workbook_urls(latest_args)[0], True) == '2027'
+    month_body = synthetic_workbook([{'A': 'Time', 'B': 'Wanted'},
+        {'A': serial('2024-08-31'), 'B': '59'}, {'A': serial('2024-09-01'), 'B': '86'}])
+    args = cli.build_parser().parse_args(['counts', '--source', 'at-cycle-monthly', '--site', 'Wanted', '--from', '2024-01-01', '--to', '2024-12-31'])
+    with patch.object(cli, 'workbook_urls', return_value=[cli.CYCLE_PAGE + 'cycle-september-2024.xlsx']), patch.object(cli, 'fetch', return_value=(month_body, '2026-10-08T00:00:00Z')):
+        monthly, _ = cli.get_counts(args)
+    assert [r['date'] for r in monthly] == ['2024-08-01', '2024-09-01']
+    assert monthly[0]['date_outside_file_month'] and '2024-08-31' in args._warnings[0]
+    print('[PASS] captured AT archive links, missing-month warnings and latest-download discovery')
+
+    for source, expected in [('at-cycle-daily', '2025-06-01'), ('hotcity', '2025-01-01'), ('nzta-tms', '2025-05-31')]:
+        args = cli.build_parser().parse_args(['counts', '--source', source, '--site', 'Wanted', '--to', '2025-06-30'])
+        cli.resolve_dates(args)
+        assert args.date_from == expected
+    for argv in [
+        ['counts', '--source', 'hotcity', '--json'],
+        ['sites', '--source', 'hotcity', '--bbox', '174,-37,174,-36', '--json'],
+        ['sites', '--source', 'hotcity', '--from', 'bad', '--json'],
+        ['counts', '--source', 'hotcity', '--site', 'x', '--from', '2026-08-01', '--to', '2025-06-01', '--json'],
+        ['sources', '--max-records', '50001', '--json'],
+        ['sites', '--source', 'hotcity', '--bbox', '174,-37,175,-36', '--format', 'geojson'],
+        ['sites', '--source', 'hotcity', '--bbox', 'bad', '--format=geojson'],
+    ]:
+        out = io.StringIO()
+        with redirect_stdout(out), redirect_stderr(io.StringIO()):
+            code = cli.main(argv)
+        error = json.loads(out.getvalue())
+        assert code in (2, 7) and error['error']['code'] == code and error['error']['type']
+        assert error['results'] == [] and error['meta']['source_url']
+    assert 'licence' not in cli.source_provenance(cli.AT, 'Unknown publisher', licence=None)
+    print('[PASS] one-sided date defaults, bounded arguments, JSON and GeoJSON error contracts')
+
+    with tempfile.TemporaryDirectory() as folder:
+        root = Path(folder)
+        unrelated = root/'unrelated.bin'; unrelated.write_bytes(b'keep')
+        own = root/'nz-traffic-counts-v1';own.mkdir()
+        other = own/'unrelated.bin';other.write_bytes(b'keep')
+        os.utime(unrelated, (0, 0));os.utime(other, (0, 0))
+        args = argparse.Namespace(cache_dir=root, max_age=1)
+        with patch.object(cli.nzfetch, 'fetch_bytes', return_value=(b'{}', 'application/json', cli.AT)):
+            cli.fetch(cli.AT, args)
+            assert unrelated.read_bytes() == other.read_bytes() == b'keep'
+            with patch.object(Path, 'mkdir', side_effect=OSError('read only')):
+                args.cache_dir = root/'new'
+                assert cli.fetch(cli.AT, args)[0] == b'{}' and args._warnings
+    print('[PASS] isolated cache pruning and successful downloads despite cache write failure')
+
+    for upstream_code, expected in [(503, 5), (400, 6)]:
+        args = argparse.Namespace(cache_dir=Path('.'), max_age=0)
+        with patch.object(cli, 'fetch', return_value=(json.dumps({'error': {'code': upstream_code, 'message': 'test'}}).encode(), '2026-10-08T00:00:00Z')):
+            try:
+                cli.arc_query(cli.AT, args)
+            except cli.SkillError as exc:
+                assert exc.code == expected
+            else:
+                raise AssertionError('ArcGIS errors must fail')
+    for source, site, counts in [('at-adt', '1:1', [0]), ('nzta-tms', 'ZZZ999', [0, 0]), ('nzta-tms', '00200444', [0, 1]), ('at-adt', '23788:522', [1])]:
+        args = cli.build_parser().parse_args(['counts', '--source', source, '--site', site, '--from', '2018-01-01', '--to', '2018-01-01'])
+        def count_query(base, a, **params):
+            assert 'DATE' not in params['where'] and 'TIMESTAMP' not in params['where']
+            return {'count': counts.pop(0)}, base, '2026-10-08T00:00:00Z'
+        with patch.object(cli, 'arc_rows', return_value=([], [])), patch.object(cli, 'arc_query', side_effect=count_query):
+            cli.resolve_dates(args)
+            try:
+                rows, warnings = cli.get_counts(args)
+            except cli.SkillError as exc:
+                assert exc.code == 2 and site in str(exc)
+            else:
+                assert not rows and warnings == ['Site exists but has no observations in the requested period']
+    args = cli.build_parser().parse_args(['counts', '--source', 'at-adt', '--site', '23788:522', '--max-records', '1'])
+    feature = json.loads((FIXTURES/'at-adt.json').read_text())['features'][0]
+    def capped_query(base, args, **params):
+        assert params['orderByFields'] == 'count_date,OBJECTID'
+        return {'features': [feature], 'exceededTransferLimit': True}, cli.AT, '2026-10-08T00:00:00Z'
+    with patch.object(cli, 'arc_query', side_effect=capped_query):
+        _, warnings = cli.arc_rows(cli.AT, args)
+    assert 'Returned period 2002-03-21..2002-03-21' in warnings[0]
+    print('[PASS] transient ArcGIS errors and unknown versus inactive site distinction')
+
+    # A fixture-backed direct envelope remains valid inside the canonical runner envelope.
+    from result_contract import validate_result_envelope
+    import importlib.util
+    runner_path = Path(__file__).resolve().parents[3]/'scripts'/'run_skill.py'
+    spec = importlib.util.spec_from_file_location('traffic_fixture_runner', runner_path)
+    runner = importlib.util.module_from_spec(spec);spec.loader.exec_module(runner)
+    args = cli.build_parser().parse_args(['counts', '--source', 'at-adt', '--site', '23788:522', '--json'])
+    fixture_envelope = cli.envelope([at_row], args, [])
+    fixture_process = subprocess.CompletedProcess([], 0, json.dumps(fixture_envelope), '')
+    out = io.StringIO()
+    with patch.object(sys, 'argv', [str(runner_path), 'nz-traffic-counts', 'counts', '--source', 'at-adt', '--site', '23788:522']), patch.object(runner.subprocess, 'run', return_value=fixture_process), redirect_stdout(out):
+        assert runner.main() == 0
+    wrapped = json.loads(out.getvalue())
+    assert validate_result_envelope(wrapped) == [] and wrapped['ok'] and wrapped['data']['results'][0]['adt'] == 451
+    p = subprocess.run([sys.executable, str(runner_path), 'nz-traffic-counts', 'sources'], capture_output=True, text=True, timeout=15)
+    result = json.loads(p.stdout)
+    assert p.returncode == 0 and result['ok'] and len(result['data']['results']) == 6
+    assert validate_result_envelope(result) == []
+    print('[PASS] fixture result contract and network-free canonical sources command')
 
 
 if __name__ == '__main__':
