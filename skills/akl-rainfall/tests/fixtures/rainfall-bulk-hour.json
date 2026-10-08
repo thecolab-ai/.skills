@@ -1,0 +1,228 @@
+{
+  "Datasets": [
+    {
+      "Identifier": "Rainfall.Continuous@900001",
+      "Parameter": "Rainfall",
+      "Label": "Synthetic Rain Garden",
+      "Unit": "mm",
+      "LocationIdentifier": "900001"
+    },
+    {
+      "Identifier": "Rainfall.Continous@900002",
+      "Parameter": "Rainfall",
+      "Label": "Synthetic Hill Gauge",
+      "Unit": "mm",
+      "LocationIdentifier": "900002"
+    }
+  ],
+  "TimeRange": {
+    "StartTime": "2024-02-20T00:00:00+12:00",
+    "EndTime": "2024-02-20T06:00:00+12:00"
+  },
+  "NumRows": 7,
+  "Rows": [
+    {
+      "Timestamp": "2024-02-20T00:00:00+12:00",
+      "Points": [
+        {
+          "Dataset": "Rainfall.Continuous@900001",
+          "Value": "NaN",
+          "GradeCode": 0,
+          "GradeName": "UNDEF",
+          "ApprovalLevel": 0,
+          "ApprovalName": "Working",
+          "Qualifiers": [],
+          "InterpolationType": 1,
+          "InterpolationName": "Linear",
+          "Notes": ""
+        },
+        {
+          "Dataset": "Rainfall.Continous@900002",
+          "Value": "NaN",
+          "GradeCode": 0,
+          "GradeName": "UNDEF",
+          "ApprovalLevel": 0,
+          "ApprovalName": "Working",
+          "Qualifiers": [],
+          "InterpolationType": 1,
+          "InterpolationName": "Linear",
+          "Notes": ""
+        }
+      ]
+    },
+    {
+      "Timestamp": "2024-02-20T01:00:00+12:00",
+      "Points": [
+        {
+          "Dataset": "Rainfall.Continuous@900001",
+          "Value": 0.6,
+          "GradeCode": 200,
+          "GradeName": "Non Verified",
+          "ApprovalLevel": 0,
+          "ApprovalName": "Working",
+          "Qualifiers": [],
+          "InterpolationType": 1,
+          "InterpolationName": "Linear",
+          "Notes": ""
+        },
+        {
+          "Dataset": "Rainfall.Continous@900002",
+          "Value": 0,
+          "GradeCode": 200,
+          "GradeName": "Non Verified",
+          "ApprovalLevel": 0,
+          "ApprovalName": "Working",
+          "Qualifiers": [],
+          "InterpolationType": 1,
+          "InterpolationName": "Linear",
+          "Notes": ""
+        }
+      ]
+    },
+    {
+      "Timestamp": "2024-02-20T02:00:00+12:00",
+      "Points": [
+        {
+          "Dataset": "Rainfall.Continuous@900001",
+          "Value": 1.2,
+          "GradeCode": 200,
+          "GradeName": "Non Verified",
+          "ApprovalLevel": 0,
+          "ApprovalName": "Working",
+          "Qualifiers": [],
+          "InterpolationType": 1,
+          "InterpolationName": "Linear",
+          "Notes": ""
+        },
+        {
+          "Dataset": "Rainfall.Continous@900002",
+          "Value": 0.8,
+          "GradeCode": 200,
+          "GradeName": "Non Verified",
+          "ApprovalLevel": 0,
+          "ApprovalName": "Working",
+          "Qualifiers": [],
+          "InterpolationType": 1,
+          "InterpolationName": "Linear",
+          "Notes": ""
+        }
+      ]
+    },
+    {
+      "Timestamp": "2024-02-20T03:00:00+12:00",
+      "Points": [
+        {
+          "Dataset": "Rainfall.Continuous@900001",
+          "Value": 0.3,
+          "GradeCode": 200,
+          "GradeName": "Non Verified",
+          "ApprovalLevel": 0,
+          "ApprovalName": "Working",
+          "Qualifiers": [],
+          "InterpolationType": 1,
+          "InterpolationName": "Linear",
+          "Notes": ""
+        },
+        {
+          "Dataset": "Rainfall.Continous@900002",
+          "Value": 0.2,
+          "GradeCode": 200,
+          "GradeName": "Non Verified",
+          "ApprovalLevel": 0,
+          "ApprovalName": "Working",
+          "Qualifiers": [],
+          "InterpolationType": 1,
+          "InterpolationName": "Linear",
+          "Notes": ""
+        }
+      ]
+    },
+    {
+      "Timestamp": "2024-02-20T04:00:00+12:00",
+      "Points": [
+        {
+          "Dataset": "Rainfall.Continuous@900001",
+          "Value": 0,
+          "GradeCode": 200,
+          "GradeName": "Non Verified",
+          "ApprovalLevel": 0,
+          "ApprovalName": "Working",
+          "Qualifiers": [],
+          "InterpolationType": 1,
+          "InterpolationName": "Linear",
+          "Notes": ""
+        },
+        {
+          "Dataset": "Rainfall.Continous@900002",
+          "Value": 0,
+          "GradeCode": 200,
+          "GradeName": "Non Verified",
+          "ApprovalLevel": 0,
+          "ApprovalName": "Working",
+          "Qualifiers": [],
+          "InterpolationType": 1,
+          "InterpolationName": "Linear",
+          "Notes": ""
+        }
+      ]
+    },
+    {
+      "Timestamp": "2024-02-20T05:00:00+12:00",
+      "Points": [
+        {
+          "Dataset": "Rainfall.Continuous@900001",
+          "Value": 0.9,
+          "GradeCode": 200,
+          "GradeName": "Non Verified",
+          "ApprovalLevel": 0,
+          "ApprovalName": "Working",
+          "Qualifiers": [],
+          "InterpolationType": 1,
+          "InterpolationName": "Linear",
+          "Notes": ""
+        },
+        {
+          "Dataset": "Rainfall.Continous@900002",
+          "Value": 1.4,
+          "GradeCode": 200,
+          "GradeName": "Non Verified",
+          "ApprovalLevel": 0,
+          "ApprovalName": "Working",
+          "Qualifiers": [],
+          "InterpolationType": 1,
+          "InterpolationName": "Linear",
+          "Notes": ""
+        }
+      ]
+    },
+    {
+      "Timestamp": "2024-02-20T06:00:00+12:00",
+      "Points": [
+        {
+          "Dataset": "Rainfall.Continuous@900001",
+          "Value": 0,
+          "GradeCode": 200,
+          "GradeName": "Non Verified",
+          "ApprovalLevel": 0,
+          "ApprovalName": "Working",
+          "Qualifiers": [],
+          "InterpolationType": 1,
+          "InterpolationName": "Linear",
+          "Notes": ""
+        },
+        {
+          "Dataset": "Rainfall.Continous@900002",
+          "Value": 0,
+          "GradeCode": 200,
+          "GradeName": "Non Verified",
+          "ApprovalLevel": 0,
+          "ApprovalName": "Working",
+          "Qualifiers": [],
+          "InterpolationType": 1,
+          "InterpolationName": "Linear",
+          "Notes": ""
+        }
+      ]
+    }
+  ]
+}
