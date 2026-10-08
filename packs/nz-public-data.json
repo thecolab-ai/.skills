@@ -3,7 +3,7 @@
   "name": "nz-public-data",
   "description": "Public, read-only New Zealand data and public-interest sources.",
   "default": true,
-  "skill_count": 108,
+  "skill_count": 109,
   "skills": [
     "akl-rainfall",
     "at-transport",
@@ -78,6 +78,7 @@
     "nz-parliament-votes",
     "nz-police-data",
     "nz-product-recalls",
+    "nz-recycling-locator",
     "nz-regulatory-analysis",
     "nz-road-closures",
     "nz-schools",

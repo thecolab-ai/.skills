@@ -1,0 +1,75 @@
+{
+  "notes": "All bundled examples are synthetic; names, addresses and coordinates are invented. No third-party phone/email values or page captures are redistributed. Endpoint URLs and structure verification dates identify the upstream parser contracts only.",
+  "sources": {
+    "recyclemap": {
+      "source_url": "https://www.recyclemap.co.nz/wp-json/wpgmza/v1/markers",
+      "publisher": "RecycleMap NZ",
+      "files": [
+        "recyclemap-markers.json",
+        "recyclemap-maps.json",
+        "recyclemap-categories.json"
+      ],
+      "fixture": "synthetic, structure captured 2026-10-08"
+    },
+    "wasteminz": {
+      "source_url": "https://www.google.com/maps/d/kml?mid=1ncyWOEWbXMSiycgz48swYqMj4aHJnSE&forcekml=1",
+      "publisher": "WasteMINZ",
+      "files": [
+        "wasteminz.kml"
+      ],
+      "fixture": "synthetic, structure captured 2026-10-08"
+    },
+    "repair": {
+      "source_url": "https://www.repairnetworkaotearoa.org.nz/dynamic-localrepaircafes_p_8500816c_6fb3_4424_8161_90ad1ae5b8b2_0_5000-sitemap.xml",
+      "publisher": "Repair Network Aotearoa",
+      "files": [
+        "repair.html"
+      ],
+      "fixture": "synthetic, structure captured 2026-10-08"
+    },
+    "tyrewise": {
+      "source_url": "https://www.tyrewise.co.nz/participant_cat/collection-site/",
+      "publisher": "Tyrewise",
+      "files": [
+        "tyrewise.html",
+        "tyrewise-last.html",
+        "tyrewise-loop.html"
+      ],
+      "fixture": "synthetic, structure captured 2026-10-08"
+    },
+    "ecycle": {
+      "source_url": "https://www.e-cycle.co.nz/wp-admin/admin-ajax.php?action=store_search&lat=-36.8485&lng=174.7633&max_results=1000&search_radius=5000&autoload=1",
+      "publisher": "E-Cycle",
+      "files": [
+        "ecycle.json"
+      ],
+      "fixture": "synthetic, structure captured 2026-10-08"
+    },
+    "branz": {
+      "source_url": "https://services7.arcgis.com/vkPf8weODt71Prmb/arcgis/rest/services/Waste_Map_Facility_Locations/FeatureServer/0",
+      "publisher": "BRANZ",
+      "files": [
+        "branz.json",
+        "branz-metadata.json"
+      ],
+      "fixture": "synthetic, structure captured 2026-10-08"
+    },
+    "agrecovery": {
+      "source_url": "https://agrecovery.co.nz/wp-json/wp/v2/ag_site?per_page=100&page=1&acf_format=standard&_fields=id,title,acf&orderby=title&order=asc",
+      "publisher": "Agrecovery",
+      "files": [
+        "agrecovery.json"
+      ],
+      "fixture": "synthetic, structure captured 2026-10-08"
+    },
+    "beautification": {
+      "source_url": "https://api.mapme.com/api/stories/aggregated/af29690b-4cd0-484f-a211-8f3e12fa51b4",
+      "publisher": "Beautification Trust",
+      "files": [
+        "beautification.json"
+      ],
+      "fixture": "synthetic, structure captured 2026-10-08"
+    }
+  },
+  "fixture": "synthetic, structure captured 2026-10-08"
+}

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Synthetic structure example; all facilities and coordinates invented. -->
+<kml xmlns="http://www.opengis.net/kml/2.2"><Document>
+<Placemark><name>Example Battery Recovery Park</name><description>Confirm acceptance of damaged batteries with the operator.</description><Point><coordinates>171.245,-44.415,0</coordinates></Point></Placemark>
+<Placemark><name>Example Battery Shop</name><description>Household cells only.</description><Point><coordinates>174.76,-36.85,0</coordinates></Point></Placemark>
+</Document></kml>
