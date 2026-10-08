@@ -2,7 +2,7 @@
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
   "last_verified": "2026-10-08",
-  "skill_count": 158,
+  "skill_count": 159,
   "skills": [
     {
       "name": "airnz-flights",
@@ -64,6 +64,34 @@
       "local_output": [
         "private-json-csv-export"
       ]
+    },
+    {
+      "name": "akl-housing-capacity",
+      "description": "Query Auckland housing supply trends and 2022/23 plan-enabled and feasible housing capacity. Use for monthly housing updates, building consents, HBA, capacity for growth, PC78, local-board growth capacity, social housing delivery and housing demolition source discovery.",
+      "path": "skills/akl-housing-capacity",
+      "category": "housing",
+      "source_owner": "Auckland Council",
+      "source_type": "official",
+      "source_url": "https://knowledgeauckland.org.nz/",
+      "auth": "none",
+      "access_mode": "public-download",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "none",
+      "schema_version": "1",
+      "skill_type": "public-download",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "knowledgeauckland.org.nz",
+        "www.knowledgeauckland.org.nz",
+        "www.hud.govt.nz",
+        "www.kaingaora.govt.nz"
+      ],
+      "last_verified": "2026-10-08",
+      "health": "degraded",
+      "maintainer": "@adam91holt"
     },
     {
       "name": "akl-rainfall",
