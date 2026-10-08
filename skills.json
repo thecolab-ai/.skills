@@ -2,7 +2,7 @@
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
   "last_verified": "2026-10-08",
-  "skill_count": 156,
+  "skill_count": 157,
   "skills": [
     {
       "name": "airnz-flights",
@@ -4460,6 +4460,42 @@
         "www.productsafety.govt.nz"
       ],
       "last_verified": "2026-07-19",
+      "health": "degraded",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "nz-recycling-locator",
+      "description": "Find New Zealand reuse and recycling drop-offs by material and location, plus text search of repair cafés and Tyrewise collection sites. Use when locating material collection services or searching local repair events.",
+      "path": "skills/nz-recycling-locator",
+      "category": "environment",
+      "source_owner": "RecycleMap NZ, WasteMINZ and collection networks",
+      "source_type": "mixed",
+      "source_url": "https://www.recyclemap.co.nz/",
+      "auth": "none",
+      "access_mode": "public-api",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "24h",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "www.recyclemap.co.nz",
+        "www.google.com",
+        "www.opengis.net",
+        "www.sitemaps.org",
+        "www.aucklandcouncil.govt.nz",
+        "www.repairnetworkaotearoa.org.nz",
+        "www.tyrewise.co.nz",
+        "www.e-cycle.co.nz",
+        "services7.arcgis.com",
+        "agrecovery.co.nz",
+        "api.mapme.com",
+        "techcollect.nz"
+      ],
+      "last_verified": "2026-10-08",
       "health": "degraded",
       "maintainer": "@adam91holt"
     },
