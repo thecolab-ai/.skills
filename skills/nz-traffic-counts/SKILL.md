@@ -101,9 +101,12 @@ the assessed catalogue. NZTA inventory remains available nationally.
 Every data command supports `--json`, emitting `meta` and `results`; errors add
 an `error` object with code, type and message. GeoJSON carries `meta` as a foreign
 member. Metadata includes UTC retrieval times, source-stated licences and source
-currency (`latest_data`); record `date` is its observation date. Each record
-references its exact query/download URL; workbook provenance appears once in
-`meta.downloads`. Source listing is a verified registry,
+currency (`latest_data`); record `date` is its observation date.
+For Tauranga and Wellington, `meta.latest_data` is the latest survey or observation
+date in the returned rows, after filtering and `--limit`. Undated responses
+(including the source registry and Wellington inventory) return null with a note.
+Each record references its exact query/download URL; workbook provenance appears
+once in `meta.downloads`. Source listing is a verified registry,
 not a health probe. Null counts are never converted to zero. Repeated NZTA daily
 keys are flagged with a warning; review UTC timestamps before any aggregation.
 

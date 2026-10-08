@@ -132,7 +132,11 @@ XML; no full series for every counter is retained. An output `--limit` does not
 limit discovery. Cache writes are optional: failures warn and use downloaded data;
 pruning touches only SHA-256 cache names in `nz-traffic-counts-v1/`.
 
-`meta.latest_data` describes source currency, never the queried record date.
+`meta.latest_data` describes source currency except for Tauranga and Wellington,
+where it is the maximum survey/observation date in the returned rows after date,
+spatial, nearest and output-limit filtering. Responses without dated rows return
+`latest_data: null` with an explanatory note, including source-registry and
+Wellington inventory responses. Layer refresh timestamps do not set this value.
 ArcGIS counts use the verified registry value (AT 2026-06-23, NZTA 2026); NZTA
 inventory retains its stated 2025 year. Workbooks use the maximum numeric date
 in each yearly file's nominal year (or across a monthly file), across all sites
@@ -171,9 +175,9 @@ whole-year volume. Raw fields preserve direction and location descriptions.
 
 Tauranga has 969 points with UUID `id`, `road_id`, `ADT`, `PcHeavy`, `count_date`
 and `SDE_Load_Date`. The CLI preserves survey dates, ADT and heavy-vehicle share.
-A load timestamp is not an observation date; the catalogue's 2026 currency
-refers to the refreshed layer. Some latest surveys are decades old. Copyright
-terms do not establish a Creative Commons licence. The catalogue's flume-results
+A load timestamp is not an observation date; currency is derived from the returned
+survey dates rather than the catalogue's layer-refresh year. Some latest surveys
+are decades old. Copyright terms do not establish a Creative Commons licence. The catalogue's flume-results
 caveat on S1373 is unrelated to the live traffic schema and is not repeated.
 
 Christchurch supplies 42 GeoJSON features (41 counter series and one network
@@ -195,8 +199,9 @@ a 64 MiB cap and 10-second HTTP timeout; the rest retain 32 MiB caps. S3 CSVs us
 a fixed host/path, disabled redirects and Content-Length completion checks,
 since nzfetch cannot raise its 32 MiB wire ceiling. CSV schema:
 `COUNTLINE_ID,COUNTLINE_DATE,COUNTLINE_HOUR,DIRECTION_COUNT,COUNTLINE_TRANSPORT_CLASS,DIRECTION`.
-Hourly records preserve mode and direction and never fill gaps. Source currency
-is the maximum date across the entire downloaded CSV, independent of filtering.
+Hourly records preserve mode and direction and never fill gaps. Each CSV's
+`meta.downloads` entry retains the maximum date across the entire downloaded CSV,
+independent of filtering; `meta.latest_data` uses the returned observations.
 Inactive historical sites may appear only in CSVs; their geometry remains null.
 WCC metadata states open urban mobility use and directs other uses to WCC;
 no named CC licence is asserted. Nearby sensors can count the same person twice.

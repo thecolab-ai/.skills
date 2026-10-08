@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Synthetic city response fixtures: no copied council observations."""
 import json
+from copy import deepcopy
 from io import StringIO
 from contextlib import redirect_stdout, redirect_stderr
 from urllib.error import HTTPError
@@ -21,6 +22,10 @@ def run():
         result = cli.execute(args('sources', '--source', source))
         assert len(result['results']) == 1 and result['results'][0]['source_id'] == source
         assert result['results'][0]['publisher'] and result['results'][0]['retrieved_at'].endswith('Z')
+        if source in cli.DATE_DERIVED_SOURCES:
+            assert result['meta']['latest_data'] is None and result['meta']['latest_data_note']
+            assert result['results'][0]['latest_data'] is None
+            assert result['results'][0]['latest_data_note'] in result['meta']['warnings']
 
     fixtures = {s: json.loads((FIXTURES / (s+'.json')).read_text())
                 for s in ('hamilton-traffic', 'tauranga-traffic', 'christchurch-cycle')}
@@ -52,9 +57,43 @@ def run():
     assert list(months) == ['2026-09']
     with patch.object(cli, 'arc_rows', return_value=([(lines['features'][0], cli.WCC+'/query', STAMP)], [])), patch.object(cli, 'fetch', side_effect=[(listing, STAMP), (body, STAMP)]):
         result = cli.execute(args('counts', '--source', 'wellington-sensors', '--site', '90001', '--from', '2026-09-01', '--to', '2026-09-01', '--format', 'geojson'))
-    assert result['meta']['source_url'] == months['2026-09'] and result['meta']['latest_data'] == '2026-09-30'
+    assert result['meta']['source_url'] == months['2026-09'] and result['meta']['latest_data'] == '2026-09-01'
+    assert result['meta']['downloads'][0]['latest_data'] == '2026-09-30'
+    assert 'latest_data_note' not in result['meta']
     assert len(result['features']) == 3 and result['features'][0]['geometry']['type'] == 'MultiLineString'
     assert result['features'][0]['properties']['geometry_source_url'] == cli.WCC+'/query'
+
+    for command in [('sites',), ('nearest', '--near', '174.7705,-41.32')]:
+        with patch.object(cli, 'arc_rows', return_value=([(lines['features'][0], cli.WCC+'/query', STAMP)], [])):
+            result = cli.execute(args(*command, '--source', 'wellington-sensors'))
+        assert result['results'] and result['meta']['latest_data'] is None
+        assert result['meta']['latest_data_note'] in result['meta']['warnings']
+
+    with patch.object(cli, 'arc_rows', return_value=([(lines['features'][0], cli.WCC+'/query', STAMP)], [])), patch.object(cli, 'fetch', side_effect=[(listing, STAMP), (body, STAMP)]):
+        result = cli.execute(args('counts', '--source', 'wellington-sensors', '--site', '90001', '--from', '2026-09-02', '--to', '2026-09-02'))
+    assert result['results'] == [] and result['meta']['latest_data'] is None
+    assert result['meta']['latest_data_note'] in result['meta']['warnings']
+
+    tauranga = fixtures['tauranga-traffic']['features'][0]
+    newer, undated = deepcopy(tauranga), deepcopy(tauranga)
+    newer['attributes']['count_date'] = '2025-04-05T00:00:00'
+    undated['attributes'].update(count_date=None, SDE_Load_Date='2026-10-08T00:00:00')
+    raw = [(f, cli.TAURANGA+'/query', STAMP) for f in (tauranga, newer, undated)]
+    for limit, expected in [('1', '2024-02-03'), ('3', '2025-04-05')]:
+        with patch.object(cli, 'arc_rows', return_value=(raw, [])):
+            result = cli.execute(args('sites', '--source', 'tauranga-traffic', '--limit', limit))
+        assert result['meta']['latest_data'] == expected and 'latest_data_note' not in result['meta']
+        assert result['results'][0]['latest_data'] == '2024-02-03'
+    for command in [('sites',), ('nearest', '--near', '176.17,-37.69'),
+                    ('counts', '--site', tauranga['attributes']['id'])]:
+        with patch.object(cli, 'arc_rows', return_value=([raw[-1]], [])):
+            result = cli.execute(args(*command, '--source', 'tauranga-traffic'))
+        assert result['results'] and result['meta']['latest_data'] is None
+        assert result['meta']['latest_data_note'] in result['meta']['warnings']
+    with patch.object(cli, 'arc_rows', return_value=([raw[0]], [])):
+        result = cli.execute(args('counts', '--source', 'tauranga-traffic', '--site', tauranga['attributes']['id'], '--from', '2025-01-01'))
+    assert result['results'] == [] and result['meta']['latest_data'] is None
+    assert result['meta']['latest_data_note'] in result['meta']['warnings']
 
     with patch.object(cli, 'fetch', return_value=(json.dumps(fixtures['christchurch-cycle']).encode(), STAMP)):
         result = cli.execute(args('nearest', '--source', 'christchurch-cycle', '--near', '172.63,-43.53', '--radius-km', '0.05', '--format', 'geojson'))
@@ -130,7 +169,7 @@ def run():
         assert cli.main(['counts', '--source', 'wellington-sensors', '--site', '90001', '--from', '2026-09-01', '--to', '2026-09-01', '--json']) == 5
     error = json.loads(output.getvalue())
     assert error['meta']['source_url'] == export and error['results'] == []
-    print('[PASS] fixture city registries, annual nulls, snapshots, countlines, class/direction CSVs, provenance and schema errors')
+    print('[PASS] fixture city registries, derived latest dates, unknown-date notes, annual nulls, snapshots, countlines, class/direction CSVs, provenance and schema errors')
 
 
 if __name__ == '__main__':

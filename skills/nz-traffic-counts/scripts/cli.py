@@ -43,6 +43,8 @@ CHCH = 'https://smartview.ccc.govt.nz/app/router/map_features.php?feat=ecocounte
 WCC = 'https://gis.wcc.govt.nz/arcgis/rest/services/Transportation/Transport_Sensors/FeatureServer/0'
 WCC_FILES = 'https://gis-snowflake-opendata-public-wcc-arcgis-prod.s3.ap-southeast-2.amazonaws.com/'
 CITY_SOURCES = ('hamilton-traffic', 'tauranga-traffic', 'christchurch-cycle', 'wellington-sensors')
+DATE_DERIVED_SOURCES = ('tauranga-traffic', 'wellington-sensors')
+UNKNOWN_DATE_NOTE = 'No survey or observation dates are available in the returned rows; latest_data is unknown.'
 ALLOWED = {'at.govt.nz', 'www.hotcity.co.nz', 'services.arcgis.com', 'services2.arcgis.com',
            'services1.arcgis.com', 'cemeteryaws.tauranga.govt.nz', 'smartview.ccc.govt.nz',
            'gis.wcc.govt.nz', urlparse(WCC_FILES).hostname}
@@ -54,9 +56,9 @@ SOURCES = {
     'nzta-tms': dict(url=TMS, publisher='NZ Transport Agency Waka Kotahi', licence='CC BY 4.0', latest_data='2026', spatial=True, granularity='daily by lane/direction/vehicle class', catalogue_id='C0018'),
     'hotcity': dict(url=HOT, publisher='Heart of the City', licence='CC BY 4.0', latest_data='2026-09-30', spatial=False, granularity='hourly camera series', catalogue_id='C0033'),
     'hamilton-traffic': dict(url=HAMILTON, publisher='Hamilton City Council', licence='CC BY 4.0', latest_data='2023', spatial=True, granularity='published annual traffic values', catalogue_id='S1098'),
-    'tauranga-traffic': dict(url=TAURANGA, publisher='Tauranga City Council and Bay of Plenty Regional Council', licence='Council copyright; no open reuse licence stated', latest_data='2026', spatial=True, granularity='latest survey ADT', catalogue_id='S1373'),
+    'tauranga-traffic': dict(url=TAURANGA, publisher='Tauranga City Council and Bay of Plenty Regional Council', licence='Council copyright; no open reuse licence stated', latest_data=None, spatial=True, granularity='latest survey ADT', catalogue_id='S1373'),
     'christchurch-cycle': dict(url=CHCH, publisher='Christchurch City Council / Smart Christchurch', licence=None, latest_data=None, spatial=True, granularity='snapshot; observation period not supplied', catalogue_id='S2160'),
-    'wellington-sensors': dict(url=WCC, publisher='Wellington City Council', licence='WCC terms: open urban mobility use; contact WCC for other purposes', latest_data='2026', spatial=True, granularity='hourly by transport class and direction', catalogue_id='S1096;S2741'),
+    'wellington-sensors': dict(url=WCC, publisher='Wellington City Council', licence='WCC terms: open urban mobility use; contact WCC for other purposes', latest_data=None, spatial=True, granularity='hourly by transport class and direction', catalogue_id='S1096;S2741'),
 }
 NS = {'s': 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
 REL = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
@@ -124,8 +126,11 @@ def bounded_records(raw):
 
 def provenance(source, url=None, retrieved_at=None, latest=None):
     s = SOURCES[source]
-    return source_provenance(url or s['url'], s['publisher'], licence=s['licence'],
-                             retrieved_at=retrieved_at, latest_data=latest or s['latest_data'])
+    meta = source_provenance(url or s['url'], s['publisher'], licence=s['licence'],
+                            retrieved_at=retrieved_at, latest_data=latest or s['latest_data'])
+    if source in DATE_DERIVED_SOURCES and not latest:
+        meta.update(latest_data=None, latest_data_note=UNKNOWN_DATE_NOTE)
+    return meta
 
 
 def note(args, message):
@@ -681,7 +686,7 @@ def parse_city_arc(feature, source, url, stamp):
             raise SkillError('Wellington countline fields changed')
         row = dict(site_id=str(a['COUNTLINE_ID']), name='Countline ' + str(a['COUNTLINE_ID']),
                    status=a['Status'], raw=a)
-    return city_spatial(dict(row, **provenance(source, url, stamp)), feature.get('geometry'))
+    return city_spatial(dict(row, **provenance(source, url, stamp, row.get('date'))), feature.get('geometry'))
 
 
 def hamilton_years(row, args):
@@ -740,7 +745,8 @@ def city_sites(args, bbox=None, site=None):
         raise SkillError('Wellington inventory has no observation dates; apply date filters to counts', 7)
     raw, warnings = arc_rows(base, args, where, bbox)
     rows = [parse_city_arc(f, source, u, t) for f, u, t in raw]
-    remember(args, provenance(source, base, min((t for _, _, t in raw), default=utc_now())))
+    latest = max((r['date'] for r in rows if r.get('date')), default=None)
+    remember(args, provenance(source, base, min((t for _, _, t in raw), default=utc_now()), latest))
     if source == 'tauranga-traffic' and site is None:
         rows = [r for r in rows if (r['date'] is not None or not (args.date_from or args.date_to))
                 and in_range(r['date'], args.date_from, args.date_to)]
@@ -840,7 +846,7 @@ def city_counts(args):
                 raise
             meta = provenance(args.source, url, stamp, latest)
             remember(args, meta)
-            rows.extend(dict(r, **meta) for r in parsed)
+            rows.extend(dict(r, **provenance(args.source, url, stamp, r['date'])) for r in parsed)
             seen = seen or found
         remember(args, inventory_meta)
         if not sites and not seen:
@@ -1029,6 +1035,13 @@ def envelope(rows, args, warnings):
         meta['retrieved_at'] = min(p['retrieved_at'] for p in downloads)
         meta['downloads'] = downloads
     warnings = list(dict.fromkeys(warnings + getattr(args, '_warnings', [])))
+    if getattr(args, 'source', None) in DATE_DERIVED_SOURCES:
+        meta['latest_data'] = max((r['date'] for r in rows[:args.limit] if r.get('date')), default=None)
+        if meta['latest_data'] is None:
+            meta['latest_data_note'] = UNKNOWN_DATE_NOTE
+            warnings.append(UNKNOWN_DATE_NOTE)
+        else:
+            meta.pop('latest_data_note', None)
     if len(rows) > args.limit:
         warnings.append(f'Output limited to {args.limit} of {len(rows)} matched records; increase --limit to return more.')
     meta.update(query={k: str(v) if isinstance(v, Path) else v for k, v in vars(args).items()
