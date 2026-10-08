@@ -20,6 +20,10 @@ sys.path.insert(0, str(REPO_ROOT / "lib"))
 
 from skill_metadata import iter_skill_dirs, load_skill  # noqa: E402
 
+# Redact while the smoke job still has the credential values, before artifacts.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from smoke_failure_issues import redact_log  # noqa: E402
+
 
 PASS_LINE = re.compile(r"^\s*(?:\[PASS\]|PASS\b|OK\b|✓)", re.I)
 FAIL_LINE = re.compile(r"^\s*(?:\[FAIL\]|FAIL\b|✗)", re.I)
@@ -149,6 +153,7 @@ def run_one(skill_dir: Path, timeout: int) -> dict[str, object]:
         log = f"smoke timeout after {timeout}s: {exc}"
         exit_code = 5
 
+    log = redact_log(log)
     lines = log.splitlines()
     skips = [line.strip() for line in lines if SKIP_LINE.search(line)]
     pass_candidates = [

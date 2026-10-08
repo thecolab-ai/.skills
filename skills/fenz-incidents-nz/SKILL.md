@@ -20,7 +20,7 @@ metadata:
   thecolab.source_url: "https://www.fireandemergency.nz/incidents-and-news/incident-reports/"
   thecolab.allowed_domains: "www.fireandemergency.nz"
   thecolab.last_verified: "2026-10-08"
-  thecolab.health: "gated"
+  thecolab.health: "healthy"
   thecolab.maintainer: "@adam91holt"
 ---
 
@@ -53,6 +53,9 @@ Operational commands default to **yesterday in Pacific/Auckland**, across North,
 South. Use `--day Wednesday` to choose a published weekday from the rolling seven-day archive,
 and `--report-region north|central|south|all` to bound requests. FENZ requires both `day` and
 numeric `region` URL parameters; the unparameterised incidents URL is not a feed.
+If `--day` is today's NZ weekday, the source returns today's **partial** feed, not last week's.
+Blank optional fields are retained with `incomplete_fields`; only incident number and time are required.
+An upstream/schema failure in any requested region fails the whole command (no partial result).
 Results are sorted newest first within the selected day. `region NAME` filters published
 locations; `--report-region` selects FENZ's broad operational region.
 
@@ -66,6 +69,7 @@ locations; `--report-region` selects FENZ's broad operational region.
   datasets for statistics. A selected day is not an exhaustive search of the seven-day archive.
 - Direct requests can be blocked by Incapsula. A blocked response is reported explicitly and
   cannot count as a successful live assertion.
+- JSON uses `meta` provenance and a `results` array; errors add `error: {code, type, message}`.
 - JSON envelopes and records carry `source_url`, `publisher`, `licence`, `retrieved_at`, and
   source-stated `latest_data`. Website material defaults to CC BY-NC-ND 4.0; check dataset terms.
 
@@ -80,6 +84,7 @@ Every annual result retains dataset URL, metadata context, financial year and ro
 - `scripts/test_contract.py` — deterministic repository contract audit
 - `scripts/smoke_test.py` — parser fixture and bounded live probe
 - `tests/fixtures/incidents.html`, `annual-resources.html` and `annual.tsv` — source fixtures
+- `tests/fixtures/incomplete-synthetic.html` — synthetic blank-Location regression shaped like F4557313
 - `tests/fixtures/incidents-live-visible.txt` — two real published records, captured as visible
   text; `blocked-live.html` — the direct HTTP challenge response
 - `references/source-profile.json` — command schema, source allowlist and warnings

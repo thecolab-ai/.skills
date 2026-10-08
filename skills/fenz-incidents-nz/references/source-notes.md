@@ -7,7 +7,8 @@
 - Declared outbound hosts: www.fireandemergency.nz
 - Access mode: bounded first-party portal/index retrieval
 - Authentication: none
-- Last verified: 2026-10-08 (published records verified; direct CLI blocked on this network)
+- Last verified: 2026-10-08; verified live by Hawk from omarchy (meaningful live smoke assertions);
+  this fix lane still receives Incapsula challenges on the same date.
 - Update cadence: operational feed and annual publication dependent
 - Website licence: CC BY-NC-ND 4.0, unless otherwise stated:
   https://www.fireandemergency.nz/about-this-website/copyright/
@@ -20,17 +21,22 @@ South=3. The corrected CLI supplies these published parameters. No extra authent
 special headers are required by the published flow. It requests yesterday in NZ by default;
 `--day` and `--report-region` let callers choose another published slice.
 
-The direct curl/CLI routes returned Incapsula challenge HTML (HTTP 200 or 403), so a clean direct
-live success could not be demonstrated here. The web retrieval tool could read the official
-Wednesday North page. `incidents-live-visible.txt` preserves its first two records verbatim as
-visible text (not reconstructed HTML), including F4558395 at 07/10/2026 00:01:18 and F4558397 at
-00:13:23. `blocked-live.html` is the actual direct HTTP response. The existing labelled HTML and
-annual fixtures are legacy synthetic parser cases, not newly captured live data.
+Hawk verified direct live commands on 2026-10-08 from omarchy, including the blank Location
+records F4557313 (Monday) and F4555835 (Saturday). The repaired parser retains empty optional
+fields and reports `incomplete_fields`; incident number and date/time remain required. Region
+requests are atomic: any access, network or parser failure fails the whole selected operation.
+Choosing today's NZ weekday returns today's partial feed, not the same weekday last week.
+
+This fix lane's direct curl/CLI still receives challenge HTML (HTTP 200/403); that network block
+is reported separately from source health. The existing two-record visible-text fixture and
+`blocked-live.html` retain original capture evidence. New blank-field regression data is clearly
+synthetic; no new restricted source captures are bundled.
 HTTP 400 and other permanent client errors remain hard smoke failures (exit 6), so the previous
 missing-parameter failure can no longer be silently counted as an upstream outage skip.
 
-The parser accepts visible labelled cells in definition-list and table layouts, requires core
-fields, retains Attending Stations/Brigades, and refuses challenge/empty pages. The source says
+The parser accepts visible labelled cells in definition-list and table layouts, requires incident
+number and date/time, retains Attending Stations/Brigades, and refuses challenge/empty pages.
+The source says
 the operational extract is incomplete and unsuitable for statistical analysis. Neither the
 single-day result nor a failed request proves that no incident occurred.
 

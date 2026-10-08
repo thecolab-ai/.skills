@@ -50,7 +50,7 @@ class IncidentText(HTMLParser):
 def parse_incident_lines(lines, source, at):
     lines = [" ".join(line.split()) for line in lines if line.strip()]
     out, row = [], {}
-    for index, label in enumerate(lines[:-1]):
+    for index, label in enumerate(lines):
         key = LABELS.get(label)
         if key is None:
             continue
@@ -58,9 +58,9 @@ def parse_incident_lines(lines, source, at):
             if row:
                 out.append(row)
             row = {}
-        value = lines[index + 1]
+        value = lines[index + 1] if index + 1 < len(lines) else ""
         if value in LABELS:
-            raise ValueError(f"FENZ incident record has no value for {label}")
+            value = ""
         if key == "incident_number" or row:
             row[key] = value
     if row:
@@ -68,8 +68,11 @@ def parse_incident_lines(lines, source, at):
     if not out:
         raise ValueError("FENZ page contained no labelled incident records")
     for row in out:
-        if not all(row.get(key) for key in ("incident_number", "date_and_time", "location", "call_type")):
+        if not all(row.get(key) for key in ("incident_number", "date_and_time")):
             raise ValueError("FENZ incident record is missing required fields")
+        for key in ("location", "call_type"):
+            row.setdefault(key, "")
+        row["incomplete_fields"] = [key for key, value in row.items() if not value]
         row.update({"classification_status": "preliminary operational report", "source_url": source,
                     "publisher": PUBLISHER, "licence": LICENCE, "retrieved_at": at})
         date = re.match(r"(\d{2})/(\d{2})/(\d{4})", row["date_and_time"])

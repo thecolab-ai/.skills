@@ -20,7 +20,7 @@ metadata:
   thecolab.source_url: "https://www.aucklandcouncil.govt.nz/en/rubbish-recycling/rubbish-recycling-collections/rubbish-recycling-collection-days.html"
   thecolab.allowed_domains: "experience.aucklandcouncil.govt.nz,www.aucklandcouncil.govt.nz"
   thecolab.last_verified: "2026-10-08"
-  thecolab.health: "gated"
+  thecolab.health: "healthy"
   thecolab.maintainer: "@adam91holt"
 ---
 
@@ -67,7 +67,7 @@ python3 skills/auckland-bin-schedule/scripts/cli.py lookup <address...> --json
 - `<address...>` — Auckland property address to search, e.g. `12 Tawa Road Onehunga`
 - `--list` — list matching properties only
 - `--property-id <id>` — fetch a known Auckland Council property/rating id directly
-- `--limit <N>` — address lookup result limit (1–100); a full page requires refinement
+- `--limit <N>` — address lookup result limit (1–20, the Council cap); a full page requires refinement
 - `--json` — emit JSON
 
 Examples:
@@ -95,11 +95,14 @@ python3 skills/auckland-bin-schedule/scripts/cli.py --property-id 12343300679 --
 - Treat dates as live current Council snapshots, not historical facts
 - Some properties show private service or property-manager messages instead of Council collection dates
 - Auto-selection requires an exact number and suffix, street name and type, and suburb when
-  supplied. Common street abbreviations and Mt/Mount in suburbs are normalised. Units remain
+  supplied. Common street abbreviations, Mt/Mount and leading St/Saint names are normalised.
+  Parsed queries sent upstream omit commas, city and postcode. Units remain
   distinct; an unspecified unit requires confirmation even if one unit is returned.
 - Multiple exact candidates, incomplete addresses, no exact match, and a full result page return
   `matches` and `exact_matches` with `status` (`ambiguous`, `no_exact_match`, or `search_limit`).
   The CLI fetches no schedule in these states. Refine the address or use a confirmed property id.
 - The previous address-only and `--list` invocations remain supported.
-- JSON schedules, candidate results and errors include source provenance. Council's data licence
-  is unconfirmed (`licence: null`); collection dates are future service dates, not data update dates.
+- JSON uses `meta` provenance and a `results` array. Candidate `status`, `matches` and
+  `exact_matches` sit in `results[0]`; errors use empty `results` and `error: {code, type, message}`.
+  Council data licence is unconfirmed and omitted; collection dates are future service dates,
+  not data update dates.
