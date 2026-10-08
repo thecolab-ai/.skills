@@ -2,7 +2,7 @@
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
   "last_verified": "2026-10-08",
-  "skill_count": 160,
+  "skill_count": 161,
   "skills": [
     {
       "name": "airnz-flights",
@@ -4623,6 +4623,35 @@
       ],
       "last_verified": "2026-07-19",
       "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "nz-road-safety-reports",
+      "description": "Query keyless NZ cycling near-miss and collision reports and fixed safety camera locations; discover official camera infringement releases with workbook extraction gated. Use for Auckland corridor screening and road safety evidence; use nzta-crash-data-nz for CAS crashes.",
+      "path": "skills/nz-road-safety-reports",
+      "category": "transport",
+      "source_owner": "BikeMaps.org; NZ Transport Agency Waka Kotahi; New Zealand Police; Auckland Transport",
+      "source_type": "mixed",
+      "source_url": "https://bikemaps.org/",
+      "auth": "none",
+      "access_mode": "public-api",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "none",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "bikemaps.org",
+        "nzta.govt.nz",
+        "www.nzta.govt.nz",
+        "www.police.govt.nz",
+        "raw.githubusercontent.com"
+      ],
+      "last_verified": "2026-10-08",
+      "health": "degraded",
       "maintainer": "@adam91holt"
     },
     {
