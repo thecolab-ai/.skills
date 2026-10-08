@@ -29,6 +29,7 @@ def run():
         *[(f'Flooded NZ default {fmt} fields', ['query', FLOODED, '--limit', '1', '--format', fmt]) for fmt in ['json', 'geojson', 'csv']],
         ('NZ curated provenance', ['layers', '--curated', 'nz']),
         ('Flooded NZ wildcard refusal', ['query', FLOODED, '--fields', '*']),
+        ('Flooded NZ private where refusal', ['query', FLOODED, '--where', "email IS NOT NULL"]),
         ('Tiled-image describe refusal', ['describe', TILED]),
     ]
     def probe(item):

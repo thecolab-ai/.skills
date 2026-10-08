@@ -93,6 +93,53 @@ def run():
                 assert not out.getvalue()
                 message = err.getvalue()
             assert 'privacy restriction' in message and ','.join(allowed) in message
+    # Filters disclose values too (count + email LIKE 'a%'), so --where is held
+    # to the same allowlist and refused before any request, metadata included.
+    refused_where = [
+        "email LIKE '%@example.org'", "EMAIL like 'a%'", "Email IS NOT NULL", "name = 'Synthetic Person'",
+        "NAME='x'", "phone LIKE '021%'", "Creator = 'x'", "editor = 'x'", "1=1 OR email IS NULL",
+        "(email IS NOT NULL)", "impact = 'x' AND (status = 'y' OR (Name = 'z'))",
+        "objectid IN (SELECT objectid FROM survey WHERE email LIKE 'a%')",
+        "EXISTS (SELECT 1 FROM survey)", "UPPER(email) = 'X'", "UPPER(impact) = 'X'", "CAST(phone AS INT) > 0",
+        '"email" = \'x\'', "[email] = 'x'", "survey.email = 'x'", "impact = 'x' -- comment", "1=1 /* x */",
+        "1=1; DROP TABLE survey", "impact = 'x\\' OR email IS NOT NULL", "impact = 'unterminated", "", "   ",
+        "objectid+0 = 1", "1e3 = 1000", "１=１", "impact = 'a\nb'",
+    ]
+    for command in ['count', 'query']:
+        for value in refused_where:
+            for machine in [False, True]:
+                out, err = io.StringIO(), io.StringIO()
+                with patch.object(cli, 'fetch', side_effect=AssertionError('private where filter reached network')):
+                    with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                        code = cli.main([command, FLOODED, '--where', value] + (['--json'] if machine else []))
+                assert code == 2, (command, value)
+                if machine:
+                    error = json.loads(out.getvalue())
+                    assert error['error']['type'] == 'invalid_input' and error['meta']['source_url'] == FLOODED
+                    message = error['error']['message']
+                else:
+                    assert not out.getvalue()
+                    message = err.getvalue()
+                assert 'privacy restriction: --where' in message and ','.join(allowed) in message
+    accepted_where = ['1=1', "impact = 'Minor'", "OBS_DEPTH_V2 >= 3 AND historic IS NOT NULL",
+                      "obs_date > DATE '2023-01-27'", "impact IN ('a', 'b''c') OR NOT (status <> 'email')",
+                      "obs_depth BETWEEN -1 AND 2.5", "impact LIKE '%name%'"]
+    for value in accepted_where:
+        seen = []
+        def counted(url, params=None, **kwargs):
+            if params is None:
+                return {'type': 'Feature Layer', 'objectIdField': 'objectid', 'geometryType': 'esriGeometryPoint'}
+            seen.append(params)
+            return {'count': 3}
+        with patch.object(cli, 'fetch', counted):
+            result = cli.execute(cli.parser().parse_args(['count', FLOODED, '--where', value]))
+        assert result['results'] == [{'count': 3}]
+        assert seen == [{'where': value, 'returnCountOnly': 'true'}]
+    # Only where/bbox are user-controlled; no ordering or statistics parameter is forwarded.
+    assert not ({'orderByFields', 'groupByFieldsForStatistics', 'outStatistics', 'having', 'sqlFormat'}
+                & {a.dest for s in cli.parser()._subparsers._group_actions[0].choices.values() for a in s._actions})
+    assert cli.query_where('at', 'email IS NOT NULL') == 'email IS NOT NULL'
+    print('[PASS] fixture Flooded --where privacy allowlist (count/query, case variants, nested and subquery refusals)')
     metadata = {'type': 'Feature Layer', 'name': 'Synthetic flood observations',
                 'objectIdField': 'objectid', 'geometryType': 'esriGeometryPoint',
                 'fields': [{'name': name, 'type': 'esriFieldTypeString'} for name in allowed + private]}
@@ -106,6 +153,7 @@ def run():
                 if params.get('returnIdsOnly'):
                     return {'objectIdFieldName': 'objectid', 'objectIds': [1]}
                 assert params['outFields'] == ','.join(expected)
+                assert not {'orderByFields', 'groupByFieldsForStatistics', 'outStatistics', 'having'} & params.keys()
                 key = 'properties' if fmt == 'geojson' else 'attributes'
                 attributes = {name: 'synthetic' for name in allowed + private}
                 attributes['objectid'] = 1

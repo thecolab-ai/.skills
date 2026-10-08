@@ -516,7 +516,7 @@
       "problem_tags": [
         "F1"
       ],
-      "caveat": "Depth bands are self-reported and layer has no stated reuse licence. Other fields include personal contact details; select observation fields explicitly and do not redistribute submissions without checking their terms.",
+      "caveat": "Depth bands are self-reported and layer has no stated reuse licence. Other fields include personal contact details; the CLI restricts --fields, --where filters and describe output to observation fields (objectid, obs_date, impact, impact_items, obs_depth, obs_depth_v2, historic, status). Do not redistribute submissions without checking their terms.",
       "catalogue_latest_data": "live",
       "verified_at": "2026-10-08T04:38:00Z",
       "retrieved_at": "2026-10-08T04:38:00Z",

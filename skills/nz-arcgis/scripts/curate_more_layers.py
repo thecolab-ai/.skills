@@ -90,7 +90,7 @@ def probe(row):
             r['tile_only'] = 'TilesOnly' in (metadata.get('capabilities') or '').split(',')
         if row['id'] == 'S2686':
             r['recommended_fields'] = FLOODED_FIELDS
-            r['caveat'] += ' Other fields include personal contact details; select observation fields explicitly and do not redistribute submissions without checking their terms.'
+            r['caveat'] += ' Other fields include personal contact details; the CLI restricts --fields, --where filters and describe output to observation fields (objectid, obs_date, impact, impact_items, obs_depth, obs_depth_v2, historic, status). Do not redistribute submissions without checking their terms.'
         records.append(r)
     return records
 

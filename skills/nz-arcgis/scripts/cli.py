@@ -230,8 +230,48 @@ def query_fields(org, value):
     return ','.join(selected)
 
 
-def filter_params(args):
-    result = {'where': args.where}
+# Conservative tokenizer for --where on field-restricted organisations. Anything
+# not matched here (quoted identifiers, dots, arithmetic, comments, semicolons,
+# backslashes, control characters) makes the whole expression unparseable.
+WHERE_TOKEN = re.compile(r"""\s*(?:
+    (?P<string>'(?:[^'\\\x00-\x1f\x7f]|'')*')
+  | (?P<number>-?\d+(?:\.\d+)?(?![A-Za-z_\d.]))
+  | (?P<ident>[A-Za-z_][A-Za-z0-9_]*(?![A-Za-z0-9_.]))
+  | (?P<op><>|!=|<=|>=|=|<|>|\(|\)|,)
+)""", re.X | re.A)
+WHERE_KEYWORDS = {'and', 'or', 'not', 'in', 'is', 'null', 'like', 'between', 'date', 'timestamp'}
+
+
+def query_where(org, value):
+    """Refuse filters on fields outside a restricted organisation's allowlist.
+
+    Filters, like outputs, can disclose private values (e.g. email LIKE 'a%'
+    with count), so only allowlisted fields, literals, comparison operators
+    and a small keyword set are accepted. Function calls and subqueries are
+    refused because their names are not allowlisted identifiers.
+    """
+    allowed = REGISTRY[org].get('field_allowlist')
+    if not allowed:
+        return value
+    refusal = (f"{org} privacy restriction: --where may reference only {','.join(allowed)} "
+               "with literals, comparison operators, parentheses and AND/OR/NOT/IN/IS/NULL/LIKE/BETWEEN/DATE/TIMESTAMP")
+    position, tokens = 0, 0
+    text = value.rstrip()
+    while position < len(text):
+        match = WHERE_TOKEN.match(text, position)
+        if not match or match.end() == position:
+            raise ClientError(refusal)
+        ident = match.group('ident')
+        if ident is not None and ident.lower() not in allowed and ident.lower() not in WHERE_KEYWORDS:
+            raise ClientError(refusal)
+        position, tokens = match.end(), tokens + 1
+    if not tokens:
+        raise ClientError(refusal)
+    return value
+
+
+def filter_params(args, org):
+    result = {'where': query_where(org, args.where)}
     if args.bbox:
         result.update(geometry=args.bbox, geometryType='esriGeometryEnvelope', inSR=4326, spatialRel='esriSpatialRelIntersects')
     return result
@@ -331,7 +371,7 @@ def query_layer(args, url, metadata):
     org, url = validate_url(url)
     args.fields = query_fields(org, args.fields)
     allowed = REGISTRY[org].get('field_allowlist')
-    params = {**filter_params(args), 'outFields': args.fields, 'returnGeometry': 'false' if args.format == 'csv' else 'true', 'outSR': 4326}
+    params = {**filter_params(args, org), 'outFields': args.fields, 'returnGeometry': 'false' if args.format == 'csv' else 'true', 'outSR': 4326}
     oid = metadata.get('objectIdField') or metadata.get('objectIdFieldName')
     if not oid:
         oid = next((f['name'] for f in metadata.get('fields', []) if f.get('type') == 'esriFieldTypeOID'), None)
@@ -377,7 +417,7 @@ def query_layer(args, url, metadata):
     try:
         if oid:
             # No outSR on the ID selection: reprojection must not remove IDs.
-            data = fetch(url, {**filter_params(args), 'returnIdsOnly': 'true', 'returnGeometry': 'false'}, query=True)
+            data = fetch(url, {**filter_params(args, org), 'returnIdsOnly': 'true', 'returnGeometry': 'false'}, query=True)
             ids = data.get('objectIds')
             if ids is None and data.get('objectIdFieldName'):
                 ids = []
@@ -418,7 +458,7 @@ def query_layer(args, url, metadata):
                 more = bool(page.get('exceededTransferLimit') or (page.get('properties') or {}).get('exceededTransferLimit')) or len(batch) == wanted
                 if not more or not supports or not batch:
                     break
-            total = record_count(url, filter_params(args))
+            total = record_count(url, filter_params(args, org))
             if len(features) < min(total, args.limit):
                 incomplete = True
                 reasons.append('returned fewer features than the count selection')
@@ -553,6 +593,9 @@ def execute(args):
     org, url = validate_url(args.layer_url)
     if command == 'query':
         args.fields = query_fields(org, args.fields)
+    if command in {'query', 'count'}:
+        # Refuse private-field filters before any request, including metadata.
+        query_where(org, args.where)
     metadata = fetch(url)
     if metadata.get('type') not in {'Feature Layer', 'Table'}:
         raise ClientError(f"not a queryable feature layer (type {metadata.get('type')})", 7)
@@ -573,7 +616,7 @@ def execute(args):
             result.update(ordering='unordered', warnings=['No object ID field; ordering and duplicate detection are unavailable.'])
         return result
     if command == 'count':
-        return result_envelope([dict(count=record_count(url, filter_params(args)))], source)
+        return result_envelope([dict(count=record_count(url, filter_params(args, org)))], source)
     data = query_layer(args, url, metadata)
     features = data.pop('features')
     envelope = geojson_envelope(features, source) if args.format == 'geojson' else result_envelope(features, source)
