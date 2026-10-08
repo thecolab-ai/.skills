@@ -1,0 +1,37 @@
+{
+  "id": "41e05dcdfcb749d390f7785543fb3b14",
+  "type": "Feature",
+  "geometry": null,
+  "properties": {
+    "snippet": "Daily traffic volumes from state highway count sites in 15-minute intervals, by vehicle class and direction, from October 2020 to January 2022.",
+    "extent": null,
+    "access": "public",
+    "description": "<p><strong>Please note:&nbsp;</strong><span style='color:inherit; font-family:var(--fontsBaseFamily),Avenir Next; font-size:inherit;'>this data differs in some of its columns from the Jan 2013 - Sep 2020 set. This data is a singular snapshot of a</span>&nbsp;dataset published to promote innovation and research. It<span style='color:inherit; font-family:var(--fontsBaseFamily),Avenir Next; font-size:inherit;'>&nbsp;is not updated or expanded from the date range described.</span></p><p><a target='_blank' href='https://opendata-nzta.opendata.arcgis.com/datasets/NZTA::tms-traffic-quarter-hourly-jan-2013-to-sept-2020/about' rel='nofollow ugc noopener noreferrer'>TMS traffic quarter-hourly (2013-2020)</a></p><p><strong>Data reuse caveats:</strong><span style='color:inherit; font-family:var(--fontsBaseFamily),Avenir Next; font-size:inherit;'>&nbsp;as per license.</span></p><p><strong>Data quality statement:&nbsp;</strong>please read the accompanying user manual, explaining:</p><ul><li>how this data is collected</li><li>identification of count stations</li><li>traffic monitoring technology</li><li>monitoring hierarchy and conventions</li><li>typical survey specification</li><li>data calculation</li><li>TMS operation.</li></ul><p><a target='_blank' href='https://www.nzta.govt.nz/assets/resources/traffic-monitoring-state-hways/docs/traffic-monitoring-state-highways.pdf' rel='nofollow ugc noopener noreferrer'>Traffic monitoring for state highways: user manual</a>&nbsp;[PDF 465 KB]</p><p>&nbsp;</p><p><strong>Data quality caveats:</strong>&nbsp;you must use this data in conjunction with the user manual, and the following caveats.</p><ul><li>Much of this data is sourced from road sensors and may be subject to technical or environmental factors.</li><li>Data is compiled from a variety of sources. Accuracy may vary and the data should only be used as a guide.</li><li>Data is representative of the change of traffic volume not of total traffic volume for each region.</li><li>Data is sourced from Waka Kotahi New Zealand Transport Agency TMS data.</li><li>Light and heavy traffic volumes have been split using TMS data where vehicles with a length of less than 5.5m are classed as light vehicles. Heavy vehicles are over 11m long. Those between 5.5 and 11m are split 50:50 into light and heavy vehicles.</li></ul><p>Please be aware that when unzipped these are very large files and some systems may have difficulty opening it. Each file contains more than 10 million rows, and therefore won't work in Excel. However, each file is in CSV format, and will work in:</p><ul><li>programming languages such as Python or R</li><li>databases with SQL.</li></ul><p><a target='_blank' href='https://opendata-nzta.opendata.arcgis.com/datasets/state-highway-traffic-monitoring-sites?geometry=127.495%2C-46.331%2C-141.758%2C-34.686' rel='nofollow ugc noopener noreferrer'>State highway traffic monitoring sites</a></p><p><a target='_blank' href='https://opendata-nzta.opendata.arcgis.com/datasets/tms-daily-traffic-counts-api' rel='nofollow ugc noopener noreferrer'>State highway daily-updated traffic count (API and CSV)</a></p><p>-----</p><p>Photo by <a target='_blank' href='https://unsplash.com/@yulokchan?utm_source=unsplash&amp;utm_medium=referral&amp;utm_content=creditCopyText' rel='nofollow ugc noopener noreferrer'>Joseph Chan</a> on <a target='_blank' href='https://unsplash.com/s/photos/traffic?utm_source=unsplash&amp;utm_medium=referral&amp;utm_content=creditCopyText' rel='nofollow ugc noopener noreferrer'>Unsplash</a></p>",
+    "licenseInfo": "<span style='font-family:&quot;Avenir Next W01&quot;, &quot;Avenir Next W00&quot;, &quot;Avenir Next&quot;, Avenir, &quot;Helvetica Neue&quot;, sans-serif; font-size:16px;'>This work is licensed under a </span><a href='https://creativecommons.org/licenses/by/4.0/' style='color:rgb(0, 121, 193); text-decoration-line:none; font-family:&quot;Avenir Next W01&quot;, &quot;Avenir Next W00&quot;, &quot;Avenir Next&quot;, Avenir, &quot;Helvetica Neue&quot;, sans-serif; font-size:16px;' target='_blank' rel='nofollow ugc noopener noreferrer'>Creative Commons Attribution 4.0 International License</a><span style='font-family:&quot;Avenir Next W01&quot;, &quot;Avenir Next W00&quot;, &quot;Avenir Next&quot;, Avenir, &quot;Helvetica Neue&quot;, sans-serif; font-size:16px;'>.</span>",
+    "title": "TMS historical traffic volumes - quarter-hourly: Oct 2020 to Jan 2022",
+    "type": "CSV Collection",
+    "modified": 1788494254000,
+    "id": "41e05dcdfcb749d390f7785543fb3b14",
+    "accessInformation": "Waka Kotahi NZ Transport Agency",
+    "url": null,
+    "name": "20201001_20220131_TMSTrafficQuarterHourly.zip",
+    "properties": {},
+    "source": "Waka Kotahi",
+    "license": "CC-BY-4.0"
+  },
+  "time": null,
+  "links": [
+    {
+      "rel": "self",
+      "type": "application/geo+json",
+      "title": "This document as GeoJSON",
+      "href": "https://opendata-nzta.opendata.arcgis.com/api/search/v1/collections/dataset/items/41e05dcdfcb749d390f7785543fb3b14"
+    },
+    {
+      "rel": "collection",
+      "type": "application/json",
+      "title": "Dataset",
+      "href": "https://opendata-nzta.opendata.arcgis.com/api/search/v1/collections/dataset"
+    }
+  ]
+}

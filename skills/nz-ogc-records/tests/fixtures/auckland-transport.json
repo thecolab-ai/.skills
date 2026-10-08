@@ -1,0 +1,285 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "id": "eeb0839fbd594c9e87189df5c84c2543",
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              174.24103550379724,
+              -36.140993690958794
+            ],
+            [
+              175.5263331618021,
+              -36.140993690958794
+            ],
+            [
+              175.5263331618021,
+              -37.28756486738531
+            ],
+            [
+              174.24103550379724,
+              -37.28756486738531
+            ],
+            [
+              174.24103550379724,
+              -36.140993690958794
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "snippet": "Future Connect is Auckland’s strategic, multi‑modal network identifying the most important corridors for people and freight movement across Tāmaki Makaurau. This layer integrates the core Strategic Networks for public transport, general traffic, freight, and cycling. \n\nIt represents the long‑term vision for Auckland’s network (2026–2036) and highlights priority routes.",
+        "extent": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [
+                174.24103550379724,
+                -36.140993690958794
+              ],
+              [
+                175.5263331618021,
+                -36.140993690958794
+              ],
+              [
+                175.5263331618021,
+                -37.28756486738531
+              ],
+              [
+                174.24103550379724,
+                -37.28756486738531
+              ],
+              [
+                174.24103550379724,
+                -36.140993690958794
+              ]
+            ]
+          ]
+        },
+        "access": "public",
+        "description": "<p>This open data is provided for reference. The primary and recommended way to view Future Connect, with additional Transport System Analysis and other insights (not shared as open data), is through the <a target='_blank' href='https://mahere.at.govt.nz/FutureConnect/' rel='nofollow ugc noopener noreferrer'>Future Connect Mapping Portal</a>.</p><h2>Description</h2><p>The <strong>Future Connect Integrated Network </strong>layer represents a long-term, multi-modal view of the region’s most important transport corridors and connections. Comprised of both the <strong>Current </strong>(existing) and <strong>First Decade</strong> (longer-term) views of Auckland’s transport network, it brings together the <strong>Strategic Networks</strong> for all transport modes — public transport, general traffic, freight, and cycling — into a single, cohesive spatial dataset. This layer also includes the lower order, <strong>Supporting Network</strong> links for all modes.</p><figure><table border='1'><tr><th>&nbsp;</th><th><strong>Strategic Networks</strong></th><th><strong>Supporting Networks</strong></th></tr><tbody><tr><td>Public Transport</td><td>Rapid Transit<br />Interim Rapid Transit<br />Frequent Transit<br />Other Strategic Corridors</td><td>Connector<br />Local<br />Peak<br />Rural Township</td></tr><tr><td>Cycle and Micromobility</td><td>Regional<br />Major<br />Connector</td><td>Local<br />Leisure<br />Sport</td></tr><tr><td>General Traffic</td><td>Motorway<br />Strategic<br />Primary<br />Secondary</td><td>Collector<br />Local</td></tr><tr><td>Freight</td><td>Rail<br />Level 1A<br />Level 1B<br />Level 2<br />Level 3</td><td>Access<br />Ferry</td></tr></tbody></table></figure><p><strong>Intended Use</strong></p><ul><li>Transport planning and prioritisation</li><li>Identifying key corridors for operational management</li><li>Supporting RLTP investment decisions</li><li>Land‑use and development integration</li></ul><p><strong>Limitations</strong></p><ul><li>Does <i>not</i> define or commit to specific projects.</li><li>Not a detailed engineering or operational dataset.</li><li>Represents strategic priorities at a regional scale.&nbsp;</li></ul><p>For more information, visit <a target='_blank' href='https://www.at.govt.nz/futureconnect' rel='nofollow ugc noopener noreferrer'>AT.govt.nz/FutureConnect</a>.</p>",
+        "licenseInfo": "<p><a target='_blank' href='https://creativecommons.org/licenses/by/4.0/' rel='nofollow ugc noopener noreferrer'>CC BY</a></p>",
+        "title": "Future Connect Integrated Network",
+        "type": "Feature Service",
+        "modified": 1783910891000,
+        "id": "eeb0839fbd594c9e87189df5c84c2543",
+        "accessInformation": "Auckland Transport Integrated Network Planning",
+        "url": "https://services2.arcgis.com/JkPEgZJGxhSjYOo0/arcgis/rest/services/FutureConnect_IntegratedNetwork/FeatureServer",
+        "name": "FutureConnect_IntegratedNetwork",
+        "properties": {
+          "view": {
+            "mapSettings": {
+              "featureLayerStyle": "item"
+            }
+          },
+          "downloads": {
+            "formats": [
+              {
+                "hidden": true,
+                "key": "csv"
+              },
+              {
+                "hidden": true,
+                "key": "shapefile"
+              },
+              {
+                "hidden": false,
+                "key": "geojson"
+              },
+              {
+                "hidden": false,
+                "key": "kml"
+              },
+              {
+                "hidden": false,
+                "key": "filegdb"
+              },
+              {
+                "hidden": false,
+                "key": "featureCollection"
+              },
+              {
+                "hidden": true,
+                "key": "excel"
+              },
+              {
+                "hidden": false,
+                "key": "geoPackage"
+              },
+              {
+                "hidden": false,
+                "key": "sqlite"
+              },
+              {
+                "hidden": false,
+                "key": "additionalResource::0"
+              }
+            ],
+            "flowType": "createReplica"
+          },
+          "location": {
+            "extent": [
+              [
+                173.87783013332205,
+                -37.42159332933253
+              ],
+              [
+                175.91595088357937,
+                -35.774641762047565
+              ]
+            ],
+            "geometries": [
+              {
+                "ymin": -37.42159332933253,
+                "xmin": 173.87783013332205,
+                "ymax": -35.774641762047565,
+                "xmax": 175.91595088357937,
+                "spatialReference": {
+                  "wkid": 4326
+                },
+                "type": "extent"
+              }
+            ],
+            "type": "custom",
+            "spatialReference": {
+              "wkid": 4326
+            }
+          }
+        },
+        "source": "Auckland Transport",
+        "license": "CC-BY-4.0"
+      },
+      "time": null,
+      "links": [
+        {
+          "rel": "self",
+          "type": "application/geo+json",
+          "title": "This document as GeoJSON",
+          "href": "https://data-atgis.opendata.arcgis.com/api/search/v1/collections/dataset/items/eeb0839fbd594c9e87189df5c84c2543"
+        },
+        {
+          "rel": "collection",
+          "type": "application/json",
+          "title": "Dataset",
+          "href": "https://data-atgis.opendata.arcgis.com/api/search/v1/collections/dataset"
+        }
+      ]
+    },
+    {
+      "id": "75bbb3afce054ee9a2826fd89c18e4bf",
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              174.4828433018163,
+              -36.32037057214393
+            ],
+            [
+              175.08343734099896,
+              -36.32037057214393
+            ],
+            [
+              175.08343734099896,
+              -37.24808972190971
+            ],
+            [
+              174.4828433018163,
+              -37.24808972190971
+            ],
+            [
+              174.4828433018163,
+              -36.32037057214393
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "snippet": "Location of Auckland Cycleways",
+        "extent": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [
+                174.4828433018163,
+                -36.32037057214393
+              ],
+              [
+                175.08343734099896,
+                -36.32037057214393
+              ],
+              [
+                175.08343734099896,
+                -37.24808972190971
+              ],
+              [
+                174.4828433018163,
+                -37.24808972190971
+              ],
+              [
+                174.4828433018163,
+                -36.32037057214393
+              ]
+            ]
+          ]
+        },
+        "access": "public",
+        "description": "<p>The Cycle Facility Network Map&nbsp;<a target='_blank' href='https://data-atgis.opendata.arcgis.com/search?tags=Cycling' rel='nofollow ugc noopener noreferrer'>data</a>&nbsp;viewable and downloadable here, shows the location of cycle facilities of all types across Auckland. This is a comprehensive view of the current built network and consists of cycle facilities provided by Auckland Transport, NZTA and Auckland Council.</p><div>&nbsp;</div><div>This data feeds into the publicly available on the&nbsp;<a target='_blank' href='https://mahere.at.govt.nz/portal/apps/experiencebuilder/experience/?id=0547bd817663487f9c148da9da284933' rel='nofollow ugc noopener noreferrer'>Auckland Cycleway Map</a>. This map shows cycle routes across the city and is provided to help you plan your rides. The map highlights the different types of infrastructure on each of the routes and shows on-road cycles lanes, on-road protected cycle lanes, shared paths and quiet routes.</div><div>&nbsp;</div><div>Cycleways form part of our future strategic network called&nbsp;<a target='_blank' href='https://at.govt.nz/media/1987213/fc_cycle-and-micromobility-v1.pdf' rel='nofollow ugc noopener noreferrer'>The Cycle and Micromobility Strategic Network</a>, which is made up of the most important corridors that link to key destinations.&nbsp;</div><div>&nbsp;</div><div><p>More details about the future strategic cycling and micromobility network and how it links to other modes is available at&nbsp;<a target='_blank' href='https://at.govt.nz/about-us/transport-plans-strategies/future-connect-auckland-transports-network-plan' rel='nofollow ugc noopener noreferrer'>Future Connect- Auckland Transport's Network Plan</a>.<br />&nbsp;</p><div>&nbsp;</div></div>",
+        "licenseInfo": "<a href='http://creativecommons.org/licenses/by/4.0/' rel='nofollow ugc'><img alt='Creative Commons License' style='border-width:0' src='https://i.creativecommons.org/l/by/4.0/88x31.png' /></a><br />This work is licensed under a <a href='http://creativecommons.org/licenses/by/4.0/' rel='nofollow ugc'>Creative Commons Attribution 4.0 International License</a>",
+        "title": "Cycle Facility Network",
+        "type": "Feature Service",
+        "modified": 1783486166000,
+        "id": "75bbb3afce054ee9a2826fd89c18e4bf",
+        "accessInformation": "Auckland Transport",
+        "url": "https://services2.arcgis.com/JkPEgZJGxhSjYOo0/arcgis/rest/services/CyclingService/FeatureServer",
+        "name": "CyclingService",
+        "properties": null,
+        "source": "Auckland Transport",
+        "license": "CC-BY-4.0"
+      },
+      "time": null,
+      "links": [
+        {
+          "rel": "self",
+          "type": "application/geo+json",
+          "title": "This document as GeoJSON",
+          "href": "https://data-atgis.opendata.arcgis.com/api/search/v1/collections/dataset/items/75bbb3afce054ee9a2826fd89c18e4bf"
+        },
+        {
+          "rel": "collection",
+          "type": "application/json",
+          "title": "Dataset",
+          "href": "https://data-atgis.opendata.arcgis.com/api/search/v1/collections/dataset"
+        }
+      ]
+    }
+  ],
+  "timestamp": "2026-10-08T01:06:13.434Z",
+  "numberMatched": 14,
+  "numberReturned": 2,
+  "links": [
+    {
+      "rel": "self",
+      "type": "application/geo+json",
+      "title": "This document as GeoJSON",
+      "href": "https://data-atgis.opendata.arcgis.com/api/search/v1/collections/dataset/items"
+    },
+    {
+      "rel": "next",
+      "type": "application/geo+json",
+      "title": "items (next)",
+      "href": "https://data-atgis.opendata.arcgis.com/api/search/v1/collections/dataset/items?limit=2&startindex=3"
+    },
+    {
+      "rel": "collection",
+      "type": "application/json",
+      "title": "Dataset",
+      "href": "https://data-atgis.opendata.arcgis.com/api/search/v1/collections/dataset"
+    }
+  ]
+}

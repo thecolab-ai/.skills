@@ -1,0 +1,89 @@
+{
+  "id": "3a1d7ee29dac42e3ba6ec4efeeafbacf",
+  "type": "Feature",
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [
+          175.6108,
+          -36.7664
+        ],
+        [
+          178.2898,
+          -36.7664
+        ],
+        [
+          178.2898,
+          -38.1117
+        ],
+        [
+          175.6108,
+          -38.1117
+        ],
+        [
+          175.6108,
+          -36.7664
+        ]
+      ]
+    ]
+  },
+  "properties": {
+    "snippet": "Bay of Plenty 25m DTM ArcGIS Image Service which is suitable for analysis and mapping and can be streamed directly using an ArcGIS Client application such as ArcGIS Pro, ArcGIS Maps for Office, a Web map viewer (browser) or Survey123, FieldMaps etc.",
+    "extent": {
+      "type": "Polygon",
+      "coordinates": [
+        [
+          [
+            175.6108,
+            -36.7664
+          ],
+          [
+            178.2898,
+            -36.7664
+          ],
+          [
+            178.2898,
+            -38.1117
+          ],
+          [
+            175.6108,
+            -38.1117
+          ],
+          [
+            175.6108,
+            -36.7664
+          ]
+        ]
+      ]
+    },
+    "access": "public",
+    "description": "<div>A bathymetry model of the Bay of Plenty (New Zealand) region in 25 m grid resolution. Bathymetry is compiled from multibeam and single-beam data sourced from surveys from NIWA and Land Information New Zealand (LINZ), as well as international surveys by vessels from United States of America and Germany. <br /></div><div><br /><p></p><p>New Zealand<span> Bay of Plenty 25m \nDTM/Bathymetric Grid. <span style='font-weight:bold;'>This is an ArcGIS Image Service </span>which is suitable \nfor analysis and mapping and can be streamed directly using an ArcGIS \nClient application such as ArcGIS Pro, ArcGIS Maps for Office, a Web map\n viewer (browser) or Survey123, FieldMaps etc.</span></p></div><div><span><br /></span></div><div><span>If you prefer, you can download the file at <span style='font-weight:bold;'>https://niwa.maps.arcgis.com/home/item.html?id=36cb18c3db034aafa16c578e952a16a0</span><br /></span></div><div><br /></div><div><br /></div><div><font size='4'><span style='font-style:italic;'>Lamarche, G., Guntz, M., Mackay, K., Pallentin, A., and Mackay, E., 2018. Bay of Plenty. NIWA Miscellaneous Chart Series 109.</span></font></div>_________________________________________________________________________________________________________________<br /><br /><font size='3'><b>Item Page Created:</b> 2022-07-25 04:43  <br /><b>Item Page Last Modified:</b> 2025-04-05 18:03<br />Owner: NIWA_OpenData</font><br />",
+    "licenseInfo": "<a href='https://creativecommons.org/licenses/by-nc/4.0' rel='nofollow ugc'><img alt='Creative Commons License' src='https://i.creativecommons.org/l/by-nc/4.0/88x31.png' style='border-width:0;' /></a><br />This work is licensed under a <a href='https://creativecommons.org/licenses/by-nc/4.0' rel='nofollow ugc'>Creative Commons Attribution-NonCommercial 4.0 International License</a>",
+    "title": "NZ Bay of Plenty BoP 25m DTM (Image Service)",
+    "type": "Image Service",
+    "modified": 1744478732000,
+    "id": "3a1d7ee29dac42e3ba6ec4efeeafbacf",
+    "accessInformation": "Lamarche, G., Guntz, M., Mackay, K., Pallentin, A., and Mackay, E., 2018. Bay of Plenty. NIWA Miscellaneous Chart Series 109.",
+    "url": "https://gis.niwa.co.nz/raster/rest/services/Bay_of_Plenty_25m_DTM/ImageServer",
+    "name": null,
+    "properties": null,
+    "source": "National Institute of Water and Atmospheric Research",
+    "license": "CC-BY-NC-4.0"
+  },
+  "time": null,
+  "links": [
+    {
+      "rel": "self",
+      "type": "application/geo+json",
+      "title": "This document as GeoJSON",
+      "href": "https://data-niwa.opendata.arcgis.com/api/search/v1/collections/dataset/items/3a1d7ee29dac42e3ba6ec4efeeafbacf"
+    },
+    {
+      "rel": "collection",
+      "type": "application/json",
+      "title": "Dataset",
+      "href": "https://data-niwa.opendata.arcgis.com/api/search/v1/collections/dataset"
+    }
+  ]
+}
