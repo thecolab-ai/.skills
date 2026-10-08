@@ -24,10 +24,10 @@ metadata:
   thecolab.maintainer: "@adam91holt"
 ---
 
-# Port of Auckland
+# Auckland and Tauranga port snapshots
 
-Use for T1 freight-demand context: expected vessel calls, port truck turnaround
-snapshots and comparison with Tauranga. These operational signals do not establish
+Use for freight-demand context at Auckland and Tauranga: expected vessel calls,
+truck turnaround snapshots and road queue counts. These operational signals do not establish
 truck counts, cargo tonnage or causation of road congestion.
 
 Run from the repository root:
@@ -70,7 +70,8 @@ results retain the original `retrieved_at`; expired results are never served
 on upstream failure. Robots rules cache for up to 24 hours independently.
 
 Every network request has a 10-second timeout and a 4 MB body bound, and is limited
-to declared hosts. The CLI checks robots.txt before fetching a fresh feed. Respect
+to declared hosts. The CLI checks robots.txt before fetching a fresh feed; HTTP 404
+means no restrictions are published. Other access failures remain errors. Respect
 source terms and rate limits; do not bulk poll, scrape disallowed paths, fetch
 camera images, automate exports or bypass access blocks. Public access does not
 establish a reuse licence.

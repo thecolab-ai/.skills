@@ -13,6 +13,7 @@ from html.parser import HTMLParser
 from pathlib import Path
 import re
 import sys
+from urllib.error import HTTPError
 from urllib.parse import urlsplit
 from urllib.robotparser import RobotFileParser
 from zoneinfo import ZoneInfo
@@ -196,7 +197,7 @@ PARSERS = {('auckland', 'arrivals'): parse_arrivals, ('auckland', 'truck-turns')
            ('tauranga', 'arrivals'): parse_tauranga_arrivals, ('tauranga', 'truck-turns'): parse_tauranga_queue}
 
 
-def fetch_text(url):
+def fetch_text(url, *, allow_missing=False):
     try:
         return nzfetch.fetch_text(url, timeout=10, max_bytes=4_000_000, allowed_hosts=ALLOWED_HOSTS,
                                   headers={'User-Agent': USER_AGENT}, browser_headers=False)
@@ -205,6 +206,8 @@ def fetch_text(url):
     except nzfetch.Blocked as exc:
         raise SkillError('network error: public source blocked access', 4) from exc
     except nzfetch.FetchError as exc:
+        if allow_missing and isinstance(exc.__cause__, HTTPError) and exc.__cause__.code == 404:
+            return ''  # A missing robots.txt imposes no restrictions.
         raise SkillError('network error: public source unavailable', 5) from exc
 
 
@@ -244,7 +247,7 @@ def check_robots(url):
             and len(cached['results']) == 1 and isinstance(cached['results'][0], str)):
         text = cached['results'][0]
     else:
-        text = fetch_text(robots_url)
+        text = fetch_text(robots_url, allow_missing=True)
         if '<html' in text.lower():
             raise SkillError('network error: robots.txt returned HTML; access policy could not be checked', 5)
         write_cache(path, result_envelope([text], provenance(robots_url, origin.netloc)))
@@ -299,7 +302,10 @@ def filter_records(records, args, field):
         if args.start or args.end:
             if not record.get(field):
                 continue
-            day = datetime.fromisoformat(record[field]).astimezone(NZ).date()
+            try:
+                day = datetime.fromisoformat(record[field]).astimezone(NZ).date()
+            except ValueError as exc:
+                raise SkillError(f'Cache schema error: unrecognised {field} date {record[field]!r}') from exc
             if (args.start and day < args.start) or (args.end and day > args.end):
                 continue
         result.append(record)

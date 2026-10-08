@@ -8,6 +8,7 @@ import sys
 import tempfile
 import unittest
 from unittest.mock import patch
+from urllib.error import HTTPError
 
 SKILL_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SKILL_DIR / 'scripts'))
@@ -83,6 +84,22 @@ class FixtureTests(unittest.TestCase):
             self.assertEqual(payload['results'], [])
             self.assertTrue(payload['meta']['retrieved_at'].endswith('Z'))
 
+    def test_corrupt_cached_arrival_returns_json_schema_error(self):
+        with tempfile.TemporaryDirectory(dir=FIXTURES) as temporary, patch.object(cli, 'CACHE_DIR', Path(temporary)):
+            rows, _ = cli.parse_arrivals(fixture('arrivals.csv'))
+            rows[0]['arrival'] = 'corrupt cached date'
+            payload = cli.result_envelope(rows, cli.provenance(*cli.FEEDS['auckland', 'arrivals']))
+            cli.write_cache(Path(temporary) / 'auckland-arrivals.json', payload)
+            out = io.StringIO()
+            with patch.object(cli, 'fetch_text') as fetch, contextlib.redirect_stdout(out):
+                status = cli.main(['arrivals', '--from', '2026-10-08', '--json'])
+            fetch.assert_not_called()
+        error = json.loads(out.getvalue())
+        self.assertEqual(status, 6)
+        self.assertEqual(error['error']['type'], 'schema_failure')
+        self.assertIn('arrival', error['error']['message'])
+        self.assertEqual(error['results'], [])
+
     def test_cache_preserves_timestamp_and_expires(self):
         with tempfile.TemporaryDirectory(dir=FIXTURES) as temporary:
             path = Path(temporary) / 'cache.json'
@@ -113,6 +130,42 @@ class FixtureTests(unittest.TestCase):
             with self.assertRaises(cli.SkillError) as exc:
                 cli.check_robots(cli.FEEDS['auckland', 'arrivals'][0])
             self.assertEqual(exc.exception.code, 4)
+
+    def test_missing_robots_allows_and_caches_policy(self):
+        url = cli.FEEDS['auckland', 'arrivals'][0]
+        robots_url = 'https://poal.co.nz/robots.txt'
+        failure = cli.nzfetch.FetchError('HTTP 404')
+        failure.__cause__ = HTTPError(robots_url, 404, 'Not Found', {}, None)
+        with tempfile.TemporaryDirectory(dir=FIXTURES) as temporary, patch.object(cli, 'CACHE_DIR', Path(temporary)), \
+                patch.object(cli.nzfetch, 'fetch_text', side_effect=failure) as fetch:
+            cli.check_robots(url)
+            cli.check_robots(url)
+            fetch.assert_called_once()
+            self.assertEqual(fetch.call_args.args[0], robots_url)
+            cached = cli.read_cache(Path(temporary) / 'poal.co.nz-robots.json', 86400)
+            self.assertEqual(cached['results'], [''])
+
+    def test_other_robots_failures_and_missing_feeds_remain_errors(self):
+        url = cli.FEEDS['auckland', 'arrivals'][0]
+        failures = [cli.nzfetch.FetchError('network error'), cli.nzfetch.Blocked('blocked'),
+                    cli.nzfetch.RateLimited('limited', retry_after='60')]
+        for code in (401, 500):
+            failure = cli.nzfetch.FetchError(f'HTTP {code}')
+            failure.__cause__ = HTTPError('https://poal.co.nz/robots.txt', code, 'Error', {}, None)
+            failures.append(failure)
+        for failure in failures:
+            with self.subTest(failure=str(failure)), tempfile.TemporaryDirectory(dir=FIXTURES) as temporary, \
+                    patch.object(cli, 'CACHE_DIR', Path(temporary)), \
+                    patch.object(cli.nzfetch, 'fetch_text', side_effect=failure):
+                with self.assertRaises(cli.SkillError):
+                    cli.check_robots(url)
+                self.assertEqual(list(Path(temporary).iterdir()), [])
+        failure = cli.nzfetch.FetchError('HTTP 404')
+        failure.__cause__ = HTTPError(url, 404, 'Not Found', {}, None)
+        with patch.object(cli.nzfetch, 'fetch_text', side_effect=failure):
+            with self.assertRaises(cli.SkillError) as exc:
+                cli.fetch_text(url)
+        self.assertEqual(exc.exception.code, 5)
 
     def test_mixed_summary_provenance(self):
         def feed(port, command, age):
