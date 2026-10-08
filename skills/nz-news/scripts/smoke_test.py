@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 import cli
 from test_interviews import InterviewTests
+from test_search import SearchMatcherTests
 
 SKILL_DIR = Path(__file__).resolve().parents[1]
 CLI = SKILL_DIR / 'scripts/cli.py'
@@ -36,11 +37,11 @@ class NewsFixtures(unittest.TestCase):
 
 
 def main():
-    suite = unittest.TestSuite([unittest.defaultTestLoader.loadTestsFromTestCase(NewsFixtures), unittest.defaultTestLoader.loadTestsFromTestCase(InterviewTests)])
+    suite = unittest.TestSuite([unittest.defaultTestLoader.loadTestsFromTestCase(NewsFixtures), unittest.defaultTestLoader.loadTestsFromTestCase(InterviewTests), unittest.defaultTestLoader.loadTestsFromTestCase(SearchMatcherTests)])
     result = unittest.TextTestRunner(verbosity=1).run(suite)
     if not result.wasSuccessful():
         return 1
-    print(f'[PASS] fixture suite: {result.testsRun} news/interview tests')
+    print(f'[PASS] fixture suite: {result.testsRun} news/interview/search tests')
     run = subprocess.run([sys.executable, str(CLI), '--help'], capture_output=True, timeout=10)
     assert run.returncode == 0 and b'interviews' in run.stdout
     for extra in ([], ['--contains', 'zz-no-interview-match-928374']):
