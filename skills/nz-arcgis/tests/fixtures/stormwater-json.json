@@ -1,0 +1,2451 @@
+{
+  "objectIdFieldName": "OBJECTID",
+  "uniqueIdField": {
+    "name": "OBJECTID",
+    "isSystemMaintained": true
+  },
+  "globalIdFieldName": "GlobalID_1",
+  "geometryProperties": {
+    "shapeLengthFieldName": "Shape__Length",
+    "units": "esriMeters"
+  },
+  "geometryType": "esriGeometryPolyline",
+  "spatialReference": {
+    "wkid": 4326,
+    "latestWkid": 4326
+  },
+  "fields": [
+    {
+      "name": "CREATOR",
+      "type": "esriFieldTypeString",
+      "alias": "CREATOR",
+      "sqlType": "sqlTypeOther",
+      "length": 255,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "OBJECTID",
+      "type": "esriFieldTypeOID",
+      "alias": "OBJECTID",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "SW_ACTIVITY_TYPE",
+      "type": "esriFieldTypeString",
+      "alias": "Asset Acquisition Source",
+      "sqlType": "sqlTypeOther",
+      "length": 254,
+      "domain": {
+        "type": "codedValue",
+        "name": "dSW_ACTIVITY_TYPE",
+        "mergePolicy": "esriMPTDefaultValue",
+        "splitPolicy": "esriSPTDefaultValue",
+        "description": "Activity Type",
+        "codedValues": [
+          {
+            "name": "Conversion",
+            "code": "CONV"
+          },
+          {
+            "name": "Disposal or Deletion",
+            "code": "DISP"
+          },
+          {
+            "name": "New Capital",
+            "code": "NCAP"
+          },
+          {
+            "name": "Natural Water Conveyance",
+            "code": "NWTC"
+          },
+          {
+            "name": "Renewal Rehabilitation",
+            "code": "REHA"
+          },
+          {
+            "name": "Renewal Replacement",
+            "code": "REPL"
+          },
+          {
+            "name": "Transition - New Capital",
+            "code": "TNCA"
+          },
+          {
+            "name": "Transition - Renewal Replacement",
+            "code": "TREP"
+          },
+          {
+            "name": "Transition - Upgrade Capital",
+            "code": "TUCA"
+          },
+          {
+            "name": "Transition - Vestment or Acquisition",
+            "code": "TVES"
+          },
+          {
+            "name": "Upgrade Capital",
+            "code": "UCAP"
+          },
+          {
+            "name": "Validation",
+            "code": "VALI"
+          },
+          {
+            "name": "Vestment or Acquisition",
+            "code": "VEST"
+          }
+        ]
+      },
+      "defaultValue": null
+    },
+    {
+      "name": "SW_ASBUILT_REGISTER_ID",
+      "type": "esriFieldTypeString",
+      "alias": "As Built Register ID",
+      "sqlType": "sqlTypeOther",
+      "length": 10,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "SW_ASSET_OWNER",
+      "type": "esriFieldTypeString",
+      "alias": "Asset Owner",
+      "sqlType": "sqlTypeOther",
+      "length": 254,
+      "domain": {
+        "type": "codedValue",
+        "name": "dSW_ASSET_OWNER",
+        "mergePolicy": "esriMPTDefaultValue",
+        "splitPolicy": "esriSPTDefaultValue",
+        "description": "Asset Owner",
+        "codedValues": [
+          {
+            "name": "Department of Conservation",
+            "code": "DOC"
+          },
+          {
+            "name": "New Zealand Transport Agency",
+            "code": "NZTA"
+          },
+          {
+            "name": "AC - Parks",
+            "code": "PARKS"
+          },
+          {
+            "name": "Private",
+            "code": "PRIVATE"
+          },
+          {
+            "name": "AC - Property",
+            "code": "PROPERTY"
+          },
+          {
+            "name": "AC - Stormwater",
+            "code": "STORMWATER"
+          },
+          {
+            "name": "AC - Auckland Transport",
+            "code": "TRANSPORT"
+          },
+          {
+            "name": "AC - Waste Management",
+            "code": "WASTE"
+          },
+          {
+            "name": "Watercare Services Limited",
+            "code": "WATERCARE"
+          },
+          {
+            "name": "AC - Waterfront",
+            "code": "WATERFRONT"
+          },
+          {
+            "name": "KiwiRail",
+            "code": "KIWIRAIL"
+          },
+          {
+            "name": "Drainage Boards",
+            "code": "DBRD"
+          }
+        ]
+      },
+      "defaultValue": null
+    },
+    {
+      "name": "SW_ASSET_TYPE",
+      "type": "esriFieldTypeString",
+      "alias": "Asset Type",
+      "sqlType": "sqlTypeOther",
+      "length": 254,
+      "domain": {
+        "type": "codedValue",
+        "name": "dSW_ASSET_TYPE_PIPE",
+        "mergePolicy": "esriMPTDefaultValue",
+        "splitPolicy": "esriSPTDefaultValue",
+        "description": "Pipe Asset Type",
+        "codedValues": [
+          {
+            "name": "Pipe Bridge",
+            "code": "BRDG"
+          },
+          {
+            "name": "Culvert",
+            "code": "CULV"
+          },
+          {
+            "name": "Gravity Main",
+            "code": "GRVY"
+          },
+          {
+            "name": "Overflow Pipe",
+            "code": "OVER"
+          },
+          {
+            "name": "Rising Main",
+            "code": "RISG"
+          },
+          {
+            "name": "Subsoil Drain",
+            "code": "SUBS"
+          },
+          {
+            "name": "Syphon",
+            "code": "SYPN"
+          },
+          {
+            "name": "Tunnel",
+            "code": "TUNL"
+          },
+          {
+            "name": "Collector",
+            "code": "CLCT"
+          }
+        ]
+      },
+      "defaultValue": null
+    },
+    {
+      "name": "SW_BEDDING_TYPE",
+      "type": "esriFieldTypeString",
+      "alias": "Pipe Bedding Material",
+      "sqlType": "sqlTypeOther",
+      "length": 254,
+      "domain": {
+        "type": "codedValue",
+        "name": "dSW_BEDDING_TYPE",
+        "mergePolicy": "esriMPTDefaultValue",
+        "splitPolicy": "esriSPTDefaultValue",
+        "description": "Bedding Type",
+        "codedValues": [
+          {
+            "name": "Concrete",
+            "code": "CONC"
+          },
+          {
+            "name": "Aggregate Passing 11mm Screen",
+            "code": "GAP11"
+          },
+          {
+            "name": "Aggregate Passing 7mm Screen",
+            "code": "GAP7"
+          },
+          {
+            "name": "Aggregate Passing 9mm Screen",
+            "code": "GAP9"
+          },
+          {
+            "name": "Haunch Type 1 (H1) Bedding",
+            "code": "H1"
+          },
+          {
+            "name": "Haunch Type 2 (H2) Bedding",
+            "code": "H2"
+          },
+          {
+            "name": "Haunch Type 1 (HS1) Bedding",
+            "code": "HS1"
+          },
+          {
+            "name": "Haunch Type 2 (HS2) Bedding",
+            "code": "HS2"
+          },
+          {
+            "name": "Scoria",
+            "code": "SCOR"
+          }
+        ]
+      },
+      "defaultValue": null
+    },
+    {
+      "name": "SW_CRE",
+      "type": "esriFieldTypeString",
+      "alias": "Coastal Receiving Environment (CRE)",
+      "sqlType": "sqlTypeOther",
+      "length": 254,
+      "domain": {
+        "type": "codedValue",
+        "name": "dSW_CRE",
+        "mergePolicy": "esriMPTDefaultValue",
+        "splitPolicy": "esriSPTDefaultValue",
+        "description": "CRE",
+        "codedValues": [
+          {
+            "name": "Hibiscus Coast",
+            "code": "HIBISCUS_COAST"
+          },
+          {
+            "name": "Islands",
+            "code": "ISLANDS"
+          },
+          {
+            "name": "Kaipara",
+            "code": "KAIPARA"
+          },
+          {
+            "name": "Mahurangi",
+            "code": "MAHURANGI"
+          },
+          {
+            "name": "Manukau Harbour",
+            "code": "MANUKAU_HARBOUR"
+          },
+          {
+            "name": "North East",
+            "code": "NORTH_EAST"
+          },
+          {
+            "name": "Tamaki",
+            "code": "TAMAKI"
+          },
+          {
+            "name": "Wairoa",
+            "code": "WAIROA"
+          },
+          {
+            "name": "Waitemata",
+            "code": "WAITEMATA"
+          },
+          {
+            "name": "West Coast",
+            "code": "WEST_COAST"
+          },
+          {
+            "name": "Waikato",
+            "code": "WAIKATO"
+          }
+        ]
+      },
+      "defaultValue": null
+    },
+    {
+      "name": "SW_DATUM_CONFIDENCE_AUK1946",
+      "type": "esriFieldTypeString",
+      "alias": "Auckland 1946 Confidence",
+      "sqlType": "sqlTypeOther",
+      "length": 15,
+      "domain": {
+        "type": "codedValue",
+        "name": "dDatumAKLC1946_Confidence",
+        "mergePolicy": "esriMPTDefaultValue",
+        "splitPolicy": "esriSPTDefaultValue",
+        "description": "Source for Auckland 1946 field data",
+        "codedValues": [
+          {
+            "name": "Auckland 1946 Survey",
+            "code": "VDAUK1946"
+          },
+          {
+            "name": "Auckland 1946 Calculated",
+            "code": "VDAUK1946CAL"
+          }
+        ]
+      },
+      "defaultValue": null
+    },
+    {
+      "name": "SW_DATUM_CONFIDENCE_NZVD2016",
+      "type": "esriFieldTypeString",
+      "alias": "NZVD2016 Confidence",
+      "sqlType": "sqlTypeOther",
+      "length": 15,
+      "domain": {
+        "type": "codedValue",
+        "name": "dDatumNZVD2016_Confidence",
+        "mergePolicy": "esriMPTDefaultValue",
+        "splitPolicy": "esriSPTDefaultValue",
+        "description": "Source for NZVD2016 field data",
+        "codedValues": [
+          {
+            "name": "NZVD2016 Survey",
+            "code": "VD2016"
+          },
+          {
+            "name": "NZVD2016 Calculated",
+            "code": "VD2016CAL"
+          }
+        ]
+      },
+      "defaultValue": null
+    },
+    {
+      "name": "SW_DECOMMISSION_DATE",
+      "type": "esriFieldTypeDate",
+      "alias": "Decommission Date",
+      "sqlType": "sqlTypeOther",
+      "length": 8,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "SW_DEPTH_DOWNSTREAM_M",
+      "type": "esriFieldTypeDouble",
+      "alias": "Pipe Depth Downstream (m)",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "SW_DEPTH_UPSTREAM_M",
+      "type": "esriFieldTypeDouble",
+      "alias": "Pipe Depth Upstream (m)",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "SW_DIAMETER_LINING_MM",
+      "type": "esriFieldTypeInteger",
+      "alias": "Diameter after Lining (if lined)",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "SW_DIAMETER_MM",
+      "type": "esriFieldTypeInteger",
+      "alias": "Asset Diameter (mm)",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "SW_DIAMETER_TYPE",
+      "type": "esriFieldTypeString",
+      "alias": "Diameter Internal/External (mm)",
+      "sqlType": "sqlTypeOther",
+      "length": 254,
+      "domain": {
+        "type": "codedValue",
+        "name": "dSW_DIAMETER_TYPE",
+        "mergePolicy": "esriMPTDefaultValue",
+        "splitPolicy": "esriSPTDefaultValue",
+        "description": "Diameter - Type",
+        "codedValues": [
+          {
+            "name": "External Diameter",
+            "code": "EXTD"
+          },
+          {
+            "name": "Internal Diameter",
+            "code": "INTD"
+          }
+        ]
+      },
+      "defaultValue": null
+    },
+    {
+      "name": "SW_DROP_TYPE_DOWNSTREAM",
+      "type": "esriFieldTypeString",
+      "alias": "Drop Type Downstream",
+      "sqlType": "sqlTypeOther",
+      "length": 254,
+      "domain": {
+        "type": "codedValue",
+        "name": "dSW_DROP_TYPE_DOWNSTREAM",
+        "mergePolicy": "esriMPTDefaultValue",
+        "splitPolicy": "esriSPTDefaultValue",
+        "description": "Drop Type Downstream",
+        "codedValues": [
+          {
+            "name": "Cascade",
+            "code": "CASC"
+          },
+          {
+            "name": "External Drop",
+            "code": "EXTD"
+          },
+          {
+            "name": "Internal Drop",
+            "code": "INTD"
+          },
+          {
+            "name": "None",
+            "code": "NONE"
+          }
+        ]
+      },
+      "defaultValue": null
+    },
+    {
+      "name": "SW_FISH_PASS_STRUCTURE_TYPE",
+      "type": "esriFieldTypeString",
+      "alias": "Fish Pass Structure Type (if installed)",
+      "sqlType": "sqlTypeOther",
+      "length": 254,
+      "domain": {
+        "type": "codedValue",
+        "name": "dSW_FISH_PASS_STRUCTURE_TYPE",
+        "mergePolicy": "esriMPTDefaultValue",
+        "splitPolicy": "esriSPTDefaultValue",
+        "description": "Fish Pass Structure Type",
+        "codedValues": [
+          {
+            "name": "Baffles",
+            "code": "BAFL"
+          },
+          {
+            "name": "None",
+            "code": "NONE"
+          },
+          {
+            "name": "Fish Ramp",
+            "code": "RAMP"
+          },
+          {
+            "name": "Roughened Surface",
+            "code": "ROUG"
+          },
+          {
+            "name": "Spat Rope",
+            "code": "SPAT"
+          }
+        ]
+      },
+      "defaultValue": null
+    },
+    {
+      "name": "SW_GIS_ID",
+      "type": "esriFieldTypeString",
+      "alias": "GIS ID",
+      "sqlType": "sqlTypeOther",
+      "length": 38,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "SW_GRADIENT_PC",
+      "type": "esriFieldTypeSmallInteger",
+      "alias": "Pipe Gradient (%)",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "SW_HEIGHT_MM",
+      "type": "esriFieldTypeInteger",
+      "alias": "Pipe Height (mm)",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "SW_INSTALLATION_DATE",
+      "type": "esriFieldTypeDate",
+      "alias": "Asset Installed Date",
+      "sqlType": "sqlTypeOther",
+      "length": 8,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "SW_INSTALLATION_TYPE",
+      "type": "esriFieldTypeString",
+      "alias": "Installation Type",
+      "sqlType": "sqlTypeOther",
+      "length": 254,
+      "domain": {
+        "type": "codedValue",
+        "name": "dSW_INSTALLATION_TYPE",
+        "mergePolicy": "esriMPTDefaultValue",
+        "splitPolicy": "esriSPTDefaultValue",
+        "description": "Installation Type",
+        "codedValues": [
+          {
+            "name": "Bore",
+            "code": "BORE"
+          },
+          {
+            "name": "Pipe Bursting",
+            "code": "BURT"
+          },
+          {
+            "name": "Horizontal Direction Drilling",
+            "code": "HZDD"
+          },
+          {
+            "name": "Pipe Jacking",
+            "code": "JACK"
+          },
+          {
+            "name": "Micro Tunnelling & Pipe Jack",
+            "code": "MTPJ"
+          },
+          {
+            "name": "Open Cut",
+            "code": "OPEN"
+          },
+          {
+            "name": "Slip Lining",
+            "code": "SLIP"
+          },
+          {
+            "name": "Suspended",
+            "code": "SUSP"
+          },
+          {
+            "name": "Utility Tunnelling",
+            "code": "UTUN"
+          }
+        ]
+      },
+      "defaultValue": null
+    },
+    {
+      "name": "SW_INVERT_LEVEL_DOWNSTREAM_M",
+      "type": "esriFieldTypeDouble",
+      "alias": "Pipe Invert Downstream (m)",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "SW_INVERT_LEVEL_DS_M_NZVD2016",
+      "type": "esriFieldTypeDouble",
+      "alias": "Down Stream Invert Level (m) NZVD2016",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "SW_INVERT_LEVEL_UPSTREAM_M",
+      "type": "esriFieldTypeDouble",
+      "alias": "Pipe Invert Upstream (m)",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "SW_INVERT_LEVEL_US_M_NZVD2016",
+      "type": "esriFieldTypeDouble",
+      "alias": "Up Stream Invert Level (m) NZVD2016",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "SW_IS_LINED",
+      "type": "esriFieldTypeString",
+      "alias": "Pipe Lined (Yes or No)",
+      "sqlType": "sqlTypeOther",
+      "length": 1,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "SW_JOINT_TYPE",
+      "type": "esriFieldTypeString",
+      "alias": "Pipe Joint Type",
+      "sqlType": "sqlTypeOther",
+      "length": 254,
+      "domain": {
+        "type": "codedValue",
+        "name": "dSW_JOINT_TYPE",
+        "mergePolicy": "esriMPTDefaultValue",
+        "splitPolicy": "esriSPTDefaultValue",
+        "description": "Joint Type",
+        "codedValues": [
+          {
+            "name": "Flanged Joint",
+            "code": "FLAN"
+          },
+          {
+            "name": "Flush Joint",
+            "code": "FLSH"
+          },
+          {
+            "name": "Fused Joint - Pipe Welded",
+            "code": "FUSE"
+          },
+          {
+            "name": "Gibault Joint",
+            "code": "GIBT"
+          },
+          {
+            "name": "Lead Joint",
+            "code": "LEAD"
+          },
+          {
+            "name": "Push Lock",
+            "code": "PUSH"
+          },
+          {
+            "name": "Rubber Ring Joint",
+            "code": "RUBB"
+          },
+          {
+            "name": "Spigot & Socket Solvent Welded",
+            "code": "SSSW"
+          }
+        ]
+      },
+      "defaultValue": null
+    },
+    {
+      "name": "SW_LEGACY_SOURCE_DOCUMENT_REF",
+      "type": "esriFieldTypeString",
+      "alias": "Legacy Source Document Ref.",
+      "sqlType": "sqlTypeOther",
+      "length": 30,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "SW_LENGTH_GIS_M",
+      "type": "esriFieldTypeDouble",
+      "alias": "Length - GIS (m)",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "SW_LINING_DATE",
+      "type": "esriFieldTypeDate",
+      "alias": "Pipe Lining Date (if lined)",
+      "sqlType": "sqlTypeOther",
+      "length": 8,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "SW_LOCAL_BOARD",
+      "type": "esriFieldTypeString",
+      "alias": "Local Board",
+      "sqlType": "sqlTypeOther",
+      "length": 254,
+      "domain": {
+        "type": "codedValue",
+        "name": "dSW_LOCAL_BOARD",
+        "mergePolicy": "esriMPTDefaultValue",
+        "splitPolicy": "esriSPTDefaultValue",
+        "description": "Local Board",
+        "codedValues": [
+          {
+            "name": "Albert-Eden",
+            "code": "100"
+          },
+          {
+            "name": "Devonport-Takapuna",
+            "code": "105"
+          },
+          {
+            "name": "Franklin",
+            "code": "110"
+          },
+          {
+            "name": "Great Barrier",
+            "code": "115"
+          },
+          {
+            "name": "Henderson-Massey",
+            "code": "120"
+          },
+          {
+            "name": "Hibiscus and Bays",
+            "code": "125"
+          },
+          {
+            "name": "Howick",
+            "code": "130"
+          },
+          {
+            "name": "Kaipatiki",
+            "code": "135"
+          },
+          {
+            "name": "Mangere-Otahuhu",
+            "code": "140"
+          },
+          {
+            "name": "Manurewa",
+            "code": "145"
+          },
+          {
+            "name": "Maungakiekie-Tamaki",
+            "code": "150"
+          },
+          {
+            "name": "Orakei",
+            "code": "155"
+          },
+          {
+            "name": "Otara-Papatoetoe",
+            "code": "160"
+          },
+          {
+            "name": "Papakura",
+            "code": "165"
+          },
+          {
+            "name": "Puketapapa",
+            "code": "170"
+          },
+          {
+            "name": "Rodney",
+            "code": "175"
+          },
+          {
+            "name": "Upper Harbour",
+            "code": "180"
+          },
+          {
+            "name": "Waiheke",
+            "code": "185"
+          },
+          {
+            "name": "Waitakere Ranges",
+            "code": "190"
+          },
+          {
+            "name": "Waitemata",
+            "code": "195"
+          },
+          {
+            "name": "Whau",
+            "code": "200"
+          }
+        ]
+      },
+      "defaultValue": null
+    },
+    {
+      "name": "SW_MANUFACTURER",
+      "type": "esriFieldTypeString",
+      "alias": "Manufacturer",
+      "sqlType": "sqlTypeOther",
+      "length": 30,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "SW_MATERIAL",
+      "type": "esriFieldTypeString",
+      "alias": "Pipe Material",
+      "sqlType": "sqlTypeOther",
+      "length": 254,
+      "domain": {
+        "type": "codedValue",
+        "name": "dSW_MATERIAL",
+        "mergePolicy": "esriMPTDefaultValue",
+        "splitPolicy": "esriSPTDefaultValue",
+        "description": "Material",
+        "codedValues": [
+          {
+            "name": "Asbestos Cement",
+            "code": "ABCM"
+          },
+          {
+            "name": "Alkathene",
+            "code": "ALKA"
+          },
+          {
+            "name": "Aluminium",
+            "code": "ALUM"
+          },
+          {
+            "name": "Biomass",
+            "code": "BIOM"
+          },
+          {
+            "name": "Brick",
+            "code": "BRCK"
+          },
+          {
+            "name": "Cast Iron",
+            "code": "CAIR"
+          },
+          {
+            "name": "Concrete Lined Steel",
+            "code": "CCLS"
+          },
+          {
+            "name": "Chain Link",
+            "code": "CHLK"
+          },
+          {
+            "name": "Corrugated Iron",
+            "code": "COIR"
+          },
+          {
+            "name": "Concrete",
+            "code": "CONC"
+          },
+          {
+            "name": "Copper",
+            "code": "COPR"
+          },
+          {
+            "name": "Corrugated Steel",
+            "code": "COST"
+          },
+          {
+            "name": "Ductile Iron",
+            "code": "DUIR"
+          },
+          {
+            "name": "Earth",
+            "code": "ERTH"
+          },
+          {
+            "name": "Ceramic / Earthenware",
+            "code": "ERWR"
+          },
+          {
+            "name": "Fiberglass",
+            "code": "FBGL"
+          },
+          {
+            "name": "Field Tile",
+            "code": "FITI"
+          },
+          {
+            "name": "Gabion Basket",
+            "code": "GABI"
+          },
+          {
+            "name": "Galvanised Iron or Steel",
+            "code": "GAIR"
+          },
+          {
+            "name": "Masonry Block",
+            "code": "MASN"
+          },
+          {
+            "name": "Other",
+            "code": "OTHR"
+          },
+          {
+            "name": "Perforated Drainage Coil",
+            "code": "PERF"
+          },
+          {
+            "name": "Plastic",
+            "code": "PLAS"
+          },
+          {
+            "name": "Post & Rail",
+            "code": "POST"
+          },
+          {
+            "name": "Polypropylene",
+            "code": "PYPR"
+          },
+          {
+            "name": "Polyethylene",
+            "code": "PYTH"
+          },
+          {
+            "name": "Polyvinyl Chloride",
+            "code": "PYVN"
+          },
+          {
+            "name": "Reno Mattress",
+            "code": "RENO"
+          },
+          {
+            "name": "Roadway",
+            "code": "ROAD"
+          },
+          {
+            "name": "Rock or Stone",
+            "code": "ROCK"
+          },
+          {
+            "name": "Sand Bag",
+            "code": "SAND"
+          },
+          {
+            "name": "Scoria",
+            "code": "SCOR"
+          },
+          {
+            "name": "Steel",
+            "code": "STEL"
+          },
+          {
+            "name": "Timber",
+            "code": "TIMB"
+          },
+          {
+            "name": "Wire Mesh",
+            "code": "WIRE"
+          }
+        ]
+      },
+      "defaultValue": null
+    },
+    {
+      "name": "SW_MATERIAL_LINING",
+      "type": "esriFieldTypeString",
+      "alias": "Pipe Lining Material (if lined)",
+      "sqlType": "sqlTypeOther",
+      "length": 254,
+      "domain": {
+        "type": "codedValue",
+        "name": "dSW_MATERIAL_LINING",
+        "mergePolicy": "esriMPTDefaultValue",
+        "splitPolicy": "esriSPTDefaultValue",
+        "description": "Material - Lining",
+        "codedValues": [
+          {
+            "name": "Cured In Place Polymer",
+            "code": "CIPP"
+          },
+          {
+            "name": "Clay",
+            "code": "CLAY"
+          },
+          {
+            "name": "Concrete, Shotcrete, etc",
+            "code": "CONC"
+          },
+          {
+            "name": "Epoxy",
+            "code": "EPOX"
+          },
+          {
+            "name": "Fibreglass",
+            "code": "FBGL"
+          },
+          {
+            "name": "Fold and Form PVC",
+            "code": "FPVC"
+          },
+          {
+            "name": "None",
+            "code": "NONE"
+          },
+          {
+            "name": "Non-PE Plastic / Geo-Membrane",
+            "code": "NOPE"
+          },
+          {
+            "name": "Polymer",
+            "code": "PYMR"
+          },
+          {
+            "name": "Polyethylene",
+            "code": "PYTH"
+          },
+          {
+            "name": "Polyvinyl Chloride",
+            "code": "PYVN"
+          },
+          {
+            "name": "Resin Impregnated",
+            "code": "RESN"
+          },
+          {
+            "name": "Ribloc Spiral PVC",
+            "code": "RIBL"
+          }
+        ]
+      },
+      "defaultValue": null
+    },
+    {
+      "name": "SW_OPERATIONAL_AREA",
+      "type": "esriFieldTypeString",
+      "alias": "Operational Area",
+      "sqlType": "sqlTypeOther",
+      "length": 254,
+      "domain": {
+        "type": "codedValue",
+        "name": "dSW_OPERATIONAL_AREA",
+        "mergePolicy": "esriMPTDefaultValue",
+        "splitPolicy": "esriSPTDefaultValue",
+        "description": "Operational Area",
+        "codedValues": [
+          {
+            "name": "Stormwater Central",
+            "code": "SC"
+          },
+          {
+            "name": "Stormwater North",
+            "code": "SN"
+          },
+          {
+            "name": "Stormwater South",
+            "code": "SS"
+          },
+          {
+            "name": "Stormwater West",
+            "code": "SW"
+          }
+        ]
+      },
+      "defaultValue": null
+    },
+    {
+      "name": "SW_PROJECT_OR_SUBDIVISION_NO",
+      "type": "esriFieldTypeString",
+      "alias": "Source Project or Subdivison Ref.",
+      "sqlType": "sqlTypeOther",
+      "length": 30,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "SW_REPLACED_ASSET",
+      "type": "esriFieldTypeString",
+      "alias": "Replaced Asset",
+      "sqlType": "sqlTypeOther",
+      "length": 18,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "SW_SAP_ID",
+      "type": "esriFieldTypeString",
+      "alias": "SAP ID",
+      "sqlType": "sqlTypeOther",
+      "length": 18,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "SW_SHAPE",
+      "type": "esriFieldTypeString",
+      "alias": "Pipe Shape",
+      "sqlType": "sqlTypeOther",
+      "length": 254,
+      "domain": {
+        "type": "codedValue",
+        "name": "dSW_SHAPE",
+        "mergePolicy": "esriMPTDefaultValue",
+        "splitPolicy": "esriSPTDefaultValue",
+        "description": "Shape",
+        "codedValues": [
+          {
+            "name": "Arched",
+            "code": "ARCH"
+          },
+          {
+            "name": "Box",
+            "code": "BOX"
+          },
+          {
+            "name": "Circular",
+            "code": "CIRC"
+          },
+          {
+            "name": "Egg",
+            "code": "EGG"
+          },
+          {
+            "name": "Non Circular",
+            "code": "NONC"
+          },
+          {
+            "name": "Octagonal",
+            "code": "OCTL"
+          },
+          {
+            "name": "Other",
+            "code": "OTHR"
+          },
+          {
+            "name": "Oval",
+            "code": "OVAL"
+          },
+          {
+            "name": "Rectangular",
+            "code": "RECT"
+          },
+          {
+            "name": "Semi Circular",
+            "code": "SEMI"
+          },
+          {
+            "name": "Trapezoidal",
+            "code": "TRAP"
+          },
+          {
+            "name": "Half Round or U Shape",
+            "code": "USHP"
+          },
+          {
+            "name": "V Shape Flume or Channel",
+            "code": "VSHP"
+          }
+        ]
+      },
+      "defaultValue": null
+    },
+    {
+      "name": "SW_STATUS",
+      "type": "esriFieldTypeString",
+      "alias": "Asset Status",
+      "sqlType": "sqlTypeOther",
+      "length": 254,
+      "domain": {
+        "type": "codedValue",
+        "name": "dSW_STATUS",
+        "mergePolicy": "esriMPTDefaultValue",
+        "splitPolicy": "esriSPTDefaultValue",
+        "description": "Status",
+        "codedValues": [
+          {
+            "name": "Abandoned",
+            "code": "ABAN"
+          },
+          {
+            "name": "Data Error",
+            "code": "DATA"
+          },
+          {
+            "name": "Decommissioned",
+            "code": "DECO"
+          },
+          {
+            "name": "In Service",
+            "code": "INSR"
+          },
+          {
+            "name": "Removed",
+            "code": "RMVD"
+          },
+          {
+            "name": "Unverified",
+            "code": "UNVF"
+          },
+          {
+            "name": "Temporary",
+            "code": "TEMP"
+          },
+          {
+            "name": "Unserviceable",
+            "code": "UNSV"
+          }
+        ]
+      },
+      "defaultValue": null
+    },
+    {
+      "name": "SW_STATUS_CHANGE_REASON",
+      "type": "esriFieldTypeString",
+      "alias": "Status Change Reason",
+      "sqlType": "sqlTypeOther",
+      "length": 254,
+      "domain": {
+        "type": "codedValue",
+        "name": "dSW_STATUS_CHANGE_REASON",
+        "mergePolicy": "esriMPTDefaultValue",
+        "splitPolicy": "esriSPTDefaultValue",
+        "description": "Status Change Reason",
+        "codedValues": [
+          {
+            "name": "Buildover",
+            "code": "BOVR"
+          },
+          {
+            "name": "End Of Useful Life",
+            "code": "ENDL"
+          },
+          {
+            "name": "Inadequate Capacity",
+            "code": "INCP"
+          },
+          {
+            "name": "Other",
+            "code": "OTHR"
+          },
+          {
+            "name": "Road Upgrading",
+            "code": "RDUG"
+          },
+          {
+            "name": "Not Required - Redundant",
+            "code": "RDUN"
+          },
+          {
+            "name": "Recomissioned",
+            "code": "RECO"
+          },
+          {
+            "name": "Linear Asset Split",
+            "code": "SPLT"
+          }
+        ]
+      },
+      "defaultValue": null
+    },
+    {
+      "name": "SW_STORMWATER_CATCHMENT",
+      "type": "esriFieldTypeString",
+      "alias": "Stormwater Catchment",
+      "sqlType": "sqlTypeOther",
+      "length": 254,
+      "domain": {
+        "type": "codedValue",
+        "name": "dSW_STORMWATERCATCHMENT",
+        "mergePolicy": "esriMPTDefaultValue",
+        "splitPolicy": "esriSPTDefaultValue",
+        "description": "Stormwater Catchment",
+        "codedValues": [
+          {
+            "name": "Awaruku",
+            "code": "085"
+          },
+          {
+            "name": "Campbells Bay",
+            "code": "088"
+          },
+          {
+            "name": "Castor Bay",
+            "code": "090"
+          },
+          {
+            "name": "Deep Creek",
+            "code": "091"
+          },
+          {
+            "name": "Lake Pupuke",
+            "code": "102"
+          },
+          {
+            "name": "Long Bay",
+            "code": "105"
+          },
+          {
+            "name": "Mairangi Bay",
+            "code": "107"
+          },
+          {
+            "name": "Milford Beach",
+            "code": "108"
+          },
+          {
+            "name": "Narrow Neck",
+            "code": "109"
+          },
+          {
+            "name": "Okura",
+            "code": "111"
+          },
+          {
+            "name": "Rothesay Bay",
+            "code": "117"
+          },
+          {
+            "name": "Taiaotea",
+            "code": "119"
+          },
+          {
+            "name": "Taiorahi",
+            "code": "120"
+          },
+          {
+            "name": "Takapuna Beach",
+            "code": "121"
+          },
+          {
+            "name": "Wairau Valley",
+            "code": "124"
+          },
+          {
+            "name": "Arkles Bay",
+            "code": "130"
+          },
+          {
+            "name": "Big & Little Manly",
+            "code": "133"
+          },
+          {
+            "name": "Duck Creek",
+            "code": "140"
+          },
+          {
+            "name": "Hatfields",
+            "code": "142"
+          },
+          {
+            "name": "Hobbs Bay",
+            "code": "144"
+          },
+          {
+            "name": "Karepiro",
+            "code": "148"
+          },
+          {
+            "name": "Nukumea",
+            "code": "162"
+          },
+          {
+            "name": "Okoromai Bay",
+            "code": "165"
+          },
+          {
+            "name": "Okura North",
+            "code": "166"
+          },
+          {
+            "name": "Orewa River East",
+            "code": "171"
+          },
+          {
+            "name": "Orewa River West",
+            "code": "172"
+          },
+          {
+            "name": "Otanerua",
+            "code": "174"
+          },
+          {
+            "name": "Pine Valley",
+            "code": "177"
+          },
+          {
+            "name": "Puawai",
+            "code": "181"
+          },
+          {
+            "name": "Puhoi",
+            "code": "182"
+          },
+          {
+            "name": "Red Beach",
+            "code": "184"
+          },
+          {
+            "name": "Shakespear",
+            "code": "186"
+          },
+          {
+            "name": "Silverdale North",
+            "code": "188"
+          },
+          {
+            "name": "Silverdale South",
+            "code": "189"
+          },
+          {
+            "name": "Silverdale Wade",
+            "code": "190"
+          },
+          {
+            "name": "Stanmore Bay",
+            "code": "192"
+          },
+          {
+            "name": "Stillwater",
+            "code": "193"
+          },
+          {
+            "name": "Waiwera",
+            "code": "206"
+          },
+          {
+            "name": "Waiwera River",
+            "code": "207"
+          },
+          {
+            "name": "Weiti River North",
+            "code": "211"
+          },
+          {
+            "name": "Weiti South",
+            "code": "212"
+          },
+          {
+            "name": "Hitapa Bay",
+            "code": "001"
+          },
+          {
+            "name": "Anzac",
+            "code": "006"
+          },
+          {
+            "name": "All Eastern Island Catchments",
+            "code": "008"
+          },
+          {
+            "name": "Blackpool",
+            "code": "013"
+          },
+          {
+            "name": "Church",
+            "code": "015"
+          },
+          {
+            "name": "Enclosure",
+            "code": "020"
+          },
+          {
+            "name": "Hekerua",
+            "code": "023"
+          },
+          {
+            "name": "Matiatia",
+            "code": "032"
+          },
+          {
+            "name": "Omiha",
+            "code": "039"
+          },
+          {
+            "name": "Oneroa",
+            "code": "042"
+          },
+          {
+            "name": "Onetangi",
+            "code": "043"
+          },
+          {
+            "name": "Orapiu",
+            "code": "044"
+          },
+          {
+            "name": "Ostend",
+            "code": "046"
+          },
+          {
+            "name": "Owhanake",
+            "code": "049"
+          },
+          {
+            "name": "Palm Beach",
+            "code": "053"
+          },
+          {
+            "name": "Putaki",
+            "code": "062"
+          },
+          {
+            "name": "Putiki",
+            "code": "063"
+          },
+          {
+            "name": "Rangihoua",
+            "code": "064"
+          },
+          {
+            "name": "Surfdale",
+            "code": "066"
+          },
+          {
+            "name": "Waiheke",
+            "code": "072"
+          },
+          {
+            "name": "Kawau Island",
+            "code": "150"
+          },
+          {
+            "name": "Araparera",
+            "code": "129"
+          },
+          {
+            "name": "Awaroa",
+            "code": "131"
+          },
+          {
+            "name": "Central Kaipara",
+            "code": "136"
+          },
+          {
+            "name": "Gumstove",
+            "code": "141"
+          },
+          {
+            "name": "Helensville",
+            "code": "143"
+          },
+          {
+            "name": "Kaipara Flats",
+            "code": "146"
+          },
+          {
+            "name": "Kaipara West",
+            "code": "147"
+          },
+          {
+            "name": "Kaukapakapa",
+            "code": "149"
+          },
+          {
+            "name": "Kumeu Huapai",
+            "code": "151"
+          },
+          {
+            "name": "Lower Hoteo",
+            "code": "153"
+          },
+          {
+            "name": "Maeneene",
+            "code": "155"
+          },
+          {
+            "name": "Makurau",
+            "code": "158"
+          },
+          {
+            "name": "Okahukura",
+            "code": "163"
+          },
+          {
+            "name": "Omaumau",
+            "code": "170"
+          },
+          {
+            "name": "Oruawharo",
+            "code": "173"
+          },
+          {
+            "name": "Poroure",
+            "code": "179"
+          },
+          {
+            "name": "Port Albert",
+            "code": "180"
+          },
+          {
+            "name": "Tauhoa",
+            "code": "194"
+          },
+          {
+            "name": "Taupaki",
+            "code": "195"
+          },
+          {
+            "name": "Te Hana",
+            "code": "197"
+          },
+          {
+            "name": "Tomarata, Waitapu Stream",
+            "code": "200"
+          },
+          {
+            "name": "Waikiri",
+            "code": "202"
+          },
+          {
+            "name": "Waionui",
+            "code": "203"
+          },
+          {
+            "name": "Waiteitei",
+            "code": "204"
+          },
+          {
+            "name": "Waiwhiu Stream",
+            "code": "208"
+          },
+          {
+            "name": "Wayby",
+            "code": "210"
+          },
+          {
+            "name": "Wellsford",
+            "code": "213"
+          },
+          {
+            "name": "Wellsford South",
+            "code": "214"
+          },
+          {
+            "name": "West Kaipara Harbour",
+            "code": "216"
+          },
+          {
+            "name": "Whanaki",
+            "code": "217"
+          },
+          {
+            "name": "Whangaripo",
+            "code": "218"
+          },
+          {
+            "name": "Jamieson Bay",
+            "code": "145"
+          },
+          {
+            "name": "Mahurangi East",
+            "code": "156"
+          },
+          {
+            "name": "Mahurangi West",
+            "code": "157"
+          },
+          {
+            "name": "Martins Bay",
+            "code": "159"
+          },
+          {
+            "name": "Sharps Road",
+            "code": "187"
+          },
+          {
+            "name": "Snells Beach, Algies Bay",
+            "code": "191"
+          },
+          {
+            "name": "Te Muri",
+            "code": "198"
+          },
+          {
+            "name": "Warkworth",
+            "code": "209"
+          },
+          {
+            "name": "Airport",
+            "code": "007"
+          },
+          {
+            "name": "Awhitu, Manukau Harbour",
+            "code": "010"
+          },
+          {
+            "name": "Clarks Beach",
+            "code": "016"
+          },
+          {
+            "name": "Elletts Beach",
+            "code": "019"
+          },
+          {
+            "name": "Hillsborough",
+            "code": "024"
+          },
+          {
+            "name": "Hingaia South",
+            "code": "025"
+          },
+          {
+            "name": "Hingaia Stream",
+            "code": "026"
+          },
+          {
+            "name": "Ihumatao",
+            "code": "028"
+          },
+          {
+            "name": "Karaka Creek",
+            "code": "029"
+          },
+          {
+            "name": "Mangere Inlet",
+            "code": "031"
+          },
+          {
+            "name": "Mauku Stream",
+            "code": "033"
+          },
+          {
+            "name": "Ngakoroa Stream",
+            "code": "037"
+          },
+          {
+            "name": "Oira Creek",
+            "code": "038"
+          },
+          {
+            "name": "One Tree Hill",
+            "code": "040"
+          },
+          {
+            "name": "Onehunga",
+            "code": "041"
+          },
+          {
+            "name": "Pahurehure Inlet",
+            "code": "050"
+          },
+          {
+            "name": "Papakura Stream",
+            "code": "054"
+          },
+          {
+            "name": "Puhinui Creek",
+            "code": "059"
+          },
+          {
+            "name": "Pukaki Waokauri",
+            "code": "060"
+          },
+          {
+            "name": "Pukekohe, Tutaenui Stream",
+            "code": "061"
+          },
+          {
+            "name": "Slippery Creek",
+            "code": "065"
+          },
+          {
+            "name": "Taihiki River",
+            "code": "067"
+          },
+          {
+            "name": "Te Hihi Creek",
+            "code": "069"
+          },
+          {
+            "name": "WWTP",
+            "code": "071"
+          },
+          {
+            "name": "Waimahia Creek",
+            "code": "074"
+          },
+          {
+            "name": "Waitangi Stream",
+            "code": "076"
+          },
+          {
+            "name": "Waiuku River",
+            "code": "077"
+          },
+          {
+            "name": "Waiuku Town",
+            "code": "078"
+          },
+          {
+            "name": "Waiuku Town, Awaroa River",
+            "code": "079"
+          },
+          {
+            "name": "Whangamaire Stream",
+            "code": "081"
+          },
+          {
+            "name": "Whangapouri Creek",
+            "code": "082"
+          },
+          {
+            "name": "Huia",
+            "code": "222"
+          },
+          {
+            "name": "Titirangi, Laingholm",
+            "code": "230"
+          },
+          {
+            "name": "Baddleys Beach",
+            "code": "132"
+          },
+          {
+            "name": "Buckletons Bay",
+            "code": "134"
+          },
+          {
+            "name": "Campbells Beach",
+            "code": "135"
+          },
+          {
+            "name": "Christian Bay",
+            "code": "137"
+          },
+          {
+            "name": "Leigh",
+            "code": "152"
+          },
+          {
+            "name": "Matakana River",
+            "code": "160"
+          },
+          {
+            "name": "Matheson Bay",
+            "code": "161"
+          },
+          {
+            "name": "Omaha East",
+            "code": "167"
+          },
+          {
+            "name": "Omaha South",
+            "code": "168"
+          },
+          {
+            "name": "Omaha West",
+            "code": "169"
+          },
+          {
+            "name": "Pakari",
+            "code": "175"
+          },
+          {
+            "name": "Point Wells",
+            "code": "178"
+          },
+          {
+            "name": "Te Arai",
+            "code": "196"
+          },
+          {
+            "name": "Ti Point",
+            "code": "199"
+          },
+          {
+            "name": "Waikauri Bay",
+            "code": "201"
+          },
+          {
+            "name": "Whangateau",
+            "code": "219"
+          },
+          {
+            "name": "Beachlands, Maraetai",
+            "code": "012"
+          },
+          {
+            "name": "Cockle Bay",
+            "code": "017"
+          },
+          {
+            "name": "Glendowie",
+            "code": "021"
+          },
+          {
+            "name": "Mangemangeroa Creek",
+            "code": "030"
+          },
+          {
+            "name": "Mt Wellington South",
+            "code": "036"
+          },
+          {
+            "name": "Otahuhu East",
+            "code": "047"
+          },
+          {
+            "name": "Otara Creek, Flat Bush",
+            "code": "048"
+          },
+          {
+            "name": "Pakuranga, Tamaki River",
+            "code": "051"
+          },
+          {
+            "name": "Pakuranga Creek",
+            "code": "052"
+          },
+          {
+            "name": "Papatoetoe, Tamaki River",
+            "code": "055"
+          },
+          {
+            "name": "Tamaki North",
+            "code": "058"
+          },
+          {
+            "name": "Turanga Creek",
+            "code": "070"
+          },
+          {
+            "name": "Waikopua Creek",
+            "code": "073"
+          },
+          {
+            "name": "Hunua Stream",
+            "code": "027"
+          },
+          {
+            "name": "Orere Stream",
+            "code": "045"
+          },
+          {
+            "name": "Pouraureroa Stream",
+            "code": "056"
+          },
+          {
+            "name": "Taitaia Stream",
+            "code": "068"
+          },
+          {
+            "name": "Wairoa River",
+            "code": "075"
+          },
+          {
+            "name": "CBD",
+            "code": "002"
+          },
+          {
+            "name": "Eastern Bays",
+            "code": "003"
+          },
+          {
+            "name": "Epsom Newmarket",
+            "code": "004"
+          },
+          {
+            "name": "Hobson Bay",
+            "code": "005"
+          },
+          {
+            "name": "Whau",
+            "code": "009"
+          },
+          {
+            "name": "Ellerslie",
+            "code": "018"
+          },
+          {
+            "name": "Grey Lynn",
+            "code": "022"
+          },
+          {
+            "name": "Meola",
+            "code": "034"
+          },
+          {
+            "name": "Motions",
+            "code": "035"
+          },
+          {
+            "name": "Pt Chevalier",
+            "code": "057"
+          },
+          {
+            "name": "Oakley",
+            "code": "080"
+          },
+          {
+            "name": "Albany West",
+            "code": "083"
+          },
+          {
+            "name": "Attwood",
+            "code": "084"
+          },
+          {
+            "name": "Bayview",
+            "code": "086"
+          },
+          {
+            "name": "Belmont",
+            "code": "087"
+          },
+          {
+            "name": "Cassino",
+            "code": "089"
+          },
+          {
+            "name": "Devonport",
+            "code": "092"
+          },
+          {
+            "name": "Duck Creek",
+            "code": "093"
+          },
+          {
+            "name": "Eskdale",
+            "code": "094"
+          },
+          {
+            "name": "Greenhithe",
+            "code": "095"
+          },
+          {
+            "name": "Hauraki",
+            "code": "096"
+          },
+          {
+            "name": "Hillcrest",
+            "code": "097"
+          },
+          {
+            "name": "Kahika",
+            "code": "098"
+          },
+          {
+            "name": "Kaipatiki",
+            "code": "099"
+          },
+          {
+            "name": "Kauri Point",
+            "code": "100"
+          },
+          {
+            "name": "Kyle",
+            "code": "101"
+          },
+          {
+            "name": "Lignite",
+            "code": "103"
+          },
+          {
+            "name": "Little Shoal Bay",
+            "code": "104"
+          },
+          {
+            "name": "Lucas Creek",
+            "code": "106"
+          },
+          {
+            "name": "Northboro",
+            "code": "110"
+          },
+          {
+            "name": "Onepoto",
+            "code": "112"
+          },
+          {
+            "name": "Orwell",
+            "code": "113"
+          },
+          {
+            "name": "Oteha Valley",
+            "code": "114"
+          },
+          {
+            "name": "Paremoremo",
+            "code": "115"
+          },
+          {
+            "name": "Rangatira",
+            "code": "116"
+          },
+          {
+            "name": "Shoal Bay",
+            "code": "118"
+          },
+          {
+            "name": "Tramway",
+            "code": "122"
+          },
+          {
+            "name": "Upper Harbour",
+            "code": "123"
+          },
+          {
+            "name": "Wairoa",
+            "code": "125"
+          },
+          {
+            "name": "Waiurutoa",
+            "code": "126"
+          },
+          {
+            "name": "Waterview",
+            "code": "127"
+          },
+          {
+            "name": "Wayside",
+            "code": "128"
+          },
+          {
+            "name": "Coatesville",
+            "code": "138"
+          },
+          {
+            "name": "Dairy Flat",
+            "code": "139"
+          },
+          {
+            "name": "Paremoremo",
+            "code": "176"
+          },
+          {
+            "name": "Rangitopuni",
+            "code": "183"
+          },
+          {
+            "name": "Riverhead",
+            "code": "185"
+          },
+          {
+            "name": "Oratia",
+            "code": "220"
+          },
+          {
+            "name": "Herald Island",
+            "code": "221"
+          },
+          {
+            "name": "Lincoln",
+            "code": "223"
+          },
+          {
+            "name": "Opanuku",
+            "code": "224"
+          },
+          {
+            "name": "Massey",
+            "code": "225"
+          },
+          {
+            "name": "Swanson",
+            "code": "226"
+          },
+          {
+            "name": "Redhills",
+            "code": "227"
+          },
+          {
+            "name": "Henderson",
+            "code": "228"
+          },
+          {
+            "name": "Te Atatu South",
+            "code": "229"
+          },
+          {
+            "name": "West Harbour",
+            "code": "234"
+          },
+          {
+            "name": "Whenuapai",
+            "code": "235"
+          },
+          {
+            "name": "Water View",
+            "code": "236"
+          },
+          {
+            "name": "Awhitu, Tasman Sea",
+            "code": "011"
+          },
+          {
+            "name": "Okiritoto",
+            "code": "164"
+          },
+          {
+            "name": "West Coast",
+            "code": "215"
+          },
+          {
+            "name": "Waitakere",
+            "code": "232"
+          },
+          {
+            "name": "Piha, Karekare",
+            "code": "233"
+          }
+        ]
+      },
+      "defaultValue": null
+    },
+    {
+      "name": "SW_WIDTH_MM",
+      "type": "esriFieldTypeInteger",
+      "alias": "Pipe Width (mm)",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "VALIDATIONSTATE",
+      "type": "esriFieldTypeSmallInteger",
+      "alias": "VALIDATIONSTATE",
+      "sqlType": "sqlTypeOther",
+      "domain": {
+        "type": "codedValue",
+        "name": "dValidationState",
+        "mergePolicy": "esriMPTDefaultValue",
+        "splitPolicy": "esriSPTDefaultValue",
+        "description": "Validation State",
+        "codedValues": [
+          {
+            "name": "Not Valid",
+            "code": 0
+          },
+          {
+            "name": "Not Valid and Public",
+            "code": 1
+          },
+          {
+            "name": "Valid and Private",
+            "code": 2
+          },
+          {
+            "name": "Valid and Public",
+            "code": 3
+          }
+        ]
+      },
+      "defaultValue": 3
+    },
+    {
+      "name": "SW_CONDITION_RELIABILITY",
+      "type": "esriFieldTypeString",
+      "alias": "Condition Reliability",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": {
+        "type": "codedValue",
+        "name": "dSW_CONDITION_RELIABILITY",
+        "mergePolicy": "esriMPTDefaultValue",
+        "splitPolicy": "esriSPTDefaultValue",
+        "description": "Condition Reliability values for swPipe",
+        "codedValues": [
+          {
+            "name": "Historic Inspection",
+            "code": "HIST"
+          },
+          {
+            "name": "Planned Inspection",
+            "code": "PLAN"
+          },
+          {
+            "name": "Post Repair Inspection",
+            "code": "POST"
+          },
+          {
+            "name": "Reactive Inspection",
+            "code": "REAC"
+          }
+        ]
+      },
+      "defaultValue": null
+    },
+    {
+      "name": "GlobalID_1",
+      "type": "esriFieldTypeGlobalID",
+      "alias": "GlobalID_1",
+      "sqlType": "sqlTypeOther",
+      "length": 38,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Shape__Length",
+      "type": "esriFieldTypeDouble",
+      "alias": "Shape__Length",
+      "sqlType": "sqlTypeDouble",
+      "domain": null,
+      "defaultValue": null
+    }
+  ],
+  "exceededTransferLimit": true,
+  "features": [
+    {
+      "attributes": {
+        "OBJECTID": 1,
+        "SW_ASSET_OWNER": "STORMWATER",
+        "SW_ASSET_TYPE": "GRVY",
+        "SW_DIAMETER_MM": 1800,
+        "SW_STATUS": "INSR"
+      },
+      "geometry": {
+        "paths": [
+          [
+            [
+              174.920539148318,
+              -37.0228394279421
+            ],
+            [
+              174.920532295985,
+              -37.0228741541692
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "attributes": {
+        "OBJECTID": 2,
+        "SW_ASSET_OWNER": "TRANSPORT",
+        "SW_ASSET_TYPE": "GRVY",
+        "SW_DIAMETER_MM": 225,
+        "SW_STATUS": "INSR"
+      },
+      "geometry": {
+        "paths": [
+          [
+            [
+              174.873308233416,
+              -36.9170631369353
+            ],
+            [
+              174.87345958747,
+              -36.9172537579931
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "attributes": {
+        "OBJECTID": 3,
+        "SW_ASSET_OWNER": "TRANSPORT",
+        "SW_ASSET_TYPE": "GRVY",
+        "SW_DIAMETER_MM": 225,
+        "SW_STATUS": "INSR"
+      },
+      "geometry": {
+        "paths": [
+          [
+            [
+              174.873834147563,
+              -36.9175711338674
+            ],
+            [
+              174.87362715036,
+              -36.9174934163092
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "attributes": {
+        "OBJECTID": 4,
+        "SW_ASSET_OWNER": "PARKS",
+        "SW_ASSET_TYPE": "GRVY",
+        "SW_DIAMETER_MM": 900,
+        "SW_STATUS": "INSR"
+      },
+      "geometry": {
+        "paths": [
+          [
+            [
+              174.873740918413,
+              -36.9169265296162
+            ],
+            [
+              174.873695579221,
+              -36.9169384123373
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "attributes": {
+        "OBJECTID": 5,
+        "SW_ASSET_OWNER": "TRANSPORT",
+        "SW_ASSET_TYPE": "GRVY",
+        "SW_DIAMETER_MM": 225,
+        "SW_STATUS": "INSR"
+      },
+      "geometry": {
+        "paths": [
+          [
+            [
+              174.873579154349,
+              -36.9175916963876
+            ],
+            [
+              174.873482881596,
+              -36.9174515547555
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}

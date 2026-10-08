@@ -1,0 +1,112 @@
+[
+  {
+    "catalogue_id": "C0069",
+    "name": "Auckland Infrared Imagery 2024-2025 (tiled MapServer)",
+    "reason": "outside verified public-sector registry"
+  },
+  {
+    "catalogue_id": "C0073",
+    "name": "Auckland Council Aerial Basemap (GeoMaps)",
+    "reason": "outside verified public-sector registry"
+  },
+  {
+    "catalogue_id": "C0102",
+    "name": "2023 Census by SA1 with NZDep2023 (730 fields incl. tenure, landlord sector, dwelling type)",
+    "reason": "outside verified public-sector registry"
+  },
+  {
+    "catalogue_id": "S0141",
+    "name": "MfE Sentinel-2 2026 Mainland NZ composite",
+    "reason": "outside verified public-sector registry"
+  },
+  {
+    "catalogue_id": "S0146",
+    "name": "NZ Floods Jan 2023 impact observation points",
+    "reason": "outside verified public-sector registry"
+  },
+  {
+    "catalogue_id": "S0244",
+    "name": "Early Childhood Services Directory New Zealand (spatial layer)",
+    "reason": "outside verified public-sector registry"
+  },
+  {
+    "catalogue_id": "S0312",
+    "name": "Proposed PC78 zoning GIS layer (notified plan-change view)",
+    "reason": "outside verified public-sector registry"
+  },
+  {
+    "catalogue_id": "S0316",
+    "name": "BRANZ Resource Recovery Map — facility locations feature layer",
+    "reason": "outside verified public-sector registry"
+  },
+  {
+    "catalogue_id": "S0346",
+    "name": "BRANZ Resource Recovery Map (national C&D facilities)",
+    "reason": "outside verified public-sector registry"
+  },
+  {
+    "catalogue_id": "S0378",
+    "name": "2023 New Zealand Index of Multiple Deprivation (IMD23)",
+    "reason": "outside verified public-sector registry"
+  },
+  {
+    "catalogue_id": "S0398",
+    "name": "LCDB v6.0 Land Cover Database (2023/24, six time steps)",
+    "reason": "outside verified public-sector registry"
+  },
+  {
+    "catalogue_id": "S0416",
+    "name": "New Zealand school enrolment zone polygons",
+    "reason": "outside verified public-sector registry"
+  },
+  {
+    "catalogue_id": "S0439",
+    "name": "Puhinui Ponds, Wetlands and Stormwater Treatment Devices",
+    "reason": "outside verified public-sector registry"
+  },
+  {
+    "catalogue_id": "S0698",
+    "name": "New Zealand Fire Station Locations (FENZ data via Eagle Technology ArcGIS)",
+    "reason": "outside verified public-sector registry"
+  },
+  {
+    "catalogue_id": "S0713",
+    "name": "New Zealand Ambulance Station Locations (prototype)",
+    "reason": "outside verified public-sector registry"
+  },
+  {
+    "catalogue_id": "S0789",
+    "name": "PC120 revised proposed amendments zoning map",
+    "reason": "outside verified public-sector registry"
+  },
+  {
+    "catalogue_id": "S0790",
+    "name": "PC120 revised precincts map",
+    "reason": "outside verified public-sector registry"
+  },
+  {
+    "catalogue_id": "S0792",
+    "name": "PC120 revised Policy 3D upzoning around centres",
+    "reason": "outside verified public-sector registry"
+  },
+  {
+    "catalogue_id": "S0805",
+    "name": "NZ dwellings by lead-based paint hazard level (EHINZ hosted layer)",
+    "reason": "outside verified public-sector registry"
+  },
+  {
+    "catalogue_id": "S2528",
+    "name": "Puhinui public land ownership polygons (Public_Land)",
+    "reason": "outside verified public-sector registry"
+  },
+  {
+    "catalogue_id": "S2686",
+    "name": "Flooded NZ public flood-experience submissions (Survey123 feature layer)",
+    "reason": "outside verified public-sector registry"
+  },
+  {
+    "catalogue_id": "S2687",
+    "name": "Auckland flood-response specialist field-assessment points (Survey123 layer)",
+    "reason": "outside verified public-sector registry"
+  }
+]

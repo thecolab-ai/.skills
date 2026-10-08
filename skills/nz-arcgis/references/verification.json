@@ -1,0 +1,455 @@
+[
+  {
+    "org": "akl",
+    "source_url": "https://services1.arcgis.com/n4yPwebTjJCmXB6W/arcgis/rest/services",
+    "verified_at": "2026-10-08T01:06:21.713832+00:00",
+    "ok": true,
+    "service_count": 345,
+    "folders": []
+  },
+  {
+    "org": "akl",
+    "source_url": "https://tiledimageservices1.arcgis.com/n4yPwebTjJCmXB6W/arcgis/rest/services",
+    "verified_at": "2026-10-08T01:06:21.714137+00:00",
+    "ok": true,
+    "service_count": 0,
+    "folders": []
+  },
+  {
+    "org": "akl",
+    "source_url": "https://mapspublic.aucklandcouncil.govt.nz/arcgis/rest/services",
+    "verified_at": "2026-10-08T01:06:21.714316+00:00",
+    "ok": true,
+    "service_count": 5,
+    "folders": [
+      "Applications",
+      "AreaPlans",
+      "AucklandPlan",
+      "Basemap",
+      "LiveMaps",
+      "Projects",
+      "Query",
+      "Raster",
+      "UnitaryPlan",
+      "Utilities"
+    ]
+  },
+  {
+    "org": "akl",
+    "source_url": "https://mapspublic.aucklandcouncil.govt.nz/arcgis3/rest/services",
+    "verified_at": "2026-10-08T01:06:21.714334+00:00",
+    "ok": true,
+    "service_count": 0,
+    "folders": [
+      "ElevationImage",
+      "GPTools",
+      "NonCouncil",
+      "OpenData",
+      "Utilities",
+      "Website"
+    ]
+  },
+  {
+    "org": "akl",
+    "source_url": "https://mapspublic.aklc.govt.nz/arcgis/rest/services",
+    "verified_at": "2026-10-08T01:06:21.714346+00:00",
+    "ok": true,
+    "service_count": 5,
+    "folders": [
+      "Applications",
+      "AreaPlans",
+      "AucklandPlan",
+      "Basemap",
+      "LiveMaps",
+      "Projects",
+      "Query",
+      "Raster",
+      "UnitaryPlan",
+      "Utilities"
+    ]
+  },
+  {
+    "org": "at",
+    "source_url": "https://services2.arcgis.com/JkPEgZJGxhSjYOo0/arcgis/rest/services",
+    "verified_at": "2026-10-08T01:06:21.714359+00:00",
+    "ok": true,
+    "service_count": 34,
+    "folders": []
+  },
+  {
+    "org": "at",
+    "source_url": "https://mahere.at.govt.nz/server/rest/services",
+    "verified_at": "2026-10-08T01:06:21.819152+00:00",
+    "ok": true,
+    "service_count": 0,
+    "folders": [
+      "ActiveModes",
+      "AllInOne",
+      "Assets",
+      "Community",
+      "Customer",
+      "External",
+      "FutureConnect",
+      "FutureWorks",
+      "Harbourmaster",
+      "NetworkOperations",
+      "Planning",
+      "PublicTransport",
+      "Risk",
+      "Routing",
+      "Safety",
+      "Utilities",
+      "UtilitiesAT"
+    ]
+  },
+  {
+    "org": "nzta",
+    "source_url": "https://services.arcgis.com/CXBb7LAjgIIdcsPt/arcgis/rest/services",
+    "verified_at": "2026-10-08T01:06:21.819197+00:00",
+    "ok": true,
+    "service_count": 146,
+    "folders": []
+  },
+  {
+    "org": "linz",
+    "source_url": "https://services.arcgis.com/xdsHIIxuCWByZiCB/arcgis/rest/services",
+    "verified_at": "2026-10-08T01:06:21.819225+00:00",
+    "ok": true,
+    "service_count": 76,
+    "folders": []
+  },
+  {
+    "org": "doc",
+    "source_url": "https://services1.arcgis.com/3JjYDyG3oajxU6HO/arcgis/rest/services",
+    "verified_at": "2026-10-08T01:06:22.467019+00:00",
+    "ok": true,
+    "service_count": 279,
+    "folders": []
+  },
+  {
+    "org": "doc",
+    "source_url": "https://seasketch.doc.govt.nz/arcgis/rest/services",
+    "verified_at": "2026-10-08T01:06:22.467083+00:00",
+    "ok": true,
+    "service_count": 1,
+    "folders": [
+      "Hauraki",
+      "National",
+      "Otago",
+      "Utilities"
+    ]
+  },
+  {
+    "org": "stats",
+    "source_url": "https://services2.arcgis.com/vKb0s8tBIA3bdocZ/arcgis/rest/services",
+    "verified_at": "2026-10-08T01:06:23.358111+00:00",
+    "ok": true,
+    "service_count": 243,
+    "folders": []
+  },
+  {
+    "org": "watercare",
+    "source_url": "https://wslgis.water.co.nz/arcgis/rest/services",
+    "verified_at": "2026-10-08T01:06:23.358165+00:00",
+    "ok": true,
+    "service_count": 0,
+    "folders": [
+      "Base",
+      "Custom",
+      "DCWebWSL",
+      "Other",
+      "Printing",
+      "Property",
+      "Public",
+      "Services",
+      "Topo",
+      "Trace",
+      "Utilities"
+    ]
+  },
+  {
+    "org": "watercare",
+    "source_url": "https://services5.arcgis.com/PnnKqtqi3qfxnaPc/arcgis/rest/services",
+    "verified_at": "2026-10-08T01:06:23.358181+00:00",
+    "ok": true,
+    "service_count": 101,
+    "folders": []
+  },
+  {
+    "org": "vector",
+    "source_url": "https://services6.arcgis.com/8RWEO35G1ALMME0I/arcgis/rest/services",
+    "verified_at": "2026-10-08T01:06:23.358208+00:00",
+    "ok": true,
+    "service_count": 17,
+    "folders": []
+  },
+  {
+    "org": "wcc",
+    "source_url": "https://services1.arcgis.com/CPYspmTk3abe6d7i/arcgis/rest/services",
+    "verified_at": "2026-10-08T01:06:23.358219+00:00",
+    "ok": true,
+    "service_count": 381,
+    "folders": []
+  },
+  {
+    "org": "wcc",
+    "source_url": "https://gis.wcc.govt.nz/arcgis/rest/services",
+    "verified_at": "2026-10-08T01:06:23.358281+00:00",
+    "ok": true,
+    "service_count": 0,
+    "folders": [
+      "2024DistrictPlan",
+      "Asset",
+      "BCC",
+      "BCP",
+      "Cache",
+      "CDPP",
+      "Community",
+      "DialBeforeYouDig",
+      "DistrictPlan",
+      "DistrictPlanProposed",
+      "DistrictPlanProposedTranche1",
+      "DraftDistrictPlan",
+      "Elevation",
+      "Environment",
+      "ForwardWorks",
+      "FreshService",
+      "Historical",
+      "Imagery",
+      "Locators",
+      "Parks",
+      "PropertyAndBoundaries",
+      "PropertySearchTest",
+      "Resilience",
+      "Reveal_POC",
+      "StateOfHousing",
+      "Tools",
+      "Transportation",
+      "Utilities",
+      "WaterServices",
+      "Webmap"
+    ]
+  },
+  {
+    "org": "gwrc",
+    "source_url": "https://services2.arcgis.com/RS7BXJAO6ksvblJm/arcgis/rest/services",
+    "verified_at": "2026-10-08T01:06:23.358298+00:00",
+    "ok": true,
+    "service_count": 184,
+    "folders": []
+  },
+  {
+    "org": "gwrc",
+    "source_url": "https://services.arcgis.com/RS7BXJAO6ksvblJm/arcgis/rest/services",
+    "verified_at": "2026-10-08T01:06:23.358324+00:00",
+    "ok": false,
+    "error": "{'error': {'code': 400, 'message': 'Invalid URL', 'details': ['Invalid URL']}}"
+  },
+  {
+    "org": "gwrc",
+    "source_url": "https://giswebprd.gw.govt.nz/arcgis/rest/services",
+    "verified_at": "2026-10-08T01:06:23.358333+00:00",
+    "ok": false,
+    "error": "<urlopen error [Errno -2] Name or service not known>"
+  },
+  {
+    "org": "gwrc",
+    "source_url": "https://mapping.gw.govt.nz/arcgis/rest/services",
+    "verified_at": "2026-10-08T01:06:24.129559+00:00",
+    "ok": true,
+    "service_count": 15,
+    "folders": [
+      "ClimateChange",
+      "emar",
+      "Floods",
+      "GW",
+      "Hazards",
+      "Property",
+      "Tracks",
+      "Utilities",
+      "WFS"
+    ]
+  },
+  {
+    "org": "gwrc",
+    "source_url": "https://mapping1.gw.govt.nz/arcgis/rest/services",
+    "verified_at": "2026-10-08T01:06:24.561621+00:00",
+    "ok": true,
+    "service_count": 15,
+    "folders": [
+      "ClimateChange",
+      "emar",
+      "Floods",
+      "GW",
+      "Hazards",
+      "Property",
+      "Tracks",
+      "Utilities",
+      "WFS"
+    ]
+  },
+  {
+    "org": "gwrc",
+    "source_url": "https://maps.gw.govt.nz/portal/rest/services",
+    "verified_at": "2026-10-08T01:06:24.561670+00:00",
+    "ok": false,
+    "error": "<urlopen error [Errno -2] Name or service not known>"
+  },
+  {
+    "org": "wellington-water",
+    "source_url": "https://gis.wellingtonwater.co.nz/server1/rest/services",
+    "verified_at": "2026-10-08T01:06:24.561681+00:00",
+    "ok": false,
+    "error": "HTTP Error 403: Forbidden"
+  },
+  {
+    "org": "niwa",
+    "source_url": "https://services3.arcgis.com/fp1tibNcN9mbExhG/arcgis/rest/services",
+    "verified_at": "2026-10-08T01:06:24.561689+00:00",
+    "ok": true,
+    "service_count": 465,
+    "folders": []
+  },
+  {
+    "org": "ccc",
+    "source_url": "https://gis.ccc.govt.nz/server/rest/services",
+    "verified_at": "2026-10-08T01:06:24.570599+00:00",
+    "ok": true,
+    "service_count": 0,
+    "folders": [
+      "AGOLCollaboration",
+      "InternalData",
+      "InternalDataEditable",
+      "InternalDataView",
+      "OpenData",
+      "Utilities"
+    ]
+  },
+  {
+    "org": "gns",
+    "source_url": "https://gis.gns.cri.nz/server/rest/services",
+    "verified_at": "2026-10-08T01:06:24.570633+00:00",
+    "ok": true,
+    "service_count": 3,
+    "folders": [
+      "Active_Faults",
+      "basemaps",
+      "boundaries",
+      "EILD",
+      "Geological_Map_of_New_Zealand_1_Million",
+      "geology",
+      "Geology_LSDB",
+      "GeolWebMap",
+      "geophysical",
+      "gw_public",
+      "Imagery",
+      "LandslideResponse",
+      "Landslides",
+      "LCDB",
+      "LidarShadeModels",
+      "NZAFD",
+      "NZL_CriticalMinerals",
+      "NZL_GNS_250K_Geology_2014",
+      "NZL_GNS_250K_Geology_2018",
+      "NZL_GNS_250K_Geology_2020",
+      "NZL_GNS_250K_Geology_2023",
+      "NZL_GNS_GM12_Pukekohe",
+      "NZL_GNS_GM3_Eastern_Canterbury_Geomorphology",
+      "NZL_GNS_GM4_Geology_of_Tongariro_National_Park_area",
+      "NZL_GNS_GM4_Geology_of_Tongariro_National_Park_Area_2020",
+      "NZL_GNS_GM5_Geology_of_the_Middlemarch_area",
+      "NZL_GNS_GM6_Geology_of_the_Victoria_Range_area",
+      "NZL_GNS_GM7_Napier_Hastings_urban_area",
+      "NZL_GNZ_GM9_HMSZ_Geology",
+      "RemoteSensing",
+      "SCAR_GeoMAP",
+      "ShakingLayers",
+      "Sites",
+      "Test",
+      "topography",
+      "TRAMZ",
+      "Utilities",
+      "Vanuatu",
+      "West_Coast_Geology"
+    ]
+  },
+  {
+    "org": "herenga",
+    "source_url": "https://maps.herengaanuku.govt.nz/maps/rest/services",
+    "verified_at": "2026-10-08T01:06:25.380664+00:00",
+    "ok": true,
+    "service_count": 13,
+    "folders": [
+      "Utilities"
+    ]
+  },
+  {
+    "org": "akl",
+    "source_url": "https://services-ap1.arcgis.com/9R0qvCUXav3QPG1F/arcgis/rest/services",
+    "verified_at": "2026-10-08T01:09:29Z",
+    "ok": true,
+    "service_count": 2,
+    "folders": []
+  },
+  {
+    "org": "akl",
+    "source_url": "https://services-ap1.arcgis.com/amvJtxbPQBZ5mG81/arcgis/rest/services",
+    "verified_at": "2026-10-08T01:09:29Z",
+    "ok": true,
+    "service_count": 2,
+    "folders": []
+  },
+  {
+    "org": "nzta",
+    "source_url": "https://services1.arcgis.com/1lLaMWUudPsf6JuN/arcgis/rest/services",
+    "verified_at": "2026-10-08T01:09:29Z",
+    "ok": true,
+    "service_count": 41,
+    "folders": []
+  },
+  {
+    "org": "mfe",
+    "source_url": "https://arcgis.mfe.govt.nz/server1/rest/services",
+    "verified_at": "2026-10-08T01:09:30Z",
+    "ok": true,
+    "service_count": 0,
+    "folders": [
+      "MFE_MPI",
+      "MfE_only",
+      "Unrestricted",
+      "Utilities"
+    ]
+  },
+  {
+    "org": "moe",
+    "source_url": "https://services9.arcgis.com/ygJ1AFEQ1sNGJz4H/arcgis/rest/services",
+    "verified_at": "2026-10-08T01:09:30Z",
+    "ok": true,
+    "service_count": 112,
+    "folders": []
+  },
+  {
+    "org": "health",
+    "source_url": "https://services2.arcgis.com/9V7Qc4NIcvZBm0io/arcgis/rest/services",
+    "verified_at": "2026-10-08T01:09:30Z",
+    "ok": true,
+    "service_count": 16,
+    "folders": []
+  },
+  {
+    "org": "mbie",
+    "source_url": "https://services-ap1.arcgis.com/0380iqO8xVVhk66v/arcgis/rest/services",
+    "verified_at": "2026-10-08T01:09:30Z",
+    "ok": true,
+    "service_count": 1,
+    "folders": []
+  },
+  {
+    "org": "nema",
+    "source_url": "https://services5.arcgis.com/cJn6oR1QqErYBL5d/arcgis/rest/services",
+    "verified_at": "2026-10-08T01:09:30Z",
+    "ok": true,
+    "service_count": 7,
+    "folders": []
+  }
+]

@@ -1,0 +1,148 @@
+{
+  "akl": {
+    "publisher": "Auckland Council",
+    "licence": null,
+    "roots": [
+      "https://services1.arcgis.com/n4yPwebTjJCmXB6W/arcgis/rest/services",
+      "https://tiledimageservices1.arcgis.com/n4yPwebTjJCmXB6W/arcgis/rest/services",
+      "https://mapspublic.aucklandcouncil.govt.nz/arcgis/rest/services",
+      "https://mapspublic.aucklandcouncil.govt.nz/arcgis3/rest/services",
+      "https://mapspublic.aklc.govt.nz/arcgis/rest/services",
+      "https://services-ap1.arcgis.com/9R0qvCUXav3QPG1F/arcgis/rest/services",
+      "https://services-ap1.arcgis.com/amvJtxbPQBZ5mG81/arcgis/rest/services"
+    ]
+  },
+  "at": {
+    "publisher": "Auckland Transport",
+    "licence": null,
+    "roots": [
+      "https://services2.arcgis.com/JkPEgZJGxhSjYOo0/arcgis/rest/services",
+      "https://mahere.at.govt.nz/server/rest/services"
+    ]
+  },
+  "nzta": {
+    "publisher": "NZ Transport Agency Waka Kotahi",
+    "licence": null,
+    "roots": [
+      "https://services.arcgis.com/CXBb7LAjgIIdcsPt/arcgis/rest/services",
+      "https://services1.arcgis.com/1lLaMWUudPsf6JuN/arcgis/rest/services"
+    ]
+  },
+  "linz": {
+    "publisher": "Toitū Te Whenua Land Information New Zealand",
+    "licence": null,
+    "roots": [
+      "https://services.arcgis.com/xdsHIIxuCWByZiCB/arcgis/rest/services"
+    ]
+  },
+  "doc": {
+    "publisher": "Department of Conservation",
+    "licence": null,
+    "roots": [
+      "https://services1.arcgis.com/3JjYDyG3oajxU6HO/arcgis/rest/services",
+      "https://seasketch.doc.govt.nz/arcgis/rest/services"
+    ]
+  },
+  "stats": {
+    "publisher": "Stats NZ",
+    "licence": null,
+    "roots": [
+      "https://services2.arcgis.com/vKb0s8tBIA3bdocZ/arcgis/rest/services"
+    ]
+  },
+  "watercare": {
+    "publisher": "Watercare",
+    "licence": null,
+    "roots": [
+      "https://wslgis.water.co.nz/arcgis/rest/services",
+      "https://services5.arcgis.com/PnnKqtqi3qfxnaPc/arcgis/rest/services"
+    ]
+  },
+  "vector": {
+    "publisher": "Vector",
+    "licence": null,
+    "roots": [
+      "https://services6.arcgis.com/8RWEO35G1ALMME0I/arcgis/rest/services"
+    ]
+  },
+  "wcc": {
+    "publisher": "Wellington City Council",
+    "licence": null,
+    "roots": [
+      "https://services1.arcgis.com/CPYspmTk3abe6d7i/arcgis/rest/services",
+      "https://gis.wcc.govt.nz/arcgis/rest/services"
+    ]
+  },
+  "gwrc": {
+    "publisher": "Greater Wellington Regional Council",
+    "licence": null,
+    "roots": [
+      "https://services2.arcgis.com/RS7BXJAO6ksvblJm/arcgis/rest/services",
+      "https://mapping.gw.govt.nz/arcgis/rest/services",
+      "https://mapping1.gw.govt.nz/arcgis/rest/services"
+    ]
+  },
+  "niwa": {
+    "publisher": "National Institute of Water and Atmospheric Research",
+    "licence": null,
+    "roots": [
+      "https://services3.arcgis.com/fp1tibNcN9mbExhG/arcgis/rest/services"
+    ]
+  },
+  "ccc": {
+    "publisher": "Christchurch City Council",
+    "licence": null,
+    "roots": [
+      "https://gis.ccc.govt.nz/server/rest/services"
+    ]
+  },
+  "gns": {
+    "publisher": "GNS Science",
+    "licence": null,
+    "roots": [
+      "https://gis.gns.cri.nz/server/rest/services"
+    ]
+  },
+  "herenga": {
+    "publisher": "Herenga ā Nuku Aotearoa",
+    "licence": null,
+    "roots": [
+      "https://maps.herengaanuku.govt.nz/maps/rest/services"
+    ]
+  },
+  "mfe": {
+    "publisher": "Ministry for the Environment",
+    "licence": null,
+    "roots": [
+      "https://arcgis.mfe.govt.nz/server1/rest/services"
+    ]
+  },
+  "moe": {
+    "publisher": "Ministry of Education",
+    "licence": null,
+    "roots": [
+      "https://services9.arcgis.com/ygJ1AFEQ1sNGJz4H/arcgis/rest/services"
+    ]
+  },
+  "health": {
+    "publisher": "Ministry of Health",
+    "licence": null,
+    "roots": [
+      "https://services2.arcgis.com/9V7Qc4NIcvZBm0io/arcgis/rest/services"
+    ]
+  },
+  "mbie": {
+    "publisher": "Ministry of Business, Innovation and Employment",
+    "licence": null,
+    "roots": [
+      "https://services-ap1.arcgis.com/0380iqO8xVVhk66v/arcgis/rest/services"
+    ]
+  },
+  "nema": {
+    "publisher": "National Emergency Management Agency",
+    "licence": null,
+    "roots": [
+      "https://services5.arcgis.com/cJn6oR1QqErYBL5d/arcgis/rest/services"
+    ]
+  }
+}

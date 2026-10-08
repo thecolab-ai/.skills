@@ -1,0 +1,25 @@
+{
+  "currentVersion": 12,
+  "services": [
+    {
+      "name": "2020AucklandLocalElectoralGeoSearch",
+      "type": "FeatureServer",
+      "url": "https://services1.arcgis.com/n4yPwebTjJCmXB6W/ArcGIS/rest/services/2020AucklandLocalElectoralGeoSearch/FeatureServer"
+    },
+    {
+      "name": "AC_Address_DEV_(Primary_View)",
+      "type": "FeatureServer",
+      "url": "https://services1.arcgis.com/n4yPwebTjJCmXB6W/ArcGIS/rest/services/AC_Address_DEV_(Primary_View)/FeatureServer"
+    },
+    {
+      "name": "AC_Address_DEV_Query",
+      "type": "FeatureServer",
+      "url": "https://services1.arcgis.com/n4yPwebTjJCmXB6W/ArcGIS/rest/services/AC_Address_DEV_Query/FeatureServer"
+    },
+    {
+      "name": "AC_Address_Query",
+      "type": "FeatureServer",
+      "url": "https://services1.arcgis.com/n4yPwebTjJCmXB6W/ArcGIS/rest/services/AC_Address_Query/FeatureServer"
+    }
+  ]
+}

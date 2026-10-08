@@ -1,0 +1,25 @@
+{
+  "currentVersion": 12,
+  "services": [
+    {
+      "name": "ATHOP_Retailer",
+      "type": "FeatureServer",
+      "url": "https://services2.arcgis.com/JkPEgZJGxhSjYOo0/ArcGIS/rest/services/ATHOP_Retailer/FeatureServer"
+    },
+    {
+      "name": "ATMobileCycleParking",
+      "type": "FeatureServer",
+      "url": "https://services2.arcgis.com/JkPEgZJGxhSjYOo0/ArcGIS/rest/services/ATMobileCycleParking/FeatureServer"
+    },
+    {
+      "name": "Bus_Interchanges",
+      "type": "FeatureServer",
+      "url": "https://services2.arcgis.com/JkPEgZJGxhSjYOo0/ArcGIS/rest/services/Bus_Interchanges/FeatureServer"
+    },
+    {
+      "name": "BusService",
+      "type": "FeatureServer",
+      "url": "https://services2.arcgis.com/JkPEgZJGxhSjYOo0/ArcGIS/rest/services/BusService/FeatureServer"
+    }
+  ]
+}

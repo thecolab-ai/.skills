@@ -1,0 +1,642 @@
+{
+  "currentVersion": 12,
+  "id": 0,
+  "name": "Roadworks",
+  "type": "Feature Layer",
+  "serviceItemId": "caf7e0554ec840c8b8da572df025c833",
+  "cacheMaxAge": 30,
+  "displayField": "WorksiteName",
+  "description": "",
+  "copyrightText": "",
+  "defaultVisibility": true,
+  "editingInfo": {
+    "lastEditDate": 1791374492495,
+    "schemaLastEditDate": 1791374450708,
+    "dataLastEditDate": 1791374492495
+  },
+  "relationships": [],
+  "isDataVersioned": false,
+  "hasContingentValuesDefinition": false,
+  "supportsAppend": true,
+  "supportsCalculate": true,
+  "supportsASyncCalculate": true,
+  "supportsTruncate": true,
+  "supportsAttachmentsByUploadId": true,
+  "supportsAttachmentsResizing": true,
+  "supportsRollbackOnFailureParameter": true,
+  "supportsStatistics": true,
+  "supportsExceedsLimitStatistics": true,
+  "supportsAdvancedQueries": true,
+  "supportsValidateSql": true,
+  "supportsCoordinatesQuantization": true,
+  "supportsLayerOverrides": true,
+  "supportsTilesAndBasicQueriesMode": true,
+  "supportsFieldDescriptionProperty": true,
+  "supportsQuantizationEditMode": true,
+  "supportsColumnStoreIndex": true,
+  "supportsApplyEditsWithGlobalIds": false,
+  "supportsMultiScaleGeometry": true,
+  "supportsReturningQueryGeometry": true,
+  "enableNullGeometry": false,
+  "hasGeometryProperties": true,
+  "geometryProperties": {
+    "shapeAreaFieldName": "Shape__Area",
+    "shapeLengthFieldName": "Shape__Length",
+    "units": "esriMeters"
+  },
+  "advancedQueryCapabilities": {
+    "supportsPagination": true,
+    "supportsPaginationOnAggregatedQueries": true,
+    "supportsQueryRelatedPagination": true,
+    "supportsQueryWithDistance": true,
+    "supportsOutDistance": true,
+    "supportsReturningQueryExtent": true,
+    "supportsStatistics": true,
+    "supportsOrderBy": true,
+    "supportsDistinct": true,
+    "supportsQueryWithResultType": true,
+    "supportsSqlExpression": true,
+    "supportsTimeRelation": true,
+    "supportsAdvancedQueryRelated": true,
+    "supportsCountDistinct": true,
+    "supportsPercentileStatistics": true,
+    "supportsApproxPercentileStatistics": true,
+    "supportsSpatialAggregationStatistics": true,
+    "supportsTrueCurve": true,
+    "supportedSpatialAggregationStatistics": [
+      "EnvelopeAggregate",
+      "CentroidAggregate",
+      "ConvexHullAggregate"
+    ],
+    "supportsLod": true,
+    "supportsQueryWithLodSR": false,
+    "supportedLodTypes": [
+      "geohash"
+    ],
+    "supportsReturningGeometryCentroid": true,
+    "supportsReturningGeometryEnvelope": true,
+    "supportsReturningGeometryProperties": true,
+    "supportsQueryWithDatumTransformation": true,
+    "supportsCurrentUserQueries": true,
+    "supportsHavingClause": true,
+    "supportsOutFieldSQLExpression": true,
+    "supportsMaxRecordCountFactor": true,
+    "supportsTopFeaturesQuery": true,
+    "supportsDisjointSpatialRel": true,
+    "supportsQueryWithCacheHint": true,
+    "supportedOperationsWithCacheHint": [
+      "query",
+      "queryTopFilter",
+      "queryAnalytics",
+      "queryAttachments",
+      "queryRelated",
+      "queryBins",
+      "queryPivot"
+    ],
+    "supportsQueryAnalytic": true,
+    "supportsQueryPivot": true,
+    "supportsQueryBins": true,
+    "supportsDefaultSR": true,
+    "supportsTranslations": false,
+    "supportsAggIds": true,
+    "supportsQueryWithCollation": true,
+    "supportsISODOW": true,
+    "supportsISOWeek": true,
+    "supportsFullTextSearch": true,
+    "fullTextSearchCapabilities": {
+      "supportsAccentSensitivity": true,
+      "supportsStopWords": true,
+      "supportsSearchOperator": true,
+      "supportsOperator": true
+    },
+    "fullTextSearchableFields": [
+      "WorksiteName",
+      "WorksiteType",
+      "ProjectName",
+      "PrincipalOrganisation"
+    ]
+  },
+  "advancedQueryAnalyticCapabilities": {
+    "supportsLinearRegression": true,
+    "supportsTrendlineRegression": true,
+    "supportsAsync": true,
+    "supportsPercentileAnalytic": true
+  },
+  "queryBinsCapabilities": {
+    "supportsAsync": true,
+    "supportsAutoIntervalBin": true,
+    "supportsFixedIntervalBin": true,
+    "supportsFixedBoundariesBin": true,
+    "supportsDateBin": true,
+    "supportsClassificationBin": true,
+    "supportsStackBy": true,
+    "supportsSplitBy": true,
+    "supportsFirstDayOfWeek": true,
+    "supportsSnapToData": true,
+    "supportsReturnFullIntervalBin": true,
+    "supportsReturnStackValueRange": true,
+    "supportsNormalization": true,
+    "supportedStatisticTypes": [
+      "COUNT",
+      "SUM",
+      "AVG",
+      "VAR",
+      "STDDEV",
+      "MIN",
+      "MAX",
+      "PERCENTILE_CONT",
+      "PERCENTILE_DISC",
+      "APPROX_PERCENTILE_CONT",
+      "APPROX_PERCENTILE_DISC",
+      "CentroidAggregate",
+      "EnvelopeAggregate",
+      "ConvexHullAggregate"
+    ],
+    "supportedNormalizationTypes": [
+      "boxCox",
+      "field",
+      "inverse",
+      "log",
+      "naturalLog",
+      "percentOfTotal",
+      "squareRoot"
+    ]
+  },
+  "supportedOperationsWithCollation": "query,addField,updateField",
+  "advancedEditingCapabilities": {
+    "supportedSqlFormatsInCalculate": [
+      "standard"
+    ],
+    "supportsAsyncApplyEdits": true,
+    "supportsReturnEditResults": true,
+    "supportsApplyEditsbyUploadID": true,
+    "supportedApplyEditsUploadIDFormats": "JSON,PBF",
+    "supportsTranslation": false,
+    "supportsMaxTranslations": 10
+  },
+  "infoInEstimates": [
+    "extent",
+    "count"
+  ],
+  "useStandardizedQueries": true,
+  "geometryType": "esriGeometryPolygon",
+  "minScale": 0,
+  "maxScale": 0,
+  "extent": {
+    "xmin": 1727928.912602268,
+    "ymin": 5874205.010500899,
+    "xmax": 1803819.054694866,
+    "ymax": 5997078.1672,
+    "spatialReference": {
+      "wkid": 2193,
+      "latestWkid": 2193
+    }
+  },
+  "spatialReference": {
+    "wkid": 2193,
+    "latestWkid": 2193
+  },
+  "drawingInfo": {
+    "renderer": {
+      "visualVariables": [
+        {
+          "type": "sizeInfo",
+          "target": "outline",
+          "expression": "view.scale",
+          "valueExpression": "$view.scale",
+          "stops": [
+            {
+              "size": 1.5,
+              "value": 8329
+            },
+            {
+              "size": 0.75,
+              "value": 26029
+            },
+            {
+              "size": 0.375,
+              "value": 104117
+            },
+            {
+              "size": 0,
+              "value": 208233
+            }
+          ]
+        }
+      ],
+      "type": "simple",
+      "label": "",
+      "description": "",
+      "symbol": {
+        "color": [
+          255,
+          115,
+          223,
+          82
+        ],
+        "outline": {
+          "color": [
+            230,
+            0,
+            169,
+            191
+          ],
+          "width": 0.75,
+          "type": "esriSLS",
+          "style": "esriSLSSolid"
+        },
+        "type": "esriSFS",
+        "style": "esriSFSSolid"
+      }
+    },
+    "transparency": 0
+  },
+  "allowGeometryUpdates": true,
+  "trueCurveSupportMode": "OGC",
+  "supportedCurveTypes": [
+    "esriGeometryCircularArc"
+  ],
+  "supportedTrueCurvePbfFeatureEncodings": [
+    "esriCompressedShapeBuffer",
+    "esriDefault"
+  ],
+  "allowTrueCurvesUpdates": true,
+  "onlyAllowTrueCurveUpdatesByTrueCurveClients": true,
+  "hasAttachments": false,
+  "htmlPopupType": "esriServerHTMLPopupTypeAsHTMLText",
+  "hasM": false,
+  "hasZ": false,
+  "objectIdField": "OBJECTID",
+  "uniqueIdField": {
+    "name": "OBJECTID",
+    "isSystemMaintained": true
+  },
+  "globalIdField": "",
+  "typeIdField": "",
+  "collation": {
+    "locale": "neutral",
+    "caseSensitive": false,
+    "accentSensitive": true
+  },
+  "fields": [
+    {
+      "name": "OBJECTID",
+      "type": "esriFieldTypeOID",
+      "alias": "OBJECTID",
+      "sqlType": "sqlTypeOther",
+      "nullable": false,
+      "editable": false,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "WorksiteCode",
+      "type": "esriFieldTypeString",
+      "alias": "CAR ID Number",
+      "sqlType": "sqlTypeOther",
+      "length": 10,
+      "nullable": true,
+      "editable": true,
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\":\"Corridor Access Request ID from MyWorksites\",\"fieldValueType\":\"\"}"
+    },
+    {
+      "name": "WorksiteName",
+      "type": "esriFieldTypeString",
+      "alias": "Worksite Name",
+      "sqlType": "sqlTypeOther",
+      "length": 100,
+      "nullable": true,
+      "editable": true,
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\":\"Worksite Name as entered in MyWorksites\",\"fieldValueType\":\"\"}"
+    },
+    {
+      "name": "ProjectName",
+      "type": "esriFieldTypeString",
+      "alias": "Project Name",
+      "sqlType": "sqlTypeOther",
+      "length": 100,
+      "nullable": true,
+      "editable": true,
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\":\"Project that this worksite is associated with, as entered in MyWorksite\",\"fieldValueType\":\"\"}"
+    },
+    {
+      "name": "Status",
+      "type": "esriFieldTypeString",
+      "alias": "CAR Status",
+      "sqlType": "sqlTypeOther",
+      "length": 10,
+      "nullable": true,
+      "editable": true,
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\":\"Simplified status of the Corridor Access Request. Most will be Active.\",\"fieldValueType\":\"\"}"
+    },
+    {
+      "name": "WorksiteType",
+      "type": "esriFieldTypeString",
+      "alias": "Worksite Type",
+      "sqlType": "sqlTypeOther",
+      "length": 20,
+      "nullable": true,
+      "editable": true,
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\":\"Differentiates worksites as Excavation/Non-Excavation or Events.\",\"fieldValueType\":\"\"}"
+    },
+    {
+      "name": "Shape__Area",
+      "type": "esriFieldTypeDouble",
+      "alias": "Shape__Area",
+      "sqlType": "sqlTypeDouble",
+      "nullable": true,
+      "editable": false,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Shape__Length",
+      "type": "esriFieldTypeDouble",
+      "alias": "Shape__Length",
+      "sqlType": "sqlTypeDouble",
+      "nullable": true,
+      "editable": false,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "PrincipalOrganisation",
+      "type": "esriFieldTypeString",
+      "alias": "Organisation",
+      "sqlType": "sqlTypeOther",
+      "length": 256,
+      "nullable": true,
+      "editable": true,
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\":\"The principal organisation which has commisionned the work.\",\"fieldValueType\":\"\"}"
+    },
+    {
+      "name": "ProjectStartDate",
+      "type": "esriFieldTypeDate",
+      "alias": "Project Start Date",
+      "sqlType": "sqlTypeOther",
+      "length": 8,
+      "nullable": true,
+      "editable": true,
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\":\"Start date for the approved window of work for the Corridor Access Request.\",\"fieldValueType\":\"\"}",
+      "precision": 1
+    },
+    {
+      "name": "ProjectEndDate",
+      "type": "esriFieldTypeDate",
+      "alias": "Project End Date",
+      "sqlType": "sqlTypeOther",
+      "length": 8,
+      "nullable": true,
+      "editable": true,
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\":\"End date for the approved window of work for the Corridor Access Request.\",\"fieldValueType\":\"\"}",
+      "precision": 1
+    },
+    {
+      "name": "WorkStartDate",
+      "type": "esriFieldTypeDate",
+      "alias": "Work Start Date",
+      "sqlType": "sqlTypeOther",
+      "length": 8,
+      "nullable": true,
+      "editable": true,
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\":\"The date that construction started, as logged in MyWorksites.\",\"fieldValueType\":\"\"}",
+      "precision": 1
+    },
+    {
+      "name": "WorkCompletionDate",
+      "type": "esriFieldTypeDate",
+      "alias": "Work Completion Date",
+      "sqlType": "sqlTypeOther",
+      "length": 8,
+      "nullable": true,
+      "editable": true,
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\":\"The date that construction completed, as logged in MyWorksites.\",\"fieldValueType\":\"\"}",
+      "precision": 1
+    },
+    {
+      "name": "WorkStatus",
+      "type": "esriFieldTypeString",
+      "alias": "Status Detail",
+      "sqlType": "sqlTypeOther",
+      "length": 100,
+      "nullable": true,
+      "editable": true,
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\":\"The Work Status field as entered in MyWorksites.\",\"fieldValueType\":\"\"}"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "PK__PJ_ROADW__F4B70D8531D94E3D",
+      "fields": "OBJECTID",
+      "isAscending": true,
+      "isUnique": true,
+      "description": "",
+      "indexType": "Attribute"
+    },
+    {
+      "name": "user_5449.PJ_ROADWORKS_MS_ROADWORKS2_Shape_sidx",
+      "fields": "SHAPE",
+      "isAscending": true,
+      "isUnique": false,
+      "description": "",
+      "indexType": "Spatial"
+    },
+    {
+      "name": "Shape__Area_Index",
+      "fields": "Shape__Area",
+      "isAscending": true,
+      "isUnique": false,
+      "description": "",
+      "indexType": "Attribute"
+    },
+    {
+      "name": "Shape__Length_Index",
+      "fields": "Shape__Length",
+      "isAscending": true,
+      "isUnique": false,
+      "description": "",
+      "indexType": "Attribute"
+    },
+    {
+      "name": "exb-dd46c5615b4347b7a284af48a43251d0-widget_8-WorksiteName",
+      "fields": "WorksiteName",
+      "isAscending": true,
+      "isUnique": false,
+      "description": "",
+      "indexType": "Attribute"
+    },
+    {
+      "name": "exb-dd46c5615b4347b7a284af48a43251d0-widget_8-WorksiteName",
+      "fields": "WorksiteName",
+      "description": "",
+      "indexType": "FullText"
+    },
+    {
+      "name": "WorksiteType_Index",
+      "fields": "WorksiteType",
+      "isAscending": true,
+      "isUnique": false,
+      "description": "WorksiteType_Index",
+      "indexType": "Attribute"
+    },
+    {
+      "name": "exb-cefe605e06ab47f6a4d96b58acbaa176-widget_270-WorksiteType",
+      "fields": "WorksiteType",
+      "isAscending": true,
+      "isUnique": false,
+      "description": "",
+      "indexType": "Attribute"
+    },
+    {
+      "name": "exb-cefe605e06ab47f6a4d96b58acbaa176-widget_270-WorksiteType",
+      "fields": "WorksiteType",
+      "description": "",
+      "indexType": "FullText"
+    },
+    {
+      "name": "ProjectEndDate_Index",
+      "fields": "ProjectEndDate",
+      "isAscending": true,
+      "isUnique": false,
+      "description": "ProjectEndDate_Index",
+      "indexType": "Attribute"
+    },
+    {
+      "name": "Status_Index",
+      "fields": "Status",
+      "isAscending": true,
+      "isUnique": false,
+      "description": "Status_Index",
+      "indexType": "Attribute"
+    },
+    {
+      "name": "WorkStatus_Index",
+      "fields": "WorkStatus",
+      "isAscending": true,
+      "isUnique": false,
+      "description": "WorkStatus_Index",
+      "indexType": "Attribute"
+    },
+    {
+      "name": "PrincipalOrganisation_Index",
+      "fields": "PrincipalOrganisation",
+      "isAscending": true,
+      "isUnique": false,
+      "description": "PrincipalOrganisation_Index",
+      "indexType": "Attribute"
+    },
+    {
+      "name": "WorksiteCode_Index",
+      "fields": "WorksiteCode",
+      "isAscending": true,
+      "isUnique": false,
+      "description": "WorksiteCode_Index",
+      "indexType": "Attribute"
+    },
+    {
+      "name": "exb_ProjectName",
+      "fields": "ProjectName",
+      "isAscending": true,
+      "isUnique": false,
+      "description": "",
+      "indexType": "Attribute"
+    },
+    {
+      "name": "exb_PrincipalOrganisation",
+      "fields": "PrincipalOrganisation",
+      "isAscending": true,
+      "isUnique": false,
+      "description": "",
+      "indexType": "Attribute"
+    },
+    {
+      "name": "exb_ProjectName_total",
+      "fields": "ProjectName, PrincipalOrganisation",
+      "description": "",
+      "indexType": "FullText"
+    }
+  ],
+  "dateFieldsTimeReference": {
+    "timeZone": "UTC",
+    "timeZoneIANA": "Etc/UTC",
+    "respectsDaylightSaving": false
+  },
+  "preferredTimeReference": null,
+  "types": [],
+  "templates": [
+    {
+      "name": "Roadworks",
+      "description": "",
+      "drawingTool": "esriFeatureEditToolPolygon",
+      "prototype": {
+        "attributes": {
+          "WorksiteType": null,
+          "WorksiteCode": null,
+          "WorksiteName": null,
+          "ProjectName": null,
+          "Status": null,
+          "PrincipalOrganisation": null,
+          "ProjectStartDate": null,
+          "ProjectEndDate": null,
+          "WorkStartDate": null,
+          "WorkCompletionDate": null,
+          "WorkStatus": null
+        }
+      }
+    }
+  ],
+  "supportedQueryFormats": "JSON, geoJSON, PBF",
+  "supportedAppendFormats": "sqlite,geoPackage,shapefile,filegdb,featureCollection,geojson,csv,excel,jsonl,featureService,pbf",
+  "supportedAppendSourceFilterFormats": "sqlite,geoPackage,shapefile,filegdb,featureService",
+  "supportedExportFormats": "csv,shapefile,sqlite,geoPackage,filegdb,featureCollection,geojson,kml,excel,parquet",
+  "supportedConvertFileFormats": "JSON,PBF,Parquet",
+  "supportedConvertContentFormats": "LayerEditCollection,FeatureCollection",
+  "supportedSpatialRelationships": [
+    "esriSpatialRelIntersects",
+    "esriSpatialRelContains",
+    "esriSpatialRelCrosses",
+    "esriSpatialRelEnvelopeIntersects",
+    "esriSpatialRelIndexIntersects",
+    "esriSpatialRelOverlaps",
+    "esriSpatialRelTouches",
+    "esriSpatialRelWithin",
+    "esriSpatialRelDisjoint",
+    "esriSpatialRelRelation"
+  ],
+  "guidFormat": "",
+  "supportsContingentValues": true,
+  "supportsEditingContingentValues": true,
+  "supportedContingentValuesFormats": "JSON, PBF",
+  "supportsFieldGroups": true,
+  "supportedSyncDataOptions": 260,
+  "hasStaticData": false,
+  "maxRecordCount": 1000,
+  "standardMaxRecordCount": 2000,
+  "maxIdsCount": 1000000,
+  "standardMaxRecordCountNoGeometry": 32000,
+  "tileMaxRecordCount": 4000,
+  "maxRecordCountFactor": 1,
+  "capabilities": "Query"
+}

@@ -1,0 +1,134 @@
+{
+  "type": "FeatureCollection",
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "EPSG:4326"
+    }
+  },
+  "properties": {
+    "exceededTransferLimit": true
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "id": 1,
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            174.920539148318,
+            -37.0228394279421
+          ],
+          [
+            174.920532295985,
+            -37.0228741541692
+          ]
+        ]
+      },
+      "properties": {
+        "OBJECTID": 1,
+        "SW_ASSET_OWNER": "STORMWATER",
+        "SW_ASSET_TYPE": "GRVY",
+        "SW_DIAMETER_MM": 1800,
+        "SW_STATUS": "INSR"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 2,
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            174.873308233416,
+            -36.9170631369353
+          ],
+          [
+            174.87345958747,
+            -36.9172537579931
+          ]
+        ]
+      },
+      "properties": {
+        "OBJECTID": 2,
+        "SW_ASSET_OWNER": "TRANSPORT",
+        "SW_ASSET_TYPE": "GRVY",
+        "SW_DIAMETER_MM": 225,
+        "SW_STATUS": "INSR"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 3,
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            174.873834147563,
+            -36.9175711338674
+          ],
+          [
+            174.87362715036,
+            -36.9174934163092
+          ]
+        ]
+      },
+      "properties": {
+        "OBJECTID": 3,
+        "SW_ASSET_OWNER": "TRANSPORT",
+        "SW_ASSET_TYPE": "GRVY",
+        "SW_DIAMETER_MM": 225,
+        "SW_STATUS": "INSR"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 4,
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            174.873740918413,
+            -36.9169265296162
+          ],
+          [
+            174.873695579221,
+            -36.9169384123373
+          ]
+        ]
+      },
+      "properties": {
+        "OBJECTID": 4,
+        "SW_ASSET_OWNER": "PARKS",
+        "SW_ASSET_TYPE": "GRVY",
+        "SW_DIAMETER_MM": 900,
+        "SW_STATUS": "INSR"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 5,
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            174.873579154349,
+            -36.9175916963876
+          ],
+          [
+            174.873482881596,
+            -36.9174515547555
+          ]
+        ]
+      },
+      "properties": {
+        "OBJECTID": 5,
+        "SW_ASSET_OWNER": "TRANSPORT",
+        "SW_ASSET_TYPE": "GRVY",
+        "SW_DIAMETER_MM": 225,
+        "SW_STATUS": "INSR"
+      }
+    }
+  ]
+}
