@@ -1,0 +1,103 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "id": "41e05dcdfcb749d390f7785543fb3b14",
+      "type": "Feature",
+      "geometry": null,
+      "properties": {
+        "snippet": "Synthetic metadata snippet.",
+        "extent": null,
+        "access": "public",
+        "description": "<p>Synthetic <b>metadata</b> description &amp; parser example.</p>",
+        "licenseInfo": "<p>Synthetic licence parser example; consult the source terms.</p>",
+        "title": "TMS historical traffic volumes - quarter-hourly: Oct 2020 to Jan 2022",
+        "type": "CSV Collection",
+        "modified": 1788494254000,
+        "id": "41e05dcdfcb749d390f7785543fb3b14",
+        "accessInformation": "Waka Kotahi NZ Transport Agency",
+        "url": null,
+        "name": "20201001_20220131_TMSTrafficQuarterHourly.zip",
+        "properties": {},
+        "source": "Waka Kotahi",
+        "license": "CC-BY-4.0"
+      },
+      "time": null,
+      "links": [
+        {
+          "rel": "self",
+          "type": "application/geo+json",
+          "title": "This document as GeoJSON",
+          "href": "https://opendata-nzta.opendata.arcgis.com/api/search/v1/collections/dataset/items/41e05dcdfcb749d390f7785543fb3b14"
+        },
+        {
+          "rel": "collection",
+          "type": "application/json",
+          "title": "Dataset",
+          "href": "https://opendata-nzta.opendata.arcgis.com/api/search/v1/collections/dataset"
+        }
+      ]
+    },
+    {
+      "id": "d682a0a23eae45dcbe8bffcb04b5a64f",
+      "type": "Feature",
+      "geometry": null,
+      "properties": {
+        "snippet": "Synthetic metadata snippet.",
+        "extent": null,
+        "access": "public",
+        "description": "<p>Synthetic <b>metadata</b> description &amp; parser example.</p>",
+        "licenseInfo": "<p>Synthetic licence parser example; consult the source terms.</p>",
+        "title": "Impacts of COVID-19 on transport choices survey",
+        "type": "CSV Collection",
+        "modified": 1710199715000,
+        "id": "d682a0a23eae45dcbe8bffcb04b5a64f",
+        "accessInformation": "Waka Kotahi NZ Transport Agency",
+        "url": null,
+        "name": "COVID19-impacts-on-transport.zip",
+        "properties": {},
+        "source": "Waka Kotahi",
+        "license": "CC-BY-4.0"
+      },
+      "time": null,
+      "links": [
+        {
+          "rel": "self",
+          "type": "application/geo+json",
+          "title": "This document as GeoJSON",
+          "href": "https://opendata-nzta.opendata.arcgis.com/api/search/v1/collections/dataset/items/d682a0a23eae45dcbe8bffcb04b5a64f"
+        },
+        {
+          "rel": "collection",
+          "type": "application/json",
+          "title": "Dataset",
+          "href": "https://opendata-nzta.opendata.arcgis.com/api/search/v1/collections/dataset"
+        }
+      ]
+    }
+  ],
+  "timestamp": "2026-10-08T01:06:13.392Z",
+  "numberMatched": 21,
+  "numberReturned": 2,
+  "links": [
+    {
+      "rel": "self",
+      "type": "application/geo+json",
+      "title": "This document as GeoJSON",
+      "href": "https://opendata-nzta.opendata.arcgis.com/api/search/v1/collections/dataset/items"
+    },
+    {
+      "rel": "next",
+      "type": "application/geo+json",
+      "title": "items (next)",
+      "href": "https://opendata-nzta.opendata.arcgis.com/api/search/v1/collections/dataset/items?limit=2&startindex=3"
+    },
+    {
+      "rel": "collection",
+      "type": "application/json",
+      "title": "Dataset",
+      "href": "https://opendata-nzta.opendata.arcgis.com/api/search/v1/collections/dataset"
+    }
+  ],
+  "_fixture_note": "Captured 2026-10-08; descriptions, snippets and licence prose are synthetic parser examples; factual IDs and source licence identifiers retained."
+}

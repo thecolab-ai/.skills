@@ -1,0 +1,207 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "id": "3a1d7ee29dac42e3ba6ec4efeeafbacf",
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              175.6108,
+              -36.7664
+            ],
+            [
+              178.2898,
+              -36.7664
+            ],
+            [
+              178.2898,
+              -38.1117
+            ],
+            [
+              175.6108,
+              -38.1117
+            ],
+            [
+              175.6108,
+              -36.7664
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "snippet": "Synthetic metadata snippet.",
+        "extent": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [
+                175.6108,
+                -36.7664
+              ],
+              [
+                178.2898,
+                -36.7664
+              ],
+              [
+                178.2898,
+                -38.1117
+              ],
+              [
+                175.6108,
+                -38.1117
+              ],
+              [
+                175.6108,
+                -36.7664
+              ]
+            ]
+          ]
+        },
+        "access": "public",
+        "description": "<p>Synthetic <b>metadata</b> description &amp; parser example.</p>",
+        "licenseInfo": "<p>Synthetic NonCommercial licence parser example.</p>",
+        "title": "NZ Bay of Plenty BoP 25m DTM (Image Service)",
+        "type": "Image Service",
+        "modified": 1744478732000,
+        "id": "3a1d7ee29dac42e3ba6ec4efeeafbacf",
+        "accessInformation": "Lamarche, G., Guntz, M., Mackay, K., Pallentin, A., and Mackay, E., 2018. Bay of Plenty. NIWA Miscellaneous Chart Series 109.",
+        "url": "https://gis.niwa.co.nz/raster/rest/services/Bay_of_Plenty_25m_DTM/ImageServer",
+        "name": null,
+        "properties": null,
+        "source": "National Institute of Water and Atmospheric Research",
+        "license": "CC-BY-NC-4.0"
+      },
+      "time": null,
+      "links": [
+        {
+          "rel": "self",
+          "type": "application/geo+json",
+          "title": "This document as GeoJSON",
+          "href": "https://data-niwa.opendata.arcgis.com/api/search/v1/collections/dataset/items/3a1d7ee29dac42e3ba6ec4efeeafbacf"
+        },
+        {
+          "rel": "collection",
+          "type": "application/json",
+          "title": "Dataset",
+          "href": "https://data-niwa.opendata.arcgis.com/api/search/v1/collections/dataset"
+        }
+      ]
+    },
+    {
+      "id": "a2582b1eb3584237a3b50418f379ca84",
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              161.15,
+              -31.329
+            ],
+            [
+              179.695,
+              -31.329
+            ],
+            [
+              179.695,
+              -49.249
+            ],
+            [
+              161.15,
+              -49.249
+            ],
+            [
+              161.15,
+              -31.329
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "snippet": "Synthetic metadata snippet.",
+        "extent": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [
+                161.15,
+                -31.329
+              ],
+              [
+                179.695,
+                -31.329
+              ],
+              [
+                179.695,
+                -49.249
+              ],
+              [
+                161.15,
+                -49.249
+              ],
+              [
+                161.15,
+                -31.329
+              ]
+            ]
+          ]
+        },
+        "access": "public",
+        "description": "<p>Synthetic <b>metadata</b> description &amp; parser example.</p>",
+        "licenseInfo": "<p>Synthetic NonCommercial licence parser example.</p>",
+        "title": "NZ Bathymetry 250m Imagery/Raster layer",
+        "type": "Image Service",
+        "modified": 1751409189000,
+        "id": "a2582b1eb3584237a3b50418f379ca84",
+        "accessInformation": "Mitchell, J.S., Mackay, K.A., Neil, H.L., Mackay, E.J., Pallentin, A., Notman P., 2012. Undersea New Zealand, 1:5,000,000.",
+        "url": "https://gis.niwa.co.nz/arcgis/rest/services/Reference/NZ_Bathymetry_250m/ImageServer",
+        "name": null,
+        "properties": {},
+        "source": "National Institute of Water and Atmospheric Research",
+        "license": "CC-BY-NC-4.0"
+      },
+      "time": null,
+      "links": [
+        {
+          "rel": "self",
+          "type": "application/geo+json",
+          "title": "This document as GeoJSON",
+          "href": "https://data-niwa.opendata.arcgis.com/api/search/v1/collections/dataset/items/a2582b1eb3584237a3b50418f379ca84"
+        },
+        {
+          "rel": "collection",
+          "type": "application/json",
+          "title": "Dataset",
+          "href": "https://data-niwa.opendata.arcgis.com/api/search/v1/collections/dataset"
+        }
+      ]
+    }
+  ],
+  "timestamp": "2026-10-08T01:06:13.407Z",
+  "numberMatched": 43,
+  "numberReturned": 2,
+  "links": [
+    {
+      "rel": "self",
+      "type": "application/geo+json",
+      "title": "This document as GeoJSON",
+      "href": "https://data-niwa.opendata.arcgis.com/api/search/v1/collections/dataset/items"
+    },
+    {
+      "rel": "next",
+      "type": "application/geo+json",
+      "title": "items (next)",
+      "href": "https://data-niwa.opendata.arcgis.com/api/search/v1/collections/dataset/items?limit=2&startindex=3"
+    },
+    {
+      "rel": "collection",
+      "type": "application/json",
+      "title": "Dataset",
+      "href": "https://data-niwa.opendata.arcgis.com/api/search/v1/collections/dataset"
+    }
+  ],
+  "_fixture_note": "Captured 2026-10-08; descriptions, snippets and licence prose are synthetic parser examples; factual IDs and source licence identifiers retained."
+}

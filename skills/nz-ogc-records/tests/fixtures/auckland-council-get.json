@@ -1,0 +1,38 @@
+{
+  "id": "3b8a6d1d29224763b41242a102d71fd2",
+  "type": "Feature",
+  "geometry": null,
+  "properties": {
+    "snippet": "Synthetic metadata snippet.",
+    "extent": null,
+    "access": "public",
+    "description": "<p>Synthetic <b>metadata</b> description &amp; parser example.</p>",
+    "licenseInfo": "<p>Synthetic licence parser example; consult the source terms.</p>",
+    "title": "Impervious Surfaces 2017",
+    "type": "File Geodatabase",
+    "modified": 1714971169000,
+    "id": "3b8a6d1d29224763b41242a102d71fd2",
+    "accessInformation": "Lynker Analytics and Healthy Waters, Auckland Council",
+    "url": null,
+    "name": "Impervious_Surfaces_2017.zip",
+    "properties": null,
+    "source": "Auckland Council",
+    "license": "CC-BY-4.0"
+  },
+  "time": null,
+  "links": [
+    {
+      "rel": "self",
+      "type": "application/geo+json",
+      "title": "This document as GeoJSON",
+      "href": "https://data-aucklandcouncil.opendata.arcgis.com/api/search/v1/collections/dataset/items/3b8a6d1d29224763b41242a102d71fd2"
+    },
+    {
+      "rel": "collection",
+      "type": "application/json",
+      "title": "Data",
+      "href": "https://data-aucklandcouncil.opendata.arcgis.com/api/search/v1/collections/dataset"
+    }
+  ],
+  "_fixture_note": "Captured 2026-10-08; descriptions, snippets and licence prose are synthetic parser examples; factual IDs and source licence identifiers retained."
+}

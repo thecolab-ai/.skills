@@ -2,7 +2,7 @@
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
   "last_verified": "2026-10-08",
-  "skill_count": 154,
+  "skill_count": 155,
   "skills": [
     {
       "name": "airnz-flights",
@@ -4304,6 +4304,35 @@
         "podcastindex.org"
       ],
       "last_verified": "2026-10-07",
+      "health": "degraded",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "nz-ogc-records",
+      "description": "Search NZ public OGC API Records and CKAN catalogues for datasets, distribution URLs, licences and update metadata. Use to discover Auckland Council, Auckland Transport, Waka Kotahi, Earth Sciences New Zealand (NIWA) and data.govt.nz datasets before querying their linked services.",
+      "path": "skills/nz-ogc-records",
+      "category": "public-data",
+      "source_owner": "Auckland Council; Auckland Transport; NZ Transport Agency Waka Kotahi; Earth Sciences New Zealand (NIWA); data.govt.nz",
+      "source_type": "official",
+      "source_url": "https://data-aucklandcouncil.opendata.arcgis.com/api/search/v1/collections/dataset/items",
+      "auth": "none",
+      "access_mode": "public-api",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "none",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "data-aucklandcouncil.opendata.arcgis.com",
+        "data-atgis.opendata.arcgis.com",
+        "opendata-nzta.opendata.arcgis.com",
+        "data-niwa.opendata.arcgis.com",
+        "catalogue.data.govt.nz"
+      ],
+      "last_verified": "2026-10-08",
       "health": "degraded",
       "maintainer": "@adam91holt"
     },

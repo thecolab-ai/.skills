@@ -1,0 +1,20 @@
+{
+  "_fixture_note": "Entirely synthetic CKAN detail fixture matching the blank-coverage search record; organisation and licence are absent. IDs and metadata are examples, not observed data.",
+  "success": true,
+  "result": {
+    "id": "synthetic-no-coverage-id",
+    "name": "synthetic-no-coverage",
+    "title": "Synthetic dataset without coverage or stated licence",
+    "notes": "<p>Synthetic optional metadata example.</p>",
+    "metadata_modified": "2026-10-03T01:09:41",
+    "spatial": "",
+    "resources": [
+      {
+        "url": "https://example.invalid/synthetic-no-coverage.csv",
+        "format": "CSV",
+        "name": "Synthetic dated CSV",
+        "last_modified": "2026-10-02T03:04:05.123456"
+      }
+    ]
+  }
+}

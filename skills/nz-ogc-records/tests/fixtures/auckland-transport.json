@@ -1,0 +1,286 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "id": "eeb0839fbd594c9e87189df5c84c2543",
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              174.24103550379724,
+              -36.140993690958794
+            ],
+            [
+              175.5263331618021,
+              -36.140993690958794
+            ],
+            [
+              175.5263331618021,
+              -37.28756486738531
+            ],
+            [
+              174.24103550379724,
+              -37.28756486738531
+            ],
+            [
+              174.24103550379724,
+              -36.140993690958794
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "snippet": "Synthetic metadata snippet.",
+        "extent": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [
+                174.24103550379724,
+                -36.140993690958794
+              ],
+              [
+                175.5263331618021,
+                -36.140993690958794
+              ],
+              [
+                175.5263331618021,
+                -37.28756486738531
+              ],
+              [
+                174.24103550379724,
+                -37.28756486738531
+              ],
+              [
+                174.24103550379724,
+                -36.140993690958794
+              ]
+            ]
+          ]
+        },
+        "access": "public",
+        "description": "<p>Synthetic <b>metadata</b> description &amp; parser example.</p>",
+        "licenseInfo": "<p>Synthetic licence parser example; consult the source terms.</p>",
+        "title": "Future Connect Integrated Network",
+        "type": "Feature Service",
+        "modified": 1783910891000,
+        "id": "eeb0839fbd594c9e87189df5c84c2543",
+        "accessInformation": "Auckland Transport Integrated Network Planning",
+        "url": "https://services2.arcgis.com/JkPEgZJGxhSjYOo0/arcgis/rest/services/FutureConnect_IntegratedNetwork/FeatureServer",
+        "name": "FutureConnect_IntegratedNetwork",
+        "properties": {
+          "view": {
+            "mapSettings": {
+              "featureLayerStyle": "item"
+            }
+          },
+          "downloads": {
+            "formats": [
+              {
+                "hidden": true,
+                "key": "csv"
+              },
+              {
+                "hidden": true,
+                "key": "shapefile"
+              },
+              {
+                "hidden": false,
+                "key": "geojson"
+              },
+              {
+                "hidden": false,
+                "key": "kml"
+              },
+              {
+                "hidden": false,
+                "key": "filegdb"
+              },
+              {
+                "hidden": false,
+                "key": "featureCollection"
+              },
+              {
+                "hidden": true,
+                "key": "excel"
+              },
+              {
+                "hidden": false,
+                "key": "geoPackage"
+              },
+              {
+                "hidden": false,
+                "key": "sqlite"
+              },
+              {
+                "hidden": false,
+                "key": "additionalResource::0"
+              }
+            ],
+            "flowType": "createReplica"
+          },
+          "location": {
+            "extent": [
+              [
+                173.87783013332205,
+                -37.42159332933253
+              ],
+              [
+                175.91595088357937,
+                -35.774641762047565
+              ]
+            ],
+            "geometries": [
+              {
+                "ymin": -37.42159332933253,
+                "xmin": 173.87783013332205,
+                "ymax": -35.774641762047565,
+                "xmax": 175.91595088357937,
+                "spatialReference": {
+                  "wkid": 4326
+                },
+                "type": "extent"
+              }
+            ],
+            "type": "custom",
+            "spatialReference": {
+              "wkid": 4326
+            }
+          }
+        },
+        "source": "Auckland Transport",
+        "license": "CC-BY-4.0"
+      },
+      "time": null,
+      "links": [
+        {
+          "rel": "self",
+          "type": "application/geo+json",
+          "title": "This document as GeoJSON",
+          "href": "https://data-atgis.opendata.arcgis.com/api/search/v1/collections/dataset/items/eeb0839fbd594c9e87189df5c84c2543"
+        },
+        {
+          "rel": "collection",
+          "type": "application/json",
+          "title": "Dataset",
+          "href": "https://data-atgis.opendata.arcgis.com/api/search/v1/collections/dataset"
+        }
+      ]
+    },
+    {
+      "id": "75bbb3afce054ee9a2826fd89c18e4bf",
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              174.4828433018163,
+              -36.32037057214393
+            ],
+            [
+              175.08343734099896,
+              -36.32037057214393
+            ],
+            [
+              175.08343734099896,
+              -37.24808972190971
+            ],
+            [
+              174.4828433018163,
+              -37.24808972190971
+            ],
+            [
+              174.4828433018163,
+              -36.32037057214393
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "snippet": "Synthetic metadata snippet.",
+        "extent": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [
+                174.4828433018163,
+                -36.32037057214393
+              ],
+              [
+                175.08343734099896,
+                -36.32037057214393
+              ],
+              [
+                175.08343734099896,
+                -37.24808972190971
+              ],
+              [
+                174.4828433018163,
+                -37.24808972190971
+              ],
+              [
+                174.4828433018163,
+                -36.32037057214393
+              ]
+            ]
+          ]
+        },
+        "access": "public",
+        "description": "<p>Synthetic <b>metadata</b> description &amp; parser example.</p>",
+        "licenseInfo": "<p>Synthetic licence parser example; consult the source terms.</p>",
+        "title": "Cycle Facility Network",
+        "type": "Feature Service",
+        "modified": 1783486166000,
+        "id": "75bbb3afce054ee9a2826fd89c18e4bf",
+        "accessInformation": "Auckland Transport",
+        "url": "https://services2.arcgis.com/JkPEgZJGxhSjYOo0/arcgis/rest/services/CyclingService/FeatureServer",
+        "name": "CyclingService",
+        "properties": null,
+        "source": "Auckland Transport",
+        "license": "CC-BY-4.0"
+      },
+      "time": null,
+      "links": [
+        {
+          "rel": "self",
+          "type": "application/geo+json",
+          "title": "This document as GeoJSON",
+          "href": "https://data-atgis.opendata.arcgis.com/api/search/v1/collections/dataset/items/75bbb3afce054ee9a2826fd89c18e4bf"
+        },
+        {
+          "rel": "collection",
+          "type": "application/json",
+          "title": "Dataset",
+          "href": "https://data-atgis.opendata.arcgis.com/api/search/v1/collections/dataset"
+        }
+      ]
+    }
+  ],
+  "timestamp": "2026-10-08T01:06:13.434Z",
+  "numberMatched": 14,
+  "numberReturned": 2,
+  "links": [
+    {
+      "rel": "self",
+      "type": "application/geo+json",
+      "title": "This document as GeoJSON",
+      "href": "https://data-atgis.opendata.arcgis.com/api/search/v1/collections/dataset/items"
+    },
+    {
+      "rel": "next",
+      "type": "application/geo+json",
+      "title": "items (next)",
+      "href": "https://data-atgis.opendata.arcgis.com/api/search/v1/collections/dataset/items?limit=2&startindex=3"
+    },
+    {
+      "rel": "collection",
+      "type": "application/json",
+      "title": "Dataset",
+      "href": "https://data-atgis.opendata.arcgis.com/api/search/v1/collections/dataset"
+    }
+  ],
+  "_fixture_note": "Captured 2026-10-08; descriptions, snippets and licence prose are synthetic parser examples; factual IDs and source licence identifiers retained."
+}
