@@ -1,0 +1,13 @@
+{
+  "name": "Example fence inventory",
+  "type": "Feature Layer",
+  "geometryType": "esriGeometryPolyline",
+  "objectIdField": "FenceID",
+  "capabilities": "Query,Extract",
+  "maxRecordCount": 2,
+  "fields": [
+    {"name": "FenceID", "type": "esriFieldTypeOID", "alias": "Fence ID"},
+    {"name": "Height", "type": "esriFieldTypeDouble", "alias": "Height"}
+  ],
+  "advancedQueryCapabilities": {"supportsPagination": true}
+}

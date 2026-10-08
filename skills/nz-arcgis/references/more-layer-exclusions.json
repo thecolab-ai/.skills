@@ -1,0 +1,26 @@
+[
+  {
+    "catalogue_id": "S2925",
+    "reason": "HTML notice, not an ArcGIS data endpoint"
+  },
+  {
+    "catalogue_id": "S2926",
+    "reason": "HTML notice, not an ArcGIS data endpoint"
+  },
+  {
+    "catalogue_id": "S2929",
+    "reason": "HTML notice, not an ArcGIS data endpoint"
+  },
+  {
+    "catalogue_id": "S2930",
+    "reason": "HTML notice, not an ArcGIS data endpoint"
+  },
+  {
+    "catalogue_id": "C0070",
+    "reason": "tiled image host robots.txt disallows automated paths; metadata/identify verification deferred"
+  },
+  {
+    "catalogue_id": "C0071",
+    "reason": "tiled image host robots.txt disallows automated paths; metadata/identify verification deferred"
+  }
+]

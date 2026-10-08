@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Captured response checks and four bounded outage-aware live ArcGIS probes."""
+"""Response fixtures and bounded outage-aware public ArcGIS probes."""
 import json
 from pathlib import Path
 import subprocess
@@ -64,6 +64,8 @@ def main():
             except Exception as exc:
                 print(f'[FAIL] live {name} {mode}: {exc}')
                 failures+=1
+    from more_smoke_checks import run as run_more
+    failures += run_more()
     return 1 if failures else 0
 
 

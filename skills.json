@@ -2114,7 +2114,7 @@
     },
     {
       "name": "nz-arcgis",
-      "description": "Discover and query allowlisted New Zealand public-sector and utility ArcGIS services and layers, including Auckland flood, stormwater, roadworks and transport data. Use for layer metadata, counts and bounded WGS84 spatial extracts as JSON, GeoJSON or CSV.",
+      "description": "Discover and query allowlisted New Zealand public-sector and utility ArcGIS services and layers, including Auckland, Christchurch, Dunedin and Hamilton assets, hazards and transport data. Use for service/layer metadata, counts and bounded WGS84 spatial extracts as JSON, GeoJSON or CSV, including PC120 map metadata.",
       "path": "skills/nz-arcgis",
       "category": "environment",
       "source_owner": "New Zealand public-sector and utility ArcGIS publishers",
@@ -2131,6 +2131,7 @@
       "skill_type": "public-api",
       "pack": "nz-public-data",
       "allowed_domains": [
+        "apps.dunedin.govt.nz",
         "arcgis.mfe.govt.nz",
         "gis.ccc.govt.nz",
         "gis.gns.cri.nz",
@@ -2151,6 +2152,7 @@
         "services6.arcgis.com",
         "services9.arcgis.com",
         "tiledimageservices1.arcgis.com",
+        "tiles.arcgis.com",
         "wslgis.water.co.nz"
       ],
       "last_verified": "2026-10-08",

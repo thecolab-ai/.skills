@@ -22,6 +22,8 @@ REGISTRY = json.loads((ROOT / 'references/orgs.json').read_text())
 CURATED = json.loads((ROOT / 'references/layers-auckland.json').read_text()) if (ROOT / 'references/layers-auckland.json').exists() else []
 CATALOGUE = CURATED if isinstance(CURATED, dict) else {'layers': CURATED}
 CURATED = CATALOGUE['layers']
+NZ_CATALOGUE = json.loads((ROOT / 'references/layers-nz.json').read_text()) if (ROOT / 'references/layers-nz.json').exists() else {'layers': []}
+NZ_CURATED = NZ_CATALOGUE['layers']
 VERIFICATION = json.loads((ROOT / 'references/verification.json').read_text())
 PUBLISHERS = 'New Zealand public-sector and utility ArcGIS publishers'
 REPO_URL = 'https://github.com/thecolab-ai/.skills/blob/main/skills/nz-arcgis/references/'
@@ -49,7 +51,7 @@ def timestamp(value=None):
 
 def provenance(url, org, metadata=None):
     info = REGISTRY[org]
-    record = next((r for r in CURATED if r['source_url'] == url), {})
+    record = next((r for r in CURATED + NZ_CURATED if r['source_url'] == url), {})
     licence = record.get('licence') if record else info.get('licence')
     if licence and UNKNOWN_LICENCE.search(licence):
         licence = None
@@ -90,6 +92,8 @@ def validate_url(url, kind='layer'):
             if p.hostname != bp.hostname or [s.lower() for s in parts[:len(prefix)]] != [s.lower() for s in prefix]:
                 continue
             tail = parts[len(prefix):]
+            if info.get('service_allowlist') and tail and tail[0] not in info['service_allowlist']:
+                continue
             valid = False
             if kind == 'directory':
                 valid = len(tail) <= 2 and not any(s in SERVER_TYPES for s in tail)
@@ -214,8 +218,60 @@ def fields(value):
     return value
 
 
-def filter_params(args):
-    result = {'where': args.where}
+def query_fields(org, value):
+    allowed = REGISTRY[org].get('field_allowlist')
+    if not allowed:
+        return value if value is not None else '*'
+    if value is None:
+        return ','.join(allowed)
+    selected = [s.strip().lower() for s in value.split(',')]
+    if any(s not in allowed for s in selected):
+        raise ClientError(f"{org} privacy restriction: --fields must use only {','.join(allowed)}; * and other fields are refused")
+    return ','.join(selected)
+
+
+# Conservative tokenizer for --where on field-restricted organisations. Anything
+# not matched here (quoted identifiers, dots, arithmetic, comments, semicolons,
+# backslashes, control characters) makes the whole expression unparseable.
+WHERE_TOKEN = re.compile(r"""\s*(?:
+    (?P<string>'(?:[^'\\\x00-\x1f\x7f]|'')*')
+  | (?P<number>-?\d+(?:\.\d+)?(?![A-Za-z_\d.]))
+  | (?P<ident>[A-Za-z_][A-Za-z0-9_]*(?![A-Za-z0-9_.]))
+  | (?P<op><>|!=|<=|>=|=|<|>|\(|\)|,)
+)""", re.X | re.A)
+WHERE_KEYWORDS = {'and', 'or', 'not', 'in', 'is', 'null', 'like', 'between', 'date', 'timestamp'}
+
+
+def query_where(org, value):
+    """Refuse filters on fields outside a restricted organisation's allowlist.
+
+    Filters, like outputs, can disclose private values (e.g. email LIKE 'a%'
+    with count), so only allowlisted fields, literals, comparison operators
+    and a small keyword set are accepted. Function calls and subqueries are
+    refused because their names are not allowlisted identifiers.
+    """
+    allowed = REGISTRY[org].get('field_allowlist')
+    if not allowed:
+        return value
+    refusal = (f"{org} privacy restriction: --where may reference only {','.join(allowed)} "
+               "with literals, comparison operators, parentheses and AND/OR/NOT/IN/IS/NULL/LIKE/BETWEEN/DATE/TIMESTAMP")
+    position, tokens = 0, 0
+    text = value.rstrip()
+    while position < len(text):
+        match = WHERE_TOKEN.match(text, position)
+        if not match or match.end() == position:
+            raise ClientError(refusal)
+        ident = match.group('ident')
+        if ident is not None and ident.lower() not in allowed and ident.lower() not in WHERE_KEYWORDS:
+            raise ClientError(refusal)
+        position, tokens = match.end(), tokens + 1
+    if not tokens:
+        raise ClientError(refusal)
+    return value
+
+
+def filter_params(args, org):
+    result = {'where': query_where(org, args.where)}
     if args.bbox:
         result.update(geometry=args.bbox, geometryType='esriGeometryEnvelope', inSR=4326, spatialRel='esriSpatialRelIntersects')
     return result
@@ -280,6 +336,8 @@ def discover(org, budget, root_index=None):
                 if not isinstance(name, str) or not name:
                     raise ClientError('source schema failure: invalid service name', 6)
                 path = name if depth == 0 or '/' in name else urllib.parse.unquote(url[len(root)+1:]) + '/' + name
+                if REGISTRY[org].get('service_allowlist') and path not in REGISTRY[org]['service_allowlist']:
+                    continue
                 service_url = root + '/' + '/'.join(urllib.parse.quote(s, safe='-_.()') for s in path.split('/')) + '/' + row['type']
                 owner, service_url = validate_url(service_url, 'service')
                 if owner != org:
@@ -310,14 +368,20 @@ def discover(org, budget, root_index=None):
 
 
 def query_layer(args, url, metadata):
-    params = {**filter_params(args), 'outFields': args.fields, 'returnGeometry': 'false' if args.format == 'csv' else 'true', 'outSR': 4326}
+    org, url = validate_url(url)
+    args.fields = query_fields(org, args.fields)
+    allowed = REGISTRY[org].get('field_allowlist')
+    params = {**filter_params(args, org), 'outFields': args.fields, 'returnGeometry': 'false' if args.format == 'csv' else 'true', 'outSR': 4326}
     oid = metadata.get('objectIdField') or metadata.get('objectIdFieldName')
     if not oid:
         oid = next((f['name'] for f in metadata.get('fields', []) if f.get('type') == 'esriFieldTypeOID'), None)
     if oid and not FIELD.fullmatch(oid):
         raise ClientError('source schema failure: invalid object ID field', 6)
+    if allowed and oid and oid.lower() not in allowed:
+        raise ClientError('source schema failure: object ID field is outside the organisation field allowlist', 6, 'malformed_response')
     if oid and args.fields != '*' and oid.lower() not in {s.strip().lower() for s in args.fields.split(',')}:
         params['outFields'] += ',' + oid
+    output_fields = {s.strip().lower() for s in params['outFields'].split(',')} if allowed else None
     page_size = metadata.get('maxRecordCount') or 1000
     if isinstance(page_size, bool) or not isinstance(page_size, int) or page_size < 1:
         raise ClientError('source schema failure: invalid record limit', 6)
@@ -337,6 +401,10 @@ def query_layer(args, url, metadata):
             attributes = feature.get('properties' if fmt == 'geojson' else 'attributes')
             if not isinstance(attributes, dict):
                 raise ClientError('source schema failure: feature has no attributes/properties', 6)
+            if output_fields is not None:
+                # Do not expose extra attributes even if upstream ignores outFields.
+                attributes = {k: v for k, v in attributes.items() if k.lower() in output_fields}
+                feature['properties' if fmt == 'geojson' else 'attributes'] = attributes
             identity = attributes.get(oid, feature.get('id')) if oid else None
             if oid and (type(identity) is not int or identity in seen or (requested is not None and identity not in requested)):
                 raise ClientError('source paging repeated, omitted or returned an unexpected object ID', 6, 'paging_failure')
@@ -349,7 +417,7 @@ def query_layer(args, url, metadata):
     try:
         if oid:
             # No outSR on the ID selection: reprojection must not remove IDs.
-            data = fetch(url, {**filter_params(args), 'returnIdsOnly': 'true', 'returnGeometry': 'false'}, query=True)
+            data = fetch(url, {**filter_params(args, org), 'returnIdsOnly': 'true', 'returnGeometry': 'false'}, query=True)
             ids = data.get('objectIds')
             if ids is None and data.get('objectIdFieldName'):
                 ids = []
@@ -390,7 +458,7 @@ def query_layer(args, url, metadata):
                 more = bool(page.get('exceededTransferLimit') or (page.get('properties') or {}).get('exceededTransferLimit')) or len(batch) == wanted
                 if not more or not supports or not batch:
                     break
-            total = record_count(url, filter_params(args))
+            total = record_count(url, filter_params(args, org))
             if len(features) < min(total, args.limit):
                 incomplete = True
                 reasons.append('returned fewer features than the count selection')
@@ -435,7 +503,8 @@ def parser():
             q.add_argument('--root', type=int, choices=range(20), help='select a registry root by its zero-based index')
         if command == 'layers':
             q.add_argument('service', nargs='?', help='service name including FeatureServer/MapServer/ImageServer, or allowlisted service URL')
-            q.add_argument('--curated', choices=['akl'])
+            q.add_argument('--curated', choices=['akl', 'nz'])
+            q.add_argument('--publisher', choices=sorted(REGISTRY), help='filter a curated selection by organisation code')
             q.add_argument('--problem', choices=list(TAGS), help='; '.join(k + ': ' + v for k, v in TAGS.items()))
         if command in {'describe', 'query', 'count'}:
             q.add_argument('layer_url')
@@ -444,7 +513,7 @@ def parser():
             q.add_argument('--where', default='1=1', help='ArcGIS read-only SQL attribute filter')
             q.add_argument('--bbox', type=bbox, help='minLon,minLat,maxLon,maxLat (WGS84)')
         if command == 'query':
-            q.add_argument('--fields', type=fields, default='*')
+            q.add_argument('--fields', type=fields, help='comma-separated fields (default *; restricted organisations use their field allowlist)')
             q.add_argument('--limit', type=bounded(10000), default=100)
             q.add_argument('--format', choices=['json', 'geojson', 'csv'], default='json')
         if command == 'search':
@@ -465,9 +534,12 @@ def execute(args):
     if command == 'layers' and args.curated:
         if args.org or args.service:
             raise ClientError('use layers --curated akl without organisation or service arguments')
-        rows = [dict(r) for r in CURATED if not args.problem or args.problem in r['problem_tags']]
-        meta = cached_meta('layers-auckland.json', CATALOGUE.get('verified_at') or max(r['verified_at'] for r in CURATED))
-        return dict(result_envelope(rows, meta), curated='akl', problem=args.problem, tags=TAGS)
+        selected = CURATED if args.curated == 'akl' else CURATED + NZ_CURATED
+        rows = [dict(r) for r in selected if (not args.problem or args.problem in r['problem_tags']) and (not args.publisher or args.publisher == r['org'])]
+        meta = cached_meta('layers-auckland.json', max(r['verified_at'] for r in selected))
+        if args.curated == 'nz':
+            meta['source_urls'] = [REPO_URL + filename for filename in ('layers-auckland.json', 'layers-nz.json')]
+        return dict(result_envelope(rows, meta), curated=args.curated, problem=args.problem, tags=TAGS)
     if command in {'services', 'search'}:
         result = discover(args.org, args.max_requests, args.root)
         rows = result.pop('services')
@@ -495,8 +567,8 @@ def execute(args):
         root = REGISTRY[args.org]['roots'][args.root or 0]
         return dict(result_envelope(rows, provenance(root, args.org)), **result)
     if command == 'layers':
-        if args.problem:
-            raise ClientError('--problem requires --curated akl')
+        if args.problem or args.publisher:
+            raise ClientError('--problem and --publisher require --curated akl or nz')
         if not args.org or not args.service:
             raise ClientError('layers requires an organisation and service, or --curated akl')
         url = args.service if args.service.startswith('https://') else REGISTRY[args.org]['roots'][0] + '/' + '/'.join(urllib.parse.quote(s, safe='-_.()') for s in args.service.split('/'))
@@ -504,7 +576,26 @@ def execute(args):
         if org != args.org:
             raise ClientError('service does not belong to the selected organisation', 7, 'blocked_organisation')
         return result_envelope(service_layers(url), provenance(url, org))
+    if command == 'describe' and args.layer_url.rstrip('/').rsplit('/', 1)[-1] in SERVER_TYPES:
+        org, url = validate_url(args.layer_url, 'service')
+        if urllib.parse.urlsplit(url).hostname == 'tiledimageservices1.arcgis.com':
+            raise ClientError('service describe refused: tiledimageservices1.arcgis.com robots.txt disallows all automated paths', 7, 'robots_disallowed')
+        metadata = fetch(url, kind='service')
+        if not any(k in metadata for k in ('layers', 'bandCount')):
+            raise ClientError('source schema failure: service has no layers or image bands', 6)
+        row = dict(name=metadata.get('name') or url.split('/')[-2], kind='service', server_type=url.rsplit('/', 1)[-1], capabilities=metadata.get('capabilities'), extent=metadata.get('fullExtent') or metadata.get('extent'), spatial_reference=metadata.get('spatialReference'), service_item_id=metadata.get('serviceItemId'), tile_only='TilesOnly' in (metadata.get('capabilities') or '').split(','))
+        for key in ('layers', 'tables', 'bandCount', 'pixelType', 'pixelSizeX', 'pixelSizeY', 'minValues', 'maxValues'):
+            if key in metadata:
+                if key in {'layers', 'tables'}:
+                    list_value(metadata, key)
+                row[key] = metadata[key]
+        return result_envelope([row], provenance(url, org, metadata))
     org, url = validate_url(args.layer_url)
+    if command == 'query':
+        args.fields = query_fields(org, args.fields)
+    if command in {'query', 'count'}:
+        # Refuse private-field filters before any request, including metadata.
+        query_where(org, args.where)
     metadata = fetch(url)
     if metadata.get('type') not in {'Feature Layer', 'Table'}:
         raise ClientError(f"not a queryable feature layer (type {metadata.get('type')})", 7)
@@ -513,13 +604,19 @@ def execute(args):
     source = provenance(url, org, metadata)
     if command == 'describe':
         oid = metadata.get('objectIdField') or metadata.get('objectIdFieldName')
-        row = dict(name=metadata.get('name'), fields=list_value(metadata, 'fields'), geometry_type=metadata.get('geometryType'), object_id_field=oid, record_count=record_count(url), editingInfo=metadata.get('editingInfo'), max_record_count=metadata.get('maxRecordCount'), supports_pagination=metadata.get('advancedQueryCapabilities', {}).get('supportsPagination', False))
+        described_fields = list_value(metadata, 'fields')
+        allowed = REGISTRY[org].get('field_allowlist')
+        if allowed:
+            described_fields = [f for f in described_fields if f.get('name', '').lower() in allowed]
+            if oid and oid.lower() not in allowed:
+                raise ClientError('source schema failure: object ID field is outside the organisation field allowlist', 6, 'malformed_response')
+        row = dict(name=metadata.get('name'), fields=described_fields, geometry_type=metadata.get('geometryType'), object_id_field=oid, record_count=record_count(url), editingInfo=metadata.get('editingInfo'), max_record_count=metadata.get('maxRecordCount'), supports_pagination=metadata.get('advancedQueryCapabilities', {}).get('supportsPagination', False))
         result = result_envelope([row], source)
         if not oid:
             result.update(ordering='unordered', warnings=['No object ID field; ordering and duplicate detection are unavailable.'])
         return result
     if command == 'count':
-        return result_envelope([dict(count=record_count(url, filter_params(args)))], source)
+        return result_envelope([dict(count=record_count(url, filter_params(args, org)))], source)
     data = query_layer(args, url, metadata)
     features = data.pop('features')
     envelope = geojson_envelope(features, source) if args.format == 'geojson' else result_envelope(features, source)
@@ -570,6 +667,13 @@ def human_output(command, result):
             print('Coverage is incomplete; inspect --json for failed or unvisited entries.')
     elif command == 'describe':
         row = rows[0]
+        if row.get('kind') == 'service':
+            print(f"{row['name']}: {row['server_type']}; capabilities={row['capabilities']}")
+            print_terms(meta)
+            for layer in row.get('layers', []):
+                print(f"  {layer['id']}: {layer['name']}")
+            print(f"Source: {meta['publisher']} — {meta['source_url']}")
+            return
         print(f"{row['name']}: {row['geometry_type'] or 'table'}; {row['record_count']} records")
         print_terms(meta)
         for field in row['fields']:
@@ -587,7 +691,8 @@ def human_output(command, result):
 def error_meta(args):
     if args and getattr(args, 'layer_url', None):
         try:
-            org, url = validate_url(args.layer_url)
+            kind = 'service' if args.command == 'describe' and args.layer_url.rstrip('/').rsplit('/', 1)[-1] in SERVER_TYPES else 'layer'
+            org, url = validate_url(args.layer_url, kind)
             return provenance(url, org)
         except ClientError:
             pass

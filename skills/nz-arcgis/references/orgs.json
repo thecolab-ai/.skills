@@ -9,7 +9,8 @@
       "https://mapspublic.aucklandcouncil.govt.nz/arcgis3/rest/services",
       "https://mapspublic.aklc.govt.nz/arcgis/rest/services",
       "https://services-ap1.arcgis.com/9R0qvCUXav3QPG1F/arcgis/rest/services",
-      "https://services-ap1.arcgis.com/amvJtxbPQBZ5mG81/arcgis/rest/services"
+      "https://services-ap1.arcgis.com/amvJtxbPQBZ5mG81/arcgis/rest/services",
+      "https://tiles.arcgis.com/tiles/n4yPwebTjJCmXB6W/arcgis/rest/services"
     ]
   },
   "at": {
@@ -136,6 +137,40 @@
     "licence": null,
     "roots": [
       "https://services-ap1.arcgis.com/0380iqO8xVVhk66v/arcgis/rest/services"
+    ]
+  },
+  "dcc": {
+    "publisher": "Dunedin City Council",
+    "licence": null,
+    "roots": [
+      "https://apps.dunedin.govt.nz/arcgis/rest/services"
+    ]
+  },
+  "hcc": {
+    "publisher": "Hamilton City Council",
+    "licence": null,
+    "roots": [
+      "https://services1.arcgis.com/R6s0QqCMQdwKY6yp/arcgis/rest/services"
+    ]
+  },
+  "flooded": {
+    "publisher": "Auckland Council (Flooded NZ)",
+    "licence": null,
+    "roots": [
+      "https://services-ap1.arcgis.com/eqbFSejuTufXDr0E/arcgis/rest/services"
+    ],
+    "service_allowlist": [
+      "flooded_nz_gdb_v2_202603181308"
+    ],
+    "field_allowlist": [
+      "objectid",
+      "obs_date",
+      "impact",
+      "impact_items",
+      "obs_depth",
+      "obs_depth_v2",
+      "historic",
+      "status"
     ]
   }
 }

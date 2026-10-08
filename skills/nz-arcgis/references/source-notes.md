@@ -27,7 +27,7 @@ Outbound hosts and exact roots:
 - health: https://services2.arcgis.com/9V7Qc4NIcvZBm0io/arcgis/rest/services
 - mbie: https://services-ap1.arcgis.com/0380iqO8xVVhk66v/arcgis/rest/services
 
-The runtime registry, `orgs.json`, permits exact HTTPS host/path pairs. ArcGIS Online roots include the tenant ID; Enterprise roots include the specific REST services path. It deliberately does not trust all tenants on an ArcGIS host. Public service discovery includes MapServer, FeatureServer and ImageServer, while feature commands require a numeric MapServer/FeatureServer layer.
+The runtime registry, `orgs.json`, permits exact HTTPS host/path pairs. ArcGIS Online roots include the tenant ID; Enterprise roots include the specific REST services path. It deliberately does not trust all tenants on an ArcGIS host. Public service discovery includes MapServer, FeatureServer and ImageServer, while feature count/query commands require a numeric MapServer/FeatureServer layer. `describe` additionally accepts service URLs for metadata.
 
 ## Verification, 8 October 2026
 
@@ -64,3 +64,14 @@ The existing `wcc-arcgis-nz` skill remains unchanged, including its wider legacy
 Contains data from Auckland Transport and Auckland Council (Healthy Waters), CC BY 4.0, captured 8 Oct 2026, trimmed. Synthetic failure/paging examples are identified in the test code.
 
 Files in `tests/fixtures/` were captured from public metadata, service directories, count queries and five-feature WGS84 bbox queries on `PJ_Roadworks_MS/FeatureServer/0` and `Stormwater_Pipe/FeatureServer/0`. Count snapshots are 2,449 and 315,956; live tests assert positive counts rather than permanent equality. Feature samples are trimmed to public asset/worksite attributes and retain the real geometry and object IDs. `PrincipalOrganisation` is omitted from both roadworks feature fixtures to avoid retaining personal applicant names. `scripts/fixture_checks.py` tests these fixtures, paging, rejection before network access, provenance, CSV and curated filtering; it is called by both contract and smoke runners.
+
+## Additional councils and service metadata, 8 October 2026
+
+- Dunedin City Council: `https://apps.dunedin.govt.nz/arcgis/rest/services` returned a directory with three folders; its Public folder listed 120 services. Non-public folders may require authentication; discovery reports those failures.
+- Hamilton City Council: `https://services1.arcgis.com/R6s0QqCMQdwKY6yp/arcgis/rest/services` listed 353 services.
+- Auckland Council cached maps: `https://tiles.arcgis.com/tiles/n4yPwebTjJCmXB6W/arcgis/rest/services` listed 80 services. Three revised PC120 services have TilesOnly capabilities: metadata is supported, feature extracts are unavailable.
+- Flooded NZ contractor tenant: `https://services-ap1.arcgis.com/eqbFSejuTufXDr0E/arcgis/rest/services` listed nine services. Only `flooded_nz_gdb_v2_202603181308` is approved; other services in that tenant are excluded before connecting. Publisher attribution is Auckland Council (Flooded NZ), not the contractor or skill author.
+
+[Additional source selection](layers-nz.md) documents 28 records from 21 catalogue rows. `layers --curated nz` combines them with the 167 original Auckland records; `layers --curated akl` retains its existing selection. Additional records and their metadata/count verification timestamps are in `layers-nz.json`; failures and deferred HTML/imagery sources are in `more-layer-exclusions.json`. Watercare water/wastewater pipes (S0277/S0278) and Council validated landslides (S0402) were already in the original selection and remain available.
+
+Robots checks: Christchurch and Watercare returned 404 for robots.txt, tiles.arcgis.com returned 404, the ArcGIS Online services hosts returned 403, and Dunedin's apps host returned a generic unavailable-page HTML rather than robot rules. Only documented REST API requests were used on these sources; there was no HTML data scraping. The tiled image host returned a universal Disallow rule, so DEM/DSM probes and identify support are deferred. Flooded's public landing page embeds Survey123; its Council launch announcement describes submissions as private. No contact details or user submissions are stored in this skill's fixtures or reference files; all new parser fixture values are synthetic.
