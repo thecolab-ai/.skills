@@ -56,7 +56,7 @@ Confirm supported organisations once that engine is installed. In particular,
 `wcc-arcgis-nz` stays restricted to its Wellington infrastructure.
 
 The planned engines are `nz-arcgis`, `nz-stac`, `nz-ogc-records`, `gtfs-nz`,
-`nz-recycling-locator`, `nz-traffic-counts` and `akl-rainfall`. They are explicitly
+`nz-recycling-locator` and `akl-rainfall`. They are explicitly
 marked `planned` even if another installation has since added them. Update
 these statuses and rules after reviewing those skills. Unmatched sources use
 an empty `fetch_skills` list, never an invented fetch command.

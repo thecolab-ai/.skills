@@ -83,7 +83,7 @@
     },
     {
       "skill": "nz-traffic-counts",
-      "status": "planned",
+      "status": "existing",
       "relationship": "exact",
       "auth": "none",
       "match": {
@@ -97,7 +97,7 @@
     },
     {
       "skill": "nz-traffic-counts",
-      "status": "planned",
+      "status": "existing",
       "relationship": "exact",
       "auth": "none",
       "match": {
@@ -112,7 +112,7 @@
     },
     {
       "skill": "nz-traffic-counts",
-      "status": "planned",
+      "status": "existing",
       "relationship": "exact",
       "auth": "none",
       "match": {
@@ -123,13 +123,14 @@
         ],
         "name_contains": [
           "traffic count",
-          "pedestrian count"
+          "pedestrian count",
+          "cycle count"
         ]
       }
     },
     {
       "skill": "nz-traffic-counts",
-      "status": "planned",
+      "status": "existing",
       "relationship": "related",
       "auth": "none",
       "match": {
@@ -140,7 +141,7 @@
           "39cdaa422dbd45c4b41e0e59b49e79e2"
         ]
       },
-      "note": "Historical bulk archive: confirm supported download bounds with the planned engine."
+      "note": "Historical bulk archive: nz-traffic-counts queries the daily table; the quarter-hourly bulk ZIP remains unsupported."
     },
     {
       "skill": "akl-rainfall",

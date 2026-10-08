@@ -106,8 +106,10 @@ class CatalogueTests(unittest.TestCase):
         route('S0351', 'charities-services-nz', 'existing', 'none')
         route('S1589', 'nz-road-closures', 'existing', 'none')
         route('S1186', 'statsnz-classifications-nz', 'existing', 'none')
-        for id, skill in [('C0001','nz-arcgis'),('C0064','nz-stac'),('C0028','gtfs-nz'),('S1213','nz-ogc-records'),('C0002','nz-traffic-counts'),('C0043','akl-rainfall'),('C0106','nz-recycling-locator')]:
+        for id, skill in [('C0001','nz-arcgis'),('C0064','nz-stac'),('C0028','gtfs-nz'),('S1213','nz-ogc-records'),('C0043','akl-rainfall'),('C0106','nz-recycling-locator')]:
             route(id, skill, 'planned', 'none')
+        for id in ('C0002', 'C0018', 'C0019', 'C0032', 'C0033', 'S0207', 'S0182'):
+            route(id, 'nz-traffic-counts', 'existing', 'none')
         overseas = dict(self.rows['C0001'], scope='Overseas')
         self.assertNotIn('nz-arcgis', [s['skill'] for s in cli.mapped_skills(overseas, self.skill_map)])
         other = dict(self.rows['C0064'], url='https://zenodo.org/records/123', direct_endpoint=None, name='Unrelated research')
