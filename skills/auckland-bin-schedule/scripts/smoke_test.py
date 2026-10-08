@@ -5,7 +5,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from test_contract import cli, test_bad_request, test_cli, test_matching, test_limits_and_errors, test_normalised_upstream_query
+from test_contract import cli, test_bad_request, test_cli, test_matching, test_limits_and_errors, test_normalised_upstream_query, test_scores_and_pick
 
 S = Path(__file__).resolve().parents[1]
 test_matching()
@@ -13,6 +13,7 @@ test_cli()
 test_bad_request()
 test_limits_and_errors()
 test_normalised_upstream_query()
+test_scores_and_pick()
 lines = ["Household collection", "Rubbish:", "Friday, 1 August", "Rubbish", "Collection day:",
          "Every week", ".", "Put bins out before 7am", "Where you can put your rubbish, food scraps and recycling for collection"]
 parsed = cli.parse_section(lines, "Household collection")
@@ -34,3 +35,21 @@ else:
     assert cli.parse_address(payload["matched_property"]["address"]) == cli.parse_address("12 Tawa Road Onehunga")
     assert all(envelope["meta"].get(key) for key in ("source_url", "publisher", "retrieved_at"))
     print(f"[PASS] live exact Onehunga schedule: {payload['address']} ({payload['property_id']})")
+
+for address in ("1 Dominion Road, Mount Eden", "1 Queen Street, Auckland Central"):
+    result = subprocess.run([sys.executable, str(S / "scripts/cli.py"), "lookup", address, "--json"],
+                            capture_output=True, text=True, timeout=25)
+    if result.returncode in {4, 5}:
+        print(f"[SKIP] network error Council lookup {address}: {(result.stdout or result.stderr).strip()}")
+    elif result.returncode:
+        print(f"[FAIL] live lookup {address}: {(result.stdout or result.stderr).strip()}")
+        raise SystemExit(1)
+    else:
+        envelope = json.loads(result.stdout)
+        payload = envelope["results"][0]
+        assert payload["query"] == address
+        matches = payload["matches"]
+        assert matches == cli.rank_properties(matches, address)
+        assert all(item["exact_match"] == (item["match_score"] == 100) for item in matches)
+        assert all(envelope["meta"].get(key) for key in ("source_url", "publisher", "retrieved_at"))
+        print(f"[PASS] live scored Council lookup {address}: {len(matches)} candidates ({payload['status']})")

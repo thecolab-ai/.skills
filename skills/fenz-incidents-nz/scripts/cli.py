@@ -74,6 +74,12 @@ def incident_url(day, region_id):
     return RECENT_URL + "?" + urlencode({"day": day, "region": region_id})
 
 
+def default_report_day(now=None):
+    """Yesterday in NZ, even when the caller's timezone has a different date."""
+    now = now or datetime.now(ZoneInfo("Pacific/Auckland"))
+    return DAYS[(now.astimezone(ZoneInfo("Pacific/Auckland")) - timedelta(days=1)).weekday()]
+
+
 def fetch_annual_rows(resource, stamp, *, region=None, incident_type=None):
     body, _, final_url = nzfetch.fetch_bytes(resource["download_url"], timeout=10, allowed_hosts=HOSTS)
     return aggregate_annual(body, final_url, stamp, resource["financial_year"], region=region, incident_type=incident_type, metadata_url=METADATA_URL)
@@ -104,7 +110,7 @@ def main(argv=None):
         if args.command in {"annual", "trend"}:
             source_url = ANNUAL_URL
         else:
-            day = args.day or DAYS[(datetime.now(ZoneInfo("Pacific/Auckland")) - timedelta(days=1)).weekday()]
+            day = args.day or default_report_day()
             selected = REPORT_REGIONS if args.report_region == "all" else {args.report_region: REPORT_REGIONS[args.report_region]}
             source_url = incident_url(day, next(iter(selected.values())))
         if not 1 <= args.limit <= 100:
@@ -169,8 +175,11 @@ def main(argv=None):
             freshness = "operational seven-day feed"
         meta = provenance(source_url, stamp)
         meta.update({"warnings": warnings, "freshness": freshness})
-        if data and any(row.get("latest_data") for row in data):
-            meta["latest_data"] = max(row["latest_data"] for row in data if row.get("latest_data"))
+        if args.command not in {"annual", "trend"}:
+            meta.update({"report_day": day, "report_regions": list(selected)})
+        dated_rows = data if args.command in {"annual", "trend"} else rows
+        if any(row.get("latest_data") for row in dated_rows):
+            meta["latest_data"] = max(row["latest_data"] for row in dated_rows if row.get("latest_data"))
         print(json.dumps({"meta": meta, "results": data} if args.json else data, indent=2, ensure_ascii=False))
         return 0
     except nzfetch.RateLimited as exc:

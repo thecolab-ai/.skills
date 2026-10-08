@@ -47,8 +47,8 @@ Query live Auckland Council household and commercial rubbish, recycling, and foo
 ## Preferred workflow
 
 1. Run `scripts/cli.py schedule` with the exact address when known
-2. Use `lookup` (or the legacy `--list`) to inspect candidates when the address is unresolved
-3. Use `--property-id` when an Auckland Council property/rating id is already known
+2. Use `lookup` (or the legacy `--list`) to inspect scored, numbered candidates when the address is unresolved
+3. Repeat the address query with `schedule --pick N` to explicitly select a candidate, or use `--property-id` for a known Council property/rating id
 4. Use `--json` for agent chaining, comparisons, alerts, or structured reports
 5. Summarise household collection first unless the user asks about commercial collection
 6. Mention that public holidays can shift collection dates and the CLI reflects the current Council page
@@ -68,6 +68,7 @@ python3 skills/auckland-bin-schedule/scripts/cli.py lookup <address...> --json
 - `--list` — list matching properties only
 - `--property-id <id>` — fetch a known Auckland Council property/rating id directly
 - `--limit <N>` — address lookup result limit (1–20, the Council cap); a full page requires refinement
+- `--pick <N>` — explicitly select the 1-based candidate number from the ranked list; schedule only
 - `--json` — emit JSON
 
 Examples:
@@ -77,6 +78,8 @@ python3 skills/auckland-bin-schedule/scripts/cli.py --list "12 Tawa Road Onehung
 python3 skills/auckland-bin-schedule/scripts/cli.py "12 Tawa Road Onehunga"
 python3 skills/auckland-bin-schedule/scripts/cli.py "12 Tawa Road Onehunga" --json
 python3 skills/auckland-bin-schedule/scripts/cli.py --property-id 12343300679 --json
+python3 skills/auckland-bin-schedule/scripts/cli.py lookup "1 Dominion Road, Mount Eden" --json
+python3 skills/auckland-bin-schedule/scripts/cli.py schedule "1 Dominion Road, Mount Eden" --pick 1 --json
 ```
 
 ## Resources
@@ -85,7 +88,7 @@ python3 skills/auckland-bin-schedule/scripts/cli.py --property-id 12343300679 --
 - Deterministic matching/CLI tests: `scripts/test_contract.py`
 - Live smoke test: `scripts/smoke_test.py`
 - Fixtures: `tests/fixtures/address-cases.json` (explicitly synthetic regressions) and
-  `tests/fixtures/blocked-live.html` (real HTTP 406 response)
+  `tests/fixtures/property-search.json` (synthetic API items); `tests/fixtures/blocked-live.html` (existing HTTP 406 response)
 - API and stability notes: `references/api-notes.md`
 
 ## Notes
@@ -94,13 +97,18 @@ python3 skills/auckland-bin-schedule/scripts/cli.py --property-id 12343300679 --
 - The CLI fetches the current public bearer token from Auckland Council's collection-day page at runtime
 - Treat dates as live current Council snapshots, not historical facts
 - Some properties show private service or property-manager messages instead of Council collection dates
-- Auto-selection requires an exact number and suffix, street name and type, and suburb when
-  supplied. Common street abbreviations, Mt/Mount and leading St/Saint names are normalised.
+- Auto-selection requires an exact number and suffix, street name and type, and an explicitly
+  supplied suburb. Common street abbreviations, Mt/Mount and leading St/Saint names are normalised.
   Parsed queries sent upstream omit commas, city and postcode. Units remain
   distinct; an unspecified unit requires confirmation even if one unit is returned.
 - Multiple exact candidates, incomplete addresses, no exact match, and a full result page return
   `matches` and `exact_matches` with `status` (`ambiguous`, `no_exact_match`, or `search_limit`).
-  The CLI fetches no schedule in these states. Refine the address or use a confirmed property id.
+  The CLI fetches no schedule in these states unless `--pick N` explicitly selects a candidate.
+  Refine the address, choose a numbered candidate or use a confirmed property id.
+- Candidates include `candidate_number`, `match_score` (0–100), `match_components` and
+  `exact_match`. Scores are component equality weights, not probabilities. See API notes.
+  Picks can select a non-exact candidate and return `status: picked`; inspect its full address.
+  Repeat the same query and limit when picking; live upstream changes can change the list.
 - The previous address-only and `--list` invocations remain supported.
 - JSON uses `meta` provenance and a `results` array. Candidate `status`, `matches` and
   `exact_matches` sit in `results[0]`; errors use empty `results` and `error: {code, type, message}`.

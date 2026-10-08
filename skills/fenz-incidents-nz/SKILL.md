@@ -58,6 +58,8 @@ Blank optional fields are retained with `incomplete_fields`; only incident numbe
 An upstream/schema failure in any requested region fails the whole command (no partial result).
 Results are sorted newest first within the selected day. `region NAME` filters published
 locations; `--report-region` selects FENZ's broad operational region.
+For Auckland, use `region Auckland --report-region north --json` to bound retrieval to the
+published North report. `meta.report_day` and `meta.report_regions` record the requested slice.
 
 ## Coverage and interpretation
 
@@ -85,6 +87,7 @@ Every annual result retains dataset URL, metadata context, financial year and ro
 - `scripts/smoke_test.py` — parser fixture and bounded live probe
 - `tests/fixtures/incidents.html`, `annual-resources.html` and `annual.tsv` — source fixtures
 - `tests/fixtures/incomplete-synthetic.html` — synthetic blank-Location regression shaped like F4557313
+- `tests/fixtures/auckland-synthetic.html` — synthetic Auckland filter and report-scope regression
 - `tests/fixtures/incidents-live-visible.txt` — two real published records, captured as visible
   text; `blocked-live.html` — the direct HTTP challenge response
 - `references/source-profile.json` — command schema, source allowlist and warnings
