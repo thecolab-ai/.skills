@@ -169,6 +169,87 @@ def main() -> int:
         raise AssertionError('invalid workbook must fail closed')
     print('[PASS] fixture official release discovery, stdlib OOXML, exact date recovery, conflicting IDs and ambiguous matches')
 
+    import argparse
+    release = {'_source_url': 'https://www.publicservice.govt.nz/assets/synthetic.xlsx',
+               '_retrieved_at': '2026-10-08T00:00:00Z'}
+    original_load = module.load_rows
+    try:
+        # A blank on-time cell (NZ Police, Jul-Dec 2018) is unreported, not 0%.
+        missing_on_time = [
+            dict(release, OrgID='390', Agency='New Zealand Police', SurveyPeriodEndDate='2018-12-31',
+                 OIA_RequestsHandled='21225', OIAs_Published='29'),
+            dict(release, OrgID='10', Agency='Small Agency', SurveyPeriodEndDate='2018-12-31',
+                 OIA_RequestsHandled='100', OIAs_CompletedWithinTimeframe='50'),
+            dict(release, OrgID='11', Agency='Other Agency', SurveyPeriodEndDate='2018-12-31',
+                 OIA_RequestsHandled='300', OIAs_CompletedWithinTimeframe='290'),
+        ]
+        module.load_rows = lambda timeout: (missing_on_time, 'fixture')
+        police = module.row_enriched(missing_on_time[0])
+        assert police['requests_completed_within_timeframe'] is None and police['timeliness_pct'] is None
+        summary = module.periods_summary(missing_on_time)[0]
+        assert summary['requests_handled'] == 21625 and summary['requests_completed_within_timeframe'] == 340
+        assert summary['timeliness_pct'] == 85.0 and summary['on_time_coverage']['requests_handled'] == 400
+        totals = module.command_totals(argparse.Namespace(timeout=5, period='2018-12-31'))
+        coverage = totals['totals']['on_time_coverage']
+        assert totals['totals']['requests_handled'] == 21625 and totals['totals']['timeliness_pct'] == 85.0
+        assert coverage == {'agency_count': 2, 'requests_handled': 400, 'missing_agency_count': 1,
+                            'missing_requests_handled': 21225, 'missing_agencies': ['New Zealand Police']}
+        assert 'New Zealand Police' in totals['warnings'][0]
+        worst = module.command_timeliness(argparse.Namespace(timeout=5, period='2018-12-31', sort='worst', limit=0))
+        assert [r['agency'] for r in worst['records']] == ['Small Agency', 'Other Agency', 'New Zealand Police']
+        assert worst['records'][-1]['timeliness_pct'] is None and worst['on_time_coverage'] == coverage
+        best = module.command_timeliness(argparse.Namespace(timeout=5, period='2018-12-31', sort='best', limit=1))
+        assert best['records'][0]['agency'] == 'Other Agency'
+        print('[PASS] fixture missing on-time count stays null and is excluded from on-time percentages')
+
+        # Release records without an OrgID merge into the matching OrgID history.
+        def rec(org, agency, period, requests, preferred=''):
+            return dict(release, OrgID=org, Agency=agency, Agency_Preffered_Name=preferred,
+                        SurveyPeriodEndDate=period, OIA_RequestsHandled=str(requests),
+                        OIAs_CompletedWithinTimeframe=str(requests))
+        tpk = 'Te Puni K?kiri-Ministry of M?ori Development'
+        history = [
+            rec('377', 'Te Puni Kōkiri-Ministry of Māori Development', '2026-06-30', 69, tpk),
+            rec('', 'Te Puni Kōkiri', '2025-12-31', 84),
+            rec('377', 'Te Puni Kōkiri-Ministry of Māori Development', '2025-06-30', 91, tpk),
+            rec('', 'Ministry of Maori Development', '2018-12-31', 30),
+            rec('3029', 'Natural Hazards Commission – Toka Tū Ake', '2025-06-30', 8405),
+            rec('3029', 'Earthquake Commission', '2021-12-31', 8454),
+            rec('', 'Earthquake Commission', '2021-06-30', 9690),
+            rec('', 'Earthquake Commission', '2020-12-31', 8467),
+            rec('2370', 'Toka Tū Ake EQC', '2022-06-30', 7176),
+            # Same normalised name as two OrgID agencies: never merged.
+            rec('50', 'Shared Name Board', '2025-06-30', 5),
+            rec('51', 'Shared Name Board', '2024-06-30', 5),
+            rec('', 'Shared Name Board', '2023-06-30', 5),
+        ]
+        module.load_rows = lambda timeout: (history, 'fixture')
+
+        def lookup(query):
+            return module.command_agency(argparse.Namespace(timeout=5, agency_query=query, period=None, limit=0))
+        tpk_result = lookup('Te Puni Kōkiri')
+        assert tpk_result['agency']['org_id'] == 377
+        assert [r['survey_period_end'] for r in tpk_result['records']] == ['2026-06-30', '2025-12-31', '2025-06-30', '2018-12-31']
+        assert tpk_result['records'][1]['org_id'] is None and tpk_result['records'][1]['inferred_org_id'] == 377
+        eqc = lookup('Earthquake Commission')
+        assert eqc['agency']['org_id'] == 3029
+        assert [r['survey_period_end'] for r in eqc['records']] == ['2025-06-30', '2021-12-31', '2021-06-30', '2020-12-31']
+        assert len(lookup('377')['records']) == 4
+        listed = {a['org_id']: a['period_count'] for a in module.list_agencies(history)}
+        assert listed[377] == 4 and listed[3029] == 4 and None not in listed
+        for query in ('Shared Name Board', 'Toka Tū Ake'):
+            try:
+                lookup(query)
+            except ValueError as exc:
+                assert 'ambiguous' in str(exc)
+            else:
+                raise AssertionError(f'{query} must stay ambiguous')
+        # Period totals are unchanged by the name merge.
+        assert module.periods_summary(history)[0]['requests_handled'] == 69
+        print('[PASS] fixture null-OrgID release records merge into the matching agency history')
+    finally:
+        module.load_rows = original_load
+
     help_proc = run(["--help"], timeout=20)
     if help_proc.returncode != 0 or "list-agencies" not in (help_proc.stdout or ""):
         print("FAIL: --help should list available commands", file=sys.stderr)
