@@ -1,0 +1,5 @@
+Year,Month,Month_Year,Notification_Type,AFF2017,AFF2017_Lvl2,IndustryLvl1,IndustryLVL2,IndustryLVL3,IndustryLVL4,Local_Government_Region,Region,Investigated,Notice_Warning_or_Agreement,Count
+2024,1,synthetic period,Synthetic notification,Construction,Synthetic subgroup,Construction,Synthetic industry two,Synthetic industry three,Synthetic industry four,Auckland,Synthetic operational region,,,7
+2024,2,synthetic period,Synthetic notification,Construction,Synthetic subgroup,Construction,Synthetic industry two,Synthetic industry three,Synthetic industry four,Auckland,Synthetic operational region,,,3
+2025,1,synthetic period,Synthetic notification,Manufacturing,Synthetic subgroup,Manufacturing,Synthetic industry two,Synthetic industry three,Synthetic industry four,Waikato,Synthetic operational region,,,2
+2025,1,synthetic period,Synthetic notification,Construction,Synthetic subgroup,Construction,Synthetic industry two,Synthetic industry three,Synthetic industry four,Waikato,Synthetic operational region,,,1

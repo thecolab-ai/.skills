@@ -2,7 +2,7 @@
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
   "last_verified": "2026-10-08",
-  "skill_count": 161,
+  "skill_count": 162,
   "skills": [
     {
       "name": "airnz-flights",
@@ -6043,6 +6043,33 @@
           "www.woolworths.co.nz"
         ]
       }
+    },
+    {
+      "name": "worksafe-nz",
+      "description": "Query WorkSafe New Zealand aggregated workplace incidents, concerns, serious harm notifications and fatalities. Use for construction-sector safety context, regional notification trends and industry comparisons.",
+      "path": "skills/worksafe-nz",
+      "category": "government",
+      "source_owner": "WorkSafe New Zealand",
+      "source_type": "official",
+      "source_url": "https://data.worksafe.govt.nz/",
+      "auth": "none",
+      "access_mode": "public-download",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "24h",
+      "schema_version": "1",
+      "skill_type": "public-download",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "data.worksafe.govt.nz",
+        "data-centre-public.s3.ap-southeast-2.amazonaws.com",
+        "www.worksafe.govt.nz"
+      ],
+      "last_verified": "2026-10-08",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
     },
     {
       "name": "wremo-nz",

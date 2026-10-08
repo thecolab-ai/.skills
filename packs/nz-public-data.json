@@ -3,7 +3,7 @@
   "name": "nz-public-data",
   "description": "Public, read-only New Zealand data and public-interest sources.",
   "default": true,
-  "skill_count": 113,
+  "skill_count": 114,
   "skills": [
     "akl-rainfall",
     "akl-transport-performance",
@@ -117,6 +117,7 @@
     "wcc-arcgis-nz",
     "wellington-bin-schedule",
     "winz-rates-nz",
+    "worksafe-nz",
     "wremo-nz"
   ]
 }
