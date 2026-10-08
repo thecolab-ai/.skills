@@ -11,6 +11,14 @@ on:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: nightly-skill-smoke
+  cancel-in-progress: false
+
 jobs:
   smoke:
     runs-on: [self-hosted, linux, x64, skills-smoke]
@@ -40,4 +48,19 @@ jobs:
           METLINK_API_KEY: ${{ secrets.METLINK_API_KEY }}
           COLAB_SMOKE_WITH_CLOAKBROWSER: "1"
           COLAB_SMOKE_USE_BROWSER: "1"
-        run: bash scripts/run_all_smoke.sh --summary-json
+        run: |
+          smoke_status=0
+          bash scripts/run_all_smoke.sh --summary-json > smoke-summary.json || smoke_status=$?
+          cat smoke-summary.json
+          exit "$smoke_status"
+
+      - name: Reconcile nightly smoke failure issues
+        if: always() && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -s smoke-summary.json ]; then
+            python3 scripts/smoke_failure_issues.py smoke-summary.json \
+              --repo "${{ github.repository }}" \
+              --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          fi

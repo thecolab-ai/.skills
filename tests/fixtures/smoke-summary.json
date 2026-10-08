@@ -1,0 +1,10 @@
+{
+  "schema_version": "1",
+  "counts": {"pass": 1, "fail": 1, "gated": 1, "untested": 1},
+  "results": [
+    {"skill": "fenz-incidents-nz", "status": "fail", "source_health": "degraded", "raw_exit_code": 6, "log": "[FAIL] parser missing incident records\nUpstream returned HTTP 400"},
+    {"skill": "auckland-bin-schedule", "status": "pass", "source_health": "healthy", "raw_exit_code": 0, "log": "[PASS] live strict address lookup"},
+    {"skill": "gated-example", "status": "gated", "log": "[SKIP] network error"},
+    {"skill": "untested-example", "status": "untested", "log": "No assertions"}
+  ]
+}

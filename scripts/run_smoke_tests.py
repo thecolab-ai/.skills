@@ -318,6 +318,7 @@ def main() -> int:
                 {
                     "schema_version": "1",
                     "counts": counts,
+                    "results": results,
                     "failures": [
                         result for result in results if result["status"] == "fail"
                     ],
