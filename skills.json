@@ -2,7 +2,7 @@
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
   "last_verified": "2026-10-08",
-  "skill_count": 163,
+  "skill_count": 164,
   "skills": [
     {
       "name": "airnz-flights",
@@ -5319,6 +5319,33 @@
       ],
       "last_verified": "2026-07-19",
       "health": "degraded",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "port-of-auckland",
+      "description": "Fetch Port of Auckland expected vessel arrivals and live truck turn times for freight demand and congestion analysis. Discover related keyless NZ port sources, fetch Tauranga expected arrivals and road queues, and summarise current port activity.",
+      "path": "skills/port-of-auckland",
+      "category": "transport",
+      "source_owner": "Port of Auckland Ltd; Port of Tauranga Limited",
+      "source_type": "official",
+      "source_url": "https://poal.co.nz/operations/schedules/arrivals/download",
+      "auth": "none",
+      "access_mode": "public CSV download and bounded read-only HTML",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "medium",
+      "cache_ttl": "5m default; 1h maximum; robots 24h",
+      "schema_version": "1",
+      "skill_type": "html-readonly",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "poal.co.nz",
+        "www.poal.co.nz",
+        "www.port-tauranga.co.nz"
+      ],
+      "last_verified": "2026-10-08",
+      "health": "healthy",
       "maintainer": "@adam91holt"
     },
     {
