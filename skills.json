@@ -2,7 +2,7 @@
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
   "last_verified": "2026-10-08",
-  "skill_count": 153,
+  "skill_count": 154,
   "skills": [
     {
       "name": "airnz-flights",
@@ -1310,6 +1310,34 @@
         "meilisearch.grocer.nz"
       ],
       "last_verified": "2026-07-24",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "gtfs-nz",
+      "description": "Read NZ public transport GTFS static timetables: feeds, stops, routes, trips, scheduled departures and route geometry. Use for Auckland Transport, Metlink (Wellington), BUSIT (Waikato) and Orbus (Otago) schedule baselines, spatial stop queries and timetable analysis.",
+      "path": "skills/gtfs-nz",
+      "category": "transport",
+      "source_owner": "NZ public transport agencies",
+      "source_type": "official",
+      "source_url": "https://gtfs.at.govt.nz/gtfs.zip",
+      "auth": "none",
+      "access_mode": "public-download",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "24h",
+      "schema_version": "1",
+      "skill_type": "public-download",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "gtfs.at.govt.nz",
+        "static.opendata.metlink.org.nz",
+        "wrcscheduledata.blob.core.windows.net",
+        "www.orc.govt.nz"
+      ],
+      "last_verified": "2026-10-08",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },

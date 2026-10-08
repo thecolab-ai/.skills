@@ -1,0 +1,25 @@
+{
+  "source_url": "https://gtfs.at.govt.nz/gtfs.zip",
+  "publisher": "Auckland Transport",
+  "licence": "CC BY 4.0",
+  "retrieved_at": "2026-10-08T01:09:06Z",
+  "latest_data": "2026-09-30/2027-01-24",
+  "fixture": "Trimmed real AT GTFS tables; three active route 101-202 trips, complete associated stop_times and shapes, calendar and metadata tables unchanged.",
+  "table_rows": {
+    "trips.txt": 3,
+    "stop_times.txt": 78,
+    "stops.txt": 27,
+    "shapes.txt": 308,
+    "routes.txt": 1
+  },
+  "service_date": "2026-10-08",
+  "route_id": "101-202",
+  "stop_id": "8000-7386a836",
+  "feed_info": [
+    {
+      "feed_start_date": "20260930",
+      "feed_end_date": "20270124",
+      "feed_version": "VDV_EOD_119_1_B_333.08584102377357178354104781798CU55"
+    }
+  ]
+}
