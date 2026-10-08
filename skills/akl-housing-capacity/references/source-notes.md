@@ -105,8 +105,9 @@ all returned rows. Values can be negative stock adjustments. `Delivery` includes
 new builds, leases, buy-ins, redirects, transfers and removed/adjusted stock;
 that last category also includes sales and expired leases, so **it cannot be
 used as a demolition count**. Default area is Auckland; explicit area substrings
-can select other published regions. `meta.latest_data` is the latest source
-observation month in the social housing worksheet, before filtering.
+can select other published regions. `meta.latest_data` is the latest observation
+month in the returned Delivery rows after area and month filtering; it is omitted
+when no rows match.
 
 The default reuse licence is CC BY 4.0, except identified third-party material:
 https://www.hud.govt.nz/about-us/copyright-and-disclaimer

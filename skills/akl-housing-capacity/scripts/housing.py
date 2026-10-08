@@ -104,15 +104,27 @@ def council_records(body):
 def capacity_records(body):
     workbook = Workbook(body)
     sheet = "Plan-enabled Feasible x LBA"
+    titles = {
+        4: ("D", "PLAN-ENABLED CAPACITY BY VALUE BAND, ALL DWELLING TYPES by LBA"),
+        5: ("Y", "PLAN-ENABLED AND FEASIBLE CAPACITY BY VALUE BAND, ALL DWELLING TYPES by LBA"),
+    }
+    titles_seen = set()
     headers = None
     totals = None
-    for _, row in workbook.rows(sheet):
+    for rn, row in workbook.rows(sheet):
+        if rn in titles:
+            column, expected = titles[rn]
+            if row.get(column) != expected:
+                raise SchemaError(f"Changed capacity block title in {sheet}!{column}{rn}")
+            titles_seen.add(rn)
         if row.get("C") == "Dwelling Value Band":
             headers = row
         if row.get("C") == "Total":
             if totals is not None:
                 raise SchemaError("Ambiguous capacity totals")
             totals = row
+    if titles_seen != titles.keys():
+        raise SchemaError("Capacity block titles D4 or Y5 missing")
     if headers is None or totals is None:
         raise SchemaError("Capacity headers or Total row missing")
     groups = {}
@@ -163,7 +175,7 @@ def typology_records(body):
 def hud_records(body, area="Auckland", month=None):
     workbook = Workbook(body)
     headers = None
-    latest_data = ""
+    observations_seen = False
     records = []
     current_period = ""
     required = {"series", "area_type", "area_name", "reporting_month", "value",
@@ -177,7 +189,7 @@ def hud_records(body, area="Auckland", month=None):
         if not row:
             continue
         period = workbook.month(row.get(headers["reporting_month"]))
-        latest_data = max(latest_data, period)
+        observations_seen = True
         if row.get(headers["series"]) != "Delivery" or not matches(str(row.get(headers["area_name"], "")), area):
             continue
         if month and period != month:
@@ -202,6 +214,6 @@ def hud_records(body, area="Auckland", month=None):
         records.append({"sheet": "Social housing", "series": "Delivery", "period": period,
                         "area": row.get(headers["area_name"]), "area_type": row.get(headers["area_type"]),
                         "unit": "homes", "value": value, "dimensions": dimensions})
-    if not headers or not latest_data:
+    if not headers or not observations_seen:
         raise SchemaError("No HUD housing observations found")
-    return records, latest_data
+    return records, max((r["period"] for r in records), default="")

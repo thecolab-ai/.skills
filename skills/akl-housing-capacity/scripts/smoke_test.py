@@ -33,6 +33,7 @@ def probe(arguments):
         assert payload["meta"]["latest_data"]
         if "hud" in arguments:
             assert all(r["series"] == "Delivery" and r["area"] == "Auckland" for r in rows)
+            assert payload["meta"]["latest_data"] == max(r["period"] for r in rows)
             assert payload["meta"]["licence"].startswith("CC BY")
         else:
             assert any(r["area"] == "Henderson - Massey" for r in rows)

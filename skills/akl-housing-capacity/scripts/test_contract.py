@@ -23,6 +23,39 @@ from workbook import NS, SchemaError, Workbook  # noqa: E402
 FIXTURES = Path(__file__).resolve().parents[1] / "tests" / "fixtures"
 
 
+def changed_cells(body, sheet_path, changes):
+    """Edit synthetic worksheet cells without changing the rest of the archive."""
+    edited = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(body)) as archive, zipfile.ZipFile(edited, "w") as output:
+        for info in archive.infolist():
+            data = archive.read(info)
+            if info.filename == sheet_path:
+                root = ET.fromstring(data)
+                sheet_data = root.find(f"{{{NS}}}sheetData")
+                for row in list(sheet_data):
+                    for cell in list(row):
+                        reference = cell.attrib["r"]
+                        if reference not in changes:
+                            continue
+                        value = changes[reference]
+                        if value is None:
+                            row.remove(cell)
+                            continue
+                        cell.clear()
+                        cell.set("r", reference)
+                        if isinstance(value, str):
+                            cell.set("t", "inlineStr")
+                            inline = ET.SubElement(cell, f"{{{NS}}}is")
+                            ET.SubElement(inline, f"{{{NS}}}t").text = value
+                        else:
+                            ET.SubElement(cell, f"{{{NS}}}v").text = str(value)
+                    if not len(row):
+                        sheet_data.remove(row)
+                data = ET.tostring(root)
+            output.writestr(info, data)
+    return edited.getvalue()
+
+
 def fixture_checks(report=False):
     count = 0
 
@@ -52,6 +85,21 @@ def fixture_checks(report=False):
           "paired capacity totals use matching local-board columns")
     check(capacity[1]["area_type"] == "region" and capacity[1]["feasible_capacity"] == 234,
           "regional capacity aggregate is identified")
+    capacity_body = (FIXTURES / "capacity.xlsx").read_bytes()
+    titles = dict(Workbook(capacity_body).rows("Plan-enabled Feasible x LBA"))
+    for changes, label in (
+        ({"D4": titles[5]["Y"], "Y5": titles[4]["D"]}, "reordered capacity blocks"),
+        ({"D4": "Changed title"}, "changed plan-enabled block title"),
+        ({"Y5": "Changed title"}, "changed feasible block title"),
+        ({"D4": None}, "missing plan-enabled block title row"),
+        ({"Y5": None}, "missing feasible block title row"),
+    ):
+        try:
+            capacity_records(changed_cells(capacity_body, "xl/worksheets/sheet1.xml", changes))
+        except SchemaError:
+            check(True, label + " fail with a schema error")
+        else:
+            raise AssertionError(label + " accepted")
     typologies = typology_records((FIXTURES / "feasibility.xlsx").read_bytes())
     check([r["feasible_capacity"] for r in typologies] == [9, 12]
           and [r["selection"] for r in typologies] == ["Max_Profit", "MinDUPrice"],
@@ -63,8 +111,20 @@ def fixture_checks(report=False):
           "HUD defaults to Auckland latest Delivery observations")
     check(hud[1]["value"] == -3 and hud[1]["dimensions"][1]["value"] == "Removed or adjusted stock (SLED)",
           "HUD preserves negative stock adjustment and category meaning")
-    historic, _ = hud_records((FIXTURES / "hud.xlsx").read_bytes(), month="2026-07")
-    check(len(historic) == 1 and historic[0]["value"] == 6, "HUD observation month filter")
+    historic, historic_month = hud_records((FIXTURES / "hud.xlsx").read_bytes(), month="2026-07")
+    check(len(historic) == 1 and historic[0]["value"] == 6 and historic_month == "2026-07",
+          "HUD observation month filter also selects the metadata period")
+    newer_excluded = changed_cells((FIXTURES / "hud.xlsx").read_bytes(),
+                                  "xl/worksheets/sheet2.xml", {"N5": 46266, "N6": 46266})
+    hud, latest_month = hud_records(newer_excluded)
+    check(len(hud) == 2 and latest_month == "2026-08",
+          "HUD metadata excludes newer Stock and other-area rows")
+    northland, latest_month = hud_records(newer_excluded, area="Northland")
+    check(len(northland) == 1 and latest_month == "2026-09",
+          "HUD metadata follows the selected area's Delivery rows")
+    for filters in ({"area": "Unknown"}, {"month": "1900-01"}):
+        hud, latest_month = hud_records(newer_excluded, **filters)
+        check(hud == [] and latest_month == "", "HUD unmatched filters have no latest data period")
     inventory = cli.business_inventory((FIXTURES / "business.zip").read_bytes())
     check(len(inventory) == 2 and inventory[0]["files"] == 2
           and inventory[0]["record_type"] == "archive_inventory", "ZIP inventory counts files, not GIS features")
@@ -158,6 +218,25 @@ def provenance_checks():
     payload = json.loads(capture.getvalue())
     assert len(payload["results"]) == 1 and payload["meta"]["latest_data"] == "2026-08"
     assert payload["results"][0]["period"] == "2026-07"
+    for month in ("2026-07", "1900-01"):
+        capture = io.StringIO()
+        with patch.object(cli.nzfetch, "fetch_text", return_value='<a href="/assets/housing-dashboard-data-download.xlsx">x</a>'), \
+             patch.object(cli, "fetch_workbook", return_value=(FIXTURES / "hud.xlsx").read_bytes()), \
+             contextlib.redirect_stdout(capture):
+            assert cli.main(["housing-update", "--source", "hud", "--month", month, "--json"]) == 0
+        payload = json.loads(capture.getvalue())
+        if month == "2026-07":
+            assert payload["meta"]["latest_data"] == month
+            assert len(payload["results"]) == 1 and payload["results"][0]["period"] == month
+        else:
+            assert "latest_data" not in payload["meta"] and payload["results"] == []
+    capture = io.StringIO()
+    reordered = changed_cells((FIXTURES / "capacity.xlsx").read_bytes(),
+                              "xl/worksheets/sheet1.xml", {"D4": "PLAN-ENABLED AND FEASIBLE CAPACITY BY VALUE BAND, ALL DWELLING TYPES by LBA"})
+    with patch.object(cli, "fetch_workbook", return_value=reordered), contextlib.redirect_stdout(capture):
+        assert cli.main(["capacity", "--json"]) == 6
+    payload = json.loads(capture.getvalue())
+    assert payload["error"]["type"] == "schema_failure" and payload["results"] == []
     capture = io.StringIO()
     failure = cli.nzfetch.RateLimited("network error: HTTP 429", retry_after="60")
     with patch.object(cli.nzfetch, "fetch_text", side_effect=failure), contextlib.redirect_stdout(capture):

@@ -1,6 +1,6 @@
 ---
 name: akl-housing-capacity
-description: "Query Auckland housing supply trends and 2022/23 plan-enabled and feasible housing capacity. Use for monthly housing updates, local-board growth capacity and housing demolition source discovery."
+description: "Query Auckland housing supply trends and 2022/23 plan-enabled and feasible housing capacity. Use for monthly housing updates, building consents, HBA, capacity for growth, PC78, local-board growth capacity, social housing delivery and housing demolition source discovery."
 license: MIT
 compatibility: "Requires Python 3.10+ and network access for live data"
 metadata:
