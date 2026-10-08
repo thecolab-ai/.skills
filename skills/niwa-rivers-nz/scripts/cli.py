@@ -266,7 +266,7 @@ def region_geometry(region):
         if isinstance(council, str):
             council = council.removesuffix(' Region')
         if isinstance(council, str) and region_key(council.replace('Wanganui', 'Whanganui')) == region_key(region):
-            if feature['geometry']['type'] not in ('Polygon', 'MultiPolygon'):
+            if feature['geometry'].get('type') not in ('Polygon', 'MultiPolygon'):
                 raise Failure(6, 'source schema failure: region is not a polygon')
             return feature['geometry'], url
     raise Failure(6, 'source schema failure: requested council missing from boundary layer')
@@ -415,7 +415,8 @@ def cmd_sources(args):
         ('hourly', SOURCE_URL, HOURLY_LICENCE, 'public_metadata_account_gated_download', 'stations',
          'Public series listings; hourly data-file API requires an account. New Zealand coverage is sparse.'),
         ('river-maps', RIVERS_URL, RIVERS_LICENCE, 'keyless_shiny_query', 'rivers',
-         'Static hydrology metrics at displayed precision via the public Shiny interface.'),
+         'Static hydrology metrics at displayed precision. Opt-in rivers command drives the NIWA Shiny app '
+         'by imitating a browser session via public Shiny/SockJS requests.'),
         ('flood-hazard', FLOOD_URL, FLOOD_LICENCE, 'public_metadata_account_gated_download', 'flood-hazard',
          'Regional ZIP listings and coverage footprints; actual 4 m hazard rasters are account-gated.'),
         ('fish-passage', WFS_URL, FPAT_LICENCE, 'keyless_wfs', 'fish-passage',
@@ -478,13 +479,14 @@ def main(argv=None):
         if getattr(args, 'offset', 0) < 0:
             raise Failure(2, '--offset must be non-negative')
         payload = args.func(args)
-    except (InputError, Failure) as exc:
-        code = exc.code if isinstance(exc, Failure) else 2
+    except (InputError, Failure, KeyError, TypeError, AttributeError) as exc:
+        code = exc.code if isinstance(exc, Failure) else 2 if isinstance(exc, InputError) else 6
+        message = str(exc) if code != 6 or isinstance(exc, Failure) else 'source schema failure: malformed upstream response'
         if machine:
-            print(json.dumps(error_envelope(code, str(exc), record_meta(source, licence),
+            print(json.dumps(error_envelope(code, message, record_meta(source, licence),
                                            retry_after=getattr(exc, 'retry_after', None)), ensure_ascii=False))
         else:
-            print('niwa-rivers-nz: ' + str(exc), file=sys.stderr)
+            print('niwa-rivers-nz: ' + message, file=sys.stderr)
         return code
     if machine:
         print(json.dumps(payload, indent=2, ensure_ascii=False))

@@ -139,20 +139,25 @@ def query(bbox, metric='Mean Flow'):
     session = URL + '__sockjs__/123/' + uuid.uuid4().hex
     deadline = time.monotonic() + 50
     def request(path, data):
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
-            raise RiverMapsError(5, 'network error: River Maps query exceeded 50 seconds')
-        try:
-            return nzfetch.fetch_text(session + path, method='POST', data=data,
-                                      headers={'Content-Type': 'application/json'}, timeout=min(10, remaining),
-                                      allowed_hosts={'shiny.niwa.co.nz'})
-        except nzfetch.RateLimited as exc:
-            raise RiverMapsError(4, 'network error: River Maps rate limited', exc.retry_after) from exc
-        except nzfetch.Blocked as exc:
-            raise RiverMapsError(4, 'network error: River Maps access blocked') from exc
-        except nzfetch.FetchError as exc:
-            # Session URLs are transient; omit them from errors and provenance.
-            raise RiverMapsError(5, 'network error: River Maps public session unavailable') from exc
+        polling = path == '/xhr'
+        for attempt in range(2 if polling else 1):
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise RiverMapsError(5, 'network error: River Maps query exceeded 50 seconds')
+            try:
+                return nzfetch.fetch_text(session + path, method='POST', data=data,
+                                          headers={'Content-Type': 'application/json'},
+                                          timeout=min(30 if polling else 10, remaining),
+                                          allowed_hosts={'shiny.niwa.co.nz'})
+            except nzfetch.RateLimited as exc:
+                raise RiverMapsError(4, 'network error: River Maps rate limited', exc.retry_after) from exc
+            except nzfetch.Blocked as exc:
+                raise RiverMapsError(4, 'network error: River Maps access blocked') from exc
+            except nzfetch.FetchError as exc:
+                if polling and attempt == 0 and re.search(r'\b(?:timed out|timeout)\b', str(exc), re.I):
+                    continue
+                # Session URLs are transient; omit them from errors and provenance.
+                raise RiverMapsError(5, 'network error: River Maps public session unavailable') from exc
     def send(data, init=False):
         packets = ['0|m|' + json.dumps({'method': 'init' if init else 'update', 'data': data})]
         if init:

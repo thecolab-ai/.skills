@@ -1,6 +1,6 @@
 ---
 name: niwa-rivers-nz
-description: "Query NIWA River Maps hydrology predictions, hourly station metadata, regional flood product coverage and Fish Passage surveys without keys. Use for NZ river flow and flood context (F1), with explicit limits on account-gated observations and rasters."
+description: "Query NIWA River Maps hydrology predictions, hourly station metadata, regional flood product coverage and Fish Passage surveys without keys. Use for NZ river flow and flood context, with explicit limits on account-gated observations and rasters."
 license: MIT
 compatibility: "Requires Python 3.10+ and network access for live data"
 metadata:
@@ -28,7 +28,7 @@ metadata:
 
 Use `scripts/cli.py` for NIWA freshwater source discovery, hourly series metadata,
 River Maps hydrology predictions, regional flood product coverage and public
-Fish Passage surveys (F1).
+Fish Passage surveys.
 Python 3.10+; stdlib only; no keys, accounts or browser required by the CLI.
 
 ```bash
@@ -48,7 +48,7 @@ python3 skills/niwa-rivers-nz/scripts/cli.py fish-passage --bbox 174.6,-37,174.9
   available series coverage; they do not imply a real-time feed.
 - `flow` exits **4** with a structured access error: the advertised DataHub
   file API requires customer authentication. It accepts no credentials.
-- `rivers` queries River Maps' public Shiny interface, then ranks reaches by
+- `rivers` is opt-in: invoke it explicitly to query River Maps' public Shiny interface, then rank reaches by
   distance to the requested point. Default `--metric "Mean Flow"`, `--limit 5`.
   Seven hydrology metrics are listed by `rivers --help`. `--radius-km` (0.1–10,
   default 5) sets the half-size of a local search box; `--bbox` overrides it.
@@ -79,8 +79,9 @@ Errors return one JSON envelope and stable exit codes, never an empty success.
 Read [references/source-notes.md](references/source-notes.md) for source schemas,
 licences and access evidence. Run `scripts/test_contract.py` for deterministic
 checks and `scripts/smoke_test.py` for bounded live probes. River Maps checks a 50-second deadline
-between requests; individual network calls time out after 10 seconds (session
-close: 2 seconds). Shared HTTP retries may extend elapsed time.
+between requests; polls time out after up to 30 seconds and retry once on timeout
+within that deadline. Other calls time out after 10 seconds (session close:
+2 seconds). Shared HTTP retries may extend elapsed time.
 
 Use `lawa-nz` for observed council/LAWA river information, `gwrc-hilltop-nz`
 for Wellington Hilltop observations and `niwa-coastal-nz` for NIWA coastal

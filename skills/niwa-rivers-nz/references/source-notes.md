@@ -69,14 +69,19 @@ Official source: <https://shiny.niwa.co.nz/nzrivermaps/>
 The app grants CC Attribution 3.0 NZ unless a metric states different terms.
 It provides static national model estimates on RECv2.4. The CLI retrieves map
 values through the same public read-only Shiny/SockJS interface used by its web
-client, without a browser or external dependencies. No stable REST prediction
+client, without a browser or external dependencies. The opt-in `rivers` command
+drives NIWA's Shiny app by imitating a browser session; invoke it only when
+River Maps predictions are explicitly requested. `sources` lists this method
+without opening a session. No stable REST prediction
 API is advertised. `robots.txt` returned 404; the source explicitly offers
 research downloads. No CAPTCHA, login or access challenge is bypassed.
 
 `scripts/rivermaps.py` implements public XHR polling under `__sockjs__`, opening
 one ephemeral session per query. POSTs contain application query inputs only;
-they do not modify source records or accounts. Each call has a 10 s timeout and
-the query checks a 50 s deadline between requests, plus a best-effort 2 s
+they do not modify source records or accounts. Long polls have a timeout of up
+to 30 s and retry once on timeout, capped by the remaining 50 s query deadline.
+Other calls have a 10 s timeout. The query checks the deadline between requests,
+plus a best-effort 2 s
 session close. Configured shared HTTP retries can extend elapsed time; smoke
 probes enforce a 70 s subprocess limit. Session/config
 identifiers are discarded and are never returned as source URLs or stored.

@@ -78,6 +78,26 @@ def fixture_checks():
             raise AssertionError('invalid box accepted: ' + value)
     print('[PASS] fixture bbox validation, region membership and polygon holes')
 
+    for malformed in (None, {'coordinates': regional['features'][0]['geometry']['coordinates']}):
+        boundary = copy.deepcopy(regional)
+        boundary['features'][0]['geometry'] = malformed
+        out = StringIO()
+        with patch.object(cli, 'product_listing', return_value=([
+                {**page['products'][0], 'source_url': cli.SOURCE_URL}], 1)), \
+                patch.object(cli, 'fetch', return_value=boundary), redirect_stdout(out):
+            assert cli.main(['stations', '--region', 'Auckland', '--json']) == 6
+        result = json.loads(out.getvalue())
+        assert result['results'] == [] and result['error']['code'] == 6
+    for row in ({}, {'metadata': None},
+                {**page['products'][0], 'metadata': {**page['products'][0]['metadata'], 'title': None}}):
+        out = StringIO()
+        with patch.object(cli, 'product_listing', return_value=([row], 1)), redirect_stdout(out):
+            assert cli.main(['stations', '--json']) == 6
+        result = json.loads(out.getvalue())
+        assert result['results'] == [] and result['error']['code'] == 6
+        assert result['error']['message'].startswith('source schema failure:')
+    print('[PASS] fixture null/missing boundary geometry and malformed source fields return exit-6 JSON')
+
     data = json.loads((FIXTURES / 'fpat.json').read_text())
     features, total = cli.parse_features(data)
     assert total == 2 and len(features) == 1 and features[0]['properties']['structure_type'] == 'Culvert'
@@ -144,11 +164,44 @@ def fixture_checks():
         assert len(actual) == 1 and visibility == 'Stream order ≥ 1'
         assert description == 'Synthetic mean flow (cumecs)'
         requests = fetch_mock.call_args_list
-        assert all(req.kwargs['method'] == 'POST' and req.kwargs['timeout'] <= 10 for req in requests)
+        assert all(req.kwargs['method'] == 'POST' and 0 < req.kwargs['timeout'] <=
+                   (30 if req.args[0].endswith('/xhr') else 10) for req in requests)
         updates = json.loads(requests[3].kwargs['data'])[0]
         assert 'SelectedVariable' in updates and 'HydroMap_bounds' in updates
         assert '|c|' in json.loads(requests[-1].kwargs['data'])[0], 'session must close'
     print('[PASS] fixture River Maps query ignores stale map, respects timeouts and closes session')
+
+    for errors, elapsed, succeeds, expected_polls in (
+            ([rivermaps.nzfetch.FetchError('network error: timed out')], 30, True, 4),
+            ([rivermaps.nzfetch.FetchError('network error: timed out')] * 2, 30, False, 3),
+            ([rivermaps.nzfetch.FetchError('network error: connection reset')], 0, False, 2),
+            ([rivermaps.nzfetch.FetchError('network error: timed out')], 50, False, 2)):
+        clock = [0]
+        responses = iter(['o', '', frame(first), '', *errors, frame(stale), frame(final), ''])
+        def fetch_response(url, **kwargs):
+            if b'|c|' in kwargs['data']:
+                return ''
+            response = next(responses)
+            if isinstance(response, Exception):
+                clock[0] += elapsed
+                raise response
+            return response
+        with patch.object(rivermaps.time, 'monotonic', side_effect=lambda: clock[0]), \
+                patch.object(rivermaps.nzfetch, 'fetch_text', side_effect=fetch_response) as fetch_mock:
+            try:
+                actual, _, visibility = rivermaps.query((174.6, -37, 174.9, -36.7))
+            except rivermaps.RiverMapsError as exc:
+                assert not succeeds and exc.code == 5
+            else:
+                assert succeeds and len(actual) == 1 and visibility == 'Stream order ≥ 1'
+            polls = [req for req in fetch_mock.call_args_list if req.args[0].endswith('/xhr')]
+            assert len(polls) == expected_polls + 1  # includes the opening request
+            assert polls[2].kwargs['timeout'] == 30
+            if succeeds:
+                assert polls[3].kwargs['timeout'] == 20, 'retry must use remaining deadline'
+                assert polls[2].args == polls[3].args, 'retry the same poll, not a new session'
+            assert b'|c|' in fetch_mock.call_args_list[-1].kwargs['data']
+    print('[PASS] fixture River Maps retries one timed-out poll within deadline, fails other errors and closes session')
 
 
     for argv, code in [(['flow', '--station', '99901', '--json'], 4),
