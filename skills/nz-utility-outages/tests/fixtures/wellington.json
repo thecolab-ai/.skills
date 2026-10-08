@@ -1,0 +1,63 @@
+{
+  "unplannedOutages": [
+    {
+      "type": "unplanned",
+      "id": "202",
+      "status": "Closed",
+      "timeBasedStatus": "recent",
+      "timeOfFault": "2026-10-01 10:00:00",
+      "lastUpdatedCustomersAffected": "9",
+      "lastUpdatedTime": "2026-10-01 12:00:00",
+      "lastUpdatedEta": "2026-10-01 11:30:00",
+      "lastUpdatedComments": "Synthetic power restored notice",
+      "link": "/outages/unplannedoutage/202",
+      "suburbsText": "Another example suburb",
+      "location": {
+        "lat": -41.32,
+        "lng": 174.79
+      },
+      "areas": [
+        {
+          "street": "Sample Street",
+          "suburb": "Another example suburb",
+          "city": "Wellington",
+          "region": "Wellington",
+          "latitude": -41.32,
+          "longitude": 174.79
+        }
+      ]
+    }
+  ],
+  "plannedOutages": [
+    {
+      "type": "planned",
+      "id": 201,
+      "distributorEventNumber": "SYNTHETIC",
+      "status": "Ordered",
+      "timeBasedStatus": "scheduled",
+      "outageStartDateTime": "2099-01-15 10:00:00",
+      "outageEndDateTime": "2099-01-15 11:00:00",
+      "customersAffected": 12,
+      "reasonForOutage": "Synthetic maintenance",
+      "reasonForCancellation": "",
+      "alternateDate": "2099-01-22",
+      "alternateStartDateTime": "2099-01-22 10:00:00",
+      "alternateEndDateTime": "2099-01-22 11:00:00",
+      "useAlternateDate": 0,
+      "link": "/outages/plannedoutage/201",
+      "suburbsText": "Example suburb",
+      "location": {
+        "lat": -41.3,
+        "lng": 174.78
+      },
+      "areas": [
+        {
+          "street": "Example Street",
+          "suburb": "Example suburb",
+          "latitude": -41.3,
+          "longitude": 174.78
+        }
+      ]
+    }
+  ]
+}
