@@ -12,6 +12,7 @@ import csv
 import datetime as dt
 import io
 import json
+import math
 import pathlib
 import re
 import sys
@@ -173,7 +174,8 @@ def request_json(
             target = url + ("&" if "?" in url else "?") + encoded.decode("utf-8")
     try:
         body, _ct, _final = nzfetch.fetch_bytes(
-            target, timeout=timeout, accept="application/json", headers=headers, data=data
+            target, timeout=timeout, accept="application/json", headers=headers, data=data,
+            expect_json=True, max_bytes=8 * 1024 * 1024,
         )
     except nzfetch.Blocked as exc:
         raise DataError(f"network error: {exc}") from exc
@@ -217,6 +219,8 @@ def arcgis_query(params: dict[str, Any]) -> dict[str, Any]:
     merged = {"f": "json", "returnGeometry": "false"}
     merged.update(params)
     data = request_json(ARCGIS_QUERY, merged, method="POST")
+    if not isinstance(data, dict):
+        raise DataError("invalid ArcGIS response: expected an object")
     if isinstance(data.get("error"), dict):
         err = data["error"]
         message = err.get("message") or "ArcGIS query error"
@@ -226,6 +230,15 @@ def arcgis_query(params: dict[str, Any]) -> dict[str, Any]:
 
 
 def emit(payload: dict[str, Any], json_flag: bool, renderer: Callable[[dict[str, Any]], None]) -> None:
+    payload.setdefault("source_url", CSV_URL if payload.get("source") == "CKAN/ArcGIS CSV mirror" else ARCGIS_LAYER)
+    payload.setdefault("publisher", "NZ Transport Agency Waka Kotahi")
+    payload.setdefault("licence", "CC BY 4.0")
+    payload.setdefault("retrieved_at", dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z"))
+    provenance = {k: payload[k] for k in ("source_url", "publisher", "licence", "retrieved_at", "latest_data") if k in payload}
+    for record in payload.get("records", []):
+        record.update(provenance)
+    for feature in payload.get("features", []):
+        feature["properties"].update(provenance)
     if json_flag:
         print(json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True))
     else:
@@ -300,8 +313,10 @@ def build_where(
     return " AND ".join(parts) if parts else "1=1"
 
 
-def crash_count(where: str) -> int:
-    data = arcgis_query({"where": where, "returnCountOnly": "true"})
+def crash_count(where: str, spatial: dict[str, Any] | None = None) -> int:
+    data = arcgis_query({"where": where, "returnCountOnly": "true", **(spatial or {})})
+    if not isinstance(data.get("count"), int):
+        raise DataError("invalid ArcGIS response: missing integer count")
     return int(data.get("count") or 0)
 
 
@@ -315,8 +330,9 @@ def arcgis_stats(where: str, stats: list[dict[str, str]], **extra: Any) -> list[
     return [feature.get("attributes") or {} for feature in data.get("features") or []]
 
 
-def paged_crashes(where: str, limit: int) -> tuple[int, list[dict[str, Any]]]:
-    total = crash_count(where)
+def paged_crashes(where: str, limit: int, spatial: dict[str, Any] | None = None,
+                  geometry: bool = False) -> tuple[int, list[dict[str, Any]]]:
+    total = crash_count(where, spatial)
     records: list[dict[str, Any]] = []
     offset = 0
     while len(records) < limit and offset < total:
@@ -328,13 +344,22 @@ def paged_crashes(where: str, limit: int) -> tuple[int, list[dict[str, Any]]]:
                 "orderByFields": "crashYear DESC, OBJECTID DESC",
                 "resultOffset": str(offset),
                 "resultRecordCount": str(page_size),
+                **(spatial or {}),
+                "returnGeometry": "true" if geometry else "false",
+                "outSR": "4326",
             }
         )
         features = data.get("features") or []
+        if not isinstance(features, list) or any(not isinstance(f, dict) or not isinstance(f.get("attributes"), dict) for f in features):
+            raise DataError("invalid ArcGIS response: expected feature attributes")
         if not features:
-            break
+            raise DataError("ArcGIS returned an empty page before the matching count was reached")
         for feature in features:
-            records.append(clean_crash_record(feature.get("attributes") or {}))
+            record = clean_crash_record(feature.get("attributes") or {})
+            if geometry:
+                point = feature.get("geometry") or {}
+                record["geometry"] = {"type": "Point", "coordinates": [point["x"], point["y"]]} if "x" in point and "y" in point else None
+            records.append(record)
         offset += len(features)
     return total, records
 
@@ -494,6 +519,10 @@ def cmd_crashes(args: argparse.Namespace) -> None:
         severity=args.severity,
         region=args.region,
     )
+    spatial = spatial_params(args)
+    geometry = bool(spatial) or args.format == "geojson"
+    if geometry and args.source == "csv":
+        die("spatial/GeoJSON queries require ArcGIS; the CSV mirror has no WGS84 geometry", 2)
     notes = [DATE_PRECISION_NOTE]
     if defaulted_start:
         notes.append("Default window is bounded to the last two calendar years.")
@@ -505,10 +534,10 @@ def cmd_crashes(args: argparse.Namespace) -> None:
             notes.extend(csv_notes)
             source = "CKAN/ArcGIS CSV mirror"
         else:
-            total, records = paged_crashes(where, limit)
+            total, records = paged_crashes(where, limit, spatial, geometry)
             source = "ArcGIS FeatureServer"
     except DataError as exc:
-        if args.source == "arcgis":
+        if args.source == "arcgis" or geometry:
             raise
         total, records, csv_notes = csv_crashes(args, start_year, end_year, limit)
         notes.append(f"ArcGIS query failed, fell back to capped CSV mirror scan: {exc}")
@@ -529,6 +558,25 @@ def cmd_crashes(args: argparse.Namespace) -> None:
         "records": records,
         "notes": notes,
     }
+    if spatial:
+        payload["spatial_filter"] = spatial
+    if isinstance(total, int):
+        payload["truncated"] = len(records) < total
+    if geometry:
+        layer = request_json(ARCGIS_LAYER, {"f": "json"})
+        if not isinstance(layer, dict) or layer.get("error"):
+            raise DataError("ArcGIS layer metadata is unavailable for spatial provenance")
+        latest = (layer.get("editingInfo") or {}).get("dataLastEditDate")
+        if latest:
+            payload["latest_data"] = dt.datetime.fromtimestamp(latest / 1000, dt.timezone.utc).isoformat().replace("+00:00", "Z")
+            payload["notes"].append("latest_data is the public layer data edit time, not the latest crash date.")
+    if args.format == "geojson":
+        payload["type"] = "FeatureCollection"
+        payload["features"] = [{"type": "Feature", "id": r["object_id"], "geometry": r.get("geometry"),
+                                "properties": {k: v for k, v in r.items() if k != "geometry"}} for r in records]
+        del payload["records"]
+        emit(payload, True, render_crashes)
+        return
     emit(payload, args.json, render_crashes)
 
 
@@ -839,6 +887,41 @@ def add_common_data_args(parser: argparse.ArgumentParser, *, include_window: boo
         parser.add_argument("--to", dest="date_to", help="end date YYYY-MM-DD; applied as a crashYear bound")
 
 
+def coordinates(raw: str, size: int) -> tuple[float, ...]:
+    try:
+        values = tuple(float(x) for x in raw.split(","))
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("coordinates must be comma-separated numbers") from exc
+    if len(values) != size or not all(math.isfinite(x) for x in values):
+        raise argparse.ArgumentTypeError(f"expected {size} finite coordinates")
+    if any(not -180 <= values[i] <= 180 for i in range(0, size, 2)) or any(not -90 <= values[i] <= 90 for i in range(1, size, 2)):
+        raise argparse.ArgumentTypeError("coordinates must be WGS84 longitude/latitude")
+    return values
+
+
+def bbox_value(raw: str) -> tuple[float, ...]:
+    box = coordinates(raw, 4)
+    if box[0] >= box[2] or box[1] >= box[3]:
+        raise argparse.ArgumentTypeError("--bbox requires minLon,minLat,maxLon,maxLat in increasing order")
+    return box
+
+
+def spatial_params(args: argparse.Namespace) -> dict[str, Any]:
+    if args.radius is not None and args.near is None:
+        die("--radius requires --near lon,lat", 2)
+    if args.radius is not None and (not math.isfinite(args.radius) or not 1 <= args.radius <= 10000):
+        die("--radius must be between 1 and 10000 metres", 2)
+    if args.bbox:
+        return {"geometry": ",".join(map(str, args.bbox)), "geometryType": "esriGeometryEnvelope",
+                "inSR": "4326", "spatialRel": "esriSpatialRelIntersects"}
+    if args.near:
+        return {"geometry": ",".join(map(str, args.near)), "geometryType": "esriGeometryPoint",
+                "inSR": "4326", "spatialRel": "esriSpatialRelIntersects",
+                "distance": args.radius if args.radius is not None else 500,
+                "units": "esriSRUnit_Meter"}
+    return {}
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="nzta-crash-data-nz",
@@ -855,6 +938,11 @@ def build_parser() -> argparse.ArgumentParser:
     crashes.add_argument("--region", help="region or TLA name substring, e.g. Auckland or Wellington")
     crashes.add_argument("--severity", choices=tuple(SEVERITY_VALUES), help="crash severity")
     crashes.add_argument("--limit", type=int, default=DEFAULT_LIMIT, help=f"records to return, max {MAX_LIMIT}")
+    spatial = crashes.add_mutually_exclusive_group()
+    spatial.add_argument("--bbox", type=bbox_value, help="WGS84 minLon,minLat,maxLon,maxLat")
+    spatial.add_argument("--near", type=lambda s: coordinates(s, 2), help="WGS84 lon,lat")
+    crashes.add_argument("--radius", type=float, help="distance in metres with --near, 1-10000 (default 500)")
+    crashes.add_argument("--format", choices=("json", "geojson"), default="json", help="GeoJSON emits WGS84 crash points")
     crashes.set_defaults(func=cmd_crashes)
 
     road_toll = sub.add_parser("road-toll", help="summarise yearly fatalities and fatal crashes")

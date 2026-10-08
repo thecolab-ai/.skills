@@ -7,9 +7,11 @@ No login, API key, or third-party dependencies.
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import json
 import math
 import pathlib
+import re
 import sys
 import time
 import urllib.parse
@@ -24,6 +26,8 @@ DEFAULT_RADIUS_M = 2000
 MAX_RADIUS_M = 10000
 DEFAULT_LIMIT = 50
 MAX_LIMIT = 100
+TIMEOUT = 10
+MAX_RESPONSE_BYTES = 8 * 1024 * 1024
 NZ_LAT_MIN = -48.5
 NZ_LAT_MAX = -33.0
 NZ_LON_MIN = 166.0
@@ -194,7 +198,7 @@ def haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
 
 def build_query(lat: float, lon: float, radius_m: int, pairs: list[tuple[str, str]]) -> str:
     """Build an Overpass QL query for the given tag pairs and radius."""
-    lines = ["[out:json][timeout:25];", "("]
+    lines = ["[out:json][timeout:8][maxsize:8388608];", "("]
 
     for key, value in pairs:
         tag = f'["{key}"="{value}"]'
@@ -213,11 +217,12 @@ def fetch_overpass(query: str) -> Any:
         # The Overpass API usage policy asks for an identifying User-Agent, so
         # keep the custom UA and pass browser_headers=False so nzfetch doesn't
         # add contradictory Chrome Client-Hints on top of it.
-        return nzfetch.fetch_json(
+        result = nzfetch.fetch_json(
             OVERPASS_URL,
             data=data,
             method="POST",
-            timeout=35,
+            timeout=TIMEOUT,
+            max_bytes=MAX_RESPONSE_BYTES,
             headers={
                 "Content-Type": "application/x-www-form-urlencoded",
                 "User-Agent": UA,
@@ -225,6 +230,11 @@ def fetch_overpass(query: str) -> Any:
             },
             browser_headers=False,
         )
+        if not isinstance(result, dict) or not isinstance(result.get("elements"), list):
+            die("invalid Overpass response: expected elements array")
+        if result.get("remark"):
+            die(f"upstream Overpass query incomplete: {result['remark']}")
+        return result
     except nzfetch.Blocked as e:
         die(f"network error calling Overpass: {e}")
     except nzfetch.FetchError as e:
@@ -256,6 +266,7 @@ def cmd_categories(args: argparse.Namespace) -> None:
             "kind": "categories",
             "count": len(payload),
             "categories": payload,
+            **provenance(),
         }, indent=2))
         return
 
@@ -376,6 +387,7 @@ def cmd_nearby(args: argparse.Namespace) -> None:
             "count": len(results),
             "elapsed_ms": elapsed,
             "results": results,
+            **provenance(raw),
         }, indent=2, ensure_ascii=False))
     else:
         cat_label = args.category or "all categories"
@@ -384,6 +396,95 @@ def cmd_nearby(args: argparse.Namespace) -> None:
             dist_label = f"{r['distance_m']}m" if r["distance_m"] < 1000 else f"{r['distance_m']/1000:.1f}km"
             type_str = f" - {r['type']}" if r.get("type") else ""
             print(f"  {dist_label:>6s} {r['travel_mode']:5s}  {r['name']}{type_str}")
+
+
+def provenance(raw: dict[str, Any] | None = None) -> dict[str, Any]:
+    result = {"source_url": OVERPASS_URL, "publisher": "OpenStreetMap contributors",
+              "licence": "ODbL 1.0",
+              "retrieved_at": dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z")}
+    latest = ((raw or {}).get("osm3s") or {}).get("timestamp_osm_base")
+    if latest:
+        result["latest_data"] = latest
+    return result
+
+
+def tag_filter(raw: str) -> tuple[str, str]:
+    key, sep, value = raw.partition("=")
+    if not sep or not re.fullmatch(r"[A-Za-z0-9_:-]{1,100}", key) or not value or len(value) > 200 or any(ord(c) < 32 for c in value):
+        raise argparse.ArgumentTypeError("--tag requires key=value (use key=* for any value)")
+    return key, value
+
+
+def bbox_value(raw: str) -> tuple[float, float, float, float]:
+    parts = raw.split(",")
+    if len(parts) != 4:
+        raise argparse.ArgumentTypeError("--bbox requires minLon,minLat,maxLon,maxLat")
+    west, south, east, north = nz_longitude(parts[0]), nz_latitude(parts[1]), nz_longitude(parts[2]), nz_latitude(parts[3])
+    if west >= east or south >= north or east - west > 1 or north - south > 1:
+        raise argparse.ArgumentTypeError("--bbox must be ordered and at most 1 degree wide/high; split larger areas")
+    return west, south, east, north
+
+
+def build_tag_query(tags: list[tuple[str, str]], bbox: tuple[float, ...] | None,
+                    area: int | None, limit: int) -> str:
+    if len(tags) > 10:
+        die("at most 10 --tag filters may be combined", 2)
+    # JSON quoting escapes values safely as Overpass string literals; no raw QL.
+    selector = "".join(f"[{json.dumps(k)}]" if v == "*" else f"[{json.dumps(k)}={json.dumps(v, ensure_ascii=False)}]" for k, v in tags)
+    lines = ["[out:json][timeout:8][maxsize:8388608];"]
+    if bbox:
+        west, south, east, north = bbox
+        lines.append(f"nwr{selector}({south},{west},{north},{east});")
+    else:
+        lines.append(f"area({area})->.searchArea;")
+        lines.append(f"(nwr{selector}(area.searchArea)({NZ_LAT_MIN},{NZ_LON_MIN},{NZ_LAT_MAX},{NZ_LON_MAX});")
+        lines.append(f"nwr{selector}(area.searchArea)({NZ_LAT_MIN},{NZ_CHATHAM_LON_MIN},{NZ_LAT_MAX},{NZ_CHATHAM_LON_MAX}););")
+    lines.append(f"out center tags {limit + 1};")
+    return "\n".join(lines)
+
+
+def raw_records(raw: dict[str, Any]) -> list[dict[str, Any]]:
+    records = []
+    for el in raw["elements"]:
+        if not isinstance(el, dict) or el.get("type") not in {"node", "way", "relation"} or not isinstance(el.get("id"), int) or not isinstance(el.get("tags", {}), dict):
+            die("invalid Overpass response: malformed OSM element")
+        center = el.get("center") or el
+        if not isinstance(center, dict):
+            die("invalid Overpass response: malformed element centre")
+        lat, lon = center.get("lat"), center.get("lon")
+        records.append({"osm_type": el["type"], "osm_id": el["id"],
+                        "osm_url": f"https://www.openstreetmap.org/{el['type']}/{el['id']}",
+                        "tags": el.get("tags") or {}, "lat": lat, "lon": lon})
+    return records
+
+
+def cmd_query(args: argparse.Namespace) -> None:
+    query = build_tag_query(args.tag, args.bbox, args.area, args.limit)
+    raw = fetch_overpass(query)
+    records = raw_records(raw)
+    payload = {"kind": "query", "bbox": args.bbox, "area": args.area,
+               "tags": [{"key": k, "value": v} for k, v in args.tag],
+               "count": min(len(records), args.limit), "limit": args.limit,
+               "truncated": len(records) > args.limit, **provenance(raw),
+               "geometry_note": "Ways and relations use bounding-box centres, not footprints or fence lines."}
+    records = records[:args.limit]
+    context = {k: payload[k] for k in ("source_url", "publisher", "licence", "retrieved_at", "latest_data") if k in payload}
+    for record in records:
+        record.update(context)
+    if args.format == "geojson":
+        payload["query_bbox"] = payload.pop("bbox")
+        payload.update({"type": "FeatureCollection", "features": [
+            {"type": "Feature", "id": f"{r['osm_type']}/{r['osm_id']}",
+             "geometry": {"type": "Point", "coordinates": [r["lon"], r["lat"]]} if r["lon"] is not None and r["lat"] is not None else None,
+             "properties": r} for r in records]})
+    else:
+        payload["records"] = records
+    if args.json or args.format == "geojson":
+        print(json.dumps(payload, indent=2, ensure_ascii=False))
+    else:
+        print(f"OSM tag query: {len(records)} results (truncated: {payload['truncated']})")
+        for r in records:
+            print(f"- {r['osm_type']}/{r['osm_id']}: {json.dumps(r['tags'], ensure_ascii=False)}")
 
 
 def main() -> None:
@@ -407,6 +508,16 @@ def main() -> None:
     s = sub.add_parser("categories", help="List available category filters")
     s.add_argument("--json", action="store_true", help="Emit machine-readable JSON")
     s.set_defaults(func=cmd_categories)
+
+    s = sub.add_parser("query", help="Query raw OSM tags, including unnamed nodes, ways and relations")
+    scope = s.add_mutually_exclusive_group(required=True)
+    scope.add_argument("--bbox", type=bbox_value, help="WGS84 minLon,minLat,maxLon,maxLat, at most 1 degree wide/high")
+    scope.add_argument("--area", type=lambda s: bounded_int(s, "Overpass area ID", 2400000000, 4294967295), help="numeric Overpass area ID; results restricted to NZ bounds")
+    s.add_argument("--tag", type=tag_filter, action="append", required=True, help="key=value, repeat for AND; key=* means key exists")
+    s.add_argument("--limit", type=result_limit, default=DEFAULT_LIMIT, help=f"maximum returned elements, 1-{MAX_LIMIT}")
+    s.add_argument("--format", choices=("json", "geojson"), default="json", help="GeoJSON uses centre points for ways and relations")
+    s.add_argument("--json", action="store_true", help="emit machine-readable JSON")
+    s.set_defaults(func=cmd_query)
 
     args = p.parse_args()
     args.func(args)

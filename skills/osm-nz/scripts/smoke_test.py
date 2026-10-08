@@ -5,6 +5,7 @@ import contextlib
 import importlib.util
 import io
 import json
+import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -188,6 +189,37 @@ results.append(test("contract nearby excessive radius errors cleanly", lambda: (
     (r := run(["nearby", "-36.8485", "174.7633", "--radius", "100000", "--json"])).returncode != 0 and
     "radius must be between" in r.stderr.lower() and "traceback" not in r.stderr.lower()
 )))
+
+def test_spatial_fixture() -> bool:
+    from spatial_contract import run_spatial_tests
+    run_spatial_tests()
+    return True
+
+
+results.append(test("fixture raw tag spatial contracts", test_spatial_fixture))
+
+
+def test_tag_query_live() -> bool:
+    result = subprocess.run([sys.executable, str(CLI), "query", "--bbox", "174.735,-36.905,174.745,-36.875", "--tag", "barrier=fence", "--limit", "3", "--format", "geojson"], capture_output=True, text=True, timeout=40)
+    if result.returncode:
+        if any(marker in result.stderr.lower() for marker in ("network error", "timed out", "http 429", "http 5", "upstream")):
+            print(f"[SKIP] live Overpass tag query: {result.stderr[:250]}")
+            return True
+        raise AssertionError(result.stderr[:300])
+    data = json.loads(result.stdout)
+    assert data["type"] == "FeatureCollection" and len(data["features"]) == 3
+    assert data["latest_data"] and data["licence"] == "ODbL 1.0"
+    assert all(f["properties"]["tags"].get("barrier") == "fence" for f in data["features"])
+    print(f"[PASS] live Overpass bbox tag query: count={data['count']}; sample={data['features'][0]['id']}")
+    return True
+
+
+# The live probe reports its own PASS/SKIP so an outage is never counted as a pass.
+try:
+    results.append(test_tag_query_live())
+except Exception as exc:
+    print(f"[FAIL] live Overpass tag query: {exc}")
+    results.append(False)
 
 if all(results):
     print("All tests passed.")

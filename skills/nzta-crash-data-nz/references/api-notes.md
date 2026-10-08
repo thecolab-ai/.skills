@@ -86,3 +86,21 @@ CAS is updated monthly. Fatal crashes generally appear within about 1 working
 day. Serious and minor injury crashes can lag by about 4 weeks while Police and
 CAS coding follow-up is completed. Recent-week DSI/minor totals can therefore
 undercount final figures; include a lag note for current or very recent windows.
+
+## Spatial queries and provenance
+
+`crashes --bbox minLon,minLat,maxLon,maxLat` passes `geometryType=esriGeometryEnvelope`,
+`inSR=4326` and `spatialRel=esriSpatialRelIntersects` to both the count and paged
+record queries. `--near lon,lat --radius m` uses `esriGeometryPoint`, `distance`
+and `units=esriSRUnit_Meter`. The live layer advertises `supportsQueryWithDistance`.
+The default near radius is 500 m, capped at 10 km. Geometry uses `outSR=4326`.
+`--format geojson` produces a FeatureCollection with normalised CAS properties.
+Spatial queries never fall back to CSV: that mirror does not expose WGS84 geometry.
+
+CC BY 4.0 is stated by ArcGIS item `8d684f1841fa4dbea6afaefc8a1ba0fc`.
+The `latest_data` timestamp comes from layer `editingInfo.dataLastEditDate`;
+it describes the layer edit, not the newest crash or reporting completeness.
+The captured public response in `tests/fixtures/spatial.json` and deterministic
+checks in `scripts/spatial_contract.py` verify bbox/distance parameters, paging,
+GeoJSON, provenance, validation and failure behaviour. Run through
+`scripts/test_contract.py`; smoke tests also run the fixture checks.

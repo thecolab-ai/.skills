@@ -19,7 +19,7 @@ metadata:
   thecolab.pack: "nz-public-data"
   thecolab.source_url: "https://services.arcgis.com/CXBb7LAjgIIdcsPt/arcgis/rest/services/"
   thecolab.allowed_domains: "catalogue.data.govt.nz,opendata-nzta.opendata.arcgis.com,services.arcgis.com"
-  thecolab.last_verified: "2026-07-19"
+  thecolab.last_verified: "2026-10-08"
   thecolab.health: "healthy"
   thecolab.maintainer: "@adam91holt"
 ---
@@ -50,7 +50,7 @@ Every data command accepts `--json`.
 | Command | Purpose | Key flags |
 |---------|---------|-----------|
 | `datasets` | Check ArcGIS FeatureServer and CKAN mirror reachability | `--json` |
-| `crashes` | Return bounded crash records with pagination | `--region`, `--from`, `--to`, `--severity`, `--limit`, `--json` |
+| `crashes` | Return bounded crash records with pagination | `--region`, `--from`, `--to`, `--severity`, `--limit`, `--bbox`, `--near`, `--radius`, `--format`, `--json` |
 | `road-toll` | Sum fatalities and fatal crashes for a calendar year | `--year`, `--json` |
 | `factors` | Aggregate public CAS indicator fields | `--region`, `--from`, `--to`, `--top`, `--json` |
 
@@ -64,6 +64,14 @@ them as calendar-year bounds and includes a `date_precision` note in outputs.
 If no date window is supplied, `crashes` and `factors` default to a bounded
 recent two-calendar-year window.
 
+Spatial `crashes` queries use WGS84 `--bbox minLon,minLat,maxLon,maxLat`,
+or `--near lon,lat --radius metres` (default 500 m; maximum 10 km). Both the
+count and records are filtered server-side. `--format geojson` emits a WGS84
+FeatureCollection; `--json` keeps the existing record envelope. Spatial and
+GeoJSON queries require ArcGIS and report failures without CSV fallback.
+JSON outputs include publisher, source URL, licence and UTC retrieval time;
+spatial outputs also report the mirror edit time as `latest_data`.
+
 ## Examples
 
 ```bash
@@ -72,6 +80,12 @@ python3 scripts/cli.py datasets --json
 
 # Fatal crash records in Auckland for 2025
 python3 scripts/cli.py crashes --region Auckland --from 2025-01-01 --to 2025-12-31 --severity fatal --limit 10
+
+# Dominion Road corridor, all 2025 crashes, as WGS84 points
+python3 scripts/cli.py crashes --bbox 174.735,-36.905,174.745,-36.875 --from 2025-01-01 --to 2025-12-31 --limit 100 --format geojson
+
+# Crashes within 500 m of a corridor point
+python3 scripts/cli.py crashes --near 174.740,-36.890 --radius 500 --from 2025-01-01 --to 2025-12-31 --json
 
 # Machine-readable current-year road toll
 python3 scripts/cli.py road-toll --year 2026 --json

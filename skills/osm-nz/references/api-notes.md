@@ -16,7 +16,7 @@ The Overpass API accepts POST requests with an `application/x-www-form-urlencode
 Example query to find restaurants within 2 km of a point:
 
 ```text
-[out:json][timeout:25];
+[out:json][timeout:8][maxsize:8388608];
 (
   node["amenity"="restaurant"] (around:2000,-36.8485,174.7633);
   way["amenity"="restaurant"] (around:2000,-36.8485,174.7633);
@@ -73,7 +73,7 @@ The CLI maps 9 user-friendly category names to specific OSM tag pairs:
 - Urban NZ areas (Auckland, Wellington, Christchurch) have good coverage
 - Rural areas may have sparse or missing POIs
 - Some businesses may be mapped but lack name tags — these are filtered out
-- The Overpass API `[timeout:25]` ensures queries don't hang forever
+- The Overpass API `[timeout:8][maxsize:8388608]` bounds server processing; the HTTP timeout is 10 seconds
 - Duplicate results (same name + category) are deduplicated
 - The public `overpass-api.de` instance is shared; consider using a local instance for production
 
@@ -84,3 +84,30 @@ The CLI maps 9 user-friendly category names to specific OSM tag pairs:
 - Respect fair-use limits — the CLI has no built-in rate limiting across invocations
 - OSM tags can be inaccurate, incomplete, or outdated — verify critical information
 - Do not redistribute bulk OSM datasets through this wrapper
+
+## Raw tags in a bbox or area
+
+`query` accepts repeatable `--tag key=value` filters, combined with AND.
+`key=*` selects any object carrying the key. Keys are validated and values are
+quoted as string literals; this is not a raw Overpass QL or regex interface.
+`nwr` includes nodes, ways and relations. Unnamed features and full tags survive.
+Bboxes use WGS84 minLon,minLat,maxLon,maxLat and at most 1 degree wide/high.
+Overpass internally receives south,west,north,east.
+
+`--area` is a numeric Overpass area ID, not a relation ID or name. An OSM relation
+usually maps to relation ID + 3600000000 when Overpass has generated its area.
+Area queries also restrict results to the mainland/Chatham NZ bounding rectangles.
+The endpoint returns at most limit+1 elements (maximum 101); the CLI trims the
+extra element and reports `truncated`. It does not report a full matching count.
+Output order follows Overpass, not distance. Response bytes are capped at 8 MiB.
+Any upstream `remark` is an incomplete-query error, not a successful partial list.
+
+GeoJSON contains point geometry. Way/relation centres represent the bounding
+box of the entire object and may be outside the query bbox; use an actual
+geometry source for fence lines. `latest_data` is `osm3s.timestamp_osm_base`,
+not a guarantee that every tag was surveyed at that time. Attribution: OSM
+contributors, ODbL 1.0 (the licence is also stated by `osm3s.copyright`).
+
+`tests/fixtures/spatial.json` is a trimmed public fence response. Fixture checks
+in `scripts/spatial_contract.py` run through both `scripts/test_contract.py`
+and `scripts/smoke_test.py`.

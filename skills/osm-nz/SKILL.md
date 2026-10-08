@@ -1,6 +1,6 @@
 ---
 name: osm-nz
-description: "Query OpenStreetMap Overpass API for nearby points of interest, attractions, amenities, shops, and services around any NZ location. Use when the task involves finding what's nearby — restaurants, cafes, parks, shops, transport stops, museums, beaches — given coordinates or an address. No login or API key required. Read-only."
+description: "Query OpenStreetMap Overpass API for nearby points of interest, attractions, amenities, shops, and services around any NZ location, or raw OSM tags within a bbox or NZ area. Use when the task involves finding what's nearby — restaurants, cafes, parks, shops, transport stops, museums, beaches — given coordinates or an address. No login or API key required. Read-only."
 license: MIT
 compatibility: "Requires Python 3.10+ and network access for live data"
 metadata:
@@ -19,7 +19,7 @@ metadata:
   thecolab.pack: "nz-public-data"
   thecolab.source_url: "https://overpass-api.de/api/interpreter"
   thecolab.allowed_domains: "overpass-api.de,www.openstreetmap.org"
-  thecolab.last_verified: "2026-07-19"
+  thecolab.last_verified: "2026-10-08"
   thecolab.health: "healthy"
   thecolab.maintainer: "@adam91holt"
 ---
@@ -65,7 +65,20 @@ python3 skills/osm-nz/scripts/cli.py <command> [flags]
 ### Commands
 
 - `nearby <lat> <lon> [--radius N] [--category CAT] [--limit N] [--json]` — POIs around a coordinate
-- `categories` — list available category filters
+- `categories [--json]` — list available category filters
+- `query --bbox minLon,minLat,maxLon,maxLat --tag key=value [--tag key=value] [--limit N] [--format geojson] [--json]` — raw tags, including unnamed objects
+- `query --area OVERPASS_AREA_ID --tag key=value [--json]` — raw tags in a numeric Overpass area, restricted to NZ bounds
+
+Raw tag queries combine repeated filters with **AND**. `repair=*` means the
+key exists; other values are literal strings, not regular expressions. Results
+retain all tags and OSM IDs for nodes, ways and relations. Bboxes are WGS84 and
+limited to 1 degree wide/high; results are capped at 100 with a `truncated` flag.
+GeoJSON uses points: ways and relations use bounding-box centres, which can lie
+outside the requested bbox. It does not return fence lines or building outlines.
+JSON includes source URL, publisher, ODbL licence, UTC retrieval time and the
+Overpass base timestamp as `latest_data`. Calls time out after 10 seconds;
+Overpass queries allow 8 seconds and responses are capped at 8 MiB.
+
 
 ### Category filters
 
@@ -90,6 +103,10 @@ python3 skills/osm-nz/scripts/cli.py nearby -36.8485 174.7633 --radius 2000
 python3 skills/osm-nz/scripts/cli.py nearby -36.8485 174.7633 --category food --limit 10 --json
 python3 skills/osm-nz/scripts/cli.py nearby -41.2865 174.7762 --category culture --radius 5000
 python3 skills/osm-nz/scripts/cli.py categories
+python3 skills/osm-nz/scripts/cli.py query --bbox 174.735,-36.905,174.745,-36.875 --tag barrier=fence --limit 5 --format geojson
+python3 skills/osm-nz/scripts/cli.py query --bbox 174.72,-36.93,174.80,-36.84 --tag amenity=recycling --json
+python3 skills/osm-nz/scripts/cli.py query --bbox 174.72,-36.93,174.80,-36.84 --tag 'repair=*' --json
+python3 skills/osm-nz/scripts/cli.py query --bbox 174.72,-36.93,174.80,-36.84 --tag shop=second_hand --json
 ```
 
 ## Resources
@@ -107,4 +124,4 @@ python3 skills/osm-nz/scripts/cli.py categories
 - The Overpass API has a fair-use policy — avoid rapid repeated queries
 - Coordinates are limited to New Zealand bounds and radius is capped at 10 km to protect the shared public API
 - OSM data coverage varies: urban areas are well-mapped, rural areas less so
-- Some results may lack names or have incomplete tags — these are filtered out
+- Nearby POIs without names are filtered out; raw tag queries retain unnamed objects
