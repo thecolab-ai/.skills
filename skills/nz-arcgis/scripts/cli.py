@@ -22,6 +22,8 @@ REGISTRY = json.loads((ROOT / 'references/orgs.json').read_text())
 CURATED = json.loads((ROOT / 'references/layers-auckland.json').read_text()) if (ROOT / 'references/layers-auckland.json').exists() else []
 CATALOGUE = CURATED if isinstance(CURATED, dict) else {'layers': CURATED}
 CURATED = CATALOGUE['layers']
+NZ_CATALOGUE = json.loads((ROOT / 'references/layers-nz.json').read_text()) if (ROOT / 'references/layers-nz.json').exists() else {'layers': []}
+NZ_CURATED = NZ_CATALOGUE['layers']
 VERIFICATION = json.loads((ROOT / 'references/verification.json').read_text())
 PUBLISHERS = 'New Zealand public-sector and utility ArcGIS publishers'
 REPO_URL = 'https://github.com/thecolab-ai/.skills/blob/main/skills/nz-arcgis/references/'
@@ -49,7 +51,7 @@ def timestamp(value=None):
 
 def provenance(url, org, metadata=None):
     info = REGISTRY[org]
-    record = next((r for r in CURATED if r['source_url'] == url), {})
+    record = next((r for r in CURATED + NZ_CURATED if r['source_url'] == url), {})
     licence = record.get('licence') if record else info.get('licence')
     if licence and UNKNOWN_LICENCE.search(licence):
         licence = None
@@ -90,6 +92,8 @@ def validate_url(url, kind='layer'):
             if p.hostname != bp.hostname or [s.lower() for s in parts[:len(prefix)]] != [s.lower() for s in prefix]:
                 continue
             tail = parts[len(prefix):]
+            if info.get('service_allowlist') and tail and tail[0] not in info['service_allowlist']:
+                continue
             valid = False
             if kind == 'directory':
                 valid = len(tail) <= 2 and not any(s in SERVER_TYPES for s in tail)
@@ -280,6 +284,8 @@ def discover(org, budget, root_index=None):
                 if not isinstance(name, str) or not name:
                     raise ClientError('source schema failure: invalid service name', 6)
                 path = name if depth == 0 or '/' in name else urllib.parse.unquote(url[len(root)+1:]) + '/' + name
+                if REGISTRY[org].get('service_allowlist') and path not in REGISTRY[org]['service_allowlist']:
+                    continue
                 service_url = root + '/' + '/'.join(urllib.parse.quote(s, safe='-_.()') for s in path.split('/')) + '/' + row['type']
                 owner, service_url = validate_url(service_url, 'service')
                 if owner != org:
@@ -435,7 +441,8 @@ def parser():
             q.add_argument('--root', type=int, choices=range(20), help='select a registry root by its zero-based index')
         if command == 'layers':
             q.add_argument('service', nargs='?', help='service name including FeatureServer/MapServer/ImageServer, or allowlisted service URL')
-            q.add_argument('--curated', choices=['akl'])
+            q.add_argument('--curated', choices=['akl', 'nz'])
+            q.add_argument('--publisher', choices=sorted(REGISTRY), help='filter a curated selection by organisation code')
             q.add_argument('--problem', choices=list(TAGS), help='; '.join(k + ': ' + v for k, v in TAGS.items()))
         if command in {'describe', 'query', 'count'}:
             q.add_argument('layer_url')
@@ -465,9 +472,11 @@ def execute(args):
     if command == 'layers' and args.curated:
         if args.org or args.service:
             raise ClientError('use layers --curated akl without organisation or service arguments')
-        rows = [dict(r) for r in CURATED if not args.problem or args.problem in r['problem_tags']]
-        meta = cached_meta('layers-auckland.json', CATALOGUE.get('verified_at') or max(r['verified_at'] for r in CURATED))
-        return dict(result_envelope(rows, meta), curated='akl', problem=args.problem, tags=TAGS)
+        selected = CURATED if args.curated == 'akl' else CURATED + NZ_CURATED
+        rows = [dict(r) for r in selected if (not args.problem or args.problem in r['problem_tags']) and (not args.publisher or args.publisher == r['org'])]
+        filename = 'layers-auckland.json' if args.curated == 'akl' else 'layers-nz.json'
+        meta = cached_meta(filename, max(r['verified_at'] for r in selected))
+        return dict(result_envelope(rows, meta), curated=args.curated, problem=args.problem, tags=TAGS)
     if command in {'services', 'search'}:
         result = discover(args.org, args.max_requests, args.root)
         rows = result.pop('services')
@@ -495,8 +504,8 @@ def execute(args):
         root = REGISTRY[args.org]['roots'][args.root or 0]
         return dict(result_envelope(rows, provenance(root, args.org)), **result)
     if command == 'layers':
-        if args.problem:
-            raise ClientError('--problem requires --curated akl')
+        if args.problem or args.publisher:
+            raise ClientError('--problem and --publisher require --curated akl or nz')
         if not args.org or not args.service:
             raise ClientError('layers requires an organisation and service, or --curated akl')
         url = args.service if args.service.startswith('https://') else REGISTRY[args.org]['roots'][0] + '/' + '/'.join(urllib.parse.quote(s, safe='-_.()') for s in args.service.split('/'))
@@ -504,6 +513,18 @@ def execute(args):
         if org != args.org:
             raise ClientError('service does not belong to the selected organisation', 7, 'blocked_organisation')
         return result_envelope(service_layers(url), provenance(url, org))
+    if command == 'describe' and args.layer_url.rstrip('/').rsplit('/', 1)[-1] in SERVER_TYPES:
+        org, url = validate_url(args.layer_url, 'service')
+        metadata = fetch(url, kind='service')
+        if not any(k in metadata for k in ('layers', 'bandCount')):
+            raise ClientError('source schema failure: service has no layers or image bands', 6)
+        row = dict(name=metadata.get('name') or url.split('/')[-2], kind='service', server_type=url.rsplit('/', 1)[-1], capabilities=metadata.get('capabilities'), extent=metadata.get('fullExtent') or metadata.get('extent'), spatial_reference=metadata.get('spatialReference'), service_item_id=metadata.get('serviceItemId'), tile_only='TilesOnly' in (metadata.get('capabilities') or '').split(','))
+        for key in ('layers', 'tables', 'bandCount', 'pixelType', 'pixelSizeX', 'pixelSizeY', 'minValues', 'maxValues'):
+            if key in metadata:
+                if key in {'layers', 'tables'}:
+                    list_value(metadata, key)
+                row[key] = metadata[key]
+        return result_envelope([row], provenance(url, org, metadata))
     org, url = validate_url(args.layer_url)
     metadata = fetch(url)
     if metadata.get('type') not in {'Feature Layer', 'Table'}:
@@ -570,6 +591,13 @@ def human_output(command, result):
             print('Coverage is incomplete; inspect --json for failed or unvisited entries.')
     elif command == 'describe':
         row = rows[0]
+        if row.get('kind') == 'service':
+            print(f"{row['name']}: {row['server_type']}; capabilities={row['capabilities']}")
+            print_terms(meta)
+            for layer in row.get('layers', []):
+                print(f"  {layer['id']}: {layer['name']}")
+            print(f"Source: {meta['publisher']} — {meta['source_url']}")
+            return
         print(f"{row['name']}: {row['geometry_type'] or 'table'}; {row['record_count']} records")
         print_terms(meta)
         for field in row['fields']:
@@ -587,7 +615,8 @@ def human_output(command, result):
 def error_meta(args):
     if args and getattr(args, 'layer_url', None):
         try:
-            org, url = validate_url(args.layer_url)
+            kind = 'service' if args.command == 'describe' and args.layer_url.rstrip('/').rsplit('/', 1)[-1] in SERVER_TYPES else 'layer'
+            org, url = validate_url(args.layer_url, kind)
             return provenance(url, org)
         except ClientError:
             pass

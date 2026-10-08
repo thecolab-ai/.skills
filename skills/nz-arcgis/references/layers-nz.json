@@ -1,0 +1,594 @@
+{
+  "verified_at": "2026-10-08T04:38:13Z",
+  "tags": {
+    "F1": "flooding/flow paths",
+    "T1": "congestion",
+    "T2": "near-miss safety",
+    "T3": "incidents/roadworks",
+    "W1": "construction and demolition materials",
+    "W2": "reuse/repair/recycling",
+    "W3": "illegal dumping"
+  },
+  "layers": [
+    {
+      "catalogue_id": "S0618",
+      "name": "Dunedin City Council public RAMM Footpath layer (comparable NZ asset inventory)",
+      "grade": "B",
+      "source_url": "https://apps.dunedin.govt.nz/arcgis/rest/services/Public/RAMM/MapServer/11",
+      "publisher": "Dunedin City Council",
+      "org": "dcc",
+      "problem_tags": [
+        "T2"
+      ],
+      "caveat": "Dunedin assets are a schema proxy and expose no condition grade.",
+      "catalogue_latest_data": "live",
+      "verified_at": "2026-10-08T04:37:53Z",
+      "retrieved_at": "2026-10-08T04:37:53Z",
+      "kind": "layer",
+      "layer_name": "Footpath",
+      "geometry_type": "esriGeometryPolyline",
+      "licence_note": "No explicit licence shown in REST layer metadata",
+      "verified_count": 9724
+    },
+    {
+      "catalogue_id": "S0625",
+      "name": "Dunedin City Council public street-light inventory layer",
+      "grade": "B",
+      "source_url": "https://apps.dunedin.govt.nz/arcgis/rest/services/Public/RAMM/MapServer/0",
+      "publisher": "Dunedin City Council",
+      "org": "dcc",
+      "problem_tags": [
+        "T2"
+      ],
+      "caveat": "Dunedin inventory is useful for prototyping but not Auckland coverage.",
+      "catalogue_latest_data": "live",
+      "verified_at": "2026-10-08T04:37:53Z",
+      "retrieved_at": "2026-10-08T04:37:53Z",
+      "kind": "layer",
+      "layer_name": "Street Lights",
+      "geometry_type": "esriGeometryPoint",
+      "licence_note": "No explicit licence shown in the layer metadata",
+      "verified_count": 15693
+    },
+    {
+      "catalogue_id": "S0789",
+      "name": "PC120 revised proposed amendments zoning map",
+      "grade": "A",
+      "source_url": "https://tiles.arcgis.com/tiles/n4yPwebTjJCmXB6W/arcgis/rest/services/PC120Revised_PROD_ProposedAmendmentsPC120Zones/MapServer",
+      "publisher": "Auckland Council",
+      "org": "akl",
+      "problem_tags": [
+        "W1"
+      ],
+      "caveat": "Cached map display only; no queryable attributes.",
+      "catalogue_latest_data": "2026",
+      "verified_at": "2026-10-08T04:37:52Z",
+      "retrieved_at": "2026-10-08T04:37:52Z",
+      "kind": "service",
+      "layer_name": "PC120Revised_PROD_ProposedAmendmentsPC120Zones",
+      "geometry_type": null,
+      "licence_note": "No open licence shown in the ArcGIS item metadata; contact plansgeospatial@aucklandcouncil.govt.nz for reuse terms.",
+      "operations": [
+        "describe",
+        "layers"
+      ],
+      "tile_only": true
+    },
+    {
+      "catalogue_id": "S0790",
+      "name": "PC120 revised precincts map",
+      "grade": "A",
+      "source_url": "https://tiles.arcgis.com/tiles/n4yPwebTjJCmXB6W/arcgis/rest/services/PC120Revised_PROD_Precincts/MapServer",
+      "publisher": "Auckland Council",
+      "org": "akl",
+      "problem_tags": [
+        "W1"
+      ],
+      "caveat": "Cached map display only; proposal status may have changed.",
+      "catalogue_latest_data": null,
+      "verified_at": "2026-10-08T04:37:52Z",
+      "retrieved_at": "2026-10-08T04:37:52Z",
+      "kind": "service",
+      "layer_name": "PC120Revised_PROD_Precincts",
+      "geometry_type": null,
+      "licence_note": "No open licence stated; item directs licence queries to plansgeospatial@aucklandcouncil.govt.nz.",
+      "operations": [
+        "describe",
+        "layers"
+      ],
+      "tile_only": true
+    },
+    {
+      "catalogue_id": "S0792",
+      "name": "PC120 revised Policy 3D upzoning around centres",
+      "grade": "A",
+      "source_url": "https://tiles.arcgis.com/tiles/n4yPwebTjJCmXB6W/arcgis/rest/services/PC120Revised_PROD_Policy3D_UpzoningAroundCentreZones/MapServer",
+      "publisher": "Auckland Council",
+      "org": "akl",
+      "problem_tags": [
+        "W1"
+      ],
+      "caveat": "Cached map display only; proposal status may have changed.",
+      "catalogue_latest_data": null,
+      "verified_at": "2026-10-08T04:37:52Z",
+      "retrieved_at": "2026-10-08T04:37:52Z",
+      "kind": "service",
+      "layer_name": "PC120Revised_PROD_Policy3D_UpzoningAroundCentreZones",
+      "geometry_type": null,
+      "licence_note": "No open licence stated; item directs licence queries to plansgeospatial@aucklandcouncil.govt.nz.",
+      "operations": [
+        "describe",
+        "layers"
+      ],
+      "tile_only": true
+    },
+    {
+      "catalogue_id": "S0943",
+      "name": "Christchurch kerbside recycling collection areas",
+      "grade": "B",
+      "source_url": "https://gis.ccc.govt.nz/server/rest/services/OpenData/SiteUtility/FeatureServer/12",
+      "publisher": "Christchurch City Council",
+      "org": "ccc",
+      "problem_tags": [
+        "W2"
+      ],
+      "caveat": "Christchurch only; not applicable to Auckland schedules.",
+      "catalogue_latest_data": "2021",
+      "verified_at": "2026-10-08T04:37:53Z",
+      "retrieved_at": "2026-10-08T04:37:53Z",
+      "kind": "layer",
+      "layer_name": "RecyclingCollection",
+      "geometry_type": "esriGeometryPolygon",
+      "licence_note": "Not stated in layer metadata; Christchurch City Council attribution",
+      "verified_count": 165
+    },
+    {
+      "catalogue_id": "S0945",
+      "name": "Dunedin refuse and recycling collection by property",
+      "grade": "B",
+      "source_url": "https://apps.dunedin.govt.nz/arcgis/rest/services/Public/Refuse_Collection_Property/MapServer/1",
+      "publisher": "Dunedin City Council",
+      "org": "dcc",
+      "problem_tags": [
+        "W2"
+      ],
+      "caveat": "Dunedin only; property schema is not Auckland coverage.",
+      "catalogue_latest_data": null,
+      "verified_at": "2026-10-08T04:37:53Z",
+      "retrieved_at": "2026-10-08T04:37:53Z",
+      "kind": "layer",
+      "layer_name": "Refuse collection (all areas)",
+      "geometry_type": "esriGeometryPolygon",
+      "licence_note": "No explicit reuse licence found in public MapServer metadata",
+      "verified_count": 66307
+    },
+    {
+      "catalogue_id": "S1098",
+      "name": "Hamilton City traffic counts",
+      "grade": "A",
+      "source_url": "https://services1.arcgis.com/R6s0QqCMQdwKY6yp/arcgis/rest/services/Hamilton%20City%20Traffic%20Counts/FeatureServer/0",
+      "publisher": "Hamilton City Council",
+      "org": "hcc",
+      "problem_tags": [
+        "T1",
+        "T2"
+      ],
+      "caveat": "Hamilton-only annual counts; latest year is 2023.",
+      "catalogue_latest_data": "2023",
+      "verified_at": "2026-10-08T04:37:54Z",
+      "retrieved_at": "2026-10-08T04:37:54Z",
+      "kind": "layer",
+      "layer_name": "Hamilton_City_Traffic_Counts",
+      "geometry_type": "esriGeometryPoint",
+      "licence": "CC BY 4.0",
+      "latest_data": "2024-04-22T21:39:39Z",
+      "verified_count": 765
+    },
+    {
+      "catalogue_id": "S1099",
+      "name": "Hamilton City stormwater asset inventory",
+      "grade": "B",
+      "source_url": "https://services1.arcgis.com/R6s0QqCMQdwKY6yp/arcgis/rest/services/Stormwater%20Dataset%20-%20Hamilton%20City%20Council/FeatureServer/0",
+      "publisher": "Hamilton City Council",
+      "org": "hcc",
+      "problem_tags": [
+        "F1"
+      ],
+      "caveat": "Hamilton asset inventory; condition and completeness may vary.",
+      "catalogue_latest_data": "2025",
+      "verified_at": "2026-10-08T04:37:54Z",
+      "retrieved_at": "2026-10-08T04:37:54Z",
+      "kind": "layer",
+      "layer_name": "Stormwater Catchpit Hamilton City Council",
+      "geometry_type": "esriGeometryPoint",
+      "licence": "CC BY 4.0",
+      "latest_data": "2025-07-10T04:39:22Z",
+      "verified_count": 13629
+    },
+    {
+      "catalogue_id": "S1100",
+      "name": "Christchurch cycleway network (OpenData)",
+      "grade": "A",
+      "source_url": "https://gis.ccc.govt.nz/server/rest/services/OpenData/Cycle/FeatureServer/1",
+      "publisher": "Christchurch City Council",
+      "org": "ccc",
+      "problem_tags": [
+        "T1",
+        "T2"
+      ],
+      "caveat": "Christchurch network only; not directly Auckland coverage.",
+      "catalogue_latest_data": "2026",
+      "verified_at": "2026-10-08T04:37:55Z",
+      "retrieved_at": "2026-10-08T04:37:55Z",
+      "kind": "layer",
+      "layer_name": "Cycleway",
+      "geometry_type": "esriGeometryPolyline",
+      "licence_note": "No licence text in the layer or Portal item metadata",
+      "verified_count": 4920
+    },
+    {
+      "catalogue_id": "S1101",
+      "name": "Christchurch coastal inundation hazard (OpenData)",
+      "grade": "A",
+      "source_url": "https://gis.ccc.govt.nz/server/rest/services/OpenData/WaterCharacteristic/FeatureServer/47",
+      "publisher": "Christchurch City Council",
+      "org": "ccc",
+      "problem_tags": [
+        "F1"
+      ],
+      "caveat": "Christchurch-only modeled hazard scenarios.",
+      "catalogue_latest_data": "2024",
+      "verified_at": "2026-10-08T04:37:55Z",
+      "retrieved_at": "2026-10-08T04:37:55Z",
+      "kind": "layer",
+      "layer_name": "CoastalInundationHazard",
+      "geometry_type": "esriGeometryPolygon",
+      "licence": "CC BY 4.0",
+      "verified_count": 105134
+    },
+    {
+      "catalogue_id": "S1102",
+      "name": "Christchurch council fence assets (OpenData)",
+      "grade": "A",
+      "source_url": "https://gis.ccc.govt.nz/server/rest/services/OpenData/Structure/FeatureServer/2",
+      "publisher": "Christchurch City Council",
+      "org": "ccc",
+      "problem_tags": [
+        "F1"
+      ],
+      "caveat": "Council fences only; private-property coverage is absent.",
+      "catalogue_latest_data": "2026",
+      "verified_at": "2026-10-08T04:37:56Z",
+      "retrieved_at": "2026-10-08T04:37:56Z",
+      "kind": "layer",
+      "layer_name": "Fence",
+      "geometry_type": "esriGeometryPolyline",
+      "licence": "CC BY 4.0",
+      "verified_count": 14067
+    },
+    {
+      "catalogue_id": "S1103",
+      "name": "Christchurch building footprints with LiDAR height (OpenData)",
+      "grade": "A",
+      "source_url": "https://gis.ccc.govt.nz/server/rest/services/OpenData/Property/FeatureServer/12",
+      "publisher": "Christchurch City Council",
+      "org": "ccc",
+      "problem_tags": [
+        "W1"
+      ],
+      "caveat": "Christchurch only; LiDAR heights are not current everywhere.",
+      "catalogue_latest_data": "2019",
+      "verified_at": "2026-10-08T04:37:56Z",
+      "retrieved_at": "2026-10-08T04:37:56Z",
+      "kind": "layer",
+      "layer_name": "Building",
+      "geometry_type": "esriGeometryPolygon",
+      "licence": "CC BY 4.0 (Christchurch City Council Open Data)",
+      "verified_count": 237094
+    },
+    {
+      "catalogue_id": "S1104",
+      "name": "Christchurch collection depots (OpenData)",
+      "grade": "B",
+      "source_url": "https://gis.ccc.govt.nz/server/rest/services/OpenData/SiteUtility/FeatureServer/9",
+      "publisher": "Christchurch City Council",
+      "org": "ccc",
+      "problem_tags": [
+        "W2"
+      ],
+      "caveat": "Only 16 Christchurch depot locations are listed.",
+      "catalogue_latest_data": "2020",
+      "verified_at": "2026-10-08T04:37:57Z",
+      "retrieved_at": "2026-10-08T04:37:57Z",
+      "kind": "layer",
+      "layer_name": "CollectionDepot",
+      "geometry_type": "esriGeometryPoint",
+      "licence": "CC BY 4.0",
+      "verified_count": 16
+    },
+    {
+      "catalogue_id": "S2095",
+      "name": "Christchurch road street-centreline and hierarchy layer",
+      "grade": "B",
+      "source_url": "https://gis.ccc.govt.nz/server/rest/services/OpenData/Road/MapServer/7",
+      "publisher": "Christchurch City Council",
+      "org": "ccc",
+      "problem_tags": [
+        "T1"
+      ],
+      "caveat": "Christchurch road geometry only; no traffic counts",
+      "catalogue_latest_data": "2026",
+      "verified_at": "2026-10-08T04:37:58Z",
+      "retrieved_at": "2026-10-08T04:37:58Z",
+      "kind": "layer",
+      "layer_name": "StreetCentreLine",
+      "geometry_type": "esriGeometryPolyline",
+      "licence_note": "Christchurch City Council open-data service; no explicit CC licence shown in layer metadata",
+      "verified_count": 12440
+    },
+    {
+      "catalogue_id": "S2162",
+      "name": "Christchurch OpenData road intersections",
+      "grade": "B",
+      "source_url": "https://gis.ccc.govt.nz/server/rest/services/OpenData/Road/FeatureServer/6",
+      "publisher": "Christchurch City Council",
+      "org": "ccc",
+      "problem_tags": [
+        "T2"
+      ],
+      "caveat": "Christchurch-only geometry, with no stated open licence.",
+      "catalogue_latest_data": "2026",
+      "verified_at": "2026-10-08T04:37:58Z",
+      "retrieved_at": "2026-10-08T04:37:58Z",
+      "kind": "layer",
+      "layer_name": "RoadIntersection",
+      "geometry_type": "esriGeometryPoint",
+      "licence_note": "Not stated in layer metadata",
+      "verified_count": 7265
+    },
+    {
+      "catalogue_id": "S2516",
+      "name": "Daily special clean areas",
+      "grade": "B",
+      "source_url": "https://apps.dunedin.govt.nz/arcgis/rest/services/Public/Roading_contract/FeatureServer/2",
+      "publisher": "Dunedin City Council",
+      "org": "dcc",
+      "problem_tags": [
+        "W3"
+      ],
+      "caveat": "Dunedin schedule is a useful model but lacks Auckland coverage.",
+      "catalogue_latest_data": null,
+      "verified_at": "2026-10-08T04:37:59Z",
+      "retrieved_at": "2026-10-08T04:37:59Z",
+      "kind": "layer",
+      "layer_name": "Daily special clean areas",
+      "geometry_type": "esriGeometryPolygon",
+      "licence_note": "Not stated in REST metadata",
+      "verified_count": 3
+    },
+    {
+      "catalogue_id": "S2516",
+      "name": "Routine street cleaning - daily",
+      "grade": "B",
+      "source_url": "https://apps.dunedin.govt.nz/arcgis/rest/services/Public/Roading_contract/FeatureServer/3",
+      "publisher": "Dunedin City Council",
+      "org": "dcc",
+      "problem_tags": [
+        "W3"
+      ],
+      "caveat": "Dunedin schedule is a useful model but lacks Auckland coverage.",
+      "catalogue_latest_data": null,
+      "verified_at": "2026-10-08T04:38:01Z",
+      "retrieved_at": "2026-10-08T04:38:01Z",
+      "kind": "layer",
+      "layer_name": "Routine street cleaning - daily",
+      "geometry_type": "esriGeometryPolyline",
+      "licence_note": "Not stated in REST metadata",
+      "verified_count": 99
+    },
+    {
+      "catalogue_id": "S2516",
+      "name": "Routine street cleaning - weekly",
+      "grade": "B",
+      "source_url": "https://apps.dunedin.govt.nz/arcgis/rest/services/Public/Roading_contract/FeatureServer/4",
+      "publisher": "Dunedin City Council",
+      "org": "dcc",
+      "problem_tags": [
+        "W3"
+      ],
+      "caveat": "Dunedin schedule is a useful model but lacks Auckland coverage.",
+      "catalogue_latest_data": null,
+      "verified_at": "2026-10-08T04:38:03Z",
+      "retrieved_at": "2026-10-08T04:38:03Z",
+      "kind": "layer",
+      "layer_name": "Routine street cleaning - weekly",
+      "geometry_type": "esriGeometryPolyline",
+      "licence_note": "Not stated in REST metadata",
+      "verified_count": 195
+    },
+    {
+      "catalogue_id": "S2516",
+      "name": "Routine street cleaning - fortnightly",
+      "grade": "B",
+      "source_url": "https://apps.dunedin.govt.nz/arcgis/rest/services/Public/Roading_contract/FeatureServer/5",
+      "publisher": "Dunedin City Council",
+      "org": "dcc",
+      "problem_tags": [
+        "W3"
+      ],
+      "caveat": "Dunedin schedule is a useful model but lacks Auckland coverage.",
+      "catalogue_latest_data": null,
+      "verified_at": "2026-10-08T04:38:05Z",
+      "retrieved_at": "2026-10-08T04:38:05Z",
+      "kind": "layer",
+      "layer_name": "Routine street cleaning - fortnightly",
+      "geometry_type": "esriGeometryPolyline",
+      "licence_note": "Not stated in REST metadata",
+      "verified_count": 7
+    },
+    {
+      "catalogue_id": "S2516",
+      "name": "Green Island tunnels - monthly",
+      "grade": "B",
+      "source_url": "https://apps.dunedin.govt.nz/arcgis/rest/services/Public/Roading_contract/FeatureServer/6",
+      "publisher": "Dunedin City Council",
+      "org": "dcc",
+      "problem_tags": [
+        "W3"
+      ],
+      "caveat": "Dunedin schedule is a useful model but lacks Auckland coverage.",
+      "catalogue_latest_data": null,
+      "verified_at": "2026-10-08T04:38:07Z",
+      "retrieved_at": "2026-10-08T04:38:07Z",
+      "kind": "layer",
+      "layer_name": "Green Island tunnels - monthly",
+      "geometry_type": "esriGeometryPolyline",
+      "licence_note": "Not stated in REST metadata",
+      "verified_count": 2
+    },
+    {
+      "catalogue_id": "S2516",
+      "name": "Street cleaning - Stadium",
+      "grade": "B",
+      "source_url": "https://apps.dunedin.govt.nz/arcgis/rest/services/Public/Roading_contract/FeatureServer/7",
+      "publisher": "Dunedin City Council",
+      "org": "dcc",
+      "problem_tags": [
+        "W3"
+      ],
+      "caveat": "Dunedin schedule is a useful model but lacks Auckland coverage.",
+      "catalogue_latest_data": null,
+      "verified_at": "2026-10-08T04:38:09Z",
+      "retrieved_at": "2026-10-08T04:38:09Z",
+      "kind": "layer",
+      "layer_name": "Street cleaning - Stadium",
+      "geometry_type": "esriGeometryPolyline",
+      "licence_note": "Not stated in REST metadata",
+      "verified_count": 115
+    },
+    {
+      "catalogue_id": "S2516",
+      "name": "Leaf clearing",
+      "grade": "B",
+      "source_url": "https://apps.dunedin.govt.nz/arcgis/rest/services/Public/Roading_contract/FeatureServer/8",
+      "publisher": "Dunedin City Council",
+      "org": "dcc",
+      "problem_tags": [
+        "W3"
+      ],
+      "caveat": "Dunedin schedule is a useful model but lacks Auckland coverage.",
+      "catalogue_latest_data": null,
+      "verified_at": "2026-10-08T04:38:11Z",
+      "retrieved_at": "2026-10-08T04:38:11Z",
+      "kind": "layer",
+      "layer_name": "Leaf clearing",
+      "geometry_type": "esriGeometryPolyline",
+      "licence_note": "Not stated in REST metadata",
+      "verified_count": 317
+    },
+    {
+      "catalogue_id": "S2516",
+      "name": "Street cleaning zones",
+      "grade": "B",
+      "source_url": "https://apps.dunedin.govt.nz/arcgis/rest/services/Public/Roading_contract/FeatureServer/12",
+      "publisher": "Dunedin City Council",
+      "org": "dcc",
+      "problem_tags": [
+        "W3"
+      ],
+      "caveat": "Dunedin schedule is a useful model but lacks Auckland coverage.",
+      "catalogue_latest_data": null,
+      "verified_at": "2026-10-08T04:38:13Z",
+      "retrieved_at": "2026-10-08T04:38:13Z",
+      "kind": "layer",
+      "layer_name": "Street cleaning zones",
+      "geometry_type": "esriGeometryPolygon",
+      "licence_note": "Not stated in REST metadata",
+      "verified_count": 17
+    },
+    {
+      "catalogue_id": "S2686",
+      "name": "Flooded NZ public flood-experience submissions (Survey123 feature layer)",
+      "grade": "A",
+      "source_url": "https://services-ap1.arcgis.com/eqbFSejuTufXDr0E/arcgis/rest/services/flooded_nz_gdb_v2_202603181308/FeatureServer/0",
+      "publisher": "Auckland Council (Flooded NZ)",
+      "org": "flooded",
+      "problem_tags": [
+        "F1"
+      ],
+      "caveat": "Depth bands are self-reported and layer has no stated reuse licence. Other fields include personal contact details; select observation fields explicitly and do not redistribute submissions without checking their terms.",
+      "catalogue_latest_data": "live",
+      "verified_at": "2026-10-08T04:38:00Z",
+      "retrieved_at": "2026-10-08T04:38:00Z",
+      "kind": "layer",
+      "layer_name": "survey",
+      "geometry_type": "esriGeometryPoint",
+      "licence_note": "No licence specified in ArcGIS item metadata; form includes terms-of-use fields",
+      "latest_data": "2026-07-28T04:27:28Z",
+      "verified_count": 742,
+      "recommended_fields": "objectid,obs_date,impact,obs_depth,obs_depth_v2,historic"
+    },
+    {
+      "catalogue_id": "S2927",
+      "name": "DCC Public Search formed-roads feature layer",
+      "grade": "B",
+      "source_url": "https://apps.dunedin.govt.nz/arcgis/rest/services/Public/Search/FeatureServer/0",
+      "publisher": "Dunedin City Council",
+      "org": "dcc",
+      "problem_tags": [
+        "T3"
+      ],
+      "caveat": "Dunedin formed roads only; no traffic or closure attributes.",
+      "catalogue_latest_data": null,
+      "verified_at": "2026-10-08T04:38:00Z",
+      "retrieved_at": "2026-10-08T04:38:00Z",
+      "kind": "layer",
+      "layer_name": "Formed Roads",
+      "geometry_type": "esriGeometryPolyline",
+      "licence_note": "No licence declared in ArcGIS metadata",
+      "verified_count": 2259
+    },
+    {
+      "catalogue_id": "S2932",
+      "name": "Hamilton City Council Road Hierarchy 2026 GIS layer",
+      "grade": "A",
+      "source_url": "https://services1.arcgis.com/R6s0QqCMQdwKY6yp/arcgis/rest/services/RoadHierarchy20260623/FeatureServer/0",
+      "publisher": "Hamilton City Council",
+      "org": "hcc",
+      "problem_tags": [
+        "T3"
+      ],
+      "caveat": "Hamilton road hierarchy only; no work or closure status.",
+      "catalogue_latest_data": "2026",
+      "verified_at": "2026-10-08T04:38:00Z",
+      "retrieved_at": "2026-10-08T04:38:00Z",
+      "kind": "layer",
+      "layer_name": "Road_PairwiseDissolve",
+      "geometry_type": "esriGeometryPolyline",
+      "licence_note": "Not specified in ArcGIS item metadata",
+      "latest_data": "2026-06-23T01:27:01Z",
+      "verified_count": 2416
+    },
+    {
+      "catalogue_id": "S2933",
+      "name": "Hamilton City Council Transport Renewals GIS (road surface renewal layer)",
+      "grade": "A",
+      "source_url": "https://services1.arcgis.com/R6s0QqCMQdwKY6yp/arcgis/rest/services/Transport_Renewals/FeatureServer/2",
+      "publisher": "Hamilton City Council",
+      "org": "hcc",
+      "problem_tags": [
+        "T3"
+      ],
+      "caveat": "Planned renewals lack confirmed closure status and exact dates.",
+      "catalogue_latest_data": "2026",
+      "verified_at": "2026-10-08T04:38:01Z",
+      "retrieved_at": "2026-10-08T04:38:01Z",
+      "kind": "layer",
+      "layer_name": "Road Surface Renewals",
+      "geometry_type": "esriGeometryPolygon",
+      "licence_note": "Not specified in ArcGIS metadata",
+      "latest_data": "2026-09-24T21:19:00Z",
+      "verified_count": 1429
+    }
+  ]
+}

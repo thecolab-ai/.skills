@@ -443,5 +443,41 @@
     "ok": true,
     "service_count": 1,
     "folders": []
+  },
+  {
+    "org": "dcc",
+    "source_url": "https://apps.dunedin.govt.nz/arcgis/rest/services",
+    "verified_at": "2026-10-08T04:35:54Z",
+    "ok": true,
+    "service_count": 0,
+    "folders": [
+      "Internal_Tools",
+      "Public",
+      "Utilities"
+    ]
+  },
+  {
+    "org": "hcc",
+    "source_url": "https://services1.arcgis.com/R6s0QqCMQdwKY6yp/arcgis/rest/services",
+    "verified_at": "2026-10-08T04:35:55Z",
+    "ok": true,
+    "service_count": 353,
+    "folders": []
+  },
+  {
+    "org": "flooded",
+    "source_url": "https://services-ap1.arcgis.com/eqbFSejuTufXDr0E/arcgis/rest/services",
+    "verified_at": "2026-10-08T04:35:57Z",
+    "ok": true,
+    "service_count": 9,
+    "folders": []
+  },
+  {
+    "org": "akl",
+    "source_url": "https://tiles.arcgis.com/tiles/n4yPwebTjJCmXB6W/arcgis/rest/services",
+    "verified_at": "2026-10-08T04:35:57Z",
+    "ok": true,
+    "service_count": 80,
+    "folders": null
   }
 ]

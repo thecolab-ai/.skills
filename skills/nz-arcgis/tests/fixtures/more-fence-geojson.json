@@ -1,0 +1,7 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {"type": "Feature", "id": 11, "properties": {"FenceID": 11, "Height": 1.2}, "geometry": {"type": "LineString", "coordinates": [[172.636, -43.533], [172.637, -43.532]]}},
+    {"type": "Feature", "id": 12, "properties": {"FenceID": 12, "Height": 1.5}, "geometry": {"type": "LineString", "coordinates": [[172.638, -43.533], [172.639, -43.532]]}}
+  ]
+}

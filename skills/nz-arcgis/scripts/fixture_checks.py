@@ -288,6 +288,8 @@ def run():
             assert code==2 and data['results']==[] and data['meta']['source_url']==AT and data['error']['type']=='invalid_input' and not err.getvalue()
     print('[PASS] fixture partial/all-root failures, unsafe folders, unsupported layer and stdout errors')
     print('[PASS] fixture service discovery, curated filtering, CSV and provenance')
+    from more_fixture_checks import run as run_more
+    run_more()
 
 
 if __name__=='__main__':run()
