@@ -1,0 +1,5 @@
+FatalID,Year,Month,Month_Year,AFF2017,AFF2017_Lvl2,IndustryLvl1,IndustryLvl2,IndustryLvl3,IndustryLvl4,local_government_region,Local_Government_District,Age,Age_Group,Worker_Or_MemberOfThePublic,Classification,Minor_Classification_Group,Major_Classification_Group,WorkSafe_Confirmed_Fatalities
+synthetic-0,2024,1,synthetic period,Construction,Synthetic subgroup,Construction,Synthetic industry two,Synthetic industry three,Synthetic industry four,Auckland,,,,,,,,
+synthetic-1,2024,2,synthetic period,Construction,Synthetic subgroup,Construction,Synthetic industry two,Synthetic industry three,Synthetic industry four,Auckland,,,,,,,,
+synthetic-2,2025,1,synthetic period,Manufacturing,Synthetic subgroup,Manufacturing,Synthetic industry two,Synthetic industry three,Synthetic industry four,Waikato,,,,,,,,
+synthetic-3,2025,1,synthetic period,Construction,Synthetic subgroup,Construction,Synthetic industry two,Synthetic industry three,Synthetic industry four,Waikato,,,,,,,,
