@@ -44,6 +44,19 @@ assert [report["report_type"] for report in footer_reports[:1]] == ["School Eval
 assert footer_reports[0]["published_on"] == "2026-05-14"
 assert all(report["report_type"] != "Other Reports" for report in footer_reports)
 
+dated_page = parse_page((S / "tests/fixtures/dated_report_body.html").read_text(),
+                        "https://www.ero.govt.nz/institution/54/example", "2026-10-08T00:00:00Z")
+dated_reports = report_sections(dated_page)
+assert len(dated_reports) == 1 and dated_reports[0]['published_on'] == '2026-10-01'
+assert dated_reports[0]['school'] == 'Synthetic Secondary School'
+assert dated_reports[0]['id'] == '54/2026-10-01:synthetic-secondary-school-october-2026'
+assert [part['heading'] for part in dated_reports[0]['sections']] == [
+    'Synthetic Secondary School - October 2026',
+    'Board Assurance with Regulatory and Legislative Requirements Report 2026 to 2029',
+    'Board Administration', 'Further Information', 'About the School']
+assert 'Other Reports' not in str(dated_reports)
+print('[PASS] fixture current ERO dated report body, void HTML tags and footer boundaries')
+
 payload = json.loads((S / "tests/fixtures/reports_api.json").read_text())
 api_rows = report_organisation_rows(payload, "2026-07-19T00:00:00Z", "54")
 assert api_rows == [

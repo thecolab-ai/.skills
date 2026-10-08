@@ -19,7 +19,7 @@ metadata:
   thecolab.pack: "nz-public-data"
   thecolab.source_url: "https://www.publicservice.govt.nz/data/oia-statistics"
   thecolab.allowed_domains: "www.publicservice.govt.nz"
-  thecolab.last_verified: "2026-07-19"
+  thecolab.last_verified: "2026-10-08"
   thecolab.health: "healthy"
   thecolab.maintainer: "@adam91holt"
 ---
@@ -30,7 +30,7 @@ metadata:
 
 Expose the Public Service Commission six-monthly Official Information Act (OIA) statistics in a small, deterministic CLI that removes scraping friction for downstream civic-transparency workflows.
 
-The skill focuses on the PSC all-data CSV series, which contains historical per-agency series from January/July 2015 onward.
+The skill uses the PSC all-data CSV and official dated release workbooks. The CSV retains historical rows, including undated records when the upstream date column is damaged.
 
 ## Use this when
 
@@ -70,8 +70,9 @@ python3 skills/oia-statistics-nz/scripts/cli.py <command> [flags]
 
 - No API key, auth, or browser automation required for implemented commands.
 - Network timeout and upstream-unavailable handling are built in for blocked upstreams.
-- CSV is the preferred parse format because this repo avoids non-stdlib XLSX dependencies.
-- XLSX/period releases are discoverable and referenced through `tables`, and the CLI documents that structured parsing is not implemented for XLSX in this skill.
+- CSV remains preferred. If its reporting dates are invalid, `scripts/oia_workbooks.py` reads dated release workbooks using stdlib ZIP/XML.
+- Release downloads have a 24-hour cache in `.cache/` inside the skill. Cached provenance retains the original retrieval time.
+- Recovery never infers dates from CSV row order. Unmatched historical records remain undated and are excluded from period totals. Published ID conflicts remain explicit warnings; use exact agency names for affected records.
 
 ## Resources
 

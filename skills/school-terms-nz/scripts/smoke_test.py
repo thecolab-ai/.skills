@@ -9,11 +9,18 @@ import subprocess
 import sys
 from contextlib import redirect_stdout
 from pathlib import Path
+from urllib.parse import urlparse
 
 SKILL_DIR = Path(__file__).resolve().parents[1]
 CLI = SKILL_DIR / "scripts" / "cli.py"
 FIXTURE = SKILL_DIR / "tests" / "fixtures" / "source-sample.html"
 SOURCE_URL = "https://www.education.govt.nz/school/school-terms-and-holidays"
+
+
+def valid_source_url(url):
+    parsed = urlparse(url)
+    return parsed.scheme == 'https' and parsed.hostname == 'www.education.govt.nz' and parsed.path.rstrip('/') in {
+        '/school/school-terms-and-holidays', '/en/school/school-terms-and-holidays'}
 
 
 def load_cli():
@@ -185,7 +192,7 @@ def opening_window_response_envelope() -> None:
 
     assert set(payload) == {"status", "source_url", "fetched_at", "provenance", "kind", "date", "break"}
     assert payload["status"] == "ok"
-    assert payload["source_url"] == SOURCE_URL
+    assert valid_source_url(payload["source_url"])
     assert payload["fetched_at"] == "2026-09-03T00:00:00Z"
     assert payload["kind"] == "next_break"
     assert payload["date"] == "2026-02-01"
@@ -667,10 +674,38 @@ def oversized_timeout_is_safe() -> None:
 results.append(check("oversized timeout returns concise structured exit 2", oversized_timeout_is_safe))
 
 
+def live_probe(probe=run):
+    result = probe(['years', '--timeout', '10', '--json'], timeout=20)
+    if result.returncode in {4, 5}:
+        result = probe(['years', '--timeout', '10', '--json'], timeout=20)
+    return result
+
+
+
+
+def live_probe_contract():
+    calls = []
+    def unavailable(*args, **kwargs):
+        calls.append(args)
+        return subprocess.CompletedProcess([], 5, '{}', '')
+    assert live_probe(unavailable).returncode == 5 and len(calls) == 2
+    calls.clear()
+    def schema_error(*args, **kwargs):
+        calls.append(args)
+        return subprocess.CompletedProcess([], 6, '{}', '')
+    assert live_probe(schema_error).returncode == 6 and len(calls) == 1
+    assert valid_source_url(SOURCE_URL)
+    assert valid_source_url('https://www.education.govt.nz/en/school/school-terms-and-holidays')
+    assert not valid_source_url('https://example.org/school/school-terms-and-holidays')
+    assert not valid_source_url('https://www.education.govt.nz/unrelated')
+
+results.append(check('live retry bound and official language redirects retain strict source identity', live_probe_contract))
+
+
 if not all(results):
     raise SystemExit(1)
 
-live = run(["years", "--timeout", "10", "--json"], timeout=20)
+live = live_probe()
 text = live.stdout or live.stderr
 try:
     payload = json.loads(text)
@@ -685,7 +720,7 @@ if live.returncode != 0:
     print(f"[FAIL] live source command failed with exit {live.returncode}: {payload}")
     raise SystemExit(1)
 assert payload["status"] == "ok"
-assert payload["source_url"] == SOURCE_URL
+assert valid_source_url(payload["source_url"])
 assert payload["fetched_at"].endswith("Z")
 assert payload["provenance"]["source_owner"] == "New Zealand Ministry of Education"
 assert "does not relicense source content" in payload["provenance"]["source_content_notice"]

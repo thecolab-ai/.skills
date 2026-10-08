@@ -7,7 +7,7 @@
 - Declared outbound host: `www.education.govt.nz`
 - Access: public HTML over HTTPS; no account or browser required
 - Authentication: none
-- Last verified: 2026-09-03
+- Last verified: 2026-10-08
 - Verification result: HTTP 200 with complete current 2026, 2027 and 2028 sections plus a complete past-year 2025 section
 - Intended cache duration: 24 hours
 
@@ -45,3 +45,5 @@ The CLI therefore returns explicit `certainty` and `caveat` fields rather than i
 ## Failure and maintenance expectations
 
 Valid commands use the repository `nzfetch` helper with a 10-second default timeout and an exact outbound-host allowlist; malformed local date inputs fail before that request. HTTP blocks/rate limits are exit 4; transport/upstream errors are exit 5; malformed source content is exit 6. Do not add unofficial mirrors, historical datasets, school-directory data or browser automation without a separate reviewed scope and updated metadata.
+
+The live probe retries exits 4/5 once and accepts the canonical Ministry page or its official `/en/` language path. It still rejects other pages and parser errors. On 8 October, the source returned HTTP 307 without a Location header; this is reported as upstream unavailable.

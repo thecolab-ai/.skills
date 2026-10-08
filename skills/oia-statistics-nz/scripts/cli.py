@@ -9,16 +9,23 @@ import argparse
 import csv
 import html
 import io
+import hashlib
+import os
+import tempfile
+import time
+import zipfile
+from concurrent.futures import ThreadPoolExecutor
 import json
 import pathlib
 import re
 import sys
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
 import nzfetch  # noqa: E402
+from oia_workbooks import MAX_BYTES, parse_release
 
 UA = "oia-statistics-nz/1.0 (+https://github.com/thecolab-ai/.skills)"
 LANDING_URL = "https://www.publicservice.govt.nz/data/oia-statistics"
@@ -26,7 +33,11 @@ CSV_URLS = [
     "https://www.publicservice.govt.nz/assets/DirectoryFile/v_OIAStatisticsAllDataResults-1.csv",
     "https://www.publicservice.govt.nz/assets/v_OIAStatisticsAllDataResults-1.csv",
 ]
-DEFAULT_TIMEOUT = 30
+DEFAULT_TIMEOUT = 10
+CACHE_DIR = pathlib.Path(__file__).resolve().parents[1] / ".cache"
+CACHE_TTL = 24 * 60 * 60
+RECOVERY_WARNINGS = []
+RECOVERY_SOURCES = {}
 class UpstreamUnavailable(RuntimeError):
     """Raised when PSC upstream cannot be reached in a blocking/outage state."""
 
@@ -65,6 +76,8 @@ def load_csv_rows(timeout: int) -> tuple[list[dict[str, str]], str]:
             except UnicodeDecodeError:
                 decoded = raw.decode("cp1252", "replace")
             reader = csv.DictReader(io.StringIO(decoded))
+            if not {'OrgID', 'Agency', 'SurveyPeriodEndDate', 'OIA_RequestsHandled'} <= set(reader.fieldnames or []):
+                raise ValueError('OIA CSV header schema changed')
             rows = [row for row in reader if row]
             if rows:
                 return rows, source
@@ -125,7 +138,13 @@ def _norm_period(raw: str | None) -> str:
     if not raw:
         return ""
     match = re.match(r"^\s*(\d{4}-\d{2}-\d{2})", str(raw).strip())
-    return match.group(1) if match else ""
+    if not match:
+        return ""
+    try:
+        datetime.strptime(match.group(1), "%Y-%m-%d")
+    except ValueError:
+        return ""
+    return match.group(1)
 
 
 def parse_period_arg(value: str | None, available: set[str]) -> str:
@@ -185,10 +204,13 @@ def row_enriched(row: dict[str, str]) -> dict[str, object]:
     timely = _as_int(_first(row, "OIAs_CompletedWithinTimeframe")) or 0
     completed_pct = _as_percent(_first(row, "Percent_OIAs_CompletedWithinTimeframe"))
     refusals_pct = _as_percent(_first(row, "Percent_OIAs_refused", "Percent_OIA_refused"))
-    extension_pct = _as_percent(_first(row, "Percent_OIA_extension"))
-    transfer_pct = _as_percent(_first(row, "Percent_OIA_transfer"))
+    extension_pct = _as_percent(_first(row, "Percent_OIA_extension", "Percent_OIAs_extension"))
+    transfer_pct = _as_percent(_first(row, "Percent_OIA_transfer", "Percent_OIAs_transfer"))
 
     return {
+        **({"source_url": row['_source_url'], "publisher": "Public Service Commission",
+            "retrieved_at": row['_retrieved_at'], "latest_data": period_end} if row.get('_source_url') else {}),
+        **({'identity_warning': row['_identity_warning']} if row.get('_identity_warning') else {}),
         "org_id": _as_int(_first(row, "OrgID")),
         "agency": _first(row, "Agency"),
         "agency_preferred_name": _first(row, "Agency_Preffered_Name", "Agency_Preferred_Name"),
@@ -279,10 +301,13 @@ def periods_summary(rows: list[dict[str, str]]) -> list[dict[str, object]]:
         published = sum((_as_int(_first(row, "OIAs_Published")) or 0) for row in period_rows)
         items.append(
             {
+                **({'source_url': period_rows[0]['_source_url'], 'publisher': 'Public Service Commission',
+                    'retrieved_at': period_rows[0]['_retrieved_at'], 'latest_data': period_end}
+                   if period_rows and period_rows[0].get('_source_url') else {}),
                 "period_end": period_end,
                 "period_label": period_label(period_end),
                 "rows": len(period_rows),
-                "agency_count": len({str(_first(r, "OrgID")) for r in period_rows}),
+                "agency_count": len({(_first(r, "OrgID"), _first(r, "Agency")) for r in period_rows}),
                 "requests_handled": requests,
                 "responses_published": published,
                 "requests_completed_within_timeframe": on_time,
@@ -325,8 +350,130 @@ def _match_agency_rows(rows: list[dict[str, str]], query: str) -> list[dict[str,
     return contains_matches
 
 
+def cached_release(url, timeout):
+    key = hashlib.sha256(url.encode()).hexdigest()
+    target = CACHE_DIR / (key + '.xlsx')
+    try:
+        age = time.time() - target.stat().st_mtime
+        if 0 <= age < CACHE_TTL and target.stat().st_size <= MAX_BYTES:
+            body = target.read_bytes()
+            if zipfile.is_zipfile(io.BytesIO(body)):
+                return body, datetime.fromtimestamp(target.stat().st_mtime, timezone.utc).isoformat().replace('+00:00', 'Z')
+    except OSError:
+        pass
+    try:
+        body, _ct, _source = nzfetch.fetch_bytes(url, timeout=timeout, max_bytes=MAX_BYTES,
+                                                allowed_hosts={'www.publicservice.govt.nz'})
+    except nzfetch.FetchError as exc:
+        raise UpstreamUnavailable(str(exc)) from exc
+    if not zipfile.is_zipfile(io.BytesIO(body)):
+        raise ValueError('OIA release download was not a valid XLSX workbook')
+    stamp = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+    try:
+        CACHE_DIR.mkdir(exist_ok=True)
+        with tempfile.NamedTemporaryFile(dir=CACHE_DIR, delete=False) as handle:
+            temporary = pathlib.Path(handle.name)
+            handle.write(body)
+        os.replace(temporary, target)
+    except OSError:
+        pass
+    return body, stamp
+
+
+def recover_release_periods(rows, releases):
+    """Use exact agency identity and published counts, never CSV row order."""
+    count_fields = ('OIA_RequestsHandled', 'OIAs_CompletedWithinTimeframe',
+                    'OIAs_Published', 'Ombudsman_Complaints', 'FinalOpinionsbyOmbudsman')
+    index = defaultdict(list)
+    for row in agency_rows(rows):
+        signature = tuple(_as_int(row.get(key)) for key in count_fields[:3])
+        index[signature].append(row)
+    consumed = set()
+    recovered = []
+    agency_identities = {(row['OrgID'], row['Agency']): row for row in agency_rows(rows)}
+    def name_matches(row, name):
+        def normal(value):
+            return ' '.join(re.sub(r'[^\w?]', ' ', value.casefold().replace('&', ' and ')).split())
+        name = normal(name)
+        names = [_first(row, 'Agency'), _first(row, 'Agency_Preffered_Name', 'Agency_Preferred_Name')]
+        for original in names:
+            candidate = normal(original)
+            if not candidate:
+                continue
+            # The source CSV explicitly replaces some Māori letters with '?'.
+            # Match each such placeholder to exactly one letter, with all other
+            # words exact. This is combined with exact published count matches.
+            pattern = re.escape(candidate).replace(r'\?', r'[^\W\d_]')
+            if re.fullmatch(pattern, name) or (len(candidate) >= 12
+                    and re.search(r'(?<!\w)' + pattern + r'(?!\w)', name)):
+                return True
+        return False
+    for period, url, stamp, records in releases:
+        for record in records:
+            signature = tuple(_as_int(record.get(key)) for key in count_fields[:3])
+            if None in signature:
+                continue
+            candidates = [row for row in index.get(signature, [])
+                          if all(_as_int(record.get(key)) is None
+                                 or _as_int(row.get(key)) == _as_int(record[key])
+                                 for key in count_fields[3:])]
+            identity_rows = [row for row in agency_identities.values() if name_matches(row, record['Agency'])]
+            if len(identity_rows) == 1:
+                resolved = identity_rows[0]
+                record = dict(record, OrgID=resolved['OrgID'])
+                candidates = [row for row in candidates if row['OrgID'] == resolved['OrgID']]
+            elif record.get('OrgID'):
+                candidates = [row for row in candidates if row.get('OrgID') == record['OrgID']]
+            else:
+                candidates = []
+            ids = {row['OrgID'] for row in candidates}
+            if len(ids) == 1:
+                original = next((row for row in candidates if id(row) not in consumed), candidates[0])
+                consumed.add(id(original))
+                # Published metrics and dates come from the release; the CSV
+                # supplies the stable ID and backwards-compatible agency names.
+                restored = dict(original, **{key: value for key, value in record.items()
+                    if key not in {'Agency', 'Agency_Type', 'OrgID'} and not key.startswith('_')})
+                restored.update(Agency=record['Agency'], _source_url=url, _retrieved_at=stamp)
+                recovered.append(restored)
+            elif record.get('OrgID'):
+                recovered.append(dict(record, _source_url=url, _retrieved_at=stamp))
+    identities = defaultdict(list)
+    for row in recovered:
+        identities[(row.get('OrgID'), row['SurveyPeriodEndDate'])].append(row)
+    for group in identities.values():
+        if len(group) > 1:
+            for row in group:
+                row['_identity_warning'] = 'The published sources reuse this ID for different agencies in this period; use the exact agency name.'
+    # Identical source counts across releases do not create ambiguous dates:
+    # each dated record is independently stated in its official workbook.
+    repaired = recovered + [row for row in rows if id(row) not in consumed]
+    if not _rows_by_period(repaired):
+        raise ValueError('OIA source contained no recoverable survey periods')
+    return repaired
+
+
 def load_rows(timeout: int) -> tuple[list[dict[str, str]], str]:
-    return load_csv_rows(timeout)
+    rows, source = load_csv_rows(timeout)
+    if _rows_by_period(rows):
+        return rows, source
+    tables = [table for table in discover_tables(timeout)
+              if table['format'] == 'xlsx' and table['period']]
+    if not tables:
+        raise ValueError('OIA CSV reporting dates are invalid and no dated release workbooks were found')
+    if len(tables) > 40:
+        raise ValueError('OIA release listing exceeds the bounded recovery limit')
+    def read(table):
+        body, stamp = cached_release(table['url'], timeout)
+        return table['period'], table['url'], stamp, parse_release(body, table['period'])
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        releases = list(executor.map(read, tables))
+    repaired = recover_release_periods(rows, releases)
+    RECOVERY_SOURCES.update({period: (url, stamp) for period, url, stamp, records in releases})
+    undated = sum(not _norm_period(row.get('SurveyPeriodEndDate')) for row in agency_rows(repaired))
+    RECOVERY_WARNINGS[:] = [f'The all-data CSV has lost its reporting dates. Official release workbooks restore exact agency/count matches; {undated} historical agency rows remain undated.',
+                           'Published tables and the CSV contain conflicting or reused IDs and some missing counts. Dates use the dated releases; use exact agency names where identity_warning is present. Undated records are excluded from period totals.']
+    return repaired, source
 
 
 def infer_period_from_text(text: str) -> str | None:
@@ -334,8 +481,8 @@ def infer_period_from_text(text: str) -> str | None:
     matches = [
         (r"(jan|january)\s*[-–—]?\s*(jun|june)\s+(\d{4})", "06-30"),
         (r"(jul|july)\s*[-–—]?\s*(dec|december)\s+(\d{4})", "12-31"),
-        (r"1\s*jan(?:uary)?\s*to\s*(?:30|31)\s*jun(?:e)?\s+(\d{4})", "06-30"),
-        (r"1\s*jul(?:y)?\s*to\s*31\s*dec(?:ember)?\s+(\d{4})", "12-31"),
+        (r"1\s*jan(?:uary)?\s*(?:\d{4}\s*)?(?:to|[-–—])\s*30\s*jun(?:e)?\s+(\d{4})", "06-30"),
+        (r"1\s*jul(?:y)?\s*(?:\d{4}\s*)?(?:to|[-–—])\s*31\s*dec(?:ember)?\s+(\d{4})", "12-31"),
     ]
     for pattern, suffix in matches:
         m = re.search(pattern, value)
@@ -418,7 +565,7 @@ def discover_tables(timeout: int) -> list[dict[str, object]]:
                 label=label or href.split("/", 1)[-1],
                 period=period,
                 ext=ext,
-                note=("csv/xlsx parse for this extension is unsupported in this stdlib-only skill" if ext in {"xlsx"} else None),
+                note=("Dated agency release tables support stdlib ZIP/XML parsing when CSV dates are unavailable." if ext in {"xlsx"} else None),
             )
         )
 
@@ -592,7 +739,7 @@ def command_totals(args: argparse.Namespace) -> dict[str, object]:
     weighted_median_sum = 0.0
 
     for row in agency_rows(period_rows):
-        agency_ids.add(str(_first(row, "OrgID")))
+        agency_ids.add((_first(row, "OrgID"), _first(row, "Agency")))
         enriched = row_enriched(row)
         handled = enriched.get("requests_handled") or 0
         totals["requests_handled"] += int(handled)
@@ -834,10 +981,21 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         payload = args.func(args)
+        payload['meta'] = {'source_url': payload.get('source', LANDING_URL),
+                           'publisher': 'Public Service Commission',
+                           'retrieved_at': datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')}
+        latest = payload.get('latest_period') or payload.get('period_end')
+        if latest:
+            payload['meta']['latest_data'] = latest
+            if latest in RECOVERY_SOURCES:
+                url, stamp = RECOVERY_SOURCES[latest]
+                payload['meta'].update(source_url=url, retrieved_at=stamp)
+        if RECOVERY_WARNINGS:
+            payload['warnings'] = list(RECOVERY_WARNINGS)
         emit(payload, bool(args.json))
         return 0
     except ValueError as exc:
-        die(str(exc))
+        die(str(exc), code=6 if str(exc).startswith('OIA ') else 1)
     except UpstreamUnavailable as exc:
         if getattr(args, "json", False):
             print(

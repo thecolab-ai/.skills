@@ -19,7 +19,7 @@ metadata:
   thecolab.pack: "nz-public-data"
   thecolab.source_url: "https://www.education.govt.nz/school/school-terms-and-holidays"
   thecolab.allowed_domains: "www.education.govt.nz"
-  thecolab.last_verified: "2026-09-03"
+  thecolab.last_verified: "2026-10-08"
   thecolab.health: "healthy"
   thecolab.maintainer: "@adam91holt"
 ---

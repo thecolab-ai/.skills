@@ -36,11 +36,12 @@ The CSV contains columns including:
   - period summary PDFs
   - per-period XLSX tables
   - all-data CSV (`/assets/DirectoryFile/v_OIAStatisticsAllDataResults-1.csv`, the same file linked from the page)
-- CLI commands use only stdlib parsing of the CSV.
+- CLI commands use stdlib CSV and, when dates are damaged, ZIP/XML parsing of the dated release workbooks.
 
 ## Caveats / limitations
 
 - Hosted pages can intermittently be protected; commands use a browser-like User-Agent and include retry-light failure handling.
-- XLSX parsing is intentionally not implemented in this skill because the repo requires stdlib-only parsing and XLSX dependencies are excluded.
-- The CLI still exposes discovered XLSX/CSV/PDF resources from the page in `tables`.
+- On 8 October 2026, every all-data CSV date was `00:00.0`. The fallback discovers the published half-year XLSX releases; annual 2015/16 and 2016/17 tables cannot establish the CSV’s six-month cut dates and are not guessed.
+- `tables` exposes the official download URLs. At most 40 dated releases are recovered using four bounded concurrent requests and a 24-hour local cache.
+- Published workbooks and the CSV also contain shifted/reused agency IDs. Warnings remain visible, affected records carry `identity_warning`, and exact agency names should be used for them. Counts and reporting periods come from the dated releases. Undated CSV rows remain available in agency history.
 - Percent columns in source can appear as either fractions (`0.978`) or percentages (`97.8`); the CLI normalises to percentage values for command output and sorting.
