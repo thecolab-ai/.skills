@@ -25,7 +25,7 @@ from provenance import result_envelope, error_envelope, geojson_envelope
 
 ROOT = Path(__file__).resolve().parents[1]
 CACHE = Path(os.environ.get('XDG_CACHE_HOME') or Path.home() / '.cache') / 'nz-recycling-locator'
-PARSER_VERSION = 2
+PARSER_VERSION = 4
 TTL = 86400
 PRIMARY_URL = 'https://www.recyclemap.co.nz/'
 RM = 'https://www.recyclemap.co.nz/wp-json/wpgmza/v1/'
@@ -40,10 +40,16 @@ SOURCES = {
     'branz': {'url': 'https://services7.arcgis.com/vkPf8weODt71Prmb/arcgis/rest/services/Waste_Map_Facility_Locations/FeatureServer/0', 'publisher': 'BRANZ', 'kind': 'ArcGIS JSON', 'licence': None},
     'agrecovery': {'url': 'https://agrecovery.co.nz/wp-json/wp/v2/ag_site?per_page=100&page=1&acf_format=standard&_fields=id,title,acf&orderby=title&order=asc', 'publisher': 'Agrecovery', 'kind': 'JSON', 'licence': None},
     'beautification': {'url': 'https://api.mapme.com/api/stories/aggregated/af29690b-4cd0-484f-a211-8f3e12fa51b4', 'publisher': 'Beautification Trust', 'kind': 'JSON', 'licence': None},
+    'trow': {'url': 'https://base44.app/api/apps/68e5846a599cc4e55639725b/entities/Item?sort=-created_date&limit=1000', 'publisher': 'TROW Group', 'kind': 'JSON stock grouped by location', 'licence': None},
+    'christchurch': {'url': 'https://gis.ccc.govt.nz/server/rest/services/OpenData/SiteUtility/FeatureServer/9', 'publisher': 'Christchurch City Council', 'kind': 'ArcGIS JSON', 'licence': None},
+    'zerowaste': {'url': 'https://zerowaste.co.nz/wp-json/wpgmza/v1/markers?map_id=2', 'publisher': 'Zero Waste Aotearoa', 'kind': 'JSON member map', 'licence': None},
+    'habitat': {'url': 'https://www.habitat.org.nz/op-shops', 'publisher': 'Habitat for Humanity New Zealand', 'kind': 'HTML directory', 'licence': None},
+    'crc': {'url': 'https://www.makingzerowastework.org.nz/find-your-local-crc', 'publisher': 'Zero Waste Tāmaki Makaurau Trust', 'kind': 'HTML directory', 'licence': None},
     'techcollect': {'url': 'https://techcollect.nz/', 'publisher': 'TechCollect NZ', 'kind': 'unsupported', 'licence': None},
 }
-DEFAULT_SOURCES = [s for s in SOURCES if s not in ('council', 'techcollect')]
-FETCH_HOSTS = {urlparse(SOURCES[s]['url']).hostname for s in DEFAULT_SOURCES}
+DEFAULT_SOURCES = [s for s in SOURCES if s not in ('council', 'techcollect', 'trow')]
+FETCH_HOSTS = {urlparse(spec['url']).hostname for source, spec in SOURCES.items()
+               if source not in ('council', 'techcollect')}
 
 
 class SourceError(Exception):
@@ -280,6 +286,123 @@ def parse_beautification(data, retrieved):
     return rows
 
 
+def parse_trow(data, retrieved):
+    """Return locations with available/pre-sale stock, never seller/account data."""
+    require(isinstance(data, list) and data, 'TROW ReStore stock array is missing')
+    require(len(data) < 1000, 'TROW ReStore reached the 1,000-item bound; refusing incomplete data')
+    groups = {}
+    for item in data:
+        require(isinstance(item, dict) and all(k in item for k in ('location', 'status', 'category')),
+                'TROW ReStore location/status/category fields are missing')
+        require(item['status'] in ('available', 'pre-sale', 'sold'), 'TROW ReStore stock status is unknown')
+        if item['status'] == 'sold':
+            continue
+        location = clean(item['location'])
+        # These two publisher labels refer to the same yard. Keep other and
+        # unspecified locations separate rather than guessing from locality.
+        if location.casefold() in ('trow group yard, ranui', 'trow yard - ranui. auckland 0612'):
+            location = 'Trow Group Yard, Ranui'
+        group = groups.setdefault(location, {'materials': set(), 'available': 0, 'pre-sale': 0, 'dates': []})
+        group['materials'].add(clean(item['category']))
+        group[item['status']] += 1
+        if item.get('updated_date'):
+            group['dates'].append(str(item['updated_date']))
+    require(groups, 'TROW ReStore returned no available or pre-sale locations')
+    latest = max((date for group in groups.values() for date in group['dates']), default=None)
+    return [record('trow', 'TROW ReStore — ' + (location or 'location not stated'), location,
+                   materials=['Reuse', 'Salvaged building materials'] + sorted(g['materials']),
+                   details='Stock location, not confirmed donation acceptance. Pre-sale items may not be ready; arrange collection with TROW.',
+                   retrieved=retrieved, latest=latest, available_items=g['available'],
+                   pre_sale_items=g['pre-sale'], website='https://trowrestore.com/')
+            for location, g in sorted(groups.items())]
+
+
+def parse_christchurch(data, retrieved, url=None):
+    require(isinstance(data, dict) and 'features' in data and not data.get('error'),
+            'Christchurch collection-depot features are missing')
+    require(not data.get('exceededTransferLimit'), 'Christchurch depot query was truncated; refusing incomplete data')
+    require(data.get('spatialReference', {}).get('wkid') == 4326,
+            'Christchurch depot response must use WGS84 (outSR=4326)')
+    dates = [f['attributes'].get('LastEditDate') for f in data['features']]
+    latest = branz_latest({'editingInfo': {'dataLastEditDate': max((d for d in dates if d is not None), default=None)}})
+    rows = []
+    for feature in data['features']:
+        a, g = feature['attributes'], feature.get('geometry') or {}
+        require(all(key in a for key in ('DepotName', 'AcceptsRefuse', 'AcceptsRecycling', 'AcceptsGreenWaste')),
+                'Christchurch depot name/acceptance fields are missing')
+        materials = [label for field, label in (('AcceptsRefuse', 'Refuse'), ('AcceptsRecycling', 'Recycling'),
+                                               ('AcceptsGreenWaste', 'Green waste')) if a[field] == 1]
+        rows.append(record('christchurch', a['DepotName'], lon=g.get('x'), lat=g.get('y'),
+                           materials=materials, hours=a.get('OperatingHours'),
+                           details='Council collection depot. Broad acceptance flags do not specify individual materials or reuse services.',
+                           url=url, retrieved=retrieved, latest=latest, id=a['CollectionDepotID']))
+    require(rows, 'Christchurch returned no collection depots')
+    return rows
+
+
+def parse_zerowaste(data, retrieved):
+    require(isinstance(data, list) and data, 'Zero Waste Aotearoa member-marker array is missing')
+    rows = []
+    for marker in data:
+        require(all(k in marker for k in ('id', 'title', 'map_id', 'lat', 'lng')),
+                'Zero Waste Aotearoa marker fields are missing')
+        # The endpoint ignores map_id and returns multiple maps. Select the
+        # published member map locally, rather than mixing other map content.
+        if str(marker['map_id']) != '2':
+            continue
+        if str(marker.get('approved', '1')) != '1':
+            continue
+        rows.append(record('zerowaste', marker['title'], marker.get('address'), marker['lng'], marker['lat'],
+                           materials=['Resource recovery network member'], details=marker.get('description'),
+                           retrieved=retrieved, id=str(marker['id']), website=marker.get('link') or None))
+    require(rows, 'Zero Waste Aotearoa returned no approved members')
+    return rows
+
+
+def parse_habitat(text, retrieved):
+    class Cards(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.rows = []
+
+        def handle_starttag(self, tag, attrs):
+            a = dict(attrs)
+            if tag != 'div' or 'js-op-shop-card' not in a.get('class', '').split():
+                return
+            require(all(a.get(key) for key in ('data-id', 'data-title', 'data-address')),
+                    'Habitat op-shop card fields are missing')
+            self.rows.append(record('habitat', a['data-title'], a['data-address'], a.get('data-lng'), a.get('data-lat'),
+                                    materials=['Op Shops', 'Reuse', 'Second hand'],
+                                    details='Pre-loved goods. Confirm donation acceptance and opening hours with the store.',
+                                    retrieved=retrieved, id=a['data-id']))
+    parser = Cards()
+    parser.feed(text)
+    require(parser.rows, 'Habitat directory contains no op-shop cards')
+    require(len({r['id'] for r in parser.rows}) == len(parser.rows), 'Habitat directory contains duplicate store cards')
+    return parser.rows
+
+
+def parse_crc(text, retrieved):
+    """Read the visible CRC list; ignore unrelated Wix business coordinates."""
+    lines = page(text).lines
+    marker = 'More information about each CRC is coming soon!'
+    require(marker in lines, 'Auckland CRC directory list marker is missing')
+    start = lines.index(marker) + 1
+    end = next((i for i in range(start, len(lines)) if lines[i].startswith('©')), None)
+    require(end is not None, 'Auckland CRC directory list end is missing')
+    entries = [line for line in lines[start:end] if line.strip('\u200b \xa0')]
+    require(entries and len(entries) % 4 == 0, 'Auckland CRC directory name/locality/address structure changed')
+    rows = []
+    for i in range(0, len(entries), 4):
+        name, locality, address, display_address = entries[i:i + 4]
+        require(address.endswith('New Zealand') and re.search(r'\d', display_address),
+                'Auckland CRC directory address fields are missing')
+        rows.append(record('crc', name, address, materials=['Reuse', 'Community recycling centre'],
+                           details='Community recycling directory; confirm individual material acceptance, charges and hours with the operator.',
+                           retrieved=retrieved, locality=locality, display_address=display_address))
+    return rows
+
+
 def repair_urls(text):
     root = ET.fromstring(text)
     urls = [e.text for e in root.iter() if e.tag.endswith('}loc')]
@@ -403,6 +526,17 @@ def load_uncached(source, probe=False):
         require(rows, 'Agrecovery returned no active collection sites')
     elif source == 'beautification':
         rows = parse_beautification(get(url, True), retrieved)
+    elif source == 'trow':
+        rows = parse_trow(get(url, True), retrieved)
+    elif source == 'christchurch':
+        query = url + '/query?where=1%3D1&outFields=*&returnGeometry=true&outSR=4326&f=json'
+        rows = parse_christchurch(get(query, True), retrieved, query)
+    elif source == 'zerowaste':
+        rows = parse_zerowaste(get(url, True), retrieved)
+    elif source == 'habitat':
+        rows = parse_habitat(get(url), retrieved)
+    elif source == 'crc':
+        rows = parse_crc(get(url), retrieved)
     elif source == 'repair':
         urls = repair_urls(get(url))
         require(len(urls) <= 150, 'Repair café sitemap exceeds the 150-page bound')
@@ -504,7 +638,8 @@ ALIASES = {'battery': ['batteries', 'household batteries'], 'batteries': ['batte
            'electronics': ['e-waste', 'e-waste and electrical items'], 'tyre': ['tyres'],
            'repair': ['repair café'],
            'clothing': ['clothing', 'clothing (resalable)', 'clothing (not resalable)', 'op shops', 'textiles'],
-           'reuse': ['op shops', 'reuse', 'second hand'], 'paper': ['cardboard and paper', 'paper'],
+           'reuse': ['op shops', 'reuse', 'second hand', 'rehome'], 'rehoming': ['rehome'],
+           'salvage': ['salvaged building materials'], 'paper': ['cardboard and paper', 'paper'],
            'cardboard': ['cardboard and paper', 'cardboard'], 'metal': ['scrap metal', 'ferrous metal', 'non-ferrous metal']}
 
 
@@ -583,9 +718,12 @@ def command_sources(args):
     statuses = []
     sources = list(dict.fromkeys(args.source or SOURCES))
     with ThreadPoolExecutor(max_workers=4) as pool:
-        futures = [pool.submit(load_uncached, source, probe=True) for source in sources]
+        futures = [None if source == 'trow' and not args.source else
+                   pool.submit(load_uncached, source, probe=True) for source in sources]
         for source, future in zip(sources, futures):
             try:
+                if future is None:
+                    raise SourceError('TROW is explicit-only: use --source trow; its internal endpoint returns personal seller/account fields.', 7)
                 rows = future.result()
                 url = SOURCES[source]['url'] if source == 'repair' else rows[0]['source_url']
                 statuses.append({'source': source, 'status': 'ok', 'count': len(rows), 'kind': SOURCES[source]['kind'],
@@ -611,13 +749,17 @@ def fail_if_empty(rows, health):
 def command_data(args):
     skipped = []
     if not args.source and (args.command == 'find' or getattr(args, 'bbox', None)):
-        skipped = ['repair', 'tyrewise']
+        skipped = ['repair', 'tyrewise', 'crc']
         args.source = [s for s in DEFAULT_SOURCES if s not in skipped]
     rows, health = combined(args)
     warnings = ['Listings may be stale; confirm material restrictions, charges and opening times with the operator.',
                 'Records remain separate across sources; counts are directory entries, not unique physical sites.']
     if skipped:
-        warnings.append('repair and tyrewise listings have no coordinates; use search <town> for them.')
+        warnings.append('repair, tyrewise and crc listings have no verified coordinates; use search <town> for them. TROW requires --source trow and has no verified coordinates.')
+    if any(r['source'] == 'trow' for r in rows):
+        warnings.append('TROW lists locations of available/pre-sale stock, not confirmed donation drop-offs; unspecified locations remain unlocated.')
+    if any(r['source'] == 'zerowaste' for r in rows):
+        warnings.append('Zero Waste Aotearoa lists network members, not verified drop-offs. Some map coordinates conflict with addresses; confirm location and services with the operator.')
     for source in health:
         warnings.extend(source.get('warnings', []))
         if source['status'] != 'ok':

@@ -1,0 +1,4 @@
+[
+  {"id": "901", "map_id": "2", "title": "Example Resource Recovery Member", "address": "10 Sample Lane, Sampletown", "lat": "-36.84", "lng": "174.77", "approved": "1", "categories": ["1", "9"], "description": "<p>Contact the operator about services.</p>", "link": ""},
+  {"id": "902", "map_id": "2", "title": "Example Unapproved Member", "address": "20 Sample Lane, Sampletown", "lat": "-36.85", "lng": "174.78", "approved": "0", "categories": [], "description": "", "link": ""}
+]

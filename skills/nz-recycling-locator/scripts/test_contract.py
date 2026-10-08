@@ -116,6 +116,182 @@ class Parsers(unittest.TestCase):
         self.assertIsNone(row['lat'])
         self.assert_record(row)
 
+    def test_trow_groups_stock_locations_and_excludes_sold(self):
+        rows = cli.parse_trow(fixture('trow'), STAMP)
+        self.assertEqual(len(rows), 2)
+        yard = next(r for r in rows if r['address'])
+        self.assertEqual(yard['available_items'], 1)
+        self.assertEqual(yard['pre_sale_items'], 1)
+        self.assertIn('timber', yard['materials'])
+        self.assertNotIn('bricks', yard['materials'])
+        self.assertEqual(yard['latest_data'], '2026-09-02T09:00:00.000000')
+        self.assertTrue(cli.material_matches(yard, 'reuse'))
+        self.assertTrue(all(r['lon'] is None for r in rows))
+        self.assertFalse(any(r['address'] == 'Old Sample Yard' for r in rows))
+        self.assertNotIn('seller_email', yard)
+        self.assert_record(yard)
+        for data in ([{}], fixture('trow')[:1] * 1000,
+                     [{**fixture('trow')[0], 'status': 'unknown'}],
+                     [{**fixture('trow')[0], 'status': 'sold'}]):
+            with self.assertRaises(cli.SourceError):
+                cli.parse_trow(data, STAMP)
+
+    def test_trow_ranui_aliases_merge_without_merging_other_locations(self):
+        data = fixture('trow')
+        data[0]['location'] = 'Trow Group Yard, Ranui'
+        data[1]['location'] = 'TROW Yard - Ranui. Auckland 0612'
+        data.append({**data[0], 'location': 'Other Yard, Ranui', 'category': 'metal'})
+        rows = cli.parse_trow(data, STAMP)
+        self.assertEqual(len(rows), 3)  # One Ranui yard, another yard and unspecified.
+        yard = next(r for r in rows if r['address'] == 'Trow Group Yard, Ranui')
+        self.assertEqual((yard['available_items'], yard['pre_sale_items']), (1, 1))
+        self.assertEqual(yard['materials'], ['Reuse', 'Salvaged building materials', 'doors', 'timber'])
+        self.assertEqual(yard['latest_data'], data[1]['updated_date'])
+        self.assertEqual(cli.parse_trow(list(reversed(data)), STAMP), rows)
+        self.assertTrue(any(r['address'] == 'Other Yard, Ranui' for r in rows))
+        self.assertTrue(any(r['address'] is None for r in rows))
+
+    def test_trow_private_fields_never_reach_outputs_or_cache(self):
+        private = {'seller_email': 'synthetic-private@example.invalid',
+                   'seller_name': 'SYNTHETIC PRIVATE SELLER',
+                   'created_by': 'synthetic-private-account'}
+        data = [{**item, **private} for item in fixture('trow')]
+        with tempfile.TemporaryDirectory() as temp, patch.object(cli, 'CACHE', Path(temp)), \
+                patch.object(cli, 'get', return_value=data) as fetch:
+            rows, cached = cli.load('trow', refresh=True)
+            self.assertFalse(cached)
+            fetch.assert_called_once_with(cli.SOURCES['trow']['url'], True)
+            saved_path = Path(temp) / 'trow.json'
+            outputs = [json.dumps(rows), saved_path.read_text()]
+            for argv in (['search', 'TROW', '--json'],
+                         ['search', 'TROW', '--format', 'geojson'],
+                         ['search', 'TROW'], ['materials', '--json'],
+                         ['sources', '--json']):
+                with redirect_stdout(io.StringIO()) as out:
+                    self.assertEqual(cli.main(argv + ['--source', 'trow']), 0)
+                outputs.append(out.getvalue())
+            for output in outputs:
+                for key, value in private.items():
+                    self.assertNotIn(key, output)
+                    self.assertNotIn(value, output)
+            # Old cache entries must not bypass the new grouping parser.
+            saved = json.loads(saved_path.read_text())
+            saved['version'] = 3
+            saved['records'][0]['name'] = 'obsolete unmerged yard'
+            saved_path.write_text(json.dumps(saved))
+            reloaded, cached = cli.load('trow')
+            self.assertFalse(cached)
+            self.assertEqual(reloaded, rows)
+
+    def test_trow_requires_explicit_selection_in_queries_and_probes(self):
+        self.assertNotIn('trow', cli.DEFAULT_SOURCES)
+        self.assertIn('base44.app', cli.FETCH_HOSTS)
+        rows = cli.parse_trow(fixture('trow'), STAMP)
+        for argv in (['materials', '--json'], ['search', 'TROW', '--json'],
+                     ['find', '--material', 'reuse', '--near=174.76,-36.85', '--json'],
+                     ['search', 'TROW', '--bbox=174,-37,175,-36', '--json']):
+            with patch.object(cli, 'load', return_value=(rows, True)) as load, \
+                    redirect_stdout(io.StringIO()):
+                self.assertEqual(cli.main(argv), 0)
+            self.assertNotIn('trow', [c.args[0] for c in load.call_args_list])
+        with patch.object(cli, 'load_uncached', return_value=rows) as load, \
+                redirect_stdout(io.StringIO()) as out:
+            self.assertEqual(cli.main(['sources', '--json']), 0)
+        self.assertNotIn('trow', [c.args[0] for c in load.call_args_list])
+        status = next(s for s in json.loads(out.getvalue())['source_status'] if s['source'] == 'trow')
+        self.assertEqual(status['status'], 'skipped')
+        self.assertIn('--source trow', status['error'])
+        with patch.object(cli, 'load_uncached', return_value=rows) as load, \
+                redirect_stdout(io.StringIO()):
+            self.assertEqual(cli.main(['sources', '--source', 'trow', '--json']), 0)
+        load.assert_called_once_with('trow', probe=True)
+
+    def test_christchurch_flags_dates_wgs84_and_truncation(self):
+        data = fixture('christchurch')
+        rows = cli.parse_christchurch(data, STAMP)
+        self.assertEqual(rows[0]['materials'], ['Recycling', 'Refuse'])
+        self.assertEqual(rows[1]['materials'], ['Green waste'])
+        self.assertEqual(rows[0]['latest_data'], '2026-01-01T00:00:00.123Z')
+        self.assertEqual(rows[1]['latest_data'], rows[0]['latest_data'])
+        self.assertIsNone(rows[0]['address'])
+        self.assert_record(rows[0])
+        self.assertEqual(len(cli.spatial_filter(rows, bbox=[172.6, -43.55, 172.65, -43.5])), 1)
+        output = cli.envelope(rows, argparse.Namespace(command='search', format='geojson'),
+                              [{'source': 'christchurch', 'status': 'ok', **rows[0]['provenance']}])
+        self.assertEqual(output['features'][0]['geometry']['coordinates'], [172.61, -43.51])
+        self.assertEqual(output['meta']['latest_data'], rows[0]['latest_data'])
+        for damaged in ({**data, 'exceededTransferLimit': True},
+                        {**data, 'spatialReference': {'wkid': 2193}}, {'error': {'code': 400}}):
+            with self.assertRaises(cli.SourceError):
+                cli.parse_christchurch(damaged, STAMP)
+
+    def test_zerowaste_members_are_not_inferred_material_acceptance(self):
+        rows = cli.parse_zerowaste(fixture('zerowaste'), STAMP)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]['materials'], ['Resource recovery network member'])
+        self.assertFalse(cli.material_matches(rows[0], 'clothing'))
+        self.assertFalse(cli.material_matches(rows[0], 'reuse'))
+        self.assert_record(rows[0])
+        other_map = {**fixture('zerowaste')[0], 'map_id': '1', 'id': '903'}
+        self.assertEqual(len(cli.parse_zerowaste(fixture('zerowaste') + [other_map], STAMP)), 1)
+        with self.assertRaises(cli.SourceError):
+            cli.parse_zerowaste([other_map], STAMP)
+
+    def test_habitat_cards_ignore_unrelated_business_coordinates(self):
+        text = (FIXTURES / 'habitat.html').read_text()
+        rows = cli.parse_habitat(text, STAMP)
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0]['address'], '10 Sample Street, Sampletown')
+        self.assertEqual(rows[0]['lon'], 174.77)
+        self.assertTrue(cli.material_matches(rows[0], 'clothing'))
+        self.assert_record(rows[0])
+        for damaged in ('<html/>', text.replace('data-id="902"', 'data-id="901"'),
+                        text.replace('data-title="Example Op Shop"', 'data-title=""')):
+            with self.assertRaises(cli.SourceError):
+                cli.parse_habitat(damaged, STAMP)
+
+    def test_new_source_dispatch_and_json_provenance(self):
+        parsers = {'trow': cli.parse_trow, 'christchurch': cli.parse_christchurch,
+                   'zerowaste': cli.parse_zerowaste, 'habitat': cli.parse_habitat, 'crc': cli.parse_crc}
+        for source, parse in parsers.items():
+            data = (FIXTURES / (source + '.html')).read_text() if source in ('habitat', 'crc') else fixture(source)
+            with patch.object(cli, 'get', return_value=data) as get, patch.object(cli, 'utc_now', return_value=STAMP):
+                rows = cli.load_uncached(source)
+            self.assertEqual(get.call_count, 1)
+            if source == 'christchurch':
+                self.assertIn('outSR=4326', get.call_args.args[0])
+                self.assertEqual(rows[0]['source_url'], get.call_args.args[0])
+            code, payload = self.invoke(['search', 'Example' if source != 'trow' else 'Sampletown',
+                                         '--source', source, '--json'], [(rows, False)])
+            self.assertEqual(code, 0)
+            self.assertEqual(payload['meta']['publisher'], cli.SOURCES[source]['publisher'])
+            self.assertEqual(payload['meta']['retrieved_at'], STAMP)
+            self.assertGreater(len(payload['results']), 0)
+        rows = cli.parse_trow(fixture('trow'), STAMP)
+        code, payload = self.invoke(['search', 'TROW', '--source', 'trow', '--format', 'geojson'], [(rows, True)])
+        self.assertEqual(code, 0)
+        self.assertTrue(all(f['geometry'] is None for f in payload['features']))
+
+    def test_crc_visible_addresses_without_global_coordinates(self):
+        text = (FIXTURES / 'crc.html').read_text()
+        rows = cli.parse_crc(text, STAMP)
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0]['name'], 'Example Community Recycling Centre')
+        self.assertEqual(rows[0]['address'], '10 Sample Road, Sampletown 0999, New Zealand')
+        self.assertEqual(rows[0]['locality'], 'Sampletown')
+        self.assertTrue(all(r['lon'] is None for r in rows))
+        self.assertTrue(cli.material_matches(rows[0], 'reuse'))
+        self.assert_record(rows[0])
+        for damaged in ('<html/>', text.replace('<p>Sampletown</p>', ''), text.replace('©', 'Copyright')):
+            with self.assertRaises(cli.SourceError):
+                cli.parse_crc(damaged, STAMP)
+
+    def test_beautification_rehoming_material_aliases(self):
+        row = cli.record('beautification', 'Example Rehoming Service', materials=['Rehome'], retrieved=STAMP)
+        self.assertTrue(cli.material_matches(row, 'reuse'))
+        self.assertTrue(cli.material_matches(row, 'rehoming'))
+        self.assertFalse(cli.material_matches(row, 'repair'))
+
     def test_tyrewise_pagination_and_null_coordinates(self):
         rows, nxt = cli.parse_tyrewise((FIXTURES / 'tyrewise.html').read_text(), cli.SOURCES['tyrewise']['url'], STAMP)
         self.assertEqual(len(rows), 3)
@@ -411,6 +587,8 @@ class Parsers(unittest.TestCase):
             called = [c.args[0] for c in load.call_args_list]
             self.assertNotIn('repair', called)
             self.assertNotIn('tyrewise', called)
+            self.assertNotIn('trow', called)
+            self.assertNotIn('crc', called)
             self.assertTrue(any('use search <town>' in w for w in json.loads(out.getvalue())['warnings']))
         with patch.object(cli, 'load', return_value=(rows, True)) as load, redirect_stdout(io.StringIO()):
             self.assertEqual(cli.main(['find', '--material', 'ewaste', '--near=174.76,-36.85', '--source', 'repair', '--json']), 0)
