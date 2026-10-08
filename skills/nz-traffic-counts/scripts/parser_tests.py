@@ -120,6 +120,7 @@ def run():
         assert rows == [{'D':'Rich text'}] and cli.excel_date('0',epoch) == '1904-01-01'
     print('[PASS] fixture sparse cells, rich shared strings and Excel 1904 epoch')
     regressions(cycle, row)
+    re_review_regressions()
 
 
 def synthetic_workbook(rows, name='test'):
@@ -200,7 +201,10 @@ def regressions(cycle, at_row):
 
     links = (FIXTURES/'cycle-links.html').read_bytes()
     parser = cli.DownloadLinks(); parser.feed(links.decode())
-    assert {cli.download_period(link) for link in parser.links} == {f'{year}-{m:02d}' for year in (2024, 2025) for m in range(1, 13)}
+    assert {cli.download_period(link) for link in parser.links} == {f'{year}-{m:02d}' for year in (2024, 2025) for m in range(1, 13)} | {'2026-05'}
+    assert cli.download_period('/media/szypg1y3/daily-cycle-count-data-may-2026_auckland-transport.xlsx') == '2026-05'
+    assert cli.download_period('/media/1982096/jan2020akldcyclecounterdata.xlsx') is None
+    assert cli.download_period('/cycle-january-2024-2025.xlsx') is None
     assert cli.download_period('/january-2024/noncycle-may-sept-2025.xlsx') is None
     assert cli.download_period('/january-2024/cycle-feb-2025.xlsx') == '2025-02'
     assert cli.download_period('/cycle-2025/file-march-2025.xlsx') is None
@@ -212,7 +216,7 @@ def regressions(cycle, at_row):
         assert len(cli.workbook_urls(args)) == 11 and '2025-03' in args._warnings[0]
     latest_args = cli.build_parser().parse_args(['sites', '--source', 'at-cycle-daily'])
     with patch.object(cli, 'fetch', return_value=(links, '2026-10-08T00:00:00Z')):
-        assert cli.download_period(cli.workbook_urls(latest_args)[0]) == '2025-12'
+        assert cli.download_period(cli.workbook_urls(latest_args)[0]) == '2026-05'
     hot_links = b'<a href="/files/All-pedestrian-2027-October.xlsx">new</a><a href="/files/All-pedestrian-2026.xlsx">old</a>'
     latest_args.source = 'hotcity'
     with patch.object(cli, 'fetch', return_value=(hot_links, '2026-10-08T00:00:00Z')):
@@ -224,6 +228,7 @@ def regressions(cycle, at_row):
         monthly, _ = cli.get_counts(args)
     assert [r['date'] for r in monthly] == ['2024-08-01', '2024-09-01']
     assert monthly[0]['date_outside_file_month'] and '2024-08-31' in args._warnings[0]
+    assert 'missing_days' not in monthly[0]
     print('[PASS] captured AT archive links, missing-month warnings and latest-download discovery')
 
     for source, expected in [('at-cycle-daily', '2025-06-01'), ('hotcity', '2025-01-01'), ('nzta-tms', '2025-05-31')]:
@@ -314,6 +319,101 @@ def regressions(cycle, at_row):
     assert p.returncode == 0 and result['ok'] and len(result['data']['results']) == 6
     assert validate_result_envelope(result) == []
     print('[PASS] fixture result contract and network-free canonical sources command')
+
+
+def re_review_regressions():
+    """Synthetic workbook regressions for the second security/QA review."""
+    stamp = '2026-10-08T00:00:00Z'
+    july_url = 'https://at.govt.nz/media/synthetic/cycle-july-2024.xlsx'
+    august_url = 'https://at.govt.nz/media/synthetic/cycle-august-2024.xlsx'
+    september_url = 'https://at.govt.nz/media/synthetic/cycle-september-2024.xlsx'
+    footer = synthetic_workbook([{'A': 'Date', 'B': 'Time', 'C': 'Wanted'},
+        {'A': '2025-01-01', 'B': '00:00', 'C': '7'},
+        {'A': 'PLEASE NOTE: ', 'C': 'Synthetic source notes, not an observation'}])
+    assert len(cli.parse_active(footer, hotcity=True)) == 1
+    body = synthetic_workbook([
+        {'A': 'Date', 'B': 'Wanted', 'C': 'Other'},
+        {'A': '2024-07-01', 'B': 'Pending', 'C': '7'},
+        {'A': '2024-07-02', 'B': 'z', 'C': '8'},
+        {'A': '2024-07-03', 'B': '9', 'C': '10'},
+    ])
+    args = cli.build_parser().parse_args(['counts', '--source', 'at-cycle-daily', '--site', 'Wanted'])
+    with patch.object(cli, 'workbook_urls', return_value=[july_url]), patch.object(cli, 'fetch', return_value=(body, stamp)):
+        daily, _ = cli.get_counts(args)
+    assert [r['count'] for r in daily] == [None, None, 9]
+    assert 'invalid_count_raw' not in daily[0] and daily[1]['invalid_count_raw'] == 'z'
+    assert any('cycle-july-2024.xlsx: Wanted on 2024-07-02' in w for w in args._warnings)
+    assert any('placeholder' in w for w in args._warnings)
+    args.source = 'at-cycle-monthly'
+    with patch.object(cli, 'workbook_urls', return_value=[july_url]), patch.object(cli, 'fetch', return_value=(body, stamp)):
+        monthly, _ = cli.get_counts(args)
+    assert monthly[0]['count'] == 9 and monthly[0]['missing_days'] == 30
+    assert monthly[0]['invalid_count_days'] == [{'date': '2024-07-02', 'invalid_count_raw': 'z'}]
+    print('[PASS] synthetic Pending/z counts, file/site/date warnings and monthly invalid-day provenance')
+
+    august = synthetic_workbook([{'A': 'Date', 'B': 'Wanted', 'C': 'Empty'},
+        {'A': '2024-08-01', 'B': '10'}, {'A': '2024-08-31', 'B': '59'}])
+    september = synthetic_workbook([{'A': 'Date', 'B': 'Wanted', 'C': 'Empty'},
+        {'A': '2024-09-02', 'B': '20'}, {'A': '2024-08-31', 'B': '59'}, {'A': '2024-09-01', 'B': '30'}])
+    def fetch_workbook(url, args, **kwargs):
+        return (august if url == august_url else september), stamp
+    args = cli.build_parser().parse_args(['sites', '--source', 'at-cycle-daily'])
+    with patch.object(cli, 'workbook_urls', return_value=[september_url, august_url]), patch.object(cli, 'fetch', side_effect=fetch_workbook):
+        sites, _ = cli.get_sites(args)
+    wanted = next(r for r in sites if r['site_id'] == 'Wanted')
+    assert (wanted['first_observed'], wanted['last_observed'], wanted['date']) == ('2024-08-01', '2024-09-02', '2024-09-02')
+    empty = next(r for r in sites if r['site_id'] == 'Empty')
+    assert empty['first_observed'] is empty['last_observed'] is empty['date'] is None
+    for order in ([august_url, september_url], [september_url, august_url]):
+        args = cli.build_parser().parse_args(['counts', '--source', 'at-cycle-daily', '--site', 'Wanted'])
+        with patch.object(cli, 'workbook_urls', return_value=order), patch.object(cli, 'fetch', side_effect=fetch_workbook):
+            daily, _ = cli.get_counts(args)
+        assert [r['date'] for r in daily] == ['2024-08-01', '2024-08-31', '2024-09-01', '2024-09-02']
+        assert sum(r['count'] for r in daily) == 119 and not any(r.get('duplicate_row') for r in daily)
+        assert any('1 equal outside-month' in w for w in args._warnings)
+        args.source = 'at-cycle-monthly'
+        with patch.object(cli, 'workbook_urls', return_value=order), patch.object(cli, 'fetch', side_effect=fetch_workbook):
+            monthly, _ = cli.get_counts(args)
+        assert [r['count'] for r in monthly] == [69, 50]
+        assert not any(r.get('date_outside_file_month') for r in monthly)
+    september = synthetic_workbook([{'A': 'Date', 'B': 'Wanted'},
+        {'A': '2024-08-31', 'B': '60'}, {'A': '2024-09-01', 'B': '30'}])
+    args.source = 'at-cycle-daily'
+    with patch.object(cli, 'workbook_urls', return_value=[august_url, september_url]), patch.object(cli, 'fetch', side_effect=fetch_workbook):
+        daily, _ = cli.get_counts(args)
+    duplicates = [r for r in daily if r['date'] == '2024-08-31']
+    assert len(duplicates) == 2 and all(r['duplicate_row'] for r in duplicates)
+    assert any('Conflicting duplicate' in w for w in args._warnings)
+    args.source = 'at-cycle-monthly'
+    with patch.object(cli, 'workbook_urls', return_value=[august_url, september_url]), patch.object(cli, 'fetch', side_effect=fetch_workbook):
+        monthly, _ = cli.get_counts(args)
+    assert all(r['duplicate_row'] for r in monthly if r['date'] == '2024-08-01')
+    assert 'missing_days' not in next(r for r in monthly if r.get('date_outside_file_month'))
+    print('[PASS] synthetic multi-workbook site bounds, equal/conflicting spillovers and daily sorting')
+
+    links = (FIXTURES / 'cycle-links.html').read_bytes()
+    for bounds in (['--from', '2027-01-01'], ['--to', '2023-12-31']):
+        args = cli.build_parser().parse_args(['counts', '--source', 'at-cycle-daily', '--site', 'Wanted', *bounds])
+        cli.resolve_dates(args)
+        with patch.object(cli, 'fetch', return_value=(links, stamp)):
+            try:
+                cli.workbook_urls(args)
+            except cli.SkillError as exc:
+                assert exc.code == 7 and 'latest published month is 2026-05' in str(exc)
+                assert 'monthly XLSX coverage begins 2024-01' in str(exc)
+            else:
+                raise AssertionError('Unsupported dates must fail with coverage bounds')
+    for broken in (synthetic_workbook([{'A': 'Changed header'}]),
+                   synthetic_workbook([{'A': 'Date', 'B': 'Wanted'}, {'A': 'invalid date', 'B': '7'}]),
+                   b'not a workbook'):
+        output = io.StringIO()
+        with patch.object(cli, 'workbook_urls', return_value=[july_url]), patch.object(cli, 'fetch', return_value=(broken, stamp)), redirect_stdout(output), redirect_stderr(io.StringIO()):
+            code = cli.main(['counts', '--source', 'at-cycle-daily', '--site', 'Wanted', '--json'])
+        result = json.loads(output.getvalue())
+        assert code == 6 and result['error']['type'] == 'schema_failure'
+        assert july_url in result['error']['message'] and 'cycle-july-2024.xlsx' in result['error']['message']
+        assert result['meta']['source_url'] == july_url and result['meta']['retrieved_at'].endswith('Z')
+    print('[PASS] synthetic archive coverage errors and workbook-specific schema error provenance')
 
 
 if __name__ == '__main__':

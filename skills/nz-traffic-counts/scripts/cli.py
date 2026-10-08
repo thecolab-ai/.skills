@@ -49,9 +49,10 @@ NZ = ZoneInfo('Pacific/Auckland')
 
 
 class SkillError(Exception):
-    def __init__(self, message, code=6, retry_after=None):
+    def __init__(self, message, code=6, retry_after=None, meta=None):
         super().__init__(message)
         self.code, self.retry_after = code, retry_after
+        self.meta = meta
 
 
 def utc_now():
@@ -347,6 +348,7 @@ def parse_active(body, hotcity=False, wanted_site=None, start=None, end=None,
     info = info if info is not None else {}
     records, summaries, known, latest = [], {}, set(), None
     placeholders, outside, found, unrelated_invalid = 0, defaultdict(int), False, 0
+    invalid_warnings = []
     for _name, rows, epoch in sheets(body, streaming=True):
         header, date_col = None, 'A'
         for r in rows:
@@ -378,7 +380,8 @@ def parse_active(body, hotcity=False, wanted_site=None, start=None, end=None,
             selected = in_range(day, start, end)
             for col, name in header.items():
                 value = r.get(col)
-                if isinstance(value, str) and value.strip().lower() in ('-', '–', 'n/a', 'na', ''):
+                invalid_raw = None
+                if isinstance(value, str) and value.strip().lower() in ('-', '–', 'n/a', 'na', '', 'pending'):
                     placeholders += 1
                     count = None
                 else:
@@ -386,9 +389,13 @@ def parse_active(body, hotcity=False, wanted_site=None, start=None, end=None,
                         count = numeric(value)
                     except SkillError:
                         if selected and not sites_only and (not wanted_site or name == wanted_site):
-                            raise
-                        # Currency scans and header listings must not retain unrelated series.
-                        unrelated_invalid += 1
+                            if hotcity:
+                                raise
+                            invalid_raw = str(value)
+                            invalid_warnings.append(f'{name} on {day}: invalid count {value!r} treated as missing')
+                        else:
+                            # Currency scans and header listings must not retain unrelated series.
+                            unrelated_invalid += 1
                         count = None
                 if count is not None and not wrong_year:
                     latest = max(latest or day, day)
@@ -403,10 +410,12 @@ def parse_active(body, hotcity=False, wanted_site=None, start=None, end=None,
                                granularity='hourly' if hotcity else 'daily')
                     if wrong_year:
                         row['date_outside_file_year'] = True
+                    if invalid_raw is not None:
+                        row['invalid_count_raw'] = invalid_raw
                     records.append(row)
     if not found:
         raise SkillError('Active-mode workbook header changed or no observations parsed')
-    warnings = []
+    warnings = invalid_warnings
     if placeholders:
         warnings.append(f'{placeholders} placeholder cells treated as missing')
     if unrelated_invalid:
@@ -433,18 +442,18 @@ def download_period(link, hotcity=False):
     filename = unquote(urlparse(link).path.rsplit('/', 1)[-1]).lower()
     if not filename.endswith('.xlsx') or ('pedestrian' if hotcity else 'cycle') not in filename:
         return None
-    years = re.findall(r'\b(?:19|20)\d{2}\b', filename)
+    years = re.findall(r'(?<!\d)(?:19|20)\d{2}(?!\d)', filename)
     if not years:
         return None
     if hotcity:
         return years[-1]
-    tokens = set(re.findall(r'[a-z]+', filename))
+    tokens = set(re.split(r'[^a-z0-9]+', filename))
     names = {name.lower(): i for i, name in enumerate(calendar.month_name) if name}
     names.update({name.lower(): i for i, name in enumerate(calendar.month_abbr) if name})
     names['sept'] = 9
     months = {i for name, i in names.items() if name in tokens}
     # Multi-month / annual layouts are outside this monthly parser's coverage.
-    if len(months) != 1:
+    if len(months) != 1 or len(years) != 1:
         return None
     return f'{years[-1]}-{months.pop():02d}'
 
@@ -484,7 +493,9 @@ def workbook_urls(args):
             note(args, f'Monthly XLSX coverage begins {coverage_start}; earlier annual/CSV layouts are unsupported.')
         selected = sorted(p for p in expected if p in periods)
     if not selected:
-        raise SkillError('No supported XLSX download found for the requested period; see source notes for archive limits', 7)
+        coverage = (f'latest published year is {max(periods)}; annual XLSX coverage begins {min(periods)}'
+                    if hotcity else f'latest published month is {max(periods)}; monthly XLSX coverage begins {min(periods)}')
+        raise SkillError('No supported XLSX download found for the requested period; ' + coverage + '; see source notes for archive limits', 7)
     if len(selected) > 24:
         raise SkillError('Request at most 24 workbooks at a time by narrowing --from/--to', 7)
     return [periods[p] for p in selected]
@@ -499,17 +510,26 @@ def workbook_records(args):
         start = start[:7] + '-01' if start else None
         end = (end[:7] + f'-{calendar.monthrange(int(end[:4]), int(end[5:7]))[1]:02d}') if end else None
     for url in urls:
-        body, stamp = fetch(url, args, binary=True)
         info = {}
         options = dict(wanted_site=getattr(args, 'site', None), start=start, end=end,
                        sites_only=args.command == 'sites', info=info)
-        if args.source == 'at-traffic':
-            parsed = parse_traffic(body, **options)
-            if start and start < '2012-07-01':
-                note(args, 'Prior to July 2012 worksheet is unsupported and omitted; only the recent worksheet is parsed.')
-        else:
-            hotcity = args.source == 'hotcity'
-            parsed = parse_active(body, hotcity, nominal_year=download_period(url, True) if hotcity else None, **options)
+        try:
+            body, stamp = fetch(url, args, binary=True)
+            if args.source == 'at-traffic':
+                parsed = parse_traffic(body, **options)
+                if start and start < '2012-07-01':
+                    note(args, 'Prior to July 2012 worksheet is unsupported and omitted; only the recent worksheet is parsed.')
+            else:
+                hotcity = args.source == 'hotcity'
+                parsed = parse_active(body, hotcity, nominal_year=download_period(url, True) if hotcity else None, **options)
+            if not info['latest']:
+                raise SkillError('Workbook contains no numeric count observations within its nominal year')
+        except (SkillError, OSError, OverflowError, ValueError, KeyError, IndexError, TypeError,
+                ET.ParseError, zipfile.BadZipFile) as exc:
+            meta = source_provenance(url, SOURCES[args.source]['publisher'],
+                                     licence=SOURCES[args.source]['licence'])
+            raise SkillError(f'{unquote(url.rsplit("/", 1)[-1])} ({url}): {exc}',
+                             getattr(exc, 'code', 6), getattr(exc, 'retry_after', None), meta) from exc
         if args.source in ('at-cycle-daily', 'at-cycle-monthly'):
             nominal_month = download_period(url)
             outside_month = [r for r in parsed if r['date'] and r['date'][:7] != nominal_month]
@@ -520,8 +540,6 @@ def workbook_records(args):
                      ', '.join(sorted({r['date'] for r in outside_month})) + '; source dates preserved.')
         known.update(info['known'])
         latest = info['latest']
-        if not latest:
-            raise SkillError('Workbook contains no numeric count observations within its nominal year')
         for message in info['warnings']:
             note(args, unquote(url.rsplit('/', 1)[-1]) + ': ' + message)
         remember(args, provenance(args.source, url, stamp, latest))
@@ -530,6 +548,27 @@ def workbook_records(args):
                 # Reference the workbook once; detailed provenance is in meta.downloads.
                 row['source_url'] = url
                 records.append(row)
+    if args.source in ('at-cycle-daily', 'at-cycle-monthly') and args.command == 'counts':
+        nominal = defaultdict(list)
+        for row in records:
+            if not row.get('date_outside_file_month'):
+                nominal[(row['site_id'], row['date'])].append(row)
+        retained, dropped = [], 0
+        for row in records:
+            originals = nominal.get((row['site_id'], row['date']), [])
+            if row.get('date_outside_file_month') and originals:
+                if all((r['count'], r.get('invalid_count_raw')) ==
+                       (row['count'], row.get('invalid_count_raw')) for r in originals):
+                    dropped += 1
+                    continue
+                for duplicate in [row, *originals]:
+                    duplicate['duplicate_row'] = True
+                note(args, f'Conflicting duplicate cycle observations for {row["site_id"]} on {row["date"]}: ' +
+                     ', '.join(r['source_url'] for r in [row, *originals]) + '; preserved and flagged.')
+            retained.append(row)
+        if dropped:
+            note(args, f'{dropped} equal outside-month cycle observations omitted; supplied by their nominal-month workbook.')
+        records = retained
     if args.command == 'counts' and args.site not in known:
         raise SkillError('Unknown site in selected workbooks; use sites --source with the same date range', 2)
     if args.command == 'counts' and not records:
@@ -594,8 +633,14 @@ def get_sites(args, bbox=None):
     unique = {}
     for row in rows:
         key = row['site_id']
+        previous = unique.get(key)
         if key not in unique or (row.get('date') or '') > (unique[key].get('date') or ''):
             unique[key] = {k: v for k, v in row.items() if k not in ('count', 'interval', 'granularity', 'adt_5_day', 'adt_7_day')}
+        if 'first_observed' in row:
+            for field, merge in (('first_observed', min), ('last_observed', max)):
+                dates = [r.get(field) for r in (row, previous or {}) if r.get(field) is not None]
+                unique[key][field] = merge(dates) if dates else None
+            unique[key]['date'] = unique[key]['last_observed']
     return list(unique.values()), warnings
 
 
@@ -611,15 +656,27 @@ def get_counts(args):
             monthly = []
             for (month, _url), days in groups.items():
                 values = [r['count'] for r in days if r['count'] is not None]
-                monthly.append({**days[0], 'date': month + '-01', 'period_end': max(r['date'] for r in days),
+                summary = {**days[0], 'date': month + '-01', 'period_end': max(r['date'] for r in days),
                                 'count': sum(values) if values else None, 'observed_days': len(values),
                                 'published_days': len(days),
-                                'missing_days': calendar.monthrange(int(month[:4]), int(month[5:]))[1]-len(values),
-                                'granularity': 'monthly'})
+                                'granularity': 'monthly'}
+                for flag in ('duplicate_row', 'date_outside_file_month'):
+                    if any(r.get(flag) for r in days):
+                        summary[flag] = True
+                if not summary.get('date_outside_file_month'):
+                    summary['missing_days'] = calendar.monthrange(int(month[:4]), int(month[5:]))[1]-len(values)
+                invalid_days = [{'date': r['date'], 'invalid_count_raw': r['invalid_count_raw']}
+                                for r in days if 'invalid_count_raw' in r]
+                summary.pop('invalid_count_raw', None)
+                if invalid_days:
+                    summary['invalid_count_days'] = invalid_days
+                monthly.append(summary)
             rows = sorted(monthly, key=lambda r: (r['date'], r['source_url']))
             warnings.append('Monthly totals sum published daily observations; missing days are not zero-filled.')
         rows = [r for r in rows if (not args.date_from or (r.get('period_end') or r['date']) >= args.date_from)
                 and (not args.date_to or r['date'] <= args.date_to)]
+        if args.source == 'at-cycle-daily':
+            rows.sort(key=lambda r: (r['date'], r['source_url']))
         return rows, warnings
     if args.source == 'at-adt':
         if not re.fullmatch(r'\d+:\d+', args.site):
@@ -795,7 +852,7 @@ def main(argv=None):
             ET.ParseError, zipfile.BadZipFile) as exc:
         code = exc.code if isinstance(exc, SkillError) else 6
         if machine:
-            meta = provenance(args.source) if args and getattr(args, 'source', None) else source_provenance(CYCLE_PAGE, 'Auckland Transport')
+            meta = getattr(exc, 'meta', None) or (provenance(args.source) if args and getattr(args, 'source', None) else source_provenance(CYCLE_PAGE, 'Auckland Transport'))
             print(json.dumps(error_envelope(code, str(exc), meta, retry_after=getattr(exc, 'retry_after', None))))
         print(f'nz-traffic-counts: {exc}', file=sys.stderr)
         return code

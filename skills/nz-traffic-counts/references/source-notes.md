@@ -55,18 +55,26 @@ Heart of the City. Unknown licences are omitted from provenance metadata.
   with the same column layout. August/September 2024 have helper columns A–F,
   `G=Date` and counter columns H onwards. These verified layouts are supported. The July 2020 file uses textual dates
   such as `Wednesday, 1 July 2020`, which are also parsed. July 2024 has an invalid `z` cell in
-  Archibald Park Cyclists on 2024-07-15. A requested invalid count fails; unrelated
+  Archibald Park Cyclists on 2024-07-15. `Pending` cells become null with a
+  placeholder warning. Other requested non-numeric cycle cells become null with
+  `invalid_count_raw` and a warning naming the workbook, site and date. Monthly
+  sums retain those dates and raw values in `invalid_count_days`. Unrelated
   invalid cells are omitted from currency/site-date calculations with a warning.
-  September 2024 also contains an extra 2024-08-31 row; preserve and flag it
-  `date_outside_file_month: true` with a warning. Monthly output therefore has
-  a separate partial August group from that September file; review before summing.
+  September 2024 also contains an extra 2024-08-31 row. Outside-month rows carry
+  `date_outside_file_month: true` and a warning. When the selected nominal-month
+  workbook supplies the same site/date and value, omit the extra row; conflicting
+  values are preserved and flagged `duplicate_row` on both rows. If the nominal
+  workbook lacks the observation, retain it. Outside-month partial groups omit
+  `missing_days`; daily output is sorted by date then source URL.
   The landing page's 26-site headline is a reporting subset, not the number of
   columns. Missing cells stay null. Monthly CLI totals are derived from daily
   downloads, not the headline network total, and report observed/missing days.
   Discovery recognises full month names and token abbreviations (including
   `feb` and `sept`) in cycle XLSX filenames. Expected months are clamped to the earliest discovered monthly XLSX
   and the latest published/verified month. Missing supported downloads produce an explicit month list. Annual,
-  multi-month and CSV layouts are unsupported. The latest monthly download is
+  multi-month, concatenated month/year names (such as `jan2020akld...`) and CSV
+  layouts are unsupported. Empty archive selections report the earliest and
+  latest published supported period. The latest monthly download is
   discovered for no-date queries; `CYCLE` is only a last-known snapshot.
 - NZTA daily counts are a **table without geometry**, even though the service is
   called `TMS_Telemetry_Sites`. Fields: `SiteRef`, `siteID`, `startDate`,
@@ -117,7 +125,9 @@ Downloads cache by URL, preserve original retrieval timestamps, expire after
 24-workbook discovery bound limits large archive requests; narrow the period to
 continue. Counts build records only for the requested site and period.
 Site listing retains
-only header labels and first/last observation dates. Workbook rows stream from
+only header labels and first/last observation dates, merging the earliest and
+latest non-null dates across every selected workbook. Its `date` is the last
+observation. Workbook rows stream from
 XML; no full series for every counter is retained. An output `--limit` does not
 limit discovery. Cache writes are optional: failures warn and use downloaded data;
 pruning touches only SHA-256 cache names in `nz-traffic-counts-v1/`.
@@ -128,6 +138,8 @@ inventory retains its stated 2025 year. Workbooks use the maximum numeric date
 in each yearly file's nominal year (or across a monthly file), across all sites
 and independent of query bounds.
 `meta.downloads` records each source file/query retrieval separately.
+Workbook schema errors identify the failing filename and URL in the message,
+with that URL and the attempted operation time in error provenance.
 Discovery ends at today's NZ-local date when only `--from` is supplied. With
 only `--to`, cycle starts at that month's first day, hotcity at that year's
 first day, and NZTA 30 days before `--to`. Resolved reversed dates fail with code 2.
