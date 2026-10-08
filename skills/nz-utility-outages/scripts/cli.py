@@ -73,6 +73,7 @@ SOURCES = {
 SOURCE_URL = SOURCES['watercare']['source_url']
 PUBLISHER = 'Watercare, Wellington Electricity and KiwiRail'
 MAX_RECORDS = 10000
+ALLOWED_HOSTS = {'webapi.watercare.co.nz', 'www.welectricity.co.nz', 'www.kiwirail.co.nz'}
 
 
 class InputError(ValueError):
@@ -99,13 +100,14 @@ def fetch(utility, *, binary=False):
     url = SOURCES[utility]['source_url']
     try:
         if binary:
-            return nzfetch.fetch_bytes(url, timeout=10)[0]
+            return nzfetch.fetch_bytes(url, timeout=10, allowed_hosts=ALLOWED_HOSTS)[0]
         # Wellington declares text/html despite returning valid JSON.
         if utility == 'wellington':
-            return json.loads(nzfetch.fetch_text(url, timeout=10))
+            return json.loads(nzfetch.fetch_text(url, timeout=10, allowed_hosts=ALLOWED_HOSTS))
         if utility == 'kiwirail':
-            return nzfetch.fetch_text(url, timeout=10)
-        body, _, _ = nzfetch.fetch_bytes(url, timeout=10, expect_json=True, accept='application/json,*/*')
+            return nzfetch.fetch_text(url, timeout=10, allowed_hosts=ALLOWED_HOSTS)
+        body, _, _ = nzfetch.fetch_bytes(url, timeout=10, expect_json=True, accept='application/json,*/*',
+                                        allowed_hosts=ALLOWED_HOSTS)
         return json.loads(body)
     except nzfetch.RateLimited as exc:
         raise SourceError(4, f'network error: rate limited by {utility}', exc.retry_after) from exc
@@ -292,7 +294,8 @@ class WorkHTML(HTMLParser):
             self.in_main = False
 
 
-def parse_works(body, meta):
+def parse_works(body, meta, now=None):
+    now = now or datetime.now(timezone.utc)
     parser = WorkHTML()
     parser.feed(body)
     rows, section, area, grouped = [], None, None, []
@@ -319,13 +322,21 @@ def parse_works(body, meta):
         start = end = None
         if len(years) == 1 and len(dates) == 2:
             year = int(next(iter(years)))
-            start, end = [date(year, list(calendar.month_name).index(month), int(day)).isoformat() for day, month in dates]
-            if start > end:
-                raise ValueError('KiwiRail notice date range is reversed')
-        # Preserve paragraphs even when dates are unavailable. No geocoding or inferred year.
+            try:
+                first, last = [date(year, list(calendar.month_name).index(month), int(day)) for day, month in dates]
+                if first > last:
+                    first = first.replace(year=year - 1)
+                start, end = first.isoformat(), last.isoformat()
+            except ValueError:
+                pass  # An invalid date leaves this notice undated, without losing other notices.
+        # Preserve paragraphs even when dates are unavailable. No geocoding or year without source evidence.
         notice_only = bool(title and 'noise' in title.lower() and 'work' not in title.lower())
+        status = 'unknown' if notice_only else 'planned' if section == 'short' else 'current'
+        if not notice_only and start and end:
+            status = window_status(iso_time(start + 'T00:00:00', local=True),
+                                   iso_time(end + 'T23:59:59.999999', local=True), now)
         rows.append(record('kiwirail', meta, identifier=f'notice-{index + 1}', kind='rail_notice' if notice_only else 'rail_work',
-                           status='unknown' if notice_only else 'planned' if section == 'short' else 'current', start=start, end=end,
+                           status=status, start=start, end=end,
                            area=title or area or text.split(' - ', 1)[0], description=text,
                            date_precision='day' if start else None, notice_links=links,
                            passenger_closure_confirmed=False))
@@ -354,7 +365,7 @@ def load(utility):
     elif utility == 'wellington':
         rows = parse_wellington(payload, meta, now)
     elif utility == 'kiwirail':
-        rows = parse_works(payload, meta)
+        rows = parse_works(payload, meta, now)
     else:
         rows = parse_calendar(payload, meta)
     return rows, meta

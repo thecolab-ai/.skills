@@ -70,14 +70,53 @@ def run():
     assert cli.parse_wellington(altered, cli.source_meta('wellington'), NOW)[0]['status'] == 'cancelled'
     print('[PASS] fixture Wellington resolution, counts, summer/winter offsets, alternate dates and cancellation')
 
-    work = cli.parse_works(data['kiwirail'], cli.source_meta('kiwirail'))
+    work = cli.parse_works(data['kiwirail'], cli.source_meta('kiwirail'), NOW)
     assert len(work) == 4 and work[0]['start'] == '2099-01-12' and work[0]['end'] == '2099-01-16'
     assert work[1]['description'].endswith('Monday to Saturday.') and work[1]['area'] == 'Sample Station'
     assert work[-1]['kind'] == 'rail_notice' and work[-1]['status'] == 'unknown'
     assert all(row['geometry'] is None and not row['passenger_closure_confirmed'] for row in work)
     no_year = data['kiwirail'].replace('January-2099.pdf', 'January.pdf')
-    assert cli.parse_works(no_year, cli.source_meta('kiwirail'))[0]['start'] is None
+    assert cli.parse_works(no_year, cli.source_meta('kiwirail'), NOW)[0]['start'] is None
     print('[PASS] fixture KiwiRail notice grouping, explicit year extraction and absence of invented locations/closures')
+
+    new_year = no_year.replace('Monday 12 January until Friday 16 January', '24 December to 12 January 2027')
+    for instant, expected_status in (
+        ('2026-12-23T10:59:59Z', 'planned'),
+        ('2026-12-23T11:00:00Z', 'current'),
+        ('2027-01-12T10:59:59Z', 'current'),
+        ('2027-01-12T11:00:00Z', 'unknown'),
+    ):
+        current = cli.parse_works(new_year, cli.source_meta('kiwirail'), datetime.fromisoformat(instant.replace('Z', '+00:00')))
+        assert current[0]['start'] == '2026-12-24' and current[0]['end'] == '2027-01-12'
+        assert current[0]['status'] == expected_status
+    for invalid_range in ('31 April to 2 May 2027', '1 April to 31 April 2027'):
+        altered = copy.deepcopy(data)
+        altered['kiwirail'] = new_year.replace('24 December to 12 January 2027', invalid_range)
+        code, payload = invoke(['outages', '--utility', 'kiwirail', '--json'], altered)
+        assert code == 0 and len(payload['results']) == len(work)
+        notice = payload['results'][0]
+        assert notice['start'] is None and notice['end'] is None and notice['date_precision'] is None
+        assert invalid_range in notice['description'] and notice['notice_links']
+        assert payload['results'][1]['description'] == work[1]['description']
+    ongoing = data['kiwirail'].replace('ongoing construction.', 'construction from 7 October to 9 October 2026.')
+    assert cli.parse_works(ongoing, cli.source_meta('kiwirail'), NOW)[1]['status'] == 'current'
+    ongoing = ongoing.replace('7 October to 9 October 2026', '7 October to 9 October 2027')
+    assert cli.parse_works(ongoing, cli.source_meta('kiwirail'), NOW)[1]['status'] == 'planned'
+    print('[PASS] fixture KiwiRail new-year windows, inclusive NZ days, invalid notice dates and dated work statuses')
+
+    for utility, binary, method, response in (
+        ('watercare', False, 'fetch_bytes', (b'[]', 'application/json', cli.SOURCES['watercare']['source_url'])),
+        ('wellington', False, 'fetch_text', '{}'),
+        ('kiwirail', False, 'fetch_text', data['kiwirail']),
+        ('kiwirail-calendar', True, 'fetch_bytes', (data['kiwirail-calendar'], 'application/pdf', cli.SOURCES['kiwirail-calendar']['source_url'])),
+    ):
+        with patch.object(cli.nzfetch, method, return_value=response) as request:
+            cli.fetch(utility, binary=binary)
+        assert request.call_args.args == (cli.SOURCES[utility]['source_url'],)
+        assert request.call_args.kwargs['allowed_hosts'] == {
+            'webapi.watercare.co.nz', 'www.welectricity.co.nz', 'www.kiwirail.co.nz',
+        }
+    print('[PASS] fixture all JSON, HTML and PDF fetch paths enforce the official host allowlist')
 
     parsed = rail_calendar.parse_pdf(data['kiwirail-calendar'])
     assert parsed['coverage_start'] == '2026-01-01' and parsed['coverage_end'] == '2026-01-31'

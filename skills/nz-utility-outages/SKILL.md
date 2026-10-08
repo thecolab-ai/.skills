@@ -1,6 +1,6 @@
 ---
 name: nz-utility-outages
-description: "Query Watercare Auckland water faults and planned shutdowns, Wellington electricity outages, KiwiRail Auckland work notices and the published 2026 rail closure calendar. Use for utility interruptions, maintenance windows and nearby outage searches; report Vector and other unavailable source limits explicitly."
+description: "Query Watercare Auckland water faults and planned shutdowns, Wellington electricity outages, KiwiRail Auckland work notices and the published rail closure calendar. Use for utility interruptions, maintenance windows and nearby outage searches; report Vector and other unavailable source limits explicitly."
 license: MIT
 compatibility: "Requires Python 3.10+ with system timezone data and network access for live data; standard library only"
 metadata:
