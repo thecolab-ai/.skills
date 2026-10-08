@@ -3,7 +3,7 @@
   "name": "nz-public-data",
   "description": "Public, read-only New Zealand data and public-interest sources.",
   "default": true,
-  "skill_count": 115,
+  "skill_count": 116,
   "skills": [
     "akl-rainfall",
     "akl-transport-performance",
@@ -100,6 +100,7 @@
     "ombudsman-nz",
     "osm-nz",
     "pharmac-schedule-nz",
+    "port-of-auckland",
     "property-rates-nz",
     "public-housing-nz",
     "public-trust-grants",
