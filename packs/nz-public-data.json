@@ -3,7 +3,7 @@
   "name": "nz-public-data",
   "description": "Public, read-only New Zealand data and public-interest sources.",
   "default": true,
-  "skill_count": 114,
+  "skill_count": 115,
   "skills": [
     "akl-rainfall",
     "akl-transport-performance",
@@ -54,6 +54,7 @@
     "mot-fleet-statistics-nz",
     "msd-benefits-nz",
     "niwa-coastal-nz",
+    "niwa-rivers-nz",
     "nz-ai-policy",
     "nz-angel-investment",
     "nz-arcgis",
