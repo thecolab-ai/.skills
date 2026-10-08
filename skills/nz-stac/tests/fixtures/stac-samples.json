@@ -1,0 +1,3143 @@
+{
+  "captured_at": "2026-10-08T01:09:28Z",
+  "licence": "CC-BY-4.0",
+  "trim_note": "Catalogue children limited to seven target collections. Collection item links limited to Mt Albert candidates and first source item. All other source fields unchanged.",
+  "responses": {
+    "https://nz-elevation.s3.ap-southeast-2.amazonaws.com/catalog.json": {
+      "stac_version": "1.0.0",
+      "type": "Catalog",
+      "id": "nz-elevation",
+      "description": "Toitū Te Whenua Land Information New Zealand makes New Zealand's publicly owned elevation archive freely available to use under an open licence. This public S3 bucket has been made available to enable bulk access and cloud-based data processing.",
+      "links": [
+        {
+          "rel": "self",
+          "href": "https://nz-elevation.s3.ap-southeast-2.amazonaws.com/catalog.json"
+        },
+        {
+          "rel": "root",
+          "href": "./catalog.json"
+        },
+        {
+          "rel": "child",
+          "href": "./auckland/auckland-north_2016-2018/dem_1m/2193/collection.json",
+          "title": "Auckland North LiDAR 1m DEM (2016-2018)",
+          "file:checksum": "1220614114259f8acc43a01064beb7433aedaa568ffac146f81644cde86e4abd72d9",
+          "file:size": 39424
+        },
+        {
+          "rel": "child",
+          "href": "./auckland/auckland-part-1_2024/dem_1m/2193/collection.json",
+          "title": "Auckland Part 1 LiDAR 1m DEM (2024)",
+          "file:checksum": "12203191d5d3d71b711dd77a846acd9c1bf3051460c9a3ebcb4b3bb9ed53a4373e55",
+          "file:size": 24244
+        },
+        {
+          "rel": "child",
+          "href": "./auckland/auckland-part-1_2024/dsm_1m/2193/collection.json",
+          "title": "Auckland Part 1 LiDAR 1m DSM (2024)",
+          "file:checksum": "12205844090f898ad4036dd13c913fdc6732a305bfcc011c511a647a19378a750d5e",
+          "file:size": 24242
+        },
+        {
+          "rel": "child",
+          "href": "./auckland/auckland-part-2_2024/dem_1m/2193/collection.json",
+          "title": "Auckland Part 2 LiDAR 1m DEM (2024)",
+          "file:checksum": "12204eda5b9d4a3a1104919580a78314e5de994951d366bc4c7b983de2007ab9e779",
+          "file:size": 37222
+        },
+        {
+          "rel": "child",
+          "href": "./auckland/auckland-part-2_2024/dsm_1m/2193/collection.json",
+          "title": "Auckland Part 2 LiDAR 1m DSM (2024)",
+          "file:checksum": "1220e923fb25de211d68df7577830682412f6682a073aeeec215c7179ffecb708842",
+          "file:size": 37202
+        }
+      ],
+      "stac_extensions": [
+        "https://stac-extensions.github.io/file/v2.1.0/schema.json"
+      ]
+    },
+    "https://nz-imagery.s3.ap-southeast-2.amazonaws.com/catalog.json": {
+      "stac_version": "1.0.0",
+      "type": "Catalog",
+      "id": "nz-imagery",
+      "description": "Toitū Te Whenua Land Information New Zealand makes New Zealand's publicly owned aerial and satellite imagery archive freely available to use under an open licence. This public S3 bucket has been made available to enable bulk access and cloud-based data processing. You can also access the imagery through the LINZ Data Service or LINZ Basemaps.",
+      "links": [
+        {
+          "rel": "self",
+          "href": "https://nz-imagery.s3.ap-southeast-2.amazonaws.com/catalog.json"
+        },
+        {
+          "rel": "root",
+          "href": "./catalog.json"
+        },
+        {
+          "rel": "child",
+          "href": "./auckland/auckland_2024_0.075m/rgb/2193/collection.json",
+          "title": "Auckland 0.075m Urban Aerial Photos (2024-2025)",
+          "file:checksum": "12207496f528a7f102c816c46afc61683eb4ecf60aa4b7a544f0b494aa2a31a915d3",
+          "file:size": 3638276
+        },
+        {
+          "rel": "child",
+          "href": "./auckland/auckland_2024_0.075m/rgbnir/2193/collection.json",
+          "title": "Auckland 0.075m Near-Infrared Aerial Photos (2024-2025)",
+          "file:checksum": "1220d62cd39d053335daf74d95cc597a38f30111099d453b4fa89f5dbbfa5dd65307",
+          "file:size": 3638306
+        }
+      ],
+      "stac_extensions": [
+        "https://stac-extensions.github.io/file/v2.1.0/schema.json"
+      ]
+    },
+    "https://nz-elevation.s3.ap-southeast-2.amazonaws.com/auckland/auckland-part-1_2024/dem_1m/2193/collection.json": {
+      "type": "Collection",
+      "stac_version": "1.0.0",
+      "id": "01JRGSXQ85EGQ0H6N7JHFP320Z",
+      "title": "Auckland Part 1 LiDAR 1m DEM (2024)",
+      "description": "Digital Elevation Model within the Auckland region captured in 2024.",
+      "license": "CC-BY-4.0",
+      "links": [
+        {
+          "rel": "root",
+          "href": "https://nz-elevation.s3.ap-southeast-2.amazonaws.com/catalog.json",
+          "type": "application/json"
+        },
+        {
+          "rel": "self",
+          "href": "./collection.json",
+          "type": "application/json"
+        },
+        {
+          "href": "./AZ30_10000_0504.json",
+          "rel": "item",
+          "type": "application/geo+json",
+          "file:checksum": "1220420e39a429bb58f7e3d4afdaa7bee9ba5c89025f03bd7609e122f0603ed418eb"
+        },
+        {
+          "href": "./BA31_10000_0505.json",
+          "rel": "item",
+          "type": "application/geo+json",
+          "file:checksum": "122033aedc8f818972db7c6c00eb8747690b0ea914887906445a71a95f958131f443"
+        }
+      ],
+      "providers": [
+        {
+          "name": "Toitū Te Whenua Land Information New Zealand",
+          "roles": [
+            "host",
+            "processor"
+          ]
+        },
+        {
+          "name": "Woolpert",
+          "roles": [
+            "producer"
+          ]
+        },
+        {
+          "name": "Regional Software Holdings Limited",
+          "roles": [
+            "licensor"
+          ]
+        }
+      ],
+      "linz:lifecycle": "completed",
+      "linz:geospatial_category": "dem",
+      "linz:region": "auckland",
+      "linz:security_classification": "unclassified",
+      "linz:slug": "auckland-part-1_2024",
+      "gsd": 1,
+      "created": "2025-04-10T21:33:02Z",
+      "updated": "2026-03-27T03:08:06Z",
+      "linz:geographic_description": "Part 1",
+      "extent": {
+        "spatial": {
+          "bbox": [
+            [
+              174.3677505,
+              -37.3346925,
+              175.0281809,
+              -36.5514359
+            ]
+          ]
+        },
+        "temporal": {
+          "interval": [
+            [
+              "2024-04-29T12:00:00Z",
+              "2024-06-26T12:00:00Z"
+            ]
+          ]
+        }
+      },
+      "assets": {
+        "capture_area": {
+          "href": "./capture-area.geojson",
+          "title": "Capture area",
+          "description": "Boundary of the total capture area for this collection. Excludes nodata areas in the source data. Geometries are simplified.",
+          "type": "application/geo+json",
+          "roles": [
+            "metadata"
+          ],
+          "file:checksum": "1220e8cf34b3cf1a08d751dc76a7c2607d89408beacf00502305a5f002568fab3a03",
+          "file:size": 11012
+        }
+      },
+      "stac_extensions": [
+        "https://stac-extensions.github.io/file/v2.0.0/schema.json"
+      ]
+    },
+    "https://nz-elevation.s3.ap-southeast-2.amazonaws.com/auckland/auckland-part-1_2024/dem_1m/2193/AZ30_10000_0504.json": {
+      "type": "Feature",
+      "stac_version": "1.0.0",
+      "id": "AZ30_10000_0504",
+      "links": [
+        {
+          "href": "./AZ30_10000_0504.json",
+          "rel": "self",
+          "type": "application/geo+json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "collection",
+          "type": "application/json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "parent",
+          "type": "application/json"
+        }
+      ],
+      "assets": {
+        "visual": {
+          "href": "./AZ30_10000_0504.tiff",
+          "file:checksum": "1220e120f3adf3565df8edb4c30e2f89e3716cdd14abf1a0374cfe77ef100958e646",
+          "created": "2025-04-10T21:33:02Z",
+          "updated": "2026-01-13T03:02:19Z",
+          "type": "image/tiff; application=geotiff; profile=cloud-optimized"
+        }
+      },
+      "stac_extensions": [
+        "https://stac-extensions.github.io/file/v2.0.0/schema.json",
+        "https://stac-extensions.github.io/processing/v1.2.0/schema.json"
+      ],
+      "properties": {
+        "created": "2025-04-10T21:33:02Z",
+        "updated": "2026-01-13T03:02:19Z",
+        "processing:datetime": "2026-01-13T03:02:19Z",
+        "processing:software": {
+          "gdal": "GDAL 3.10.3, released 2025/04/01",
+          "linz/topo-imagery": "https://github.com/linz/topo-imagery/commit/e0bac515cfb3e5ceebf4d5bba3ac5d41ac633b34"
+        },
+        "processing:version": "v7.14.0",
+        "start_datetime": "2024-04-29T12:00:00Z",
+        "end_datetime": "2024-06-26T12:00:00Z",
+        "datetime": null
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              174.3677505,
+              -36.5587933
+            ],
+            [
+              174.3688963,
+              -36.6236831
+            ],
+            [
+              174.4225638,
+              -36.6230543
+            ],
+            [
+              174.4213731,
+              -36.558166
+            ],
+            [
+              174.3677505,
+              -36.5587933
+            ]
+          ]
+        ]
+      },
+      "bbox": [
+        174.3677505,
+        -36.6236831,
+        174.4225638,
+        -36.558166
+      ],
+      "collection": "01JRGSXQ85EGQ0H6N7JHFP320Z"
+    },
+    "https://nz-elevation.s3.ap-southeast-2.amazonaws.com/auckland/auckland-part-1_2024/dem_1m/2193/BA31_10000_0505.json": {
+      "type": "Feature",
+      "stac_version": "1.0.0",
+      "id": "BA31_10000_0505",
+      "links": [
+        {
+          "href": "./BA31_10000_0505.json",
+          "rel": "self",
+          "type": "application/geo+json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "collection",
+          "type": "application/json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "parent",
+          "type": "application/json"
+        }
+      ],
+      "assets": {
+        "visual": {
+          "href": "./BA31_10000_0505.tiff",
+          "file:checksum": "1220752e08ed6ca0860a1095b6aefac16fa896afd6e58c7e001baafaab7c536d331c",
+          "created": "2025-04-10T21:33:02Z",
+          "updated": "2026-01-13T03:02:19Z",
+          "type": "image/tiff; application=geotiff; profile=cloud-optimized"
+        }
+      },
+      "stac_extensions": [
+        "https://stac-extensions.github.io/file/v2.0.0/schema.json",
+        "https://stac-extensions.github.io/processing/v1.2.0/schema.json"
+      ],
+      "properties": {
+        "created": "2025-04-10T21:33:02Z",
+        "updated": "2026-01-13T03:02:19Z",
+        "processing:datetime": "2026-01-13T03:02:19Z",
+        "processing:software": {
+          "gdal": "GDAL 3.10.3, released 2025/04/01",
+          "linz/topo-imagery": "https://github.com/linz/topo-imagery/commit/e0bac515cfb3e5ceebf4d5bba3ac5d41ac633b34"
+        },
+        "processing:version": "v7.14.0",
+        "start_datetime": "2024-04-29T12:00:00Z",
+        "end_datetime": "2024-06-26T12:00:00Z",
+        "datetime": null
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              174.69658,
+              -36.8790609
+            ],
+            [
+              174.6980178,
+              -36.9439372
+            ],
+            [
+              174.7519006,
+              -36.9431544
+            ],
+            [
+              174.7504172,
+              -36.8782799
+            ],
+            [
+              174.69658,
+              -36.8790609
+            ]
+          ]
+        ]
+      },
+      "bbox": [
+        174.69658,
+        -36.9439372,
+        174.7519006,
+        -36.8782799
+      ],
+      "collection": "01JRGSXQ85EGQ0H6N7JHFP320Z"
+    },
+    "https://nz-elevation.s3.ap-southeast-2.amazonaws.com/auckland/auckland-part-1_2024/dsm_1m/2193/collection.json": {
+      "type": "Collection",
+      "stac_version": "1.0.0",
+      "id": "01JRGTZFNHFZ24R8TY7J519K41",
+      "title": "Auckland Part 1 LiDAR 1m DSM (2024)",
+      "description": "Digital Surface Model within the Auckland region captured in 2024.",
+      "license": "CC-BY-4.0",
+      "links": [
+        {
+          "rel": "root",
+          "href": "https://nz-elevation.s3.ap-southeast-2.amazonaws.com/catalog.json",
+          "type": "application/json"
+        },
+        {
+          "rel": "self",
+          "href": "./collection.json",
+          "type": "application/json"
+        },
+        {
+          "href": "./AZ30_10000_0504.json",
+          "rel": "item",
+          "type": "application/geo+json",
+          "file:checksum": "12203c9a42e46b917af50230a393b91919210d2b52799941a37570ce8177b5a5b90b"
+        },
+        {
+          "href": "./BA31_10000_0505.json",
+          "rel": "item",
+          "type": "application/geo+json",
+          "file:checksum": "12206c73f896a127c8c9d2971fec3484e1934f2c26c29ab1b35fb0e24b96ef82debd"
+        }
+      ],
+      "providers": [
+        {
+          "name": "Woolpert",
+          "roles": [
+            "producer"
+          ]
+        },
+        {
+          "name": "Regional Software Holdings Limited",
+          "roles": [
+            "licensor"
+          ]
+        },
+        {
+          "name": "Toitū Te Whenua Land Information New Zealand",
+          "roles": [
+            "host",
+            "processor"
+          ]
+        }
+      ],
+      "linz:lifecycle": "completed",
+      "linz:geospatial_category": "dsm",
+      "linz:region": "auckland",
+      "linz:security_classification": "unclassified",
+      "linz:slug": "auckland-part-1_2024",
+      "gsd": 1,
+      "created": "2025-04-10T21:51:28Z",
+      "updated": "2026-03-27T03:08:06Z",
+      "linz:geographic_description": "Part 1",
+      "extent": {
+        "spatial": {
+          "bbox": [
+            [
+              174.3677505,
+              -37.3346925,
+              175.0281809,
+              -36.5514359
+            ]
+          ]
+        },
+        "temporal": {
+          "interval": [
+            [
+              "2024-04-29T12:00:00Z",
+              "2024-06-26T12:00:00Z"
+            ]
+          ]
+        }
+      },
+      "assets": {
+        "capture_area": {
+          "href": "./capture-area.geojson",
+          "title": "Capture area",
+          "description": "Boundary of the total capture area for this collection. Excludes nodata areas in the source data. Geometries are simplified.",
+          "type": "application/geo+json",
+          "roles": [
+            "metadata"
+          ],
+          "file:checksum": "1220596352cc0ad2079b542d71e6e34cf36c7f721386257b3e3b1efdef73cfcc81e4",
+          "file:size": 11013
+        }
+      },
+      "stac_extensions": [
+        "https://stac-extensions.github.io/file/v2.0.0/schema.json"
+      ]
+    },
+    "https://nz-elevation.s3.ap-southeast-2.amazonaws.com/auckland/auckland-part-1_2024/dsm_1m/2193/BA31_10000_0505.json": {
+      "type": "Feature",
+      "stac_version": "1.0.0",
+      "id": "BA31_10000_0505",
+      "links": [
+        {
+          "href": "./BA31_10000_0505.json",
+          "rel": "self",
+          "type": "application/geo+json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "collection",
+          "type": "application/json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "parent",
+          "type": "application/json"
+        }
+      ],
+      "assets": {
+        "visual": {
+          "href": "./BA31_10000_0505.tiff",
+          "file:checksum": "12208c4600a6ed21c527a34fed70d26c6875133bd44ff246ff403328923cdc588862",
+          "created": "2025-04-10T21:51:28Z",
+          "updated": "2025-04-10T21:51:28Z",
+          "type": "image/tiff; application=geotiff; profile=cloud-optimized"
+        }
+      },
+      "stac_extensions": [
+        "https://stac-extensions.github.io/file/v2.0.0/schema.json",
+        "https://stac-extensions.github.io/processing/v1.2.0/schema.json"
+      ],
+      "properties": {
+        "created": "2025-04-10T21:51:28Z",
+        "updated": "2025-04-10T21:51:28Z",
+        "processing:datetime": "2025-04-10T21:51:28Z",
+        "processing:software": {
+          "gdal": "GDAL 3.9.0, released 2024/05/07",
+          "linz/topo-imagery": "https://github.com/linz/topo-imagery/commit/761b78235f8b280e00d26d2370ab390f747ad98d"
+        },
+        "processing:version": "v7.4.1",
+        "start_datetime": "2024-04-29T12:00:00Z",
+        "end_datetime": "2024-06-26T12:00:00Z",
+        "datetime": null
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              174.69658,
+              -36.8790609
+            ],
+            [
+              174.6980178,
+              -36.9439372
+            ],
+            [
+              174.7519006,
+              -36.9431544
+            ],
+            [
+              174.7504172,
+              -36.8782799
+            ],
+            [
+              174.69658,
+              -36.8790609
+            ]
+          ]
+        ]
+      },
+      "bbox": [
+        174.69658,
+        -36.9439372,
+        174.7519006,
+        -36.8782799
+      ],
+      "collection": "01JRGTZFNHFZ24R8TY7J519K41"
+    },
+    "https://nz-elevation.s3.ap-southeast-2.amazonaws.com/auckland/auckland-part-1_2024/dsm_1m/2193/AZ30_10000_0504.json": {
+      "type": "Feature",
+      "stac_version": "1.0.0",
+      "id": "AZ30_10000_0504",
+      "links": [
+        {
+          "href": "./AZ30_10000_0504.json",
+          "rel": "self",
+          "type": "application/geo+json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "collection",
+          "type": "application/json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "parent",
+          "type": "application/json"
+        }
+      ],
+      "assets": {
+        "visual": {
+          "href": "./AZ30_10000_0504.tiff",
+          "file:checksum": "1220dc222c5b610bee9d27303a91f2fd33dd3dac0b32b61d738f803b6ee23d496e5f",
+          "created": "2025-04-10T21:51:28Z",
+          "updated": "2025-04-10T21:51:28Z",
+          "type": "image/tiff; application=geotiff; profile=cloud-optimized"
+        }
+      },
+      "stac_extensions": [
+        "https://stac-extensions.github.io/file/v2.0.0/schema.json",
+        "https://stac-extensions.github.io/processing/v1.2.0/schema.json"
+      ],
+      "properties": {
+        "created": "2025-04-10T21:51:28Z",
+        "updated": "2025-04-10T21:51:28Z",
+        "processing:datetime": "2025-04-10T21:51:28Z",
+        "processing:software": {
+          "gdal": "GDAL 3.9.0, released 2024/05/07",
+          "linz/topo-imagery": "https://github.com/linz/topo-imagery/commit/761b78235f8b280e00d26d2370ab390f747ad98d"
+        },
+        "processing:version": "v7.4.1",
+        "start_datetime": "2024-04-29T12:00:00Z",
+        "end_datetime": "2024-06-26T12:00:00Z",
+        "datetime": null
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              174.3677505,
+              -36.5587933
+            ],
+            [
+              174.3688963,
+              -36.6236831
+            ],
+            [
+              174.4225638,
+              -36.6230543
+            ],
+            [
+              174.4213731,
+              -36.558166
+            ],
+            [
+              174.3677505,
+              -36.5587933
+            ]
+          ]
+        ]
+      },
+      "bbox": [
+        174.3677505,
+        -36.6236831,
+        174.4225638,
+        -36.558166
+      ],
+      "collection": "01JRGTZFNHFZ24R8TY7J519K41"
+    },
+    "https://nz-elevation.s3.ap-southeast-2.amazonaws.com/auckland/auckland-part-2_2024/dem_1m/2193/collection.json": {
+      "type": "Collection",
+      "stac_version": "1.0.0",
+      "id": "01JZ4GBZNKCJ3WM29TK02M27AV",
+      "title": "Auckland Part 2 LiDAR 1m DEM (2024)",
+      "description": "Digital Elevation Model within the Auckland region captured in 2024.",
+      "license": "CC-BY-4.0",
+      "links": [
+        {
+          "rel": "root",
+          "href": "https://nz-elevation.s3.ap-southeast-2.amazonaws.com/catalog.json",
+          "type": "application/json"
+        },
+        {
+          "rel": "self",
+          "href": "./collection.json",
+          "type": "application/json"
+        },
+        {
+          "href": "./AY30_10000_0504.json",
+          "rel": "item",
+          "type": "application/geo+json",
+          "file:checksum": "1220a270ba440645d790c968bfdc7ad9afe41daa38f2bdcd456b7b8d1108d530abf5"
+        }
+      ],
+      "providers": [
+        {
+          "name": "Toitū Te Whenua Land Information New Zealand",
+          "roles": [
+            "host",
+            "processor"
+          ]
+        },
+        {
+          "name": "Woolpert",
+          "roles": [
+            "producer"
+          ]
+        },
+        {
+          "name": "Regional Software Holdings Limited",
+          "roles": [
+            "licensor"
+          ]
+        }
+      ],
+      "linz:lifecycle": "completed",
+      "linz:geospatial_category": "dem",
+      "linz:region": "auckland",
+      "linz:security_classification": "unclassified",
+      "linz:slug": "auckland-part-2_2024",
+      "gsd": 1,
+      "created": "2025-07-02T02:45:03Z",
+      "updated": "2026-03-27T03:08:06Z",
+      "linz:geographic_description": "Part 2",
+      "extent": {
+        "spatial": {
+          "bbox": [
+            [
+              174.1503643,
+              -37.3298549,
+              175.5940431,
+              -36.0228458
+            ]
+          ]
+        },
+        "temporal": {
+          "interval": [
+            [
+              "2024-06-25T12:00:00Z",
+              "2024-11-03T11:00:00Z"
+            ]
+          ]
+        }
+      },
+      "assets": {
+        "capture_area": {
+          "href": "./capture-area.geojson",
+          "title": "Capture area",
+          "description": "Boundary of the total capture area for this collection. Excludes nodata areas in the source data. Geometries are simplified.",
+          "type": "application/geo+json",
+          "roles": [
+            "metadata"
+          ],
+          "file:checksum": "12207753fba70494105bca5e5e9a5843736d297feff4fed82eb6be55379e84a8eab1",
+          "file:size": 29689
+        }
+      },
+      "stac_extensions": [
+        "https://stac-extensions.github.io/file/v2.0.0/schema.json"
+      ]
+    },
+    "https://nz-elevation.s3.ap-southeast-2.amazonaws.com/auckland/auckland-part-2_2024/dem_1m/2193/AY30_10000_0504.json": {
+      "type": "Feature",
+      "stac_version": "1.0.0",
+      "id": "AY30_10000_0504",
+      "links": [
+        {
+          "href": "./AY30_10000_0504.json",
+          "rel": "self",
+          "type": "application/geo+json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "collection",
+          "type": "application/json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "parent",
+          "type": "application/json"
+        }
+      ],
+      "assets": {
+        "visual": {
+          "href": "./AY30_10000_0504.tiff",
+          "file:checksum": "12201aa48baf55dbf6b467ccc5ccddf022095bd616fff151e14c33d72bf7a9c81485",
+          "created": "2025-07-02T02:45:03Z",
+          "updated": "2026-01-13T21:29:07Z",
+          "type": "image/tiff; application=geotiff; profile=cloud-optimized"
+        }
+      },
+      "stac_extensions": [
+        "https://stac-extensions.github.io/file/v2.0.0/schema.json",
+        "https://stac-extensions.github.io/processing/v1.2.0/schema.json"
+      ],
+      "properties": {
+        "created": "2025-07-02T02:45:03Z",
+        "updated": "2026-01-13T21:29:07Z",
+        "processing:datetime": "2026-01-13T21:29:07Z",
+        "processing:software": {
+          "gdal": "GDAL 3.10.3, released 2025/04/01",
+          "linz/topo-imagery": "https://github.com/linz/topo-imagery/commit/e0bac515cfb3e5ceebf4d5bba3ac5d41ac633b34"
+        },
+        "processing:version": "v7.14.0",
+        "start_datetime": "2024-06-25T12:00:00Z",
+        "end_datetime": "2024-11-03T11:00:00Z",
+        "datetime": null
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              174.3620763,
+              -36.2343332
+            ],
+            [
+              174.3632039,
+              -36.2992267
+            ],
+            [
+              174.4166484,
+              -36.2986053
+            ],
+            [
+              174.4154767,
+              -36.2337132
+            ],
+            [
+              174.3620763,
+              -36.2343332
+            ]
+          ]
+        ]
+      },
+      "bbox": [
+        174.3620763,
+        -36.2992267,
+        174.4166484,
+        -36.2337132
+      ],
+      "collection": "01JZ4GBZNKCJ3WM29TK02M27AV"
+    },
+    "https://nz-elevation.s3.ap-southeast-2.amazonaws.com/auckland/auckland-part-2_2024/dsm_1m/2193/collection.json": {
+      "type": "Collection",
+      "stac_version": "1.0.0",
+      "id": "01JZ4H3M40NR6PAQA4YN673JJF",
+      "title": "Auckland Part 2 LiDAR 1m DSM (2024)",
+      "description": "Digital Surface Model within the Auckland region captured in 2024.",
+      "license": "CC-BY-4.0",
+      "links": [
+        {
+          "rel": "root",
+          "href": "https://nz-elevation.s3.ap-southeast-2.amazonaws.com/catalog.json",
+          "type": "application/json"
+        },
+        {
+          "rel": "self",
+          "href": "./collection.json",
+          "type": "application/json"
+        },
+        {
+          "href": "./AY30_10000_0504.json",
+          "rel": "item",
+          "type": "application/geo+json",
+          "file:checksum": "1220104e4a64d29b40de0f81a66e8582a621868af9987470d3c13fbff9b9ef5e1c24"
+        }
+      ],
+      "providers": [
+        {
+          "name": "Toitū Te Whenua Land Information New Zealand",
+          "roles": [
+            "host",
+            "processor"
+          ]
+        },
+        {
+          "name": "Woolpert",
+          "roles": [
+            "producer"
+          ]
+        },
+        {
+          "name": "Auckland Council",
+          "roles": [
+            "licensor"
+          ]
+        }
+      ],
+      "linz:lifecycle": "completed",
+      "linz:geospatial_category": "dsm",
+      "linz:region": "auckland",
+      "linz:security_classification": "unclassified",
+      "linz:slug": "auckland-part-2_2024",
+      "gsd": 1,
+      "created": "2025-07-02T02:57:58Z",
+      "updated": "2026-03-27T03:08:06Z",
+      "linz:geographic_description": "Part 2",
+      "extent": {
+        "spatial": {
+          "bbox": [
+            [
+              174.1503643,
+              -37.3298549,
+              175.5940431,
+              -36.0228458
+            ]
+          ]
+        },
+        "temporal": {
+          "interval": [
+            [
+              "2024-06-25T12:00:00Z",
+              "2024-11-03T11:00:00Z"
+            ]
+          ]
+        }
+      },
+      "assets": {
+        "capture_area": {
+          "href": "./capture-area.geojson",
+          "title": "Capture area",
+          "description": "Boundary of the total capture area for this collection. Excludes nodata areas in the source data. Geometries are simplified.",
+          "type": "application/geo+json",
+          "roles": [
+            "metadata"
+          ],
+          "file:checksum": "12208d6b4954f9748f0c0f694faec6adf0d07f991d42bb90471f879a96d95ccb4e7f",
+          "file:size": 29719
+        }
+      },
+      "stac_extensions": [
+        "https://stac-extensions.github.io/file/v2.0.0/schema.json"
+      ]
+    },
+    "https://nz-elevation.s3.ap-southeast-2.amazonaws.com/auckland/auckland-part-2_2024/dsm_1m/2193/AY30_10000_0504.json": {
+      "type": "Feature",
+      "stac_version": "1.0.0",
+      "id": "AY30_10000_0504",
+      "links": [
+        {
+          "href": "./AY30_10000_0504.json",
+          "rel": "self",
+          "type": "application/geo+json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "collection",
+          "type": "application/json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "parent",
+          "type": "application/json"
+        }
+      ],
+      "assets": {
+        "visual": {
+          "href": "./AY30_10000_0504.tiff",
+          "file:checksum": "1220118da8f188d75133abc3f64c4f4c2b5a0173c8601df1c1169940757729e05dc1",
+          "created": "2025-07-02T02:57:58Z",
+          "updated": "2025-07-02T02:57:58Z",
+          "type": "image/tiff; application=geotiff; profile=cloud-optimized"
+        }
+      },
+      "stac_extensions": [
+        "https://stac-extensions.github.io/file/v2.0.0/schema.json",
+        "https://stac-extensions.github.io/processing/v1.2.0/schema.json"
+      ],
+      "properties": {
+        "created": "2025-07-02T02:57:58Z",
+        "updated": "2025-07-02T02:57:58Z",
+        "processing:datetime": "2025-07-02T02:57:58Z",
+        "processing:software": {
+          "gdal": "GDAL 3.9.0, released 2024/05/07",
+          "linz/topo-imagery": "https://github.com/linz/topo-imagery/commit/dfbc5666d3c98dd5cf23687fc68f44481b09fd96"
+        },
+        "processing:version": "v7.7.0",
+        "start_datetime": "2024-06-25T12:00:00Z",
+        "end_datetime": "2024-11-03T11:00:00Z",
+        "datetime": null
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              174.3620763,
+              -36.2343332
+            ],
+            [
+              174.3632039,
+              -36.2992267
+            ],
+            [
+              174.4166484,
+              -36.2986053
+            ],
+            [
+              174.4154767,
+              -36.2337132
+            ],
+            [
+              174.3620763,
+              -36.2343332
+            ]
+          ]
+        ]
+      },
+      "bbox": [
+        174.3620763,
+        -36.2992267,
+        174.4166484,
+        -36.2337132
+      ],
+      "collection": "01JZ4H3M40NR6PAQA4YN673JJF"
+    },
+    "https://nz-elevation.s3.ap-southeast-2.amazonaws.com/auckland/auckland-north_2016-2018/dem_1m/2193/collection.json": {
+      "type": "Collection",
+      "stac_version": "1.0.0",
+      "id": "01HQS6C8F88JGM04345RY84N9D",
+      "title": "Auckland North LiDAR 1m DEM (2016-2018)",
+      "description": "Digital Elevation Model within the Auckland region captured in 2016-2018.",
+      "license": "CC-BY-4.0",
+      "links": [
+        {
+          "rel": "root",
+          "href": "https://nz-elevation.s3.ap-southeast-2.amazonaws.com/catalog.json",
+          "type": "application/json"
+        },
+        {
+          "rel": "self",
+          "href": "./collection.json",
+          "type": "application/json"
+        },
+        {
+          "rel": "item",
+          "href": "./AY30_10000_0405.json",
+          "type": "application/json",
+          "file:checksum": "1220ce4caab0f6ae61f8d825ece8e838056120c46c080fc3822c29ff47bcd9482429"
+        },
+        {
+          "rel": "item",
+          "href": "./BA31_10000_0505.json",
+          "type": "application/json",
+          "file:checksum": "122067a547084d4f00237adde279773e792af0a043624416f0ce59a85f7c3570c962"
+        }
+      ],
+      "providers": [
+        {
+          "name": "Aerial Surveys",
+          "roles": [
+            "producer"
+          ]
+        },
+        {
+          "name": "Auckland Council",
+          "roles": [
+            "licensor"
+          ]
+        },
+        {
+          "name": "Toitū Te Whenua Land Information New Zealand",
+          "roles": [
+            "host",
+            "processor"
+          ]
+        }
+      ],
+      "linz:lifecycle": "completed",
+      "linz:geospatial_category": "dem",
+      "linz:region": "auckland",
+      "linz:security_classification": "unclassified",
+      "linz:geographic_description": "Auckland North",
+      "linz:slug": "auckland-north_2016-2018",
+      "extent": {
+        "spatial": {
+          "bbox": [
+            [
+              174.1503643,
+              -37.0772518,
+              175.5940431,
+              -36.0228458
+            ]
+          ]
+        },
+        "temporal": {
+          "interval": [
+            [
+              "2016-08-15T12:00:00Z",
+              "2018-08-08T12:00:00Z"
+            ]
+          ]
+        }
+      },
+      "assets": {
+        "capture_area": {
+          "href": "./capture-area.geojson",
+          "title": "Capture area",
+          "type": "application/geo+json",
+          "roles": [
+            "metadata"
+          ],
+          "file:checksum": "122039942a5b46234c077a134693078b0265e8a0e8cdf63d900c81177515eb470b13",
+          "file:size": 40235
+        }
+      },
+      "stac_extensions": [
+        "https://stac-extensions.github.io/file/v2.0.0/schema.json"
+      ],
+      "gsd": 1,
+      "created": "2024-03-14T00:00:00Z",
+      "updated": "2026-03-27T03:08:06Z"
+    },
+    "https://nz-elevation.s3.ap-southeast-2.amazonaws.com/auckland/auckland-north_2016-2018/dem_1m/2193/AY30_10000_0405.json": {
+      "type": "Feature",
+      "stac_version": "1.0.0",
+      "id": "AY30_10000_0405",
+      "links": [
+        {
+          "rel": "self",
+          "href": "./AY30_10000_0405.json",
+          "type": "application/json"
+        },
+        {
+          "rel": "collection",
+          "href": "./collection.json",
+          "type": "application/json"
+        },
+        {
+          "rel": "parent",
+          "href": "./collection.json",
+          "type": "application/json"
+        }
+      ],
+      "assets": {
+        "visual": {
+          "href": "./AY30_10000_0405.tiff",
+          "type": "image/tiff; application=geotiff; profile=cloud-optimized",
+          "file:checksum": "1220681f9151992908f5cef21486796d5d7849d9d6ccc282a1afb5749cf181587727",
+          "created": "2024-03-14T00:00:00Z",
+          "updated": "2024-03-14T00:00:00Z"
+        }
+      },
+      "stac_extensions": [
+        "https://stac-extensions.github.io/file/v2.0.0/schema.json"
+      ],
+      "properties": {
+        "start_datetime": "2016-08-15T12:00:00Z",
+        "end_datetime": "2018-08-08T12:00:00Z",
+        "datetime": null,
+        "created": "2024-03-14T00:00:00Z",
+        "updated": "2024-03-14T00:00:00Z"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              174.4143087,
+              -36.1688205
+            ],
+            [
+              174.4154767,
+              -36.2337132
+            ],
+            [
+              174.4688754,
+              -36.2330695
+            ],
+            [
+              174.4676633,
+              -36.1681782
+            ],
+            [
+              174.4143087,
+              -36.1688205
+            ]
+          ]
+        ]
+      },
+      "bbox": [
+        174.4143087,
+        -36.2337132,
+        174.4688754,
+        -36.1681782
+      ],
+      "collection": "01HQS6C8F88JGM04345RY84N9D"
+    },
+    "https://nz-elevation.s3.ap-southeast-2.amazonaws.com/auckland/auckland-north_2016-2018/dem_1m/2193/BA31_10000_0505.json": {
+      "type": "Feature",
+      "stac_version": "1.0.0",
+      "id": "BA31_10000_0505",
+      "links": [
+        {
+          "rel": "self",
+          "href": "./BA31_10000_0505.json",
+          "type": "application/json"
+        },
+        {
+          "rel": "collection",
+          "href": "./collection.json",
+          "type": "application/json"
+        },
+        {
+          "rel": "parent",
+          "href": "./collection.json",
+          "type": "application/json"
+        }
+      ],
+      "assets": {
+        "visual": {
+          "href": "./BA31_10000_0505.tiff",
+          "type": "image/tiff; application=geotiff; profile=cloud-optimized",
+          "file:checksum": "122090c9547ad1619fca464d82d2c882b1781080a17cd630567288ad65be18e9399e",
+          "created": "2024-03-14T00:00:00Z",
+          "updated": "2024-03-14T00:00:00Z"
+        }
+      },
+      "stac_extensions": [
+        "https://stac-extensions.github.io/file/v2.0.0/schema.json"
+      ],
+      "properties": {
+        "start_datetime": "2016-08-15T12:00:00Z",
+        "end_datetime": "2018-08-08T12:00:00Z",
+        "datetime": null,
+        "created": "2024-03-14T00:00:00Z",
+        "updated": "2024-03-14T00:00:00Z"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              174.69658,
+              -36.8790609
+            ],
+            [
+              174.6980178,
+              -36.9439372
+            ],
+            [
+              174.7519006,
+              -36.9431544
+            ],
+            [
+              174.7504172,
+              -36.8782799
+            ],
+            [
+              174.69658,
+              -36.8790609
+            ]
+          ]
+        ]
+      },
+      "bbox": [
+        174.69658,
+        -36.9439372,
+        174.7519006,
+        -36.8782799
+      ],
+      "collection": "01HQS6C8F88JGM04345RY84N9D"
+    },
+    "https://nz-imagery.s3.ap-southeast-2.amazonaws.com/auckland/auckland_2024_0.075m/rgb/2193/collection.json": {
+      "type": "Collection",
+      "stac_version": "1.0.0",
+      "id": "01JMWYKCHN35W88BJ5YV4M79AM",
+      "title": "Auckland 0.075m Urban Aerial Photos (2024-2025)",
+      "description": "Orthophotography within the Auckland region captured in the 2024-2025 flying season.",
+      "license": "CC-BY-4.0",
+      "links": [
+        {
+          "rel": "root",
+          "href": "https://nz-imagery.s3.ap-southeast-2.amazonaws.com/catalog.json",
+          "type": "application/json"
+        },
+        {
+          "rel": "self",
+          "href": "./collection.json",
+          "type": "application/json"
+        },
+        {
+          "href": "./AY30_1000_4447.json",
+          "rel": "item",
+          "type": "application/geo+json",
+          "file:checksum": "12205dec7f0a05be412cf9a33b1b1ef07562ab4e7b7b8096537168afa65222254f4f"
+        },
+        {
+          "href": "./BA31_1000_4344.json",
+          "rel": "item",
+          "type": "application/geo+json",
+          "file:checksum": "12204f5cc07ed8bba8d5474a10e179ad5760ce1f5030f72515e6b027c335aad30a91"
+        },
+        {
+          "href": "./BA31_1000_4345.json",
+          "rel": "item",
+          "type": "application/geo+json",
+          "file:checksum": "12206064cab2551af9f0f744227f8859a7424109e18d0a7be942c855b3356f9e46bf"
+        },
+        {
+          "href": "./BA31_1000_4346.json",
+          "rel": "item",
+          "type": "application/geo+json",
+          "file:checksum": "122076ae381ace0ba54da15c8fc4e3cf56d8741d41ed4613d131a899d73872dc4ba0"
+        },
+        {
+          "href": "./BA31_1000_4444.json",
+          "rel": "item",
+          "type": "application/geo+json",
+          "file:checksum": "1220c449c7aba728413f7a4b44b3a15caa40226710bc74ea1a51ffd36d0164db8856"
+        },
+        {
+          "href": "./BA31_1000_4445.json",
+          "rel": "item",
+          "type": "application/geo+json",
+          "file:checksum": "1220a0f916b71ff8b3c5fb47490b321e020210af3a3c3ece09d671ec0240651e5e2d"
+        },
+        {
+          "href": "./BA31_1000_4446.json",
+          "rel": "item",
+          "type": "application/geo+json",
+          "file:checksum": "1220d93a55d018b34134c93e69d47f050e77e18162460bf30601d8c3881a6e922156"
+        },
+        {
+          "href": "./BA31_1000_4544.json",
+          "rel": "item",
+          "type": "application/geo+json",
+          "file:checksum": "1220f3c145e1393251fb5f5b0813cb00e2af8c60031f78771ac9b1ffff211c876fa9"
+        },
+        {
+          "href": "./BA31_1000_4545.json",
+          "rel": "item",
+          "type": "application/geo+json",
+          "file:checksum": "122042a174cb58208f0629979303aa7d3b1987d8c7f6730cfdbcdbb0691a6bd27fbe"
+        },
+        {
+          "href": "./BA31_1000_4546.json",
+          "rel": "item",
+          "type": "application/geo+json",
+          "file:checksum": "122072aa098b237db3267840249c3f63f87b9bfafcfa596468fa873af4d86df3ef72"
+        }
+      ],
+      "providers": [
+        {
+          "name": "Toitū Te Whenua Land Information New Zealand",
+          "roles": [
+            "host",
+            "processor"
+          ]
+        },
+        {
+          "name": "Aerial Surveys",
+          "roles": [
+            "producer"
+          ]
+        },
+        {
+          "name": "Auckland Council",
+          "roles": [
+            "licensor"
+          ]
+        }
+      ],
+      "linz:lifecycle": "completed",
+      "linz:geospatial_category": "urban-aerial-photos",
+      "linz:region": "auckland",
+      "linz:security_classification": "unclassified",
+      "linz:slug": "auckland_2024_0.075m",
+      "created": "2025-02-24T21:42:53Z",
+      "updated": "2026-06-25T02:00:00Z",
+      "extent": {
+        "spatial": {
+          "bbox": [
+            [
+              174.1568679,
+              -37.2950242,
+              175.5557893,
+              -36.0230606
+            ]
+          ]
+        },
+        "temporal": {
+          "interval": [
+            [
+              "2024-01-31T11:00:00Z",
+              "2025-03-05T11:00:00Z"
+            ]
+          ]
+        }
+      },
+      "assets": {
+        "capture_area": {
+          "href": "./capture-area.geojson",
+          "title": "Capture area",
+          "description": "Boundary of the total capture area for this collection. Excludes nodata areas in the source data. Geometries are simplified.",
+          "type": "application/geo+json",
+          "roles": [
+            "metadata"
+          ],
+          "file:checksum": "1220fe6357590d3ee173daa293660c45134e7ecbb30c8f9d9d44ef02fd87b82c18bf",
+          "file:size": 40743
+        }
+      },
+      "stac_extensions": [
+        "https://stac-extensions.github.io/file/v2.0.0/schema.json"
+      ],
+      "gsd": 0.075
+    },
+    "https://nz-imagery.s3.ap-southeast-2.amazonaws.com/auckland/auckland_2024_0.075m/rgb/2193/BA31_1000_4544.json": {
+      "type": "Feature",
+      "stac_version": "1.0.0",
+      "id": "BA31_1000_4544",
+      "links": [
+        {
+          "href": "./BA31_1000_4544.json",
+          "rel": "self",
+          "type": "application/geo+json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "collection",
+          "type": "application/json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "parent",
+          "type": "application/json"
+        }
+      ],
+      "assets": {
+        "visual": {
+          "href": "./BA31_1000_4544.tiff",
+          "file:checksum": "1220fd7b7d9223b0f049a5b508dbc391b6600d959deae19c28da142b833054cf9747",
+          "created": "2025-02-24T21:42:53Z",
+          "updated": "2025-07-16T03:32:07Z",
+          "type": "image/tiff; application=geotiff; profile=cloud-optimized"
+        }
+      },
+      "stac_extensions": [
+        "https://stac-extensions.github.io/file/v2.0.0/schema.json",
+        "https://stac-extensions.github.io/processing/v1.2.0/schema.json"
+      ],
+      "properties": {
+        "created": "2025-02-24T21:42:53Z",
+        "updated": "2025-07-16T03:32:07Z",
+        "processing:datetime": "2025-07-16T03:32:07Z",
+        "processing:software": {
+          "gdal": "GDAL 3.9.0, released 2024/05/07",
+          "linz/topo-imagery": "https://github.com/linz/topo-imagery/commit/dfbc5666d3c98dd5cf23687fc68f44481b09fd96"
+        },
+        "processing:version": "v7.7.0",
+        "start_datetime": "2024-01-31T11:00:00Z",
+        "end_datetime": "2025-03-05T11:00:00Z",
+        "datetime": null
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              174.7133114,
+              -36.9047795
+            ],
+            [
+              174.7134566,
+              -36.9112671
+            ],
+            [
+              174.7188426,
+              -36.9111893
+            ],
+            [
+              174.718697,
+              -36.9047017
+            ],
+            [
+              174.7133114,
+              -36.9047795
+            ]
+          ]
+        ]
+      },
+      "bbox": [
+        174.7133114,
+        -36.9112671,
+        174.7188426,
+        -36.9047017
+      ],
+      "collection": "01JMWYKCHN35W88BJ5YV4M79AM"
+    },
+    "https://nz-imagery.s3.ap-southeast-2.amazonaws.com/auckland/auckland_2024_0.075m/rgb/2193/BA31_1000_4546.json": {
+      "type": "Feature",
+      "stac_version": "1.0.0",
+      "id": "BA31_1000_4546",
+      "links": [
+        {
+          "href": "./BA31_1000_4546.json",
+          "rel": "self",
+          "type": "application/geo+json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "collection",
+          "type": "application/json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "parent",
+          "type": "application/json"
+        }
+      ],
+      "assets": {
+        "visual": {
+          "href": "./BA31_1000_4546.tiff",
+          "file:checksum": "1220fab0d83230c311ace615cc13dbcee35bd4ffd44c6b0a7b83d6326cdb9188e48b",
+          "created": "2025-02-24T21:42:53Z",
+          "updated": "2025-07-16T03:32:07Z",
+          "type": "image/tiff; application=geotiff; profile=cloud-optimized"
+        }
+      },
+      "stac_extensions": [
+        "https://stac-extensions.github.io/file/v2.0.0/schema.json",
+        "https://stac-extensions.github.io/processing/v1.2.0/schema.json"
+      ],
+      "properties": {
+        "created": "2025-02-24T21:42:53Z",
+        "updated": "2025-07-16T03:32:07Z",
+        "processing:datetime": "2025-07-16T03:32:07Z",
+        "processing:software": {
+          "gdal": "GDAL 3.9.0, released 2024/05/07",
+          "linz/topo-imagery": "https://github.com/linz/topo-imagery/commit/dfbc5666d3c98dd5cf23687fc68f44481b09fd96"
+        },
+        "processing:version": "v7.7.0",
+        "start_datetime": "2024-01-31T11:00:00Z",
+        "end_datetime": "2025-03-05T11:00:00Z",
+        "datetime": null
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              174.7240826,
+              -36.9046237
+            ],
+            [
+              174.7242286,
+              -36.9111112
+            ],
+            [
+              174.7296146,
+              -36.9110329
+            ],
+            [
+              174.7294681,
+              -36.9045454
+            ],
+            [
+              174.7240826,
+              -36.9046237
+            ]
+          ]
+        ]
+      },
+      "bbox": [
+        174.7240826,
+        -36.9111112,
+        174.7296146,
+        -36.9045454
+      ],
+      "collection": "01JMWYKCHN35W88BJ5YV4M79AM"
+    },
+    "https://nz-imagery.s3.ap-southeast-2.amazonaws.com/auckland/auckland_2024_0.075m/rgb/2193/BA31_1000_4346.json": {
+      "type": "Feature",
+      "stac_version": "1.0.0",
+      "id": "BA31_1000_4346",
+      "links": [
+        {
+          "href": "./BA31_1000_4346.json",
+          "rel": "self",
+          "type": "application/geo+json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "collection",
+          "type": "application/json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "parent",
+          "type": "application/json"
+        }
+      ],
+      "assets": {
+        "visual": {
+          "href": "./BA31_1000_4346.tiff",
+          "file:checksum": "122018735a26ad83743e1f718b95c5c73b513d147b6324180d9e769f11a4f935af7c",
+          "created": "2025-02-24T21:42:53Z",
+          "updated": "2025-07-16T03:32:07Z",
+          "type": "image/tiff; application=geotiff; profile=cloud-optimized"
+        }
+      },
+      "stac_extensions": [
+        "https://stac-extensions.github.io/file/v2.0.0/schema.json",
+        "https://stac-extensions.github.io/processing/v1.2.0/schema.json"
+      ],
+      "properties": {
+        "created": "2025-02-24T21:42:53Z",
+        "updated": "2025-07-16T03:32:07Z",
+        "processing:datetime": "2025-07-16T03:32:07Z",
+        "processing:software": {
+          "gdal": "GDAL 3.9.0, released 2024/05/07",
+          "linz/topo-imagery": "https://github.com/linz/topo-imagery/commit/dfbc5666d3c98dd5cf23687fc68f44481b09fd96"
+        },
+        "processing:version": "v7.7.0",
+        "start_datetime": "2024-01-31T11:00:00Z",
+        "end_datetime": "2025-03-05T11:00:00Z",
+        "datetime": null
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              174.7237906,
+              -36.8916486
+            ],
+            [
+              174.7239366,
+              -36.8981361
+            ],
+            [
+              174.7293217,
+              -36.8980578
+            ],
+            [
+              174.7291753,
+              -36.8915703
+            ],
+            [
+              174.7237906,
+              -36.8916486
+            ]
+          ]
+        ]
+      },
+      "bbox": [
+        174.7237906,
+        -36.8981361,
+        174.7293217,
+        -36.8915703
+      ],
+      "collection": "01JMWYKCHN35W88BJ5YV4M79AM"
+    },
+    "https://nz-imagery.s3.ap-southeast-2.amazonaws.com/auckland/auckland_2024_0.075m/rgb/2193/BA31_1000_4545.json": {
+      "type": "Feature",
+      "stac_version": "1.0.0",
+      "id": "BA31_1000_4545",
+      "links": [
+        {
+          "href": "./BA31_1000_4545.json",
+          "rel": "self",
+          "type": "application/geo+json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "collection",
+          "type": "application/json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "parent",
+          "type": "application/json"
+        }
+      ],
+      "assets": {
+        "visual": {
+          "href": "./BA31_1000_4545.tiff",
+          "file:checksum": "12208ded8f48db48b1e675ab38e23fec9000db74dd66d596c1032399d142a17dc59c",
+          "created": "2025-02-24T21:42:53Z",
+          "updated": "2025-07-16T03:32:07Z",
+          "type": "image/tiff; application=geotiff; profile=cloud-optimized"
+        }
+      },
+      "stac_extensions": [
+        "https://stac-extensions.github.io/file/v2.0.0/schema.json",
+        "https://stac-extensions.github.io/processing/v1.2.0/schema.json"
+      ],
+      "properties": {
+        "created": "2025-02-24T21:42:53Z",
+        "updated": "2025-07-16T03:32:07Z",
+        "processing:datetime": "2025-07-16T03:32:07Z",
+        "processing:software": {
+          "gdal": "GDAL 3.9.0, released 2024/05/07",
+          "linz/topo-imagery": "https://github.com/linz/topo-imagery/commit/dfbc5666d3c98dd5cf23687fc68f44481b09fd96"
+        },
+        "processing:version": "v7.7.0",
+        "start_datetime": "2024-01-31T11:00:00Z",
+        "end_datetime": "2025-03-05T11:00:00Z",
+        "datetime": null
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              174.718697,
+              -36.9047017
+            ],
+            [
+              174.7188426,
+              -36.9111893
+            ],
+            [
+              174.7242286,
+              -36.9111112
+            ],
+            [
+              174.7240826,
+              -36.9046237
+            ],
+            [
+              174.718697,
+              -36.9047017
+            ]
+          ]
+        ]
+      },
+      "bbox": [
+        174.718697,
+        -36.9111893,
+        174.7242286,
+        -36.9046237
+      ],
+      "collection": "01JMWYKCHN35W88BJ5YV4M79AM"
+    },
+    "https://nz-imagery.s3.ap-southeast-2.amazonaws.com/auckland/auckland_2024_0.075m/rgb/2193/BA31_1000_4445.json": {
+      "type": "Feature",
+      "stac_version": "1.0.0",
+      "id": "BA31_1000_4445",
+      "links": [
+        {
+          "href": "./BA31_1000_4445.json",
+          "rel": "self",
+          "type": "application/geo+json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "collection",
+          "type": "application/json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "parent",
+          "type": "application/json"
+        }
+      ],
+      "assets": {
+        "visual": {
+          "href": "./BA31_1000_4445.tiff",
+          "file:checksum": "1220a9e14524c0c83f005ea508ec27f10d1cdbe6a53757b6c8e7058369174c862e85",
+          "created": "2025-02-24T21:42:53Z",
+          "updated": "2025-07-16T03:32:07Z",
+          "type": "image/tiff; application=geotiff; profile=cloud-optimized"
+        }
+      },
+      "stac_extensions": [
+        "https://stac-extensions.github.io/file/v2.0.0/schema.json",
+        "https://stac-extensions.github.io/processing/v1.2.0/schema.json"
+      ],
+      "properties": {
+        "created": "2025-02-24T21:42:53Z",
+        "updated": "2025-07-16T03:32:07Z",
+        "processing:datetime": "2025-07-16T03:32:07Z",
+        "processing:software": {
+          "gdal": "GDAL 3.9.0, released 2024/05/07",
+          "linz/topo-imagery": "https://github.com/linz/topo-imagery/commit/dfbc5666d3c98dd5cf23687fc68f44481b09fd96"
+        },
+        "processing:version": "v7.7.0",
+        "start_datetime": "2024-01-31T11:00:00Z",
+        "end_datetime": "2025-03-05T11:00:00Z",
+        "datetime": null
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              174.7185515,
+              -36.8982142
+            ],
+            [
+              174.718697,
+              -36.9047017
+            ],
+            [
+              174.7240826,
+              -36.9046237
+            ],
+            [
+              174.7239366,
+              -36.8981361
+            ],
+            [
+              174.7185515,
+              -36.8982142
+            ]
+          ]
+        ]
+      },
+      "bbox": [
+        174.7185515,
+        -36.9047017,
+        174.7240826,
+        -36.8981361
+      ],
+      "collection": "01JMWYKCHN35W88BJ5YV4M79AM"
+    },
+    "https://nz-imagery.s3.ap-southeast-2.amazonaws.com/auckland/auckland_2024_0.075m/rgb/2193/AY30_1000_4447.json": {
+      "type": "Feature",
+      "stac_version": "1.0.0",
+      "id": "AY30_1000_4447",
+      "links": [
+        {
+          "href": "./AY30_1000_4447.json",
+          "rel": "self",
+          "type": "application/geo+json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "collection",
+          "type": "application/json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "parent",
+          "type": "application/json"
+        }
+      ],
+      "assets": {
+        "visual": {
+          "href": "./AY30_1000_4447.tiff",
+          "file:checksum": "12205bd065fbcb39af713396089ae9149ee02588dc02e0266b4aa21c1b7d8e869633",
+          "created": "2025-02-24T21:42:53Z",
+          "updated": "2025-07-16T03:32:07Z",
+          "type": "image/tiff; application=geotiff; profile=cloud-optimized"
+        }
+      },
+      "stac_extensions": [
+        "https://stac-extensions.github.io/file/v2.0.0/schema.json",
+        "https://stac-extensions.github.io/processing/v1.2.0/schema.json"
+      ],
+      "properties": {
+        "created": "2025-02-24T21:42:53Z",
+        "updated": "2025-07-16T03:32:07Z",
+        "processing:datetime": "2025-07-16T03:32:07Z",
+        "processing:software": {
+          "gdal": "GDAL 3.9.0, released 2024/05/07",
+          "linz/topo-imagery": "https://github.com/linz/topo-imagery/commit/dfbc5666d3c98dd5cf23687fc68f44481b09fd96"
+        },
+        "processing:version": "v7.7.0",
+        "start_datetime": "2024-01-31T11:00:00Z",
+        "end_datetime": "2025-03-05T11:00:00Z",
+        "datetime": null
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              174.4478752,
+              -36.2527972
+            ],
+            [
+              174.4479949,
+              -36.2592864
+            ],
+            [
+              174.4533365,
+              -36.2592216
+            ],
+            [
+              174.4532163,
+              -36.2527325
+            ],
+            [
+              174.4478752,
+              -36.2527972
+            ]
+          ]
+        ]
+      },
+      "bbox": [
+        174.4478752,
+        -36.2592864,
+        174.4533365,
+        -36.2527325
+      ],
+      "collection": "01JMWYKCHN35W88BJ5YV4M79AM"
+    },
+    "https://nz-imagery.s3.ap-southeast-2.amazonaws.com/auckland/auckland_2024_0.075m/rgb/2193/BA31_1000_4446.json": {
+      "type": "Feature",
+      "stac_version": "1.0.0",
+      "id": "BA31_1000_4446",
+      "links": [
+        {
+          "href": "./BA31_1000_4446.json",
+          "rel": "self",
+          "type": "application/geo+json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "collection",
+          "type": "application/json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "parent",
+          "type": "application/json"
+        }
+      ],
+      "assets": {
+        "visual": {
+          "href": "./BA31_1000_4446.tiff",
+          "file:checksum": "1220a2452d8be796b6c80a5ee73aff4f2bc07d4fc66571c18c41185aaea93b8038e9",
+          "created": "2025-02-24T21:42:53Z",
+          "updated": "2025-07-16T03:32:07Z",
+          "type": "image/tiff; application=geotiff; profile=cloud-optimized"
+        }
+      },
+      "stac_extensions": [
+        "https://stac-extensions.github.io/file/v2.0.0/schema.json",
+        "https://stac-extensions.github.io/processing/v1.2.0/schema.json"
+      ],
+      "properties": {
+        "created": "2025-02-24T21:42:53Z",
+        "updated": "2025-07-16T03:32:07Z",
+        "processing:datetime": "2025-07-16T03:32:07Z",
+        "processing:software": {
+          "gdal": "GDAL 3.9.0, released 2024/05/07",
+          "linz/topo-imagery": "https://github.com/linz/topo-imagery/commit/dfbc5666d3c98dd5cf23687fc68f44481b09fd96"
+        },
+        "processing:version": "v7.7.0",
+        "start_datetime": "2024-01-31T11:00:00Z",
+        "end_datetime": "2025-03-05T11:00:00Z",
+        "datetime": null
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              174.7239366,
+              -36.8981361
+            ],
+            [
+              174.7240826,
+              -36.9046237
+            ],
+            [
+              174.7294681,
+              -36.9045454
+            ],
+            [
+              174.7293217,
+              -36.8980578
+            ],
+            [
+              174.7239366,
+              -36.8981361
+            ]
+          ]
+        ]
+      },
+      "bbox": [
+        174.7239366,
+        -36.9046237,
+        174.7294681,
+        -36.8980578
+      ],
+      "collection": "01JMWYKCHN35W88BJ5YV4M79AM"
+    },
+    "https://nz-imagery.s3.ap-southeast-2.amazonaws.com/auckland/auckland_2024_0.075m/rgb/2193/BA31_1000_4344.json": {
+      "type": "Feature",
+      "stac_version": "1.0.0",
+      "id": "BA31_1000_4344",
+      "links": [
+        {
+          "href": "./BA31_1000_4344.json",
+          "rel": "self",
+          "type": "application/geo+json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "collection",
+          "type": "application/json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "parent",
+          "type": "application/json"
+        }
+      ],
+      "assets": {
+        "visual": {
+          "href": "./BA31_1000_4344.tiff",
+          "file:checksum": "1220b357ab756ba951d0153768837b635dec7fa7f28e160412bb304861c6c575896a",
+          "created": "2025-02-24T21:42:53Z",
+          "updated": "2025-07-16T03:32:07Z",
+          "type": "image/tiff; application=geotiff; profile=cloud-optimized"
+        }
+      },
+      "stac_extensions": [
+        "https://stac-extensions.github.io/file/v2.0.0/schema.json",
+        "https://stac-extensions.github.io/processing/v1.2.0/schema.json"
+      ],
+      "properties": {
+        "created": "2025-02-24T21:42:53Z",
+        "updated": "2025-07-16T03:32:07Z",
+        "processing:datetime": "2025-07-16T03:32:07Z",
+        "processing:software": {
+          "gdal": "GDAL 3.9.0, released 2024/05/07",
+          "linz/topo-imagery": "https://github.com/linz/topo-imagery/commit/dfbc5666d3c98dd5cf23687fc68f44481b09fd96"
+        },
+        "processing:version": "v7.7.0",
+        "start_datetime": "2024-01-31T11:00:00Z",
+        "end_datetime": "2025-03-05T11:00:00Z",
+        "datetime": null
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              174.7130213,
+              -36.8918043
+            ],
+            [
+              174.7131664,
+              -36.8982919
+            ],
+            [
+              174.7185515,
+              -36.8982142
+            ],
+            [
+              174.718406,
+              -36.8917266
+            ],
+            [
+              174.7130213,
+              -36.8918043
+            ]
+          ]
+        ]
+      },
+      "bbox": [
+        174.7130213,
+        -36.8982919,
+        174.7185515,
+        -36.8917266
+      ],
+      "collection": "01JMWYKCHN35W88BJ5YV4M79AM"
+    },
+    "https://nz-imagery.s3.ap-southeast-2.amazonaws.com/auckland/auckland_2024_0.075m/rgb/2193/BA31_1000_4345.json": {
+      "type": "Feature",
+      "stac_version": "1.0.0",
+      "id": "BA31_1000_4345",
+      "links": [
+        {
+          "href": "./BA31_1000_4345.json",
+          "rel": "self",
+          "type": "application/geo+json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "collection",
+          "type": "application/json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "parent",
+          "type": "application/json"
+        }
+      ],
+      "assets": {
+        "visual": {
+          "href": "./BA31_1000_4345.tiff",
+          "file:checksum": "12208253307cd85dad10da6fa5a4551e59218cbb688fd5da67239016a4585cf26148",
+          "created": "2025-02-24T21:42:53Z",
+          "updated": "2025-07-16T03:32:07Z",
+          "type": "image/tiff; application=geotiff; profile=cloud-optimized"
+        }
+      },
+      "stac_extensions": [
+        "https://stac-extensions.github.io/file/v2.0.0/schema.json",
+        "https://stac-extensions.github.io/processing/v1.2.0/schema.json"
+      ],
+      "properties": {
+        "created": "2025-02-24T21:42:53Z",
+        "updated": "2025-07-16T03:32:07Z",
+        "processing:datetime": "2025-07-16T03:32:07Z",
+        "processing:software": {
+          "gdal": "GDAL 3.9.0, released 2024/05/07",
+          "linz/topo-imagery": "https://github.com/linz/topo-imagery/commit/dfbc5666d3c98dd5cf23687fc68f44481b09fd96"
+        },
+        "processing:version": "v7.7.0",
+        "start_datetime": "2024-01-31T11:00:00Z",
+        "end_datetime": "2025-03-05T11:00:00Z",
+        "datetime": null
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              174.718406,
+              -36.8917266
+            ],
+            [
+              174.7185515,
+              -36.8982142
+            ],
+            [
+              174.7239366,
+              -36.8981361
+            ],
+            [
+              174.7237906,
+              -36.8916486
+            ],
+            [
+              174.718406,
+              -36.8917266
+            ]
+          ]
+        ]
+      },
+      "bbox": [
+        174.718406,
+        -36.8982142,
+        174.7239366,
+        -36.8916486
+      ],
+      "collection": "01JMWYKCHN35W88BJ5YV4M79AM"
+    },
+    "https://nz-imagery.s3.ap-southeast-2.amazonaws.com/auckland/auckland_2024_0.075m/rgb/2193/BA31_1000_4444.json": {
+      "type": "Feature",
+      "stac_version": "1.0.0",
+      "id": "BA31_1000_4444",
+      "links": [
+        {
+          "href": "./BA31_1000_4444.json",
+          "rel": "self",
+          "type": "application/geo+json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "collection",
+          "type": "application/json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "parent",
+          "type": "application/json"
+        }
+      ],
+      "assets": {
+        "visual": {
+          "href": "./BA31_1000_4444.tiff",
+          "file:checksum": "1220ca49d4225e49be02ab472a954f06ab4596786f25253448d7a3f1701879cbf6f0",
+          "created": "2025-02-24T21:42:53Z",
+          "updated": "2025-07-16T03:32:07Z",
+          "type": "image/tiff; application=geotiff; profile=cloud-optimized"
+        }
+      },
+      "stac_extensions": [
+        "https://stac-extensions.github.io/file/v2.0.0/schema.json",
+        "https://stac-extensions.github.io/processing/v1.2.0/schema.json"
+      ],
+      "properties": {
+        "created": "2025-02-24T21:42:53Z",
+        "updated": "2025-07-16T03:32:07Z",
+        "processing:datetime": "2025-07-16T03:32:07Z",
+        "processing:software": {
+          "gdal": "GDAL 3.9.0, released 2024/05/07",
+          "linz/topo-imagery": "https://github.com/linz/topo-imagery/commit/dfbc5666d3c98dd5cf23687fc68f44481b09fd96"
+        },
+        "processing:version": "v7.7.0",
+        "start_datetime": "2024-01-31T11:00:00Z",
+        "end_datetime": "2025-03-05T11:00:00Z",
+        "datetime": null
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              174.7131664,
+              -36.8982919
+            ],
+            [
+              174.7133114,
+              -36.9047795
+            ],
+            [
+              174.718697,
+              -36.9047017
+            ],
+            [
+              174.7185515,
+              -36.8982142
+            ],
+            [
+              174.7131664,
+              -36.8982919
+            ]
+          ]
+        ]
+      },
+      "bbox": [
+        174.7131664,
+        -36.9047795,
+        174.718697,
+        -36.8982142
+      ],
+      "collection": "01JMWYKCHN35W88BJ5YV4M79AM"
+    },
+    "https://nz-imagery.s3.ap-southeast-2.amazonaws.com/auckland/auckland_2024_0.075m/rgbnir/2193/collection.json": {
+      "type": "Collection",
+      "stac_version": "1.0.0",
+      "id": "01KJ3SCS6GC16B1NNJ0BBSSY1R",
+      "title": "Auckland 0.075m Near-Infrared Aerial Photos (2024-2025)",
+      "description": "Near-infrared orthophotography within the Auckland region captured in the 2024-2025 flying season.",
+      "license": "CC-BY-4.0",
+      "links": [
+        {
+          "rel": "root",
+          "href": "https://nz-imagery.s3.ap-southeast-2.amazonaws.com/catalog.json",
+          "type": "application/json"
+        },
+        {
+          "rel": "self",
+          "href": "./collection.json",
+          "type": "application/json"
+        },
+        {
+          "href": "./AY30_1000_4447.json",
+          "rel": "item",
+          "type": "application/geo+json",
+          "file:checksum": "1220b78e67b0be30eb64cb4589cefe3c0fbbc76a846c66636545489b7eaf32632429"
+        },
+        {
+          "href": "./BA31_1000_4344.json",
+          "rel": "item",
+          "type": "application/geo+json",
+          "file:checksum": "1220b5f8b588f794271ba2c0f916948a38364c3b46e981a9ffb29ac27bcf9b64300e"
+        },
+        {
+          "href": "./BA31_1000_4345.json",
+          "rel": "item",
+          "type": "application/geo+json",
+          "file:checksum": "122053dae5a30e8f13402a681456763e76be78e8f8146453bec113c9612656383353"
+        },
+        {
+          "href": "./BA31_1000_4346.json",
+          "rel": "item",
+          "type": "application/geo+json",
+          "file:checksum": "12209a839fae286295a99aa3d0a1c18e551cafc31bbcd793677ad35fc23a24c86d27"
+        },
+        {
+          "href": "./BA31_1000_4444.json",
+          "rel": "item",
+          "type": "application/geo+json",
+          "file:checksum": "122041d2834629a2444c411bba13b3587e19b660120678a22e7730aadef9bb82bfa7"
+        },
+        {
+          "href": "./BA31_1000_4445.json",
+          "rel": "item",
+          "type": "application/geo+json",
+          "file:checksum": "12204538f83411e0e4a2518a2650eb12487a0955e54b9ef909e6a37c25c18f2a2faa"
+        },
+        {
+          "href": "./BA31_1000_4446.json",
+          "rel": "item",
+          "type": "application/geo+json",
+          "file:checksum": "12203e81bedd3b8e7424f22cbc52da2bec6ecc0bd53f874b8f8db289a1959ed06df8"
+        },
+        {
+          "href": "./BA31_1000_4544.json",
+          "rel": "item",
+          "type": "application/geo+json",
+          "file:checksum": "1220dfa972c811b367c654a72e72abae53d3ad28c25c73691d8694d629af102aeb7c"
+        },
+        {
+          "href": "./BA31_1000_4545.json",
+          "rel": "item",
+          "type": "application/geo+json",
+          "file:checksum": "122084b8f8f920efd56589be2e6a291223271edd8bc032bd1cb0e09f74eefbdbdb30"
+        },
+        {
+          "href": "./BA31_1000_4546.json",
+          "rel": "item",
+          "type": "application/geo+json",
+          "file:checksum": "1220b4e44194a9901d5efbab15388579fffb2fe23a5c2131797c16b36680e8b698e2"
+        }
+      ],
+      "providers": [
+        {
+          "name": "Toitū Te Whenua Land Information New Zealand",
+          "roles": [
+            "host",
+            "processor"
+          ]
+        },
+        {
+          "name": "Aerial Surveys",
+          "roles": [
+            "producer"
+          ]
+        },
+        {
+          "name": "Auckland Council",
+          "roles": [
+            "licensor"
+          ]
+        }
+      ],
+      "linz:lifecycle": "completed",
+      "linz:geospatial_category": "near-infrared-aerial-photos",
+      "linz:region": "auckland",
+      "linz:security_classification": "unclassified",
+      "linz:slug": "auckland_2024_0.075m",
+      "gsd": 0.075,
+      "created": "2026-02-22T23:01:47Z",
+      "updated": "2026-02-22T23:01:47Z",
+      "extent": {
+        "spatial": {
+          "bbox": [
+            [
+              174.1568679,
+              -37.2950242,
+              175.5557893,
+              -36.0230606
+            ]
+          ]
+        },
+        "temporal": {
+          "interval": [
+            [
+              "2024-01-31T11:00:00Z",
+              "2025-03-05T11:00:00Z"
+            ]
+          ]
+        }
+      },
+      "assets": {
+        "capture_area": {
+          "href": "./capture-area.geojson",
+          "title": "Capture area",
+          "description": "Boundary of the total capture area for this collection. Excludes nodata areas in the source data. Geometries are simplified.",
+          "type": "application/geo+json",
+          "roles": [
+            "metadata"
+          ],
+          "file:checksum": "12203936d3012846fd36bacbf196cb8b95b8929c49a9fc8c3d49997ace07f8c412cd",
+          "file:size": 40919
+        }
+      },
+      "stac_extensions": [
+        "https://stac-extensions.github.io/file/v2.0.0/schema.json"
+      ]
+    },
+    "https://nz-imagery.s3.ap-southeast-2.amazonaws.com/auckland/auckland_2024_0.075m/rgbnir/2193/AY30_1000_4447.json": {
+      "type": "Feature",
+      "stac_version": "1.0.0",
+      "id": "AY30_1000_4447",
+      "links": [
+        {
+          "href": "./AY30_1000_4447.json",
+          "rel": "self",
+          "type": "application/geo+json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "collection",
+          "type": "application/json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "parent",
+          "type": "application/json"
+        }
+      ],
+      "assets": {
+        "visual": {
+          "href": "./AY30_1000_4447.tiff",
+          "file:checksum": "1220c6e0cc4c2523106349235303e9012100d1132570878af73ab9f64980a4660d26",
+          "created": "2026-02-22T23:01:47Z",
+          "updated": "2026-02-22T23:01:47Z",
+          "type": "image/tiff; application=geotiff; profile=cloud-optimized"
+        }
+      },
+      "stac_extensions": [
+        "https://stac-extensions.github.io/file/v2.0.0/schema.json",
+        "https://stac-extensions.github.io/processing/v1.2.0/schema.json"
+      ],
+      "properties": {
+        "created": "2026-02-22T23:01:47Z",
+        "updated": "2026-02-22T23:01:47Z",
+        "processing:datetime": "2026-02-22T23:01:47Z",
+        "processing:software": {
+          "gdal": "GDAL 3.10.3, released 2025/04/01",
+          "linz/topo-imagery": "https://github.com/linz/topo-imagery/commit/f5f286496ad282bfc14a77e3d1968c3aec392b5a"
+        },
+        "processing:version": "v7.16.1",
+        "start_datetime": "2024-01-31T11:00:00Z",
+        "end_datetime": "2025-03-05T11:00:00Z",
+        "datetime": null
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              174.4478752,
+              -36.2527972
+            ],
+            [
+              174.4479949,
+              -36.2592864
+            ],
+            [
+              174.4533365,
+              -36.2592216
+            ],
+            [
+              174.4532163,
+              -36.2527325
+            ],
+            [
+              174.4478752,
+              -36.2527972
+            ]
+          ]
+        ]
+      },
+      "bbox": [
+        174.4478752,
+        -36.2592864,
+        174.4533365,
+        -36.2527325
+      ],
+      "collection": "01KJ3SCS6GC16B1NNJ0BBSSY1R"
+    },
+    "https://nz-imagery.s3.ap-southeast-2.amazonaws.com/auckland/auckland_2024_0.075m/rgbnir/2193/BA31_1000_4546.json": {
+      "type": "Feature",
+      "stac_version": "1.0.0",
+      "id": "BA31_1000_4546",
+      "links": [
+        {
+          "href": "./BA31_1000_4546.json",
+          "rel": "self",
+          "type": "application/geo+json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "collection",
+          "type": "application/json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "parent",
+          "type": "application/json"
+        }
+      ],
+      "assets": {
+        "visual": {
+          "href": "./BA31_1000_4546.tiff",
+          "file:checksum": "1220d24065900628ffd32b9e5d034a9dc089c7a9a83f4f5497c0caa3c2618ba84985",
+          "created": "2026-02-22T23:01:47Z",
+          "updated": "2026-02-22T23:01:47Z",
+          "type": "image/tiff; application=geotiff; profile=cloud-optimized"
+        }
+      },
+      "stac_extensions": [
+        "https://stac-extensions.github.io/file/v2.0.0/schema.json",
+        "https://stac-extensions.github.io/processing/v1.2.0/schema.json"
+      ],
+      "properties": {
+        "created": "2026-02-22T23:01:47Z",
+        "updated": "2026-02-22T23:01:47Z",
+        "processing:datetime": "2026-02-22T23:01:47Z",
+        "processing:software": {
+          "gdal": "GDAL 3.10.3, released 2025/04/01",
+          "linz/topo-imagery": "https://github.com/linz/topo-imagery/commit/f5f286496ad282bfc14a77e3d1968c3aec392b5a"
+        },
+        "processing:version": "v7.16.1",
+        "start_datetime": "2024-01-31T11:00:00Z",
+        "end_datetime": "2025-03-05T11:00:00Z",
+        "datetime": null
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              174.7240826,
+              -36.9046237
+            ],
+            [
+              174.7242286,
+              -36.9111112
+            ],
+            [
+              174.7296146,
+              -36.9110329
+            ],
+            [
+              174.7294681,
+              -36.9045454
+            ],
+            [
+              174.7240826,
+              -36.9046237
+            ]
+          ]
+        ]
+      },
+      "bbox": [
+        174.7240826,
+        -36.9111112,
+        174.7296146,
+        -36.9045454
+      ],
+      "collection": "01KJ3SCS6GC16B1NNJ0BBSSY1R"
+    },
+    "https://nz-imagery.s3.ap-southeast-2.amazonaws.com/auckland/auckland_2024_0.075m/rgbnir/2193/BA31_1000_4545.json": {
+      "type": "Feature",
+      "stac_version": "1.0.0",
+      "id": "BA31_1000_4545",
+      "links": [
+        {
+          "href": "./BA31_1000_4545.json",
+          "rel": "self",
+          "type": "application/geo+json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "collection",
+          "type": "application/json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "parent",
+          "type": "application/json"
+        }
+      ],
+      "assets": {
+        "visual": {
+          "href": "./BA31_1000_4545.tiff",
+          "file:checksum": "1220548213e3559ed5b69c24ff2962467da3c8b36b29167f47f3f4790febf7cb3e22",
+          "created": "2026-02-22T23:01:47Z",
+          "updated": "2026-02-22T23:01:47Z",
+          "type": "image/tiff; application=geotiff; profile=cloud-optimized"
+        }
+      },
+      "stac_extensions": [
+        "https://stac-extensions.github.io/file/v2.0.0/schema.json",
+        "https://stac-extensions.github.io/processing/v1.2.0/schema.json"
+      ],
+      "properties": {
+        "created": "2026-02-22T23:01:47Z",
+        "updated": "2026-02-22T23:01:47Z",
+        "processing:datetime": "2026-02-22T23:01:47Z",
+        "processing:software": {
+          "gdal": "GDAL 3.10.3, released 2025/04/01",
+          "linz/topo-imagery": "https://github.com/linz/topo-imagery/commit/f5f286496ad282bfc14a77e3d1968c3aec392b5a"
+        },
+        "processing:version": "v7.16.1",
+        "start_datetime": "2024-01-31T11:00:00Z",
+        "end_datetime": "2025-03-05T11:00:00Z",
+        "datetime": null
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              174.718697,
+              -36.9047017
+            ],
+            [
+              174.7188426,
+              -36.9111893
+            ],
+            [
+              174.7242286,
+              -36.9111112
+            ],
+            [
+              174.7240826,
+              -36.9046237
+            ],
+            [
+              174.718697,
+              -36.9047017
+            ]
+          ]
+        ]
+      },
+      "bbox": [
+        174.718697,
+        -36.9111893,
+        174.7242286,
+        -36.9046237
+      ],
+      "collection": "01KJ3SCS6GC16B1NNJ0BBSSY1R"
+    },
+    "https://nz-imagery.s3.ap-southeast-2.amazonaws.com/auckland/auckland_2024_0.075m/rgbnir/2193/BA31_1000_4345.json": {
+      "type": "Feature",
+      "stac_version": "1.0.0",
+      "id": "BA31_1000_4345",
+      "links": [
+        {
+          "href": "./BA31_1000_4345.json",
+          "rel": "self",
+          "type": "application/geo+json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "collection",
+          "type": "application/json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "parent",
+          "type": "application/json"
+        }
+      ],
+      "assets": {
+        "visual": {
+          "href": "./BA31_1000_4345.tiff",
+          "file:checksum": "1220f97354cac4c40f460eda03f9bbf02f40e6e49c60b6158ad6190f830c80dba6f9",
+          "created": "2026-02-22T23:01:47Z",
+          "updated": "2026-02-22T23:01:47Z",
+          "type": "image/tiff; application=geotiff; profile=cloud-optimized"
+        }
+      },
+      "stac_extensions": [
+        "https://stac-extensions.github.io/file/v2.0.0/schema.json",
+        "https://stac-extensions.github.io/processing/v1.2.0/schema.json"
+      ],
+      "properties": {
+        "created": "2026-02-22T23:01:47Z",
+        "updated": "2026-02-22T23:01:47Z",
+        "processing:datetime": "2026-02-22T23:01:47Z",
+        "processing:software": {
+          "gdal": "GDAL 3.10.3, released 2025/04/01",
+          "linz/topo-imagery": "https://github.com/linz/topo-imagery/commit/f5f286496ad282bfc14a77e3d1968c3aec392b5a"
+        },
+        "processing:version": "v7.16.1",
+        "start_datetime": "2024-01-31T11:00:00Z",
+        "end_datetime": "2025-03-05T11:00:00Z",
+        "datetime": null
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              174.718406,
+              -36.8917266
+            ],
+            [
+              174.7185515,
+              -36.8982142
+            ],
+            [
+              174.7239366,
+              -36.8981361
+            ],
+            [
+              174.7237906,
+              -36.8916486
+            ],
+            [
+              174.718406,
+              -36.8917266
+            ]
+          ]
+        ]
+      },
+      "bbox": [
+        174.718406,
+        -36.8982142,
+        174.7239366,
+        -36.8916486
+      ],
+      "collection": "01KJ3SCS6GC16B1NNJ0BBSSY1R"
+    },
+    "https://nz-imagery.s3.ap-southeast-2.amazonaws.com/auckland/auckland_2024_0.075m/rgbnir/2193/BA31_1000_4445.json": {
+      "type": "Feature",
+      "stac_version": "1.0.0",
+      "id": "BA31_1000_4445",
+      "links": [
+        {
+          "href": "./BA31_1000_4445.json",
+          "rel": "self",
+          "type": "application/geo+json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "collection",
+          "type": "application/json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "parent",
+          "type": "application/json"
+        }
+      ],
+      "assets": {
+        "visual": {
+          "href": "./BA31_1000_4445.tiff",
+          "file:checksum": "122073a62adc1390c8114256c4c53dbc9e0f6559c0272cba767fe4b4d7f5ebd98354",
+          "created": "2026-02-22T23:01:47Z",
+          "updated": "2026-02-22T23:01:47Z",
+          "type": "image/tiff; application=geotiff; profile=cloud-optimized"
+        }
+      },
+      "stac_extensions": [
+        "https://stac-extensions.github.io/file/v2.0.0/schema.json",
+        "https://stac-extensions.github.io/processing/v1.2.0/schema.json"
+      ],
+      "properties": {
+        "created": "2026-02-22T23:01:47Z",
+        "updated": "2026-02-22T23:01:47Z",
+        "processing:datetime": "2026-02-22T23:01:47Z",
+        "processing:software": {
+          "gdal": "GDAL 3.10.3, released 2025/04/01",
+          "linz/topo-imagery": "https://github.com/linz/topo-imagery/commit/f5f286496ad282bfc14a77e3d1968c3aec392b5a"
+        },
+        "processing:version": "v7.16.1",
+        "start_datetime": "2024-01-31T11:00:00Z",
+        "end_datetime": "2025-03-05T11:00:00Z",
+        "datetime": null
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              174.7185515,
+              -36.8982142
+            ],
+            [
+              174.718697,
+              -36.9047017
+            ],
+            [
+              174.7240826,
+              -36.9046237
+            ],
+            [
+              174.7239366,
+              -36.8981361
+            ],
+            [
+              174.7185515,
+              -36.8982142
+            ]
+          ]
+        ]
+      },
+      "bbox": [
+        174.7185515,
+        -36.9047017,
+        174.7240826,
+        -36.8981361
+      ],
+      "collection": "01KJ3SCS6GC16B1NNJ0BBSSY1R"
+    },
+    "https://nz-imagery.s3.ap-southeast-2.amazonaws.com/auckland/auckland_2024_0.075m/rgbnir/2193/BA31_1000_4544.json": {
+      "type": "Feature",
+      "stac_version": "1.0.0",
+      "id": "BA31_1000_4544",
+      "links": [
+        {
+          "href": "./BA31_1000_4544.json",
+          "rel": "self",
+          "type": "application/geo+json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "collection",
+          "type": "application/json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "parent",
+          "type": "application/json"
+        }
+      ],
+      "assets": {
+        "visual": {
+          "href": "./BA31_1000_4544.tiff",
+          "file:checksum": "122086cfbe6565841c6fbfa0fbfb2d5927b38ec2f3351c2f378ce8765c57d81356a7",
+          "created": "2026-02-22T23:01:47Z",
+          "updated": "2026-02-22T23:01:47Z",
+          "type": "image/tiff; application=geotiff; profile=cloud-optimized"
+        }
+      },
+      "stac_extensions": [
+        "https://stac-extensions.github.io/file/v2.0.0/schema.json",
+        "https://stac-extensions.github.io/processing/v1.2.0/schema.json"
+      ],
+      "properties": {
+        "created": "2026-02-22T23:01:47Z",
+        "updated": "2026-02-22T23:01:47Z",
+        "processing:datetime": "2026-02-22T23:01:47Z",
+        "processing:software": {
+          "gdal": "GDAL 3.10.3, released 2025/04/01",
+          "linz/topo-imagery": "https://github.com/linz/topo-imagery/commit/f5f286496ad282bfc14a77e3d1968c3aec392b5a"
+        },
+        "processing:version": "v7.16.1",
+        "start_datetime": "2024-01-31T11:00:00Z",
+        "end_datetime": "2025-03-05T11:00:00Z",
+        "datetime": null
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              174.7133114,
+              -36.9047795
+            ],
+            [
+              174.7134566,
+              -36.9112671
+            ],
+            [
+              174.7188426,
+              -36.9111893
+            ],
+            [
+              174.718697,
+              -36.9047017
+            ],
+            [
+              174.7133114,
+              -36.9047795
+            ]
+          ]
+        ]
+      },
+      "bbox": [
+        174.7133114,
+        -36.9112671,
+        174.7188426,
+        -36.9047017
+      ],
+      "collection": "01KJ3SCS6GC16B1NNJ0BBSSY1R"
+    },
+    "https://nz-imagery.s3.ap-southeast-2.amazonaws.com/auckland/auckland_2024_0.075m/rgbnir/2193/BA31_1000_4444.json": {
+      "type": "Feature",
+      "stac_version": "1.0.0",
+      "id": "BA31_1000_4444",
+      "links": [
+        {
+          "href": "./BA31_1000_4444.json",
+          "rel": "self",
+          "type": "application/geo+json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "collection",
+          "type": "application/json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "parent",
+          "type": "application/json"
+        }
+      ],
+      "assets": {
+        "visual": {
+          "href": "./BA31_1000_4444.tiff",
+          "file:checksum": "122077a32cbe5e4f382d92906f7bcd5a03e44688497245814b66e34f97e3067366fd",
+          "created": "2026-02-22T23:01:47Z",
+          "updated": "2026-02-22T23:01:47Z",
+          "type": "image/tiff; application=geotiff; profile=cloud-optimized"
+        }
+      },
+      "stac_extensions": [
+        "https://stac-extensions.github.io/file/v2.0.0/schema.json",
+        "https://stac-extensions.github.io/processing/v1.2.0/schema.json"
+      ],
+      "properties": {
+        "created": "2026-02-22T23:01:47Z",
+        "updated": "2026-02-22T23:01:47Z",
+        "processing:datetime": "2026-02-22T23:01:47Z",
+        "processing:software": {
+          "gdal": "GDAL 3.10.3, released 2025/04/01",
+          "linz/topo-imagery": "https://github.com/linz/topo-imagery/commit/f5f286496ad282bfc14a77e3d1968c3aec392b5a"
+        },
+        "processing:version": "v7.16.1",
+        "start_datetime": "2024-01-31T11:00:00Z",
+        "end_datetime": "2025-03-05T11:00:00Z",
+        "datetime": null
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              174.7131664,
+              -36.8982919
+            ],
+            [
+              174.7133114,
+              -36.9047795
+            ],
+            [
+              174.718697,
+              -36.9047017
+            ],
+            [
+              174.7185515,
+              -36.8982142
+            ],
+            [
+              174.7131664,
+              -36.8982919
+            ]
+          ]
+        ]
+      },
+      "bbox": [
+        174.7131664,
+        -36.9047795,
+        174.718697,
+        -36.8982142
+      ],
+      "collection": "01KJ3SCS6GC16B1NNJ0BBSSY1R"
+    },
+    "https://nz-imagery.s3.ap-southeast-2.amazonaws.com/auckland/auckland_2024_0.075m/rgbnir/2193/BA31_1000_4346.json": {
+      "type": "Feature",
+      "stac_version": "1.0.0",
+      "id": "BA31_1000_4346",
+      "links": [
+        {
+          "href": "./BA31_1000_4346.json",
+          "rel": "self",
+          "type": "application/geo+json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "collection",
+          "type": "application/json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "parent",
+          "type": "application/json"
+        }
+      ],
+      "assets": {
+        "visual": {
+          "href": "./BA31_1000_4346.tiff",
+          "file:checksum": "12205a39ed55f2430cf4aa251495a7c297a0cf0a7f4e7a0025a4b7c54fadb0a0d61a",
+          "created": "2026-02-22T23:01:47Z",
+          "updated": "2026-02-22T23:01:47Z",
+          "type": "image/tiff; application=geotiff; profile=cloud-optimized"
+        }
+      },
+      "stac_extensions": [
+        "https://stac-extensions.github.io/file/v2.0.0/schema.json",
+        "https://stac-extensions.github.io/processing/v1.2.0/schema.json"
+      ],
+      "properties": {
+        "created": "2026-02-22T23:01:47Z",
+        "updated": "2026-02-22T23:01:47Z",
+        "processing:datetime": "2026-02-22T23:01:47Z",
+        "processing:software": {
+          "gdal": "GDAL 3.10.3, released 2025/04/01",
+          "linz/topo-imagery": "https://github.com/linz/topo-imagery/commit/f5f286496ad282bfc14a77e3d1968c3aec392b5a"
+        },
+        "processing:version": "v7.16.1",
+        "start_datetime": "2024-01-31T11:00:00Z",
+        "end_datetime": "2025-03-05T11:00:00Z",
+        "datetime": null
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              174.7237906,
+              -36.8916486
+            ],
+            [
+              174.7239366,
+              -36.8981361
+            ],
+            [
+              174.7293217,
+              -36.8980578
+            ],
+            [
+              174.7291753,
+              -36.8915703
+            ],
+            [
+              174.7237906,
+              -36.8916486
+            ]
+          ]
+        ]
+      },
+      "bbox": [
+        174.7237906,
+        -36.8981361,
+        174.7293217,
+        -36.8915703
+      ],
+      "collection": "01KJ3SCS6GC16B1NNJ0BBSSY1R"
+    },
+    "https://nz-imagery.s3.ap-southeast-2.amazonaws.com/auckland/auckland_2024_0.075m/rgbnir/2193/BA31_1000_4344.json": {
+      "type": "Feature",
+      "stac_version": "1.0.0",
+      "id": "BA31_1000_4344",
+      "links": [
+        {
+          "href": "./BA31_1000_4344.json",
+          "rel": "self",
+          "type": "application/geo+json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "collection",
+          "type": "application/json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "parent",
+          "type": "application/json"
+        }
+      ],
+      "assets": {
+        "visual": {
+          "href": "./BA31_1000_4344.tiff",
+          "file:checksum": "122044b1afb4eef5ec9071131e1fcd8858f080a64a2085d8d8c9d70275713142875c",
+          "created": "2026-02-22T23:01:47Z",
+          "updated": "2026-02-22T23:01:47Z",
+          "type": "image/tiff; application=geotiff; profile=cloud-optimized"
+        }
+      },
+      "stac_extensions": [
+        "https://stac-extensions.github.io/file/v2.0.0/schema.json",
+        "https://stac-extensions.github.io/processing/v1.2.0/schema.json"
+      ],
+      "properties": {
+        "created": "2026-02-22T23:01:47Z",
+        "updated": "2026-02-22T23:01:47Z",
+        "processing:datetime": "2026-02-22T23:01:47Z",
+        "processing:software": {
+          "gdal": "GDAL 3.10.3, released 2025/04/01",
+          "linz/topo-imagery": "https://github.com/linz/topo-imagery/commit/f5f286496ad282bfc14a77e3d1968c3aec392b5a"
+        },
+        "processing:version": "v7.16.1",
+        "start_datetime": "2024-01-31T11:00:00Z",
+        "end_datetime": "2025-03-05T11:00:00Z",
+        "datetime": null
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              174.7130213,
+              -36.8918043
+            ],
+            [
+              174.7131664,
+              -36.8982919
+            ],
+            [
+              174.7185515,
+              -36.8982142
+            ],
+            [
+              174.718406,
+              -36.8917266
+            ],
+            [
+              174.7130213,
+              -36.8918043
+            ]
+          ]
+        ]
+      },
+      "bbox": [
+        174.7130213,
+        -36.8982919,
+        174.7185515,
+        -36.8917266
+      ],
+      "collection": "01KJ3SCS6GC16B1NNJ0BBSSY1R"
+    },
+    "https://nz-imagery.s3.ap-southeast-2.amazonaws.com/auckland/auckland_2024_0.075m/rgbnir/2193/BA31_1000_4446.json": {
+      "type": "Feature",
+      "stac_version": "1.0.0",
+      "id": "BA31_1000_4446",
+      "links": [
+        {
+          "href": "./BA31_1000_4446.json",
+          "rel": "self",
+          "type": "application/geo+json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "collection",
+          "type": "application/json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "parent",
+          "type": "application/json"
+        }
+      ],
+      "assets": {
+        "visual": {
+          "href": "./BA31_1000_4446.tiff",
+          "file:checksum": "1220e6a6756284801e4640e840c4ba35c69ccc6416ec56a9c9c46f3fcd96ce952fe4",
+          "created": "2026-02-22T23:01:47Z",
+          "updated": "2026-02-22T23:01:47Z",
+          "type": "image/tiff; application=geotiff; profile=cloud-optimized"
+        }
+      },
+      "stac_extensions": [
+        "https://stac-extensions.github.io/file/v2.0.0/schema.json",
+        "https://stac-extensions.github.io/processing/v1.2.0/schema.json"
+      ],
+      "properties": {
+        "created": "2026-02-22T23:01:47Z",
+        "updated": "2026-02-22T23:01:47Z",
+        "processing:datetime": "2026-02-22T23:01:47Z",
+        "processing:software": {
+          "gdal": "GDAL 3.10.3, released 2025/04/01",
+          "linz/topo-imagery": "https://github.com/linz/topo-imagery/commit/f5f286496ad282bfc14a77e3d1968c3aec392b5a"
+        },
+        "processing:version": "v7.16.1",
+        "start_datetime": "2024-01-31T11:00:00Z",
+        "end_datetime": "2025-03-05T11:00:00Z",
+        "datetime": null
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              174.7239366,
+              -36.8981361
+            ],
+            [
+              174.7240826,
+              -36.9046237
+            ],
+            [
+              174.7294681,
+              -36.9045454
+            ],
+            [
+              174.7293217,
+              -36.8980578
+            ],
+            [
+              174.7239366,
+              -36.8981361
+            ]
+          ]
+        ]
+      },
+      "bbox": [
+        174.7239366,
+        -36.9046237,
+        174.7294681,
+        -36.8980578
+      ],
+      "collection": "01KJ3SCS6GC16B1NNJ0BBSSY1R"
+    }
+  }
+}
