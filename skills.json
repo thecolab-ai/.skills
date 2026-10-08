@@ -1629,7 +1629,7 @@
     },
     {
       "name": "linz-data-service",
-      "description": "Search and inspect LINZ Data Service public Koordinates catalogue layers, tables, services, licences, tags, and download/view capabilities through no-login JSON endpoints. Use when the task involves Toitū Te Whenua LINZ datasets such as addresses, parcels, imagery, hydrography, roads, property, or geospatial layers. Read-only; no API key needed for catalogue metadata.",
+      "description": "Search and inspect LINZ Data Service public Koordinates catalogue layers, tables, services, licences, tags, and download/view capabilities through no-login JSON endpoints. Use when the task involves Toitū Te Whenua LINZ datasets such as addresses, parcels, imagery, hydrography, roads, property, or geospatial layers. Query keyless primary-parcel and building-outline polygons from the public LINZ ArcGIS mirror. Read-only; no API key needed.",
       "path": "skills/linz-data-service",
       "category": "public-data",
       "source_owner": "Toitū Te Whenua LINZ",
@@ -1646,9 +1646,10 @@
       "skill_type": "public-api",
       "pack": "nz-public-data",
       "allowed_domains": [
-        "data.linz.govt.nz"
+        "data.linz.govt.nz",
+        "services.arcgis.com"
       ],
-      "last_verified": "2026-07-19",
+      "last_verified": "2026-10-08",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
@@ -4668,7 +4669,7 @@
         "opendata-nzta.opendata.arcgis.com",
         "services.arcgis.com"
       ],
-      "last_verified": "2026-07-19",
+      "last_verified": "2026-10-08",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
@@ -4778,7 +4779,7 @@
     },
     {
       "name": "osm-nz",
-      "description": "Query OpenStreetMap Overpass API for nearby points of interest, attractions, amenities, shops, and services around any NZ location. Use when the task involves finding what's nearby — restaurants, cafes, parks, shops, transport stops, museums, beaches — given coordinates or an address. No login or API key required. Read-only.",
+      "description": "Query OpenStreetMap Overpass API for nearby points of interest, attractions, amenities, shops, and services around any NZ location, or raw OSM tags within a bbox or NZ area. Use when the task involves finding what's nearby — restaurants, cafes, parks, shops, transport stops, museums, beaches — given coordinates or an address. No login or API key required. Read-only.",
       "path": "skills/osm-nz",
       "category": "public-data",
       "source_owner": "OpenStreetMap contributors",
@@ -4798,7 +4799,7 @@
         "overpass-api.de",
         "www.openstreetmap.org"
       ],
-      "last_verified": "2026-07-19",
+      "last_verified": "2026-10-08",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
