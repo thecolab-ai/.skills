@@ -3,7 +3,7 @@
   "name": "nz-public-data",
   "description": "Public, read-only New Zealand data and public-interest sources.",
   "default": true,
-  "skill_count": 107,
+  "skill_count": 108,
   "skills": [
     "akl-rainfall",
     "at-transport",
@@ -84,6 +84,7 @@
     "nz-select-committees",
     "nz-stac",
     "nz-tides-surf",
+    "nz-traffic-counts",
     "nz-trains",
     "nzbn-register",
     "nzpost",

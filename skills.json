@@ -2,7 +2,7 @@
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
   "last_verified": "2026-10-08",
-  "skill_count": 155,
+  "skill_count": 156,
   "skills": [
     {
       "name": "airnz-flights",
@@ -4620,6 +4620,34 @@
         "www.swellmap.com"
       ],
       "last_verified": "2026-07-19",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "nz-traffic-counts",
+      "description": "Query NZ traffic, cycle and pedestrian count sites and time series, starting with Auckland Transport, NZTA TMS and Heart of the City. Use for historical volumes, active-mode monitoring and nearby count sites.",
+      "path": "skills/nz-traffic-counts",
+      "category": "transport",
+      "source_owner": "Auckland Transport; NZ Transport Agency; Heart of the City",
+      "source_type": "mixed",
+      "source_url": "https://at.govt.nz/about-us/reports-publications/traffic-counts",
+      "auth": "none",
+      "access_mode": "public-download",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "24h",
+      "schema_version": "1",
+      "skill_type": "public-download",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "at.govt.nz",
+        "www.hotcity.co.nz",
+        "services.arcgis.com",
+        "services2.arcgis.com"
+      ],
+      "last_verified": "2026-10-08",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
