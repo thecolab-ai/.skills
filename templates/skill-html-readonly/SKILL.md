@@ -29,3 +29,7 @@ metadata:
 Use `scripts/cli.py` only for bounded public read-only pages. Do not add account,
 cart, checkout, booking, or payment flows. Read `references/source-notes.md` and
 verify parsers with fixtures before running `scripts/smoke_test.py`.
+
+Return data with the provenance envelope from `scripts/provenance.py`: source
+URL, publisher, retrieval time, known data licence and source-stated latest data.
+See `references/source-notes.md` for errors and optional spatial output.

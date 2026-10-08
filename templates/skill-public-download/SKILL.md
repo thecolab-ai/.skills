@@ -30,3 +30,7 @@ Use `scripts/cli.py` for bounded first-party downloads and deterministic parsing
 Keep representative source fixtures in `tests/fixtures/` and provenance in every
 result. Read `references/source-notes.md`, then run `scripts/test_contract.py`
 and `scripts/smoke_test.py`.
+
+Return data with the provenance envelope from `scripts/provenance.py`: source
+URL, publisher, retrieval time, known data licence and source-stated latest data.
+See `references/source-notes.md` for errors and optional spatial output.

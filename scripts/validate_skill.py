@@ -5,10 +5,27 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
+from pathlib import Path
 
 import validate_agent_spec
 import validate_repo_policy
+
+
+def provenance_warnings(skill_dir: Path) -> list[str]:
+    """Advisory adoption hint, not a schema audit or a strict policy gate."""
+    cli = skill_dir / "scripts" / "cli.py"
+    if not cli.is_file():
+        return []  # Missing entry points are handled by repository policy.
+    text = cli.read_text(encoding="utf-8")
+    if re.search(r"\b(?:source_url|publisher|licence|retrieved_at|latest_data)\b", text):
+        return []
+    return [
+        "Result provenance (advisory): scripts/cli.py shows no provenance fields; "
+        "include source_url, publisher, retrieved_at, and known licence/latest_data "
+        "in JSON results (see docs/contracts.md)"
+    ]
 
 
 def main() -> int:
@@ -34,6 +51,8 @@ def main() -> int:
             if args.strict:
                 errors.extend(f"strict: {warning}" for warning in warnings)
                 warnings = []
+            # Keep gradual provenance adoption non-blocking, including in strict mode.
+            warnings.extend(provenance_warnings(skill_dir))
             results.append({"skill": spec_result["skill"], "errors": errors, "warnings": warnings})
     except (OSError, ValueError) as exc:
         print(f"[ERROR] {exc}", file=sys.stderr)

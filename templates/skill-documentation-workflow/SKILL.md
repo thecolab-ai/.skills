@@ -29,3 +29,7 @@ metadata:
 Keep the workflow concise and operational. Use `scripts/cli.py` for deterministic
 inspection or validation, `references/source-notes.md` for detailed provenance,
 and the bundled contract and smoke tests for verification.
+
+Return data with the provenance envelope from `scripts/provenance.py`: source
+URL, publisher, retrieval time, known data licence and source-stated latest data.
+See `references/source-notes.md` for errors and optional spatial output.
