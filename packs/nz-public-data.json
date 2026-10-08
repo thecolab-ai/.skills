@@ -3,7 +3,7 @@
   "name": "nz-public-data",
   "description": "Public, read-only New Zealand data and public-interest sources.",
   "default": true,
-  "skill_count": 105,
+  "skill_count": 106,
   "skills": [
     "akl-rainfall",
     "at-transport",
@@ -35,6 +35,7 @@
     "geonet-nz",
     "gets-procurement-nz",
     "gns-hazards-nz",
+    "gtfs-nz",
     "gwrc-hilltop-nz",
     "healthcert-rest-homes-nz",
     "heritage-list-nz",
