@@ -2,6 +2,7 @@
 """Scaffold a new skill from an opinionated template."""
 
 import argparse
+import json
 import os
 import re
 import shutil
@@ -93,6 +94,7 @@ def scaffold_skill(
     category: str,
     source_type: str,
     pack: str | None,
+    source_licence: str | None = None,
 ) -> None:
     name = normalize_name(name)
     if not name:
@@ -138,6 +140,10 @@ def scaffold_skill(
         "DESCRIPTION": quoted_template_value(description),
         "SOURCE_OWNER": quoted_template_value(source_owner),
         "SOURCE_URL": quoted_template_value(source_url),
+        "PY_SOURCE_URL": json.dumps(source_url, ensure_ascii=False),
+        "PY_SOURCE_OWNER": json.dumps(source_owner, ensure_ascii=False),
+        "PY_SOURCE_LICENCE": json.dumps(source_licence, ensure_ascii=False) if source_licence else "None",
+        "SOURCE_LICENCE": source_licence or "Unknown; verify the source's reuse terms",
         "ALLOWED_DOMAINS": parsed_source.hostname.lower(),
         "CATEGORY": category,
         "SOURCE_TYPE": source_type,
@@ -188,6 +194,7 @@ def main():
     parser.add_argument("--description", required=True, help="Agent Skills trigger description")
     parser.add_argument("--source-owner", required=True, help="agency, operator, project, or internal owner")
     parser.add_argument("--source-url", required=True, help="canonical absolute primary-source URL")
+    parser.add_argument("--source-licence", help="source data reuse terms, only when verified (not the code licence)")
     parser.add_argument("--category", default="public-data", help="catalogue category")
     parser.add_argument(
         "--source-type",
@@ -218,6 +225,7 @@ def main():
             category=args.category,
             source_type=args.source_type,
             pack=args.pack,
+            source_licence=args.source_licence,
         )
     except Exception as exc:
         print(f"[ERROR] {exc}", file=sys.stderr)

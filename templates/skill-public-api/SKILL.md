@@ -31,3 +31,7 @@ Use the Python CLI in `scripts/cli.py`. Every data command must support
 
 Read `references/source-notes.md` before replacing the scaffold status command.
 Run `scripts/test_contract.py` and `scripts/smoke_test.py` after implementation.
+
+Return data with the provenance envelope from `scripts/provenance.py`: source
+URL, publisher, retrieval time, known data licence and source-stated latest data.
+See `references/source-notes.md` for errors and optional spatial output.

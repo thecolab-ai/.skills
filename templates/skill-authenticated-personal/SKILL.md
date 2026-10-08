@@ -29,3 +29,7 @@ metadata:
 Load credentials lazily inside `scripts/cli.py`, never emit them, and never use
 live personal records in fixtures or CI. Read `references/source-notes.md` and
 run the deterministic contract test before any opt-in live probe.
+
+Return data with the provenance envelope from `scripts/provenance.py`: source
+URL, publisher, retrieval time, known data licence and source-stated latest data.
+See `references/source-notes.md` for errors and optional spatial output.
