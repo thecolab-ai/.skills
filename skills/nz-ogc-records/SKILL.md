@@ -1,11 +1,11 @@
 ---
 name: nz-ogc-records
-description: "Search NZ public OGC API Records and CKAN catalogues for datasets, distribution URLs, licences and update metadata. Use to discover Auckland Council, Auckland Transport, Waka Kotahi, NIWA and data.govt.nz datasets before querying their linked services."
+description: "Search NZ public OGC API Records and CKAN catalogues for datasets, distribution URLs, licences and update metadata. Use to discover Auckland Council, Auckland Transport, Waka Kotahi, Earth Sciences New Zealand (NIWA) and data.govt.nz datasets before querying their linked services."
 license: MIT
 compatibility: "Requires Python 3.10+ and network access for live data"
 metadata:
   thecolab.category: "public-data"
-  thecolab.source_owner: "Auckland Council; Auckland Transport; NZ Transport Agency Waka Kotahi; NIWA; data.govt.nz"
+  thecolab.source_owner: "Auckland Council; Auckland Transport; NZ Transport Agency Waka Kotahi; Earth Sciences New Zealand (NIWA); data.govt.nz"
   thecolab.source_type: "official"
   thecolab.auth: "none"
   thecolab.access_mode: "public-api"
@@ -18,7 +18,7 @@ metadata:
   thecolab.skill_type: "public-api"
   thecolab.pack: "nz-public-data"
   thecolab.source_url: "https://data-aucklandcouncil.opendata.arcgis.com/api/search/v1/collections/dataset/items"
-  thecolab.allowed_domains: "data-aucklandcouncil.opendata.arcgis.com,data-atgis.opendata.arcgis.com,opendata-nzta.opendata.arcgis.com,data-niwa.opendata.arcgis.com,catalogue.data.govt.nz,www.arcgis.com"
+  thecolab.allowed_domains: "data-aucklandcouncil.opendata.arcgis.com,data-atgis.opendata.arcgis.com,opendata-nzta.opendata.arcgis.com,data-niwa.opendata.arcgis.com,catalogue.data.govt.nz"
   thecolab.last_verified: "2026-10-08"
   thecolab.health: "degraded"
   thecolab.maintainer: "@adam91holt"
@@ -39,7 +39,7 @@ python3 skills/nz-ogc-records/scripts/cli.py get auckland-transport eeb0839fbd59
 ```
 
 - `catalogues` probes all five endpoints and reports availability and upstream
-  matched counts. An unavailable endpoint is a status row, not a crash.
+  matched counts. Failed probes remain status rows; all failed probes exit non-zero.
 - `search TEXT` searches all catalogues by default. Repeat `--catalogue` to
   select several. Names: `auckland-council`, `auckland-transport`, `waka-kotahi`,
   `niwa`, `data-govt-nz`. `--limit` is **per catalogue**, from 1 to 100.
@@ -49,33 +49,41 @@ python3 skills/nz-ogc-records/scripts/cli.py get auckland-transport eeb0839fbd59
   an item ID to a layer ID with a suffix such as `_0`; retain the returned ID.
 - `--bbox minLon,minLat,maxLon,maxLat` filters catalogue coverage in WGS84.
   Use increasing bounds; split antimeridian searches into two boxes. Extents
-  can be broad or absent and do not establish local data coverage. CKAN bbox
-  search is unverified and returns `unsupported_bbox` rather than ignoring it.
+  can be broad or absent and do not establish local data coverage. Filtering
+  occurs upstream and uses coverage intersection on Hub and CKAN (`ext_bbox`),
+  rather than containment. National-coverage records can intersect tiny boxes.
 - Search and get accept `--format geojson`; geometries describe **metadata
   coverage**, not dataset features. Records without geometry have `null` geometry.
 
 ## Workflow and interpretation
 
-1. Check `catalogues` when selecting a source. At verification on 8 October
-   2026 the four OGC catalogues were available; data.govt.nz's keyless CKAN
-   endpoint returned a bot challenge and was unavailable from this network.
+1. Check `catalogues` when selecting a source. On 8 October 2026 Hawk verified
+   CKAN search/get live; this lane's curl and nzfetch recheck received a bot
+   challenge. Access varies by network. CKAN fixtures are clearly marked
+   synthetic; the four OGC catalogues are live-verified here.
 2. Search relevant catalogues, inspect `catalogues`, `partial`, and `warnings`,
    and use returned IDs with `get` to review the record.
 3. Check each record's `licence`, `licence_info`, attribution, description and
    dates. NIWA includes non-commercial licences. `updated_at` is a catalogue
-   modification date; `latest_data` stays null unless the source explicitly
+   modification date; `latest_data` is omitted unless the source explicitly
    provides it. Do not label old survey data current because metadata changed.
 4. Hand FeatureServer/MapServer URLs in `distribution_urls` to `nz-arcgis` when
    available. ImageServer URLs require a raster-capable client. File downloads
    can be large; review their format before downloading.
 
-JSON envelopes, catalogue statuses, records and distributions carry `source_url`,
-`publisher`, `licence`, `retrieved_at` (UTC), and `latest_data`. Unknown licence and
-latest data are null. Mixed-source envelopes have null licence/latest data; use
-record values. No keys or sign-in are used. Linked distributions are surfaced,
-not fetched or checked for their own availability or authentication requirements.
-Search may succeed with partial results; all unavailable catalogues produce a
-non-zero search exit. Empty results from available sources are valid.
+JSON success output is exactly `{"meta": {...}, "results": [...]}`; get also
+returns an array. `meta` carries `source_url`, `publisher`, and `retrieved_at`
+(UTC), plus catalogue statuses, query settings, `partial` and `warnings`.
+Mixed-source records and distributions carry their own provenance. `licence`
+and `latest_data` are omitted when unknown. `custom`/`none` Hub licence markers
+use up to 300 characters of plain-text licence terms when present; inspect
+`licence_info` for the full terms. GeoJSON uses `meta` as a foreign member.
+Failures use `meta`, `results: []`, and `error` with numeric `code`, contract
+`type` and `message`; rate limits preserve `retry_after`. No keys or sign-in are
+used. Linked distributions are surfaced, not fetched or checked for their own
+availability or authentication requirements. Search may succeed with partial
+results; all unavailable catalogues produce a non-zero search or catalogues exit.
+Empty results from available sources are valid. `--format json` implies JSON.
 
 Read [references/source-notes.md](references/source-notes.md) for endpoint,
 fixture and parser details. Run `scripts/test_contract.py` for deterministic

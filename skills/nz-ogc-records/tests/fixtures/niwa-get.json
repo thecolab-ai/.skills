@@ -29,7 +29,7 @@
     ]
   },
   "properties": {
-    "snippet": "Bay of Plenty 25m DTM ArcGIS Image Service which is suitable for analysis and mapping and can be streamed directly using an ArcGIS Client application such as ArcGIS Pro, ArcGIS Maps for Office, a Web map viewer (browser) or Survey123, FieldMaps etc.",
+    "snippet": "Synthetic metadata snippet.",
     "extent": {
       "type": "Polygon",
       "coordinates": [
@@ -58,8 +58,8 @@
       ]
     },
     "access": "public",
-    "description": "<div>A bathymetry model of the Bay of Plenty (New Zealand) region in 25 m grid resolution. Bathymetry is compiled from multibeam and single-beam data sourced from surveys from NIWA and Land Information New Zealand (LINZ), as well as international surveys by vessels from United States of America and Germany. <br /></div><div><br /><p></p><p>New Zealand<span> Bay of Plenty 25m \nDTM/Bathymetric Grid. <span style='font-weight:bold;'>This is an ArcGIS Image Service </span>which is suitable \nfor analysis and mapping and can be streamed directly using an ArcGIS \nClient application such as ArcGIS Pro, ArcGIS Maps for Office, a Web map\n viewer (browser) or Survey123, FieldMaps etc.</span></p></div><div><span><br /></span></div><div><span>If you prefer, you can download the file at <span style='font-weight:bold;'>https://niwa.maps.arcgis.com/home/item.html?id=36cb18c3db034aafa16c578e952a16a0</span><br /></span></div><div><br /></div><div><br /></div><div><font size='4'><span style='font-style:italic;'>Lamarche, G., Guntz, M., Mackay, K., Pallentin, A., and Mackay, E., 2018. Bay of Plenty. NIWA Miscellaneous Chart Series 109.</span></font></div>_________________________________________________________________________________________________________________<br /><br /><font size='3'><b>Item Page Created:</b> 2022-07-25 04:43  <br /><b>Item Page Last Modified:</b> 2025-04-05 18:03<br />Owner: NIWA_OpenData</font><br />",
-    "licenseInfo": "<a href='https://creativecommons.org/licenses/by-nc/4.0' rel='nofollow ugc'><img alt='Creative Commons License' src='https://i.creativecommons.org/l/by-nc/4.0/88x31.png' style='border-width:0;' /></a><br />This work is licensed under a <a href='https://creativecommons.org/licenses/by-nc/4.0' rel='nofollow ugc'>Creative Commons Attribution-NonCommercial 4.0 International License</a>",
+    "description": "<p>Synthetic <b>metadata</b> description &amp; parser example.</p>",
+    "licenseInfo": "<p>Synthetic NonCommercial licence parser example.</p>",
     "title": "NZ Bay of Plenty BoP 25m DTM (Image Service)",
     "type": "Image Service",
     "modified": 1744478732000,
@@ -85,5 +85,6 @@
       "title": "Dataset",
       "href": "https://data-niwa.opendata.arcgis.com/api/search/v1/collections/dataset"
     }
-  ]
+  ],
+  "_fixture_note": "Captured 2026-10-08; descriptions, snippets and licence prose are synthetic parser examples; factual IDs and source licence identifiers retained."
 }

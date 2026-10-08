@@ -9,7 +9,7 @@ import sys
 import cli
 
 FIXTURES = Path(__file__).resolve().parents[1] / 'tests' / 'fixtures'
-PROVENANCE = {'source_url', 'publisher', 'licence', 'retrieved_at', 'latest_data'}
+PROVENANCE = {'source_url', 'publisher', 'retrieved_at'}
 
 
 def live(cat, term):
@@ -33,10 +33,10 @@ def live(cat, term):
     assert detail['title'] == records[0]['title']
     assert detail['distribution_urls']
     assert PROVENANCE <= detail.keys()
-    geo = cli.make_geojson({'record': detail})
+    geo = cli.make_geojson({'results': [detail], 'meta': cli.provenance(url, detail['publisher'], cli.now())})
     assert geo['type'] == 'FeatureCollection' and len(geo['features']) == 1
     return (f"[PASS] live {cat} search: {status['number_matched']} matched; {len(records)} returned; {records[0]['title']}\n"
-            f"[PASS] live {cat} get: {detail['id']}; {detail['licence']}; {detail['distribution_urls'][0]}")
+            f"[PASS] live {cat} get: {detail['id']}; {detail.get('licence', 'unknown')}; {detail['distribution_urls'][0]}")
 
 
 def main():
@@ -45,7 +45,22 @@ def main():
         rows, count, links = cli.ogc_page(data)
         record = cli.normalise_ogc(rows[0], cat, cli.CATALOGUES[cat]['source_url'], cli.now())
         assert count > 0 and record['distribution_urls'] and PROVENANCE <= record.keys()
-        print(f'[PASS] fixture {cat}: real Records response and distributions')
+        print(f'[PASS] fixture {cat}: Records response shape and distributions')
+    ckan_fixture = json.loads((FIXTURES / 'data-govt-nz.json').read_text())
+    rows, count, _ = cli.ckan_result(ckan_fixture)
+    assert count == ckan_fixture['result']['count'] and len(rows) == 2
+    record = cli.normalise_ckan(rows[0], 'data-govt-nz', cli.query_url('data-govt-nz'), cli.now())
+    assert PROVENANCE <= record.keys() and record['distribution_urls']
+    assert record['publisher'] == rows[0]['organization']['title']
+    assert record['licence'] == rows[0]['license_title']
+    assert record['geometry'] == json.loads(rows[0]['spatial'])
+    assert 'latest_data' not in record
+    print('[PASS] fixture data-govt-nz: synthetic CKAN search, provenance and geometry')
+    ckan_detail = json.loads((FIXTURES / 'data-govt-nz-get.json').read_text())
+    detail = cli.normalise_ckan(cli.ckan_result(ckan_detail, detail=True), 'data-govt-nz',
+                                cli.query_url('data-govt-nz', record_id=rows[0]['id']), cli.now())
+    assert detail['id'] == rows[0]['id'] and detail['distribution_urls'] == record['distribution_urls']
+    print('[PASS] fixture data-govt-nz get: synthetic CKAN detail and distributions')
     jobs = [('auckland-council', 'flood'), ('auckland-transport', 'Future Connect'),
             ('waka-kotahi', 'traffic'), ('niwa', 'bathymetry')]
     failed = False
@@ -61,13 +76,21 @@ def main():
     run = subprocess.run([sys.executable, str(Path(__file__).with_name('cli.py')), 'search',
                           'bathymetry', '--catalogue', 'niwa', '--limit', '1', '--format', 'geojson'],
                          text=True, capture_output=True, timeout=50)
-    result = json.loads(run.stdout)
     if run.returncode in (4, 5):
         print('[SKIP] CLI GeoJSON: network error')
+    elif run.returncode != 0:
+        print('[FAIL] CLI GeoJSON: ' + run.stderr[-300:].strip())
+        failed = True
     else:
-        assert run.returncode == 0 and result['type'] == 'FeatureCollection' and result['features']
-        assert PROVENANCE <= result.keys() and PROVENANCE <= result['features'][0]['properties'].keys()
-        print('[PASS] live CLI GeoJSON: provenance and catalogue coverage geometry')
+        try:
+            result = json.loads(run.stdout)
+            assert result['type'] == 'FeatureCollection' and result['features']
+            assert PROVENANCE <= result['meta'].keys() and PROVENANCE <= result['features'][0]['properties'].keys()
+        except (ValueError, KeyError, TypeError, AssertionError):
+            print('[FAIL] CLI GeoJSON: invalid output; ' + run.stderr[-300:].strip())
+            failed = True
+        else:
+            print('[PASS] live CLI GeoJSON: provenance and catalogue coverage geometry')
     ckan, records = cli.catalogue_request('data-govt-nz', limit=1)
     if ckan['available']:
         assert records and PROVENANCE <= records[0].keys()

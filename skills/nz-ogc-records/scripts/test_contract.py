@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""Real-fixture capability checks plus the shared repository contract."""
+"""Captured OGC and synthetic CKAN checks plus the shared repository contract."""
 from __future__ import annotations
 
 import contextlib
 import copy
 import io
+import importlib.util
+from urllib.error import HTTPError
 import json
 from pathlib import Path
 import sys
@@ -16,10 +18,11 @@ SKILL_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SKILL_DIR.parents[1] / 'lib'))
 from contract_test import run_contract_test  # noqa: E402
 import cli  # noqa: E402
+import smoke_test  # noqa: E402
 
 FIXTURES = SKILL_DIR / 'tests' / 'fixtures'
 STAMP = '2026-10-08T00:00:00Z'
-PROVENANCE = {'source_url', 'publisher', 'licence', 'retrieved_at', 'latest_data'}
+PROVENANCE = {'source_url', 'publisher', 'retrieved_at'}
 
 
 def fixture(name):
@@ -43,7 +46,7 @@ class RecordsTests(unittest.TestCase):
             self.assertEqual(rec['title'], features[0]['properties']['title'])
             self.assertEqual(rec['licence'], features[0]['properties']['license'])
             self.assertTrue(PROVENANCE <= rec.keys())
-            self.assertIsNone(rec['latest_data'])
+            self.assertNotIn('latest_data', rec)
             self.assertTrue(rec['updated_at'].endswith('Z'))
             self.assertEqual(rec['geometry'], features[0]['geometry'])
             self.assertTrue(rec['distribution_urls'])
@@ -67,7 +70,7 @@ class RecordsTests(unittest.TestCase):
             r = cli.normalise_ogc(f, cat, f['links'][0]['href'], STAMP)
             self.assertTrue(r['distributions'][0]['derived'])
             self.assertTrue(r['distribution_urls'][0].endswith('/' + f['id'] + '/data'))
-            self.assertIsNone(r['latest_data'])
+            self.assertNotIn('latest_data', r)
             self.assertIsNotNone(r['updated_at'])
         f = fixture('niwa-get.json')
         f['properties'].pop('license')
@@ -75,7 +78,10 @@ class RecordsTests(unittest.TestCase):
         self.assertIn('NonCommercial', r['licence'])
         f['properties'].pop('licenseInfo')
         r = cli.normalise_ogc(f, 'niwa', f['links'][0]['href'], STAMP)
-        self.assertIsNone(r['licence'])
+        self.assertNotIn('licence', r)
+        for d in r['distributions']:
+            self.assertNotIn('licence', d)
+            self.assertNotIn('latest_data', d)
 
     def test_search_forwards_bbox_and_keeps_pagination_and_provenance(self):
         calls = []
@@ -90,13 +96,13 @@ class RecordsTests(unittest.TestCase):
         self.assertEqual(params['q'], ['bathymetry'])
         self.assertEqual(params['bbox'], ['174.4,-37.2,175.3,-36.4'])
         self.assertEqual(params['limit'], ['1'])
-        self.assertEqual(len(payload['records']), 1)
-        self.assertEqual(payload['catalogues'][0]['next_urls'],
+        self.assertEqual(len(payload['results']), 1)
+        self.assertEqual(payload['meta']['catalogues'][0]['next_urls'],
                          [l['href'] for l in fixture('niwa.json')['links'] if l['rel'] == 'next'])
-        self.assertTrue(PROVENANCE <= payload.keys())
-        self.assertFalse(payload['partial'])
-        self.assertEqual(payload['publisher'], 'NIWA')
-        self.assertEqual(payload['source_url'], cli.CATALOGUES['niwa']['source_url'])
+        self.assertTrue(PROVENANCE <= payload['meta'].keys())
+        self.assertFalse(payload['meta']['partial'])
+        self.assertEqual(payload['meta']['publisher'], cli.CATALOGUES['niwa']['publisher'])
+        self.assertEqual(payload['meta']['source_url'], cli.CATALOGUES['niwa']['source_url'])
 
     def test_partial_search_reports_blocked_ckan_without_crashing(self):
         def fetch(url):
@@ -106,16 +112,16 @@ class RecordsTests(unittest.TestCase):
         code, p = self.invoke(['search', 'water', '--catalogue', 'niwa', '--catalogue',
                               'data-govt-nz', '--json'], fetch)
         self.assertEqual(code, 0)
-        self.assertTrue(p['ok'])
-        self.assertTrue(p['partial'])
-        self.assertTrue(p['records'])
-        self.assertEqual(p['catalogues'][1]['status'], 'unavailable')
-        self.assertEqual(p['catalogues'][1]['error_code'], 4)
-        self.assertTrue(p['warnings'])
+        self.assertNotIn('error', p)
+        self.assertTrue(p['meta']['partial'])
+        self.assertTrue(p['results'])
+        self.assertEqual(p['meta']['catalogues'][1]['status'], 'unavailable')
+        self.assertEqual(p['meta']['catalogues'][1]['error_code'], 4)
+        self.assertTrue(p['meta']['warnings'])
         code, p = self.invoke(['search', 'water', '--catalogue', 'data-govt-nz', '--json'], fetch)
         self.assertEqual(code, 4)
-        self.assertFalse(p['ok'])
-        self.assertEqual(p['records'], [])
+        self.assertIn('error', p)
+        self.assertEqual(p['results'], [])
         self.assertIn('error', p)
 
     def test_catalogue_probe_reports_all_statuses(self):
@@ -128,21 +134,21 @@ class RecordsTests(unittest.TestCase):
             self.fail('Unknown outbound catalogue')
         code, p = self.invoke(['catalogues', '--json'], fetch)
         self.assertEqual(code, 0)
-        self.assertEqual(len(p['catalogues']), 5)
-        for c in p['catalogues']:
+        self.assertEqual(len(p['meta']['catalogues']), 5)
+        for c in p['meta']['catalogues']:
             self.assertTrue(PROVENANCE <= c.keys())
-        self.assertEqual(sum(c['available'] for c in p['catalogues']), 4)
+        self.assertEqual(sum(c['available'] for c in p['meta']['catalogues']), 4)
 
     def test_geojson_search_and_get_preserve_null_coverage(self):
         code, p = self.invoke(['search', 'impervious', '--catalogue', 'auckland-council',
                               '--limit', '1', '--format', 'geojson'],
-                             lambda url: fixture('auckland-council.json'))
+                             lambda url, **kwargs: fixture('auckland-council.json'))
         self.assertEqual(code, 0)
         self.assertEqual(p['type'], 'FeatureCollection')
         self.assertIsNone(p['features'][0]['geometry'])
         self.assertTrue(PROVENANCE <= p['features'][0]['properties'].keys())
         code, p = self.invoke(['get', 'auckland-transport', fixture('auckland-transport.json')['features'][0]['id'],
-                              '--format', 'geojson'], lambda url: fixture('auckland-transport-get.json'))
+                              '--format', 'geojson'], lambda url, **kwargs: fixture('auckland-transport-get.json'))
         self.assertEqual(code, 0)
         self.assertEqual(p['features'][0]['geometry']['type'], 'Polygon')
         self.assertTrue(p['features'][0]['id'].endswith('_0'))
@@ -150,34 +156,162 @@ class RecordsTests(unittest.TestCase):
     def test_malformed_response_is_failure_and_empty_search_is_valid(self):
         for data in ({}, {'type': 'FeatureCollection', 'features': [], 'numberMatched': 'unknown'},
                      {'type': 'FeatureCollection', 'features': [None], 'numberMatched': 1}):
-            code, p = self.invoke(['search', 'water', '--catalogue', 'niwa', '--json'], lambda url: data)
+            code, p = self.invoke(['search', 'water', '--catalogue', 'niwa', '--json'], lambda url, **kwargs: data)
             self.assertEqual(code, 6)
-            self.assertFalse(p['ok'])
-            self.assertEqual(p['catalogues'][0]['error_category'], 'schema_error')
+            self.assertIn('error', p)
+            self.assertEqual(p['meta']['catalogues'][0]['error_category'], 'schema_failure')
         data = copy.deepcopy(fixture('niwa.json'))
         data.update(features=[], numberMatched=0, numberReturned=0, links=[])
-        code, p = self.invoke(['search', 'water', '--catalogue', 'niwa', '--json'], lambda url: data)
+        code, p = self.invoke(['search', 'water', '--catalogue', 'niwa', '--json'], lambda url, **kwargs: data)
         self.assertEqual(code, 0)
-        self.assertTrue(p['ok'])
-        self.assertEqual(p['returned'], 0)
+        self.assertNotIn('error', p)
+        self.assertEqual(p['meta']['returned'], 0)
         for key in ('type', 'license', 'source', 'url'):
             malformed = copy.deepcopy(fixture('niwa-get.json'))
             malformed['properties'][key] = {}
-            code, p = self.invoke(['get', 'niwa', malformed['id'], '--json'], lambda url: malformed)
+            code, p = self.invoke(['get', 'niwa', malformed['id'], '--json'], lambda url, **kwargs: malformed)
             self.assertEqual(code, 6)
-            self.assertEqual(p['error']['category'], 'schema_error')
-        code, p = self.invoke(['get', 'niwa', 'missing', '--json'], lambda url: {})
+            self.assertEqual(p['error']['type'], 'schema_failure')
+        code, p = self.invoke(['get', 'niwa', 'missing', '--json'], lambda url, **kwargs: {})
         self.assertEqual(code, 6)
-        self.assertFalse(p['ok'])
-        self.assertTrue(PROVENANCE <= p.keys())
+        self.assertIn('error', p)
+        self.assertTrue(PROVENANCE <= p['meta'].keys())
 
-    def test_ckan_bbox_is_explicitly_unsupported(self):
-        with patch.object(cli, 'fetch_json') as fetch:
-            code, p = self.invoke(['search', 'water', '--catalogue', 'data-govt-nz',
-                                  '--bbox', '174,-37,175,-36', '--json'], lambda url: self.fail('Must not fetch'))
-        self.assertEqual(code, 7)
-        self.assertEqual(p['catalogues'][0]['status'], 'unsupported_bbox')
-        fetch.assert_not_called()
+    def test_ckan_fixtures_bbox_geometry_and_pagination(self):
+        raw = fixture('data-govt-nz.json')
+        rows, count, _ = cli.ckan_result(raw)
+        self.assertEqual(count, raw['result']['count'])
+        self.assertEqual(len(rows), 2)
+        url = cli.query_url('data-govt-nz', 'water', [174, -37, 175, -36], 2)
+        r = cli.normalise_ckan(rows[0], 'data-govt-nz', url, STAMP)
+        self.assertEqual(r['publisher'], rows[0]['organization']['title'])
+        self.assertEqual(r['licence'], rows[0]['license_title'])
+        self.assertEqual(r['distribution_urls'], [d['url'] for d in rows[0]['resources']])
+        self.assertEqual(r['formats'], ['CSV'])
+        self.assertEqual(r['geometry'], json.loads(rows[0]['spatial']))
+        self.assertEqual(r['updated_at'], '2022-03-05T02:19:21Z')
+        self.assertNotIn('latest_data', r)
+        self.assertEqual(r['description'], 'Synthetic water metadata.')
+        for d in r['distributions']:
+            self.assertTrue(PROVENANCE <= d.keys())
+            self.assertNotIn('latest_data', d)
+        for spatial in (json.loads(rows[0]['spatial']), None):
+            mutated = dict(rows[0], spatial=spatial)
+            self.assertEqual(cli.normalise_ckan(mutated, 'data-govt-nz', url, STAMP)['geometry'], spatial)
+        for spatial in ('{bad', '', '[]', {}, {'type': 4}, ['Polygon']):
+            with self.assertRaises(cli.SourceError) as caught:
+                cli.normalise_ckan(dict(rows[0], spatial=spatial), 'data-govt-nz', url, STAMP)
+            self.assertEqual(caught.exception.code, 6)
+        calls = []
+        def fetch(url):
+            calls.append(url)
+            return raw
+        code, p = self.invoke(['search', 'water', '--catalogue', 'data-govt-nz', '--limit', '2',
+                              '--bbox', '174,-37,175,-36', '--format', 'json'], fetch)
+        self.assertEqual(code, 0)
+        self.assertFalse(p['meta']['partial'])
+        self.assertEqual(parse_qs(urlsplit(calls[0]).query)['ext_bbox'], ['174.0,-37.0,175.0,-36.0'])
+        next_url = p['meta']['catalogues'][0]['next_urls'][0]
+        self.assertEqual(parse_qs(urlsplit(next_url).query),
+                         {'q': ['water'], 'rows': ['2'], 'start': ['2'], 'ext_bbox': ['174.0,-37.0,175.0,-36.0']})
+        code, p = self.invoke(['get', 'data-govt-nz', rows[0]['name'], '--json'],
+                             lambda url, **kwargs: fixture('data-govt-nz-get.json'))
+        self.assertEqual(code, 0)
+        self.assertEqual(p['results'][0]['id'], rows[0]['id'])
+        self.assertEqual(len(p['results']), 1)
+
+    def test_shared_runner_accepts_success_and_error_shapes(self):
+        spec = importlib.util.spec_from_file_location('records_run_skill', SKILL_DIR.parents[1] / 'scripts/run_skill.py')
+        runner = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(runner)
+        for fetch, expected in ((lambda url, **kwargs: fixture('niwa-get.json'), 0),
+                                (lambda url, **kwargs: {}, 6)):
+            code, p = self.invoke(['get', 'niwa', 'record', '--json'], fetch)
+            self.assertEqual(code, expected)
+            self.assertFalse(runner.looks_like_result_envelope(p))
+            self.assertEqual(set(p), {'meta', 'results'} | ({'error'} if expected else set()))
+            self.assertTrue(PROVENANCE <= p['meta'].keys())
+            self.assertNotIn('latest_data', p['meta'])
+            if expected:
+                self.assertEqual(p['results'], [])
+                self.assertNotIn('licence', p['meta'])
+
+    def test_fetch_error_causes_and_get_not_found(self):
+        for status in (404, 410):
+            err = cli.nzfetch.FetchError('unavailable')
+            err.__cause__ = HTTPError(cli.query_url('niwa'), status, 'not found', {}, None)
+            with patch.object(cli.nzfetch, 'fetch_json', side_effect=err):
+                with self.assertRaises(cli.SourceError) as caught:
+                    cli.fetch_json(cli.query_url('niwa'))
+                self.assertEqual(caught.exception.code, 5)
+                out = io.StringIO()
+                with contextlib.redirect_stdout(out):
+                    code = cli.main(['get', 'niwa', 'missing', '--json'])
+                p = json.loads(out.getvalue())
+                self.assertEqual(code, 2)
+                self.assertEqual(p['error']['type'], 'invalid_input')
+        with patch.object(cli.nzfetch, 'fetch_bytes', return_value=(b'{not json', 'application/json', cli.query_url('niwa'))):
+            with self.assertRaises(cli.SourceError) as caught:
+                cli.fetch_json(cli.query_url('niwa'))
+            self.assertEqual(caught.exception.code, 6)
+            self.assertEqual(caught.exception.category, 'schema_failure')
+
+    def test_all_failed_catalogues_and_order_independent_codes(self):
+        def failed(url):
+            raise cli.SourceError('network error: unavailable', 5)
+        code, p = self.invoke(['catalogues', '--json'], failed)
+        self.assertEqual(code, 5)
+        self.assertEqual(p['error']['type'], 'upstream_unavailable')
+        self.assertEqual(len(p['meta']['catalogues']), 5)
+        for codes, expected in (((4, 5), 4), ((7, 5), 5), ((4, 6), 6)):
+            for ordered in (codes, tuple(reversed(codes))):
+                def fetch(url):
+                    code = ordered[0 if 'data-niwa' in url else 1]
+                    raise cli.SourceError('failure', code, retry_after='60' if code == 4 else None)
+                code, p = self.invoke(['search', 'x', '--catalogue', 'niwa', '--catalogue', 'data-govt-nz',
+                                      '--format', 'geojson'], fetch)
+                self.assertEqual(code, expected)
+                self.assertEqual(set(p), {'meta', 'results', 'error'})
+                self.assertEqual(p['results'], [])
+                if code == 4:
+                    self.assertEqual(p['error']['retry_after'], '60')
+        def limited(url):
+            raise cli.SourceError('rate limited', 4, retry_after='120')
+        code, p = self.invoke(['catalogues', '--json'], limited)
+        self.assertEqual(p['error']['retry_after'], '120')
+
+    def test_custom_none_licences_and_invalid_dates(self):
+        for marker in ('custom', 'none', ''):
+            f = fixture('auckland-council-get.json')
+            f['properties']['license'] = marker
+            f['properties']['licenseInfo'] = '<p>Terms &amp; conditions ' + 'x' * 350 + '</p>'
+            r = cli.normalise_ogc(f, 'auckland-council', 'https://example.invalid/', STAMP)
+            self.assertEqual(r['licence'], r['licence_info'][:300])
+            self.assertNotIn('<p>', r['licence'])
+            f['properties'].pop('licenseInfo')
+            r = cli.normalise_ogc(f, 'auckland-council', 'https://example.invalid/', STAMP)
+            self.assertNotIn('licence', r)
+            for d in r['distributions']:
+                self.assertNotIn('licence', d)
+        self.assertEqual(cli.iso_date('2022-03-05T02:19:21.805308'), '2022-03-05T02:19:21Z')
+        self.assertEqual(cli.iso_date('2022-03-05T03:19:21+01:00'), '2022-03-05T02:19:21Z')
+        with self.assertRaises(cli.SourceError):
+            cli.iso_date('invalid date')
+
+    def test_smoke_cli_traceback_and_invalid_json_are_clean_failures(self):
+        raw = fixture('data-govt-nz.json')
+        rows, _, _ = cli.ckan_result(raw)
+        record = cli.normalise_ckan(rows[0], 'data-govt-nz', cli.query_url('data-govt-nz'), STAMP)
+        for returncode in (1, 0):
+            run = smoke_test.subprocess.CompletedProcess([], returncode, '', 'synthetic traceback tail')
+            out = io.StringIO()
+            with patch.object(smoke_test, 'live', return_value='[SKIP] synthetic live probe'), \
+                 patch.object(smoke_test.subprocess, 'run', return_value=run), \
+                 patch.object(cli, 'catalogue_request', return_value=({'available': True, 'number_matched': 3}, [record])), \
+                 contextlib.redirect_stdout(out):
+                self.assertEqual(smoke_test.main(), 1)
+            self.assertIn('[FAIL] CLI GeoJSON:', out.getvalue())
+            self.assertIn('synthetic traceback tail', out.getvalue())
 
     def test_input_rejected_before_network(self):
         for argv in (['search', 'x', '--limit', '0'], ['search', 'x', '--limit', '101'],

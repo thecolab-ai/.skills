@@ -1,0 +1,26 @@
+{
+  "_fixture_note": "Entirely synthetic CKAN parser fixture. Live capture of package_search?q=water&rows=2 was blocked by Incapsula on 2026-10-08; count, IDs and metadata are examples, not observed data.",
+  "success": true,
+  "result": {
+    "id": "synthetic-water-id",
+    "name": "synthetic-water",
+    "title": "Synthetic water dataset",
+    "notes": "<p>Synthetic <b>water</b> metadata.</p>",
+    "organization": {
+      "title": "Synthetic NZ Publisher",
+      "name": "synthetic-publisher"
+    },
+    "license_title": "Creative Commons Attribution 4.0",
+    "license_id": "cc-by",
+    "metadata_modified": "2022-03-05T02:19:21.805308",
+    "resources": [
+      {
+        "url": "https://example.invalid/synthetic-water.csv",
+        "format": "CSV",
+        "name": "Synthetic CSV",
+        "last_modified": null
+      }
+    ],
+    "spatial": "{\"type\": \"Polygon\", \"coordinates\": [[[174, -37], [175, -37], [175, -36], [174, -36], [174, -37]]]}"
+  }
+}

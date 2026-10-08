@@ -3,64 +3,84 @@
 - Authentication: none
 - Last verified: 2026-10-08
 
-Verified with direct curl and the CLI on 8 October 2026. All HTTP calls use a
-10 second timeout through the repo's stdlib `nzfetch` helper. No cache, login or
-API key is required. The shared helper can use an already configured proxy;
-this skill does not inspect or print proxy configuration.
+All HTTP calls use a 10 second timeout through the repo's stdlib `nzfetch` helper.
+No cache, login or API key is required. Keep nzfetch's configured proxy fallback
+for blocked requests; this skill does not inspect or print proxy configuration.
 
 | CLI name | Publisher | Dataset items endpoint | Observed unfiltered count |
 |---|---|---|---:|
 | auckland-council | Auckland Council | https://data-aucklandcouncil.opendata.arcgis.com/api/search/v1/collections/dataset/items | 171 |
 | auckland-transport | Auckland Transport | https://data-atgis.opendata.arcgis.com/api/search/v1/collections/dataset/items | 14 |
 | waka-kotahi | NZ Transport Agency Waka Kotahi | https://opendata-nzta.opendata.arcgis.com/api/search/v1/collections/dataset/items | 21 |
-| niwa | NIWA | https://data-niwa.opendata.arcgis.com/api/search/v1/collections/dataset/items | 43 |
-| data-govt-nz | data.govt.nz | https://catalogue.data.govt.nz/api/3/action/package_search | unavailable: bot challenge |
+| niwa | Earth Sciences New Zealand (NIWA) | https://data-niwa.opendata.arcgis.com/api/search/v1/collections/dataset/items | 43 |
+| data-govt-nz | data.govt.nz | https://catalogue.data.govt.nz/api/3/action/package_search | Hawk: 32884; lane recheck blocked |
 
-Counts are observations, not hard-coded runtime totals. Search uses OGC `q`,
-`bbox` and `limit`. Get appends a URL-encoded record ID. These are ArcGIS Hub's
-OGC Records search surfaces, not a full harvesting or general OGC client.
-`features`, `numberMatched`, record `id`, `properties.title`, and the relevant
-record property types are checked; malformed source responses are unavailable
-with `error_category=schema_error`, never empty successful result sets.
+Counts are observations on 8 October 2026, not hard-coded runtime totals. Hawk
+live-verified CKAN search/get on that date; this lane's direct curl and nzfetch
+rechecks received an Incapsula challenge. Health remains degraded for this
+network, and CKAN parser coverage uses synthetic fixtures instead of a claimed
+live capture. A later probe may succeed from a different network.
 
-Real GeoJSON responses supplied the fixtures in `tests/fixtures/`. Search
-fixtures are the first two unfiltered results (`?limit=2`); `*-get.json` are
-responses at the first search record's `links[rel=self].href`. Nonessential
-ArcGIS administrative fields were removed; source dates, descriptions, licences,
-URLs, coverage and links were retained. The Auckland Transport detail fixture
-illustrates an item ID resolving to an ID ending `_0`.
+The NIWA catalogue HTML still has the title "National Institute of Water and
+Atmospheric Research". The [current owner's announcement](https://earthsciences.nz/about-us)
+confirms NIWA and GNS Science merged on 1 July 2025. Catalogue provenance uses
+Earth Sciences New Zealand (NIWA); record-level upstream `source` is preserved.
 
-`properties.url` provides service URLs. Explicit data/download links are also
-included when available. Hub ZIP items have no distribution links in their
-Records response; the CLI derives the ArcGIS item data endpoint for File
-Geodatabase, CSV Collection and Shapefile ZIP records and marks it `derived`.
-HEAD requests verified this endpoint for Council item
-`3b8a6d1d29224763b41242a102d71fd2` (application/zip, 529,982,083 bytes) and Waka
-Kotahi item `41e05dcdfcb749d390f7785543fb3b14` (application/zip, 1,525,639,765 bytes):
+Search uses Hub `q`, `bbox`, `limit`, and CKAN `q`, `rows`, `ext_bbox`. Both
+filter upstream by coverage intersection, not containment. Broad national
+coverage can intersect a small box. This lane confirmed three Waka Kotahi traffic
+records for Fiordland `166,-47.5,166.5,-47`. Hawk observed CKAN water counts of
+4503 without bbox versus 1025 for `174,-37,175,-36`; these CKAN observations
+could not be repeated on this lane's blocked network. Get uses a URL-encoded record ID.
+One bounded page is returned; `next_urls` exposes Hub next links or CKAN's next
+`start=rows` URL, retaining the query/bbox. No hidden pagination occurs.
+
+OGC `features`, `numberMatched`, record `id`, `properties.title`, property types
+and geometry shape are checked. CKAN validates `success`, `result.results`,
+`count`, `resources`, `organization`, and parses `spatial` JSON into coverage
+geometry. Malformed responses and invalid JSON are `schema_failure` (6), never
+empty successful datasets. Get HTTP 404/410 means `invalid_input` (2); the same
+HTTP status on a collection/search endpoint means `upstream_unavailable` (5).
+
+Fixture provenance and licences: OGC factual metadata captured 2026-10-08 from
+the endpoints above; descriptions, snippets and licence prose are synthetic
+HTML parser examples in every fixture. CC BY 4.0 attribution belongs to Auckland
+Council (`3b8a6d1d29224763b41242a102d71fd2`, `017febe483a14ba99108215cc1a3804c`),
+Auckland Transport (`eeb0839fbd594c9e87189df5c84c2543` / `_0`,
+`75bbb3afce054ee9a2826fd89c18e4bf`), and NZ Transport Agency Waka Kotahi
+(`41e05dcdfcb749d390f7785543fb3b14`, `d682a0a23eae45dcbe8bffcb04b5a64f`).
+NIWA / Earth Sciences New Zealand metadata (`3a1d7ee29dac42e3ba6ec4efeeafbacf`,
+`a2582b1eb3584237a3b50418f379ca84`) states CC BY-NC 4.0; substantive descriptions
+and bespoke terms have been replaced with synthetic prose, retaining only
+factual fields and the NonCommercial parser marker. CC licences are source data
+licences, separate from this repository's MIT code licence. Search examples
+retain their source self/next links. Detail examples use the first search record;
+AT illustrates item-to-layer `_0` resolution. `data-govt-nz.json` and
+`data-govt-nz-get.json` are entirely synthetic CKAN responses, clearly marked
+inside each file; their counts, publishers, IDs, resources and geometry are
+examples and were never claimed as observed datasets.
+
+`properties.url` and explicit data/download links supply distributions. For
+Hub ZIP records without links, the CLI derives the ArcGIS item data endpoint
+for File Geodatabase, CSV Collection and Shapefile and marks it `derived`:
 `https://www.arcgis.com/sharing/rest/content/items/{item-id}/data`.
-The skill never retrieves a linked download or ArcGIS service.
+Original HEAD checks verified Council `3b8a6d1d29224763b41242a102d71fd2` and
+Waka Kotahi `41e05dcdfcb749d390f7785543fb3b14` as application/zip. The CLI never
+fetches linked services or downloads; their hosts are outside its outbound list.
 
-Formats are catalogue types plus visible Hub download-format keys, not proof of
-an available generated export. `licence_info` retains source licence prose,
-including Council caveats. `modified` is an ArcGIS epoch-millisecond metadata
-update; `updated_at` normalises it to UTC without asserting dataset freshness.
-`time` is retained as `temporal_extent`. All captured sample `time` values were
-null; no data date is inferred from the title, description or modification date.
+Formats are catalogue types plus visible Hub download keys, not guaranteed
+exports. Hub licence markers `custom`, `none`, and empty are unstated: use up to
+300 plain-text characters of `licenseInfo`, or omit `licence`. `licence_info`
+retains complete live source prose. Unknown `licence`/`latest_data` are omitted
+from meta, records and distributions. `updated_at` describes catalogue metadata
+modification, normalised to UTC Z (naive CKAN dates are interpreted as UTC), not
+data vintage. `time` is retained as `temporal_extent`. `latest_data` is emitted
+only if explicitly provided by the source, preserving source precision.
 
-CKAN is listed and probed via `package_search?q=*:*&rows=1`; search uses `q` and
-`rows`, get uses `package_show?id=...`. Successful responses use standard CKAN
-`result.results`, `count`, `resources`, `organization`, `license_title`/
-`license_id` and `metadata_modified` (matching the existing `data-govt-nz` skill).
-Direct curl and nzfetch returned a bot challenge, so the CKAN adapter has no
-live parser fixture and is not claimed live-verified. Recheck if network access
-changes. No CKAN spatial extension has been verified; bbox queries exclude it
-with an explicit unsupported status. Prefer the existing `data-govt-nz` skill
-for CKAN datastore queries.
-
-Partial searches retain failed statuses, stable error codes and Retry-After on
-429 responses. `catalogues` exits successfully after reporting probe results,
-even if all are unavailable; its `ok` field shows whether any are usable.
-Search exits 4 for a block/rate limit, 5 for an upstream outage, 6 for source
-schema failure, or 7 for unsupported bbox when every selected catalogue fails.
-Invalid CLI input exits 2. Get reports a JSON error with provenance on network
-or parser failure. No pagination or distribution availability checks are hidden.
+Partial search/catalogues results retain failure statuses and warnings. If all
+catalogues fail, both commands emit the error envelope and exit non-zero.
+Mixed failures use fixed precedence 6 > 4 > 5 > 7; any schema failure therefore
+wins, followed by blocked/rate limited, upstream unavailable and unsupported.
+Rate limits preserve upstream Retry-After in status rows and aggregate errors.
+Get failures use the same error envelope, even for `--format geojson`.
+Invalid CLI input exits 2. Prefer `data-govt-nz` for CKAN datastore queries.
