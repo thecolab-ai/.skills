@@ -9,6 +9,7 @@ import sys
 import tempfile
 import unittest
 import urllib.error
+import urllib.parse
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -106,8 +107,13 @@ class CatalogueTests(unittest.TestCase):
         route('S0351', 'charities-services-nz', 'existing', 'none')
         route('S1589', 'nz-road-closures', 'existing', 'none')
         route('S1186', 'statsnz-classifications-nz', 'existing', 'none')
-        for id, skill in [('C0001','nz-arcgis'),('C0064','nz-stac'),('C0028','gtfs-nz'),('S1213','nz-ogc-records'),('C0043','akl-rainfall'),('C0106','nz-recycling-locator')]:
+        for id, skill in [('C0064','nz-stac'),('C0028','gtfs-nz'),('S1213','nz-ogc-records'),('C0043','akl-rainfall'),('C0106','nz-recycling-locator')]:
             route(id, skill, 'planned', 'none')
+        for id in ('C0001', 'C0012', 'S0131', 'S0618', 'S1098', 'S2932', 'S2686', 'S1097'):
+            route(id, 'nz-arcgis', 'existing', 'none')
+        self.assertEqual(next(r for r in cli.mapped_skills(self.rows['S0790'], self.skill_map) if r['skill'] == 'nz-arcgis')['relationship'], 'related')
+        for id in ('S2687', 'C0070', 'C0102'):  # unlisted Flooded NZ service, refused tiled image host, unlisted organisation
+            self.assertNotIn('nz-arcgis', [s['skill'] for s in cli.mapped_skills(self.rows[id], self.skill_map)])
         for id in ('C0002', 'C0018', 'C0019', 'C0032', 'C0033', 'S0207', 'S0182'):
             route(id, 'nz-traffic-counts', 'existing', 'none')
         overseas = dict(self.rows['C0001'], scope='Overseas')
@@ -116,6 +122,21 @@ class CatalogueTests(unittest.TestCase):
         self.assertEqual(cli.mapped_skills(other, self.skill_map), [])
         cross_url = dict(self.rows['C0024'], direct_endpoint='https://trafficnz.info/some-other-path', url='https://github.com/service/traffic/rest/4/events')
         self.assertEqual(cli.mapped_skills(cross_url, self.skill_map), [])
+
+    @unittest.skipUnless((ROOT.parent / 'nz-arcgis/references/orgs.json').exists(), 'nz-arcgis not installed alongside')
+    def test_arcgis_routes_stay_within_runtime_allowlist(self):
+        orgs = json.loads((ROOT.parent / 'nz-arcgis/references/orgs.json').read_text())
+        roots = {(urllib.parse.urlsplit(root).hostname, urllib.parse.urlsplit(root).path + '/'): code
+                 for code, org in orgs.items() for root in org['roots']}
+        routed = set()
+        for rule in (r for r in self.skill_map['rules'] if r['skill'] == 'nz-arcgis'):
+            self.assertEqual(rule['status'], 'existing')
+            (host,), (path,) = rule['match']['hosts'], rule['match']['url_contains']
+            root = next((key for key in roots if key[0] == host and path.startswith(key[1])), None)
+            self.assertIsNotNone(root, (host, path))
+            self.assertIn(f'`{roots[root]}`', rule['note'])
+            routed.add(root)
+        self.assertEqual(set(roots) - routed, {('tiledimageservices1.arcgis.com', '/n4yPwebTjJCmXB6W/arcgis/rest/services/')})
 
     def test_json_commands_and_provenance(self):
         for args in (['search','roadworks'], ['filter','--problem','F1'], ['get','c0001'], ['stats'], ['top','--problem','F1','--n','10']):

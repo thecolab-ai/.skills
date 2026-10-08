@@ -39,8 +39,8 @@ The contract sentinel is synthetic repository-policy metadata.
 
 ## Mapping maintenance
 
-`skill-map.json` contains 78 ordered rules covering 31 existing skills and
-seven planned engines. Existing skill names, source URLs and auth modes were
+`skill-map.json` contains 82 ordered rules covering 33 existing skills and
+five planned engines. Existing skill names, source URLs and auth modes were
 read from their `skills/<name>/SKILL.md` files, then restricted to known
 capabilities. The rule matches hosts and optional path/ID fragments against
 the same direct or landing URL. Optional name and NZ-scope restrictions also
@@ -50,12 +50,15 @@ Do not route every dataset on a shared host to a specialist: Zenodo is limited
 to SeaRise, CKAN schools use a subject restriction, and ArcGIS rules use
 organisation IDs. `related` mappings require reading that skill's commands;
 `catalogue` mappings discover metadata and do not promise source retrieval.
-Planned ArcGIS organisation/host pairs come from actual NZ-scoped seed rows,
-but this is a routing suggestion, not the new engine's fetch allowlist.
-Confirm supported organisations once that engine is installed. In particular,
-`wcc-arcgis-nz` stays restricted to its Wellington infrastructure.
+`nz-arcgis` rules mirror its runtime allowlist, `skills/nz-arcgis/references/orgs.json`:
+one NZ-scoped rule per organisation root, named by organisation code. Flooded NZ
+routes only its allowlisted service. Tiled maps are `related` because only
+service metadata is supported. The tiled image host is omitted because the
+skill refuses it. Organisations outside that allowlist have no `nz-arcgis` route;
+when `orgs.json` changes, update these rules. `wcc-arcgis-nz` stays restricted
+to its Wellington infrastructure.
 
-The planned engines are `nz-arcgis`, `nz-stac`, `nz-ogc-records`, `gtfs-nz`,
+The planned engines are `nz-stac`, `nz-ogc-records`, `gtfs-nz`,
 `nz-recycling-locator` and `akl-rainfall`. They are explicitly
 marked `planned` even if another installation has since added them. Update
 these statuses and rules after reviewing those skills. Unmatched sources use

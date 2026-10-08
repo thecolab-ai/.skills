@@ -516,359 +516,7 @@
     },
     {
       "skill": "nz-arcgis",
-      "status": "planned",
-      "relationship": "exact",
-      "auth": "none",
-      "match": {
-        "hosts": [
-          "services1.arcgis.com"
-        ],
-        "url_contains": [
-          "/1lLaMWUudPsf6JuN/arcgis/rest/services/"
-        ],
-        "nz_only": true
-      },
-      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
-    },
-    {
-      "skill": "nz-arcgis",
-      "status": "planned",
-      "relationship": "exact",
-      "auth": "none",
-      "match": {
-        "hosts": [
-          "services1.arcgis.com"
-        ],
-        "url_contains": [
-          "/3JjYDyG3oajxU6HO/arcgis/rest/services/"
-        ],
-        "nz_only": true
-      },
-      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
-    },
-    {
-      "skill": "nz-arcgis",
-      "status": "planned",
-      "relationship": "exact",
-      "auth": "none",
-      "match": {
-        "hosts": [
-          "services7.arcgis.com"
-        ],
-        "url_contains": [
-          "/8G10QCd84QpdcTJ9/arcgis/rest/services/"
-        ],
-        "nz_only": true
-      },
-      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
-    },
-    {
-      "skill": "nz-arcgis",
-      "status": "planned",
-      "relationship": "exact",
-      "auth": "none",
-      "match": {
-        "hosts": [
-          "services6.arcgis.com"
-        ],
-        "url_contains": [
-          "/8RWEO35G1ALMME0I/arcgis/rest/services/"
-        ],
-        "nz_only": true
-      },
-      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
-    },
-    {
-      "skill": "nz-arcgis",
-      "status": "planned",
-      "relationship": "exact",
-      "auth": "none",
-      "match": {
-        "hosts": [
-          "services1.arcgis.com"
-        ],
-        "url_contains": [
-          "/9YyqaQtDdDR8tupG/arcgis/rest/services/"
-        ],
-        "nz_only": true
-      },
-      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
-    },
-    {
-      "skill": "nz-arcgis",
-      "status": "planned",
-      "relationship": "exact",
-      "auth": "none",
-      "match": {
-        "hosts": [
-          "services6.arcgis.com"
-        ],
-        "url_contains": [
-          "/ALxeDxaeNjQo1Mf0/arcgis/rest/services/"
-        ],
-        "nz_only": true
-      },
-      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
-    },
-    {
-      "skill": "nz-arcgis",
-      "status": "planned",
-      "relationship": "exact",
-      "auth": "none",
-      "match": {
-        "hosts": [
-          "services.arcgis.com"
-        ],
-        "url_contains": [
-          "/CXBb7LAjgIIdcsPt/arcgis/rest/services/"
-        ],
-        "nz_only": true
-      },
-      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
-    },
-    {
-      "skill": "nz-arcgis",
-      "status": "planned",
-      "relationship": "exact",
-      "auth": "none",
-      "match": {
-        "hosts": [
-          "services9.arcgis.com"
-        ],
-        "url_contains": [
-          "/DUYVFPAJ5YcaFDs0/arcgis/rest/services/"
-        ],
-        "nz_only": true
-      },
-      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
-    },
-    {
-      "skill": "nz-arcgis",
-      "status": "planned",
-      "relationship": "exact",
-      "auth": "none",
-      "match": {
-        "hosts": [
-          "services.arcgis.com"
-        ],
-        "url_contains": [
-          "/Fv0Tvc98QEDvQyjL/arcgis/rest/services/"
-        ],
-        "nz_only": true
-      },
-      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
-    },
-    {
-      "skill": "nz-arcgis",
-      "status": "planned",
-      "relationship": "exact",
-      "auth": "none",
-      "match": {
-        "hosts": [
-          "services1.arcgis.com"
-        ],
-        "url_contains": [
-          "/ISqEHdhr3detVO9I/arcgis/rest/services/"
-        ],
-        "nz_only": true
-      },
-      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
-    },
-    {
-      "skill": "nz-arcgis",
-      "status": "planned",
-      "relationship": "exact",
-      "auth": "none",
-      "match": {
-        "hosts": [
-          "services2.arcgis.com"
-        ],
-        "url_contains": [
-          "/J8errK5dyxu7Xjf7/arcgis/rest/services/"
-        ],
-        "nz_only": true
-      },
-      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
-    },
-    {
-      "skill": "nz-arcgis",
-      "status": "planned",
-      "relationship": "exact",
-      "auth": "none",
-      "match": {
-        "hosts": [
-          "services2.arcgis.com"
-        ],
-        "url_contains": [
-          "/JkPEgZJGxhSjYOo0/arcgis/rest/services/"
-        ],
-        "nz_only": true
-      },
-      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
-    },
-    {
-      "skill": "nz-arcgis",
-      "status": "planned",
-      "relationship": "exact",
-      "auth": "none",
-      "match": {
-        "hosts": [
-          "services.arcgis.com"
-        ],
-        "url_contains": [
-          "/MMPHUPU6MnEt0lEK/arcgis/rest/services/"
-        ],
-        "nz_only": true
-      },
-      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
-    },
-    {
-      "skill": "nz-arcgis",
-      "status": "planned",
-      "relationship": "exact",
-      "auth": "none",
-      "match": {
-        "hosts": [
-          "services5.arcgis.com"
-        ],
-        "url_contains": [
-          "/PnnKqtqi3qfxnaPc/arcgis/rest/services/"
-        ],
-        "nz_only": true
-      },
-      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
-    },
-    {
-      "skill": "nz-arcgis",
-      "status": "planned",
-      "relationship": "exact",
-      "auth": "none",
-      "match": {
-        "hosts": [
-          "services1.arcgis.com"
-        ],
-        "url_contains": [
-          "/R6s0QqCMQdwKY6yp/arcgis/rest/services/"
-        ],
-        "nz_only": true
-      },
-      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
-    },
-    {
-      "skill": "nz-arcgis",
-      "status": "planned",
-      "relationship": "exact",
-      "auth": "none",
-      "match": {
-        "hosts": [
-          "services.arcgis.com"
-        ],
-        "url_contains": [
-          "/XTtANUDT8Va4DLwI/arcgis/rest/services/"
-        ],
-        "nz_only": true
-      },
-      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
-    },
-    {
-      "skill": "nz-arcgis",
-      "status": "planned",
-      "relationship": "exact",
-      "auth": "none",
-      "match": {
-        "hosts": [
-          "services1.arcgis.com"
-        ],
-        "url_contains": [
-          "/Y4k7lyf2XTGeQC6V/arcgis/rest/services/"
-        ],
-        "nz_only": true
-      },
-      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
-    },
-    {
-      "skill": "nz-arcgis",
-      "status": "planned",
-      "relationship": "exact",
-      "auth": "none",
-      "match": {
-        "hosts": [
-          "services2.arcgis.com"
-        ],
-        "url_contains": [
-          "/Z0aWguFDHESYteHT/arcgis/rest/services/"
-        ],
-        "nz_only": true
-      },
-      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
-    },
-    {
-      "skill": "nz-arcgis",
-      "status": "planned",
-      "relationship": "exact",
-      "auth": "none",
-      "match": {
-        "hosts": [
-          "services6.arcgis.com"
-        ],
-        "url_contains": [
-          "/ZVM1rEuVZjtC1Wwk/arcgis/rest/services/"
-        ],
-        "nz_only": true
-      },
-      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
-    },
-    {
-      "skill": "nz-arcgis",
-      "status": "planned",
-      "relationship": "exact",
-      "auth": "none",
-      "match": {
-        "hosts": [
-          "services5.arcgis.com"
-        ],
-        "url_contains": [
-          "/cJn6oR1QqErYBL5d/arcgis/rest/services/"
-        ],
-        "nz_only": true
-      },
-      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
-    },
-    {
-      "skill": "nz-arcgis",
-      "status": "planned",
-      "relationship": "exact",
-      "auth": "none",
-      "match": {
-        "hosts": [
-          "services3.arcgis.com"
-        ],
-        "url_contains": [
-          "/fp1tibNcN9mbExhG/arcgis/rest/services/"
-        ],
-        "nz_only": true
-      },
-      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
-    },
-    {
-      "skill": "nz-arcgis",
-      "status": "planned",
-      "relationship": "exact",
-      "auth": "none",
-      "match": {
-        "hosts": [
-          "services1.arcgis.com"
-        ],
-        "url_contains": [
-          "/ligOmcZkuYGDjlNm/arcgis/rest/services/"
-        ],
-        "nz_only": true
-      },
-      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
-    },
-    {
-      "skill": "nz-arcgis",
-      "status": "planned",
+      "status": "existing",
       "relationship": "exact",
       "auth": "none",
       "match": {
@@ -880,43 +528,107 @@
         ],
         "nz_only": true
       },
-      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
+      "note": "nz-arcgis organisation `akl` (Auckland Council)."
     },
     {
       "skill": "nz-arcgis",
-      "status": "planned",
+      "status": "existing",
       "relationship": "exact",
       "auth": "none",
       "match": {
         "hosts": [
-          "services.arcgis.com"
+          "mapspublic.aucklandcouncil.govt.nz"
         ],
         "url_contains": [
-          "/pA2nEVnB6tquxgOW/arcgis/rest/services/"
+          "/arcgis/rest/services/"
         ],
         "nz_only": true
       },
-      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
+      "note": "nz-arcgis organisation `akl` (Auckland Council)."
     },
     {
       "skill": "nz-arcgis",
-      "status": "planned",
+      "status": "existing",
       "relationship": "exact",
       "auth": "none",
       "match": {
         "hosts": [
-          "services1.arcgis.com"
+          "mapspublic.aucklandcouncil.govt.nz"
         ],
         "url_contains": [
-          "/sswNXkUiRoWtrx0t/arcgis/rest/services/"
+          "/arcgis3/rest/services/"
         ],
         "nz_only": true
       },
-      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
+      "note": "nz-arcgis organisation `akl` (Auckland Council)."
     },
     {
       "skill": "nz-arcgis",
-      "status": "planned",
+      "status": "existing",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "mapspublic.aklc.govt.nz"
+        ],
+        "url_contains": [
+          "/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "nz-arcgis organisation `akl` (Auckland Council)."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "existing",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services-ap1.arcgis.com"
+        ],
+        "url_contains": [
+          "/9R0qvCUXav3QPG1F/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "nz-arcgis organisation `akl` (Auckland Council)."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "existing",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services-ap1.arcgis.com"
+        ],
+        "url_contains": [
+          "/amvJtxbPQBZ5mG81/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "nz-arcgis organisation `akl` (Auckland Council)."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "existing",
+      "relationship": "related",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "tiles.arcgis.com"
+        ],
+        "url_contains": [
+          "/tiles/n4yPwebTjJCmXB6W/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "nz-arcgis organisation `akl` (Auckland Council). Tiled maps: `describe` returns service metadata; `count` and `query` need a numeric FeatureServer/MapServer layer."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "existing",
       "relationship": "exact",
       "auth": "none",
       "match": {
@@ -924,31 +636,63 @@
           "services2.arcgis.com"
         ],
         "url_contains": [
-          "/vKb0s8tBIA3bdocZ/arcgis/rest/services/"
+          "/JkPEgZJGxhSjYOo0/arcgis/rest/services/"
         ],
         "nz_only": true
       },
-      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
+      "note": "nz-arcgis organisation `at` (Auckland Transport)."
     },
     {
       "skill": "nz-arcgis",
-      "status": "planned",
+      "status": "existing",
       "relationship": "exact",
       "auth": "none",
       "match": {
         "hosts": [
-          "services7.arcgis.com"
+          "mahere.at.govt.nz"
         ],
         "url_contains": [
-          "/vkPf8weODt71Prmb/arcgis/rest/services/"
+          "/server/rest/services/"
         ],
         "nz_only": true
       },
-      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
+      "note": "nz-arcgis organisation `at` (Auckland Transport)."
     },
     {
       "skill": "nz-arcgis",
-      "status": "planned",
+      "status": "existing",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services.arcgis.com"
+        ],
+        "url_contains": [
+          "/CXBb7LAjgIIdcsPt/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "nz-arcgis organisation `nzta` (NZ Transport Agency Waka Kotahi)."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "existing",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services1.arcgis.com"
+        ],
+        "url_contains": [
+          "/1lLaMWUudPsf6JuN/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "nz-arcgis organisation `nzta` (NZ Transport Agency Waka Kotahi)."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "existing",
       "relationship": "exact",
       "auth": "none",
       "match": {
@@ -960,11 +704,267 @@
         ],
         "nz_only": true
       },
-      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
+      "note": "nz-arcgis organisation `linz` (Toitū Te Whenua Land Information New Zealand)."
     },
     {
       "skill": "nz-arcgis",
-      "status": "planned",
+      "status": "existing",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services1.arcgis.com"
+        ],
+        "url_contains": [
+          "/3JjYDyG3oajxU6HO/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "nz-arcgis organisation `doc` (Department of Conservation)."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "existing",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "seasketch.doc.govt.nz"
+        ],
+        "url_contains": [
+          "/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "nz-arcgis organisation `doc` (Department of Conservation)."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "existing",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services2.arcgis.com"
+        ],
+        "url_contains": [
+          "/vKb0s8tBIA3bdocZ/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "nz-arcgis organisation `stats` (Stats NZ)."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "existing",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "wslgis.water.co.nz"
+        ],
+        "url_contains": [
+          "/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "nz-arcgis organisation `watercare` (Watercare)."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "existing",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services5.arcgis.com"
+        ],
+        "url_contains": [
+          "/PnnKqtqi3qfxnaPc/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "nz-arcgis organisation `watercare` (Watercare)."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "existing",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services6.arcgis.com"
+        ],
+        "url_contains": [
+          "/8RWEO35G1ALMME0I/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "nz-arcgis organisation `vector` (Vector)."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "existing",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services1.arcgis.com"
+        ],
+        "url_contains": [
+          "/CPYspmTk3abe6d7i/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "nz-arcgis organisation `wcc` (Wellington City Council)."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "existing",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "gis.wcc.govt.nz"
+        ],
+        "url_contains": [
+          "/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "nz-arcgis organisation `wcc` (Wellington City Council)."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "existing",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services2.arcgis.com"
+        ],
+        "url_contains": [
+          "/RS7BXJAO6ksvblJm/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "nz-arcgis organisation `gwrc` (Greater Wellington Regional Council)."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "existing",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "mapping.gw.govt.nz"
+        ],
+        "url_contains": [
+          "/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "nz-arcgis organisation `gwrc` (Greater Wellington Regional Council)."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "existing",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "mapping1.gw.govt.nz"
+        ],
+        "url_contains": [
+          "/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "nz-arcgis organisation `gwrc` (Greater Wellington Regional Council)."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "existing",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services3.arcgis.com"
+        ],
+        "url_contains": [
+          "/fp1tibNcN9mbExhG/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "nz-arcgis organisation `niwa` (National Institute of Water and Atmospheric Research)."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "existing",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "gis.ccc.govt.nz"
+        ],
+        "url_contains": [
+          "/server/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "nz-arcgis organisation `ccc` (Christchurch City Council)."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "existing",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "gis.gns.cri.nz"
+        ],
+        "url_contains": [
+          "/server/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "nz-arcgis organisation `gns` (GNS Science)."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "existing",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "maps.herengaanuku.govt.nz"
+        ],
+        "url_contains": [
+          "/maps/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "nz-arcgis organisation `herenga` (Herenga ā Nuku Aotearoa)."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "existing",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "arcgis.mfe.govt.nz"
+        ],
+        "url_contains": [
+          "/server1/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "nz-arcgis organisation `mfe` (Ministry for the Environment)."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "existing",
       "relationship": "exact",
       "auth": "none",
       "match": {
@@ -976,21 +976,87 @@
         ],
         "nz_only": true
       },
-      "note": "NZ-scoped organisation observed in the export; confirm the planned engine allows this organisation before fetching."
+      "note": "nz-arcgis organisation `moe` (Ministry of Education)."
     },
     {
       "skill": "nz-arcgis",
-      "status": "planned",
+      "status": "existing",
       "relationship": "exact",
       "auth": "none",
       "match": {
         "hosts": [
-          "mahere.at.govt.nz",
-          "mapspublic.aucklandcouncil.govt.nz",
-          "mapspublic.aklc.govt.nz"
+          "services2.arcgis.com"
+        ],
+        "url_contains": [
+          "/9V7Qc4NIcvZBm0io/arcgis/rest/services/"
         ],
         "nz_only": true
-      }
+      },
+      "note": "nz-arcgis organisation `health` (Ministry of Health)."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "existing",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services-ap1.arcgis.com"
+        ],
+        "url_contains": [
+          "/0380iqO8xVVhk66v/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "nz-arcgis organisation `mbie` (Ministry of Business, Innovation and Employment)."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "existing",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "apps.dunedin.govt.nz"
+        ],
+        "url_contains": [
+          "/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "nz-arcgis organisation `dcc` (Dunedin City Council)."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "existing",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services1.arcgis.com"
+        ],
+        "url_contains": [
+          "/R6s0QqCMQdwKY6yp/arcgis/rest/services/"
+        ],
+        "nz_only": true
+      },
+      "note": "nz-arcgis organisation `hcc` (Hamilton City Council)."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "existing",
+      "relationship": "exact",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "services-ap1.arcgis.com"
+        ],
+        "url_contains": [
+          "/eqbFSejuTufXDr0E/arcgis/rest/services/flooded_nz_gdb_v2_202603181308/"
+        ],
+        "nz_only": true
+      },
+      "note": "nz-arcgis organisation `flooded` (Auckland Council (Flooded NZ)). Only this service is allowlisted; output fields and `--where` filters are restricted to its observation fields, and it has no stated reuse licence."
     },
     {
       "skill": "charities-services-nz",
