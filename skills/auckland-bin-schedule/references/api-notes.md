@@ -23,7 +23,7 @@ No username, password, account cookie, API key, or private credential is require
 - Public holidays can shift collection dates; trust the next dates on the Council page over a normal rhythm.
 - Some addresses return multiple units/properties; use `lookup` or `--list` to inspect candidates.
   The CLI never falls back to the first fuzzy result. It compares number, suffix, street name,
-  normalised street type and any supplied suburb. It selects only one exact property, with a
+  normalised street type and an explicitly supplied suburb. It selects only one exact property, with a
   specified unit when needed, and only when the search page is not full.
 - Central/commercial properties may show private service or property-manager messages instead of Council collection dates.
 - Endpoint/page shapes can change without notice because this is not an official API.
@@ -34,6 +34,34 @@ No username, password, account cookie, API key, or private credential is require
 - Do not use this skill for account changes, service requests, or non-Auckland council schedules.
 
 ## Verification and fixtures (8 October 2026)
+
+The M08 follow-up adds scored candidates and explicit selection. Component equality weights
+are number 25, suffix 10, street name 30, street type 15, suburb 15 and unit 5. A missing query
+suburb never earns suburb points or permits unattended selection; an unspecified unit earns
+unit points only for a candidate with no unit. Unparseable addresses score zero. A score is not a confidence
+probability. Only the strict match rules, a unique candidate and a non-full page permit automatic
+selection. Candidates are deduplicated by property id and sorted by score descending, then
+normalised address and id, with 1-based `candidate_number` values.
+
+`exact_match` means membership in `exact_matches`: number, suffix, street name and type must
+match, plus suburb and unit when supplied. An omitted suburb or unit does not exclude candidates
+from this list. `auto_selectable` requires equality of every component, including an explicitly
+supplied suburb and matching unit; it indicates candidate eligibility. Actual automatic selection
+also requires exactly one exact candidate and a non-full result page. An exact candidate can
+therefore score below 100 and require confirmation.
+
+`schedule ADDRESS --pick N` explicitly chooses that numbered result even if it is non-exact or
+the search page is full. `status: picked` and `matched_property` retain the selected candidate's
+score and component checks. Invalid/out-of-range picks fail with exit 2 before fetching a
+schedule. `lookup --pick`, `--list --pick` and `--property-id --pick` are rejected. Repeat the same
+query and limit as the lookup; changes at the live source may change candidate order between calls.
+`property-search.json` is a small synthetic response in the API's `items` shape; all ids and
+addresses in that fixture are made up.
+
+M08 direct probes on 8 October still receive HTTP 406 from the search page. The experience
+host's robots.txt returns `User-Agent: * / Disallow: /`; no direct API scraping was attempted.
+Fresh live candidate/schedule verification must be completed where the public website is
+accessible and its API access terms permit it.
 
 Verified live 2026-10-08 by Hawk from omarchy: `schedule "12 Tawa Road Onehunga"` resolves
 exactly and smoke reports one meaningful live assertion. This fix lane still receives HTTP 406

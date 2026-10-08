@@ -280,8 +280,39 @@ def choose_property(items: list[dict[str, str]], query: str) -> dict[str, str] |
     return matches[0]
 
 
+MATCH_WEIGHTS = {"number": 25, "suffix": 10, "street": 30, "type": 15,
+                 "suburb": 15, "unit": 5}
+
+
+def rank_properties(items: list[dict[str, Any]], query: str) -> list[dict[str, Any]]:
+    """Score component equality, not fuzzy similarity; 100 requires a full address."""
+    wanted = parse_address(query)
+    exact_ids = {item["id"] for item in exact_properties(items, query)}
+    ranked = []
+    for item in {item["id"]: item for item in items}.values():
+        found = parse_address(item["address"])
+        components = {key: bool(wanted is not None and found is not None
+                                and wanted[key] == found[key]
+                                and (key != "suburb" or wanted[key]))
+                      for key in MATCH_WEIGHTS}
+        score = sum(weight for key, weight in MATCH_WEIGHTS.items() if components[key])
+        ranked.append({**item, "match_score": score, "match_components": components,
+                       "exact_match": item["id"] in exact_ids,
+                       "auto_selectable": all(components.values())})
+    ranked.sort(key=lambda item: (-item["match_score"], normalise_words(item["address"]), item["id"]))
+    return [{**item, "candidate_number": i} for i, item in enumerate(ranked, 1)]
+
+
+def print_candidates(items: list[dict[str, Any]]) -> None:
+    for item in items:
+        print(f"{item['candidate_number']}\t{item['match_score']}/100\t{item['id']}\t{item['address']}")
+
+
 def print_human(result: dict[str, Any], alternatives: list[dict[str, str]]) -> None:
     print(f"{result['address']}")
+    matched = result.get("matched_property", {})
+    if "candidate_number" in matched:
+        print(f"Address match: candidate {matched['candidate_number']}, score {matched['match_score']}/100")
     print(f"Source: {result['url']}")
     for section_name in ["household", "commercial"]:
         sec = result.get(section_name)
@@ -298,8 +329,7 @@ def print_human(result: dict[str, Any], alternatives: list[dict[str, str]]) -> N
             print(f"    {svc.replace('_', ' ').title()}: {freq or '—'}")
     if alternatives:
         print("\nOther address matches:")
-        for item in alternatives[:5]:
-            print(f"  {item['id']}: {item['address']}")
+        print_candidates(alternatives)
 
 class InvalidInput(ValueError):
     pass
@@ -332,6 +362,7 @@ def build_parser() -> argparse.ArgumentParser:
         child.add_argument("--json", action="store_true", help="Emit JSON with source provenance")
         child.add_argument("--list", action="store_true", help="List candidates only (legacy lookup alias)")
         child.add_argument("--limit", type=int, default=10, help="Search limit, 1–20 (Council cap); a full page requires refinement")
+        child.add_argument("--pick", type=int, help="Fetch candidate N from the scored list (1-based); schedule only")
     return ap
 
 
@@ -351,6 +382,10 @@ def main(argv: list[str] | None = None) -> int:
             ap.error("--property-id must contain digits only")
         if args.property_id and (query or args.command == "lookup" or args.list):
             ap.error("--property-id is for a schedule without an address or --list")
+        if args.pick is not None and (args.pick < 1 or args.pick > args.limit):
+            ap.error("--pick must be between 1 and --limit")
+        if args.pick is not None and (args.property_id or args.command == "lookup" or args.list):
+            ap.error("--pick is for a schedule address query without --property-id or --list")
         if not args.property_id and not query:
             ap.error("provide an address or --property-id")
     except InvalidInput as exc:
@@ -361,11 +396,18 @@ def main(argv: list[str] | None = None) -> int:
             matches = []
         else:
             source_url = property_url(query, args.limit)
-            matches = lookup_properties(query, args.limit)
+            items = lookup_properties(query, args.limit)
+            matches = rank_properties(items, query)
             exact = exact_properties(matches, query)
-            chosen = choose_property(matches, query) if len(matches) < args.limit else None
+            chosen = choose_property(matches, query) if len(items) < args.limit else None
+            if chosen and not chosen["auto_selectable"]:
+                chosen = None  # Full component equality is required for unattended selection.
+            if args.pick is not None:
+                if args.pick > len(matches):
+                    return emit_error(args.json, 2, f"--pick {args.pick} is outside the {len(matches)} returned candidates", source_url)
+                chosen = matches[args.pick - 1]
             if args.command == "lookup" or args.list or chosen is None:
-                status = ("search_limit" if len(matches) >= args.limit else
+                status = ("search_limit" if len(items) >= args.limit else
                           "ambiguous" if exact and chosen is None else
                           "exact" if chosen else "no_exact_match")
                 result = {"query": query, "status": status, "matches": matches,
@@ -373,16 +415,16 @@ def main(argv: list[str] | None = None) -> int:
                 if args.json:
                     print(json.dumps({"meta": provenance(source_url), "results": [result]}, indent=2, ensure_ascii=False))
                 else:
-                    print(f"Address search: {status}. Refine the address or use a confirmed --property-id.")
-                    for item in matches:
-                        print(f"{item['id']}\t{item['address']}")
+                    print(f"Address search: {status}. Refine the address, use --pick N or a confirmed --property-id.")
+                    print_candidates(matches)
                 return 0
         source_url = DETAIL_URL.format(property_id=chosen["id"])
         result = get_schedule(chosen["id"])
         result["matched_property"] = chosen
         alternatives = [m for m in matches if m.get("id") != chosen.get("id")]
         if args.json:
-            print(json.dumps({"meta": provenance(source_url), "results": [{**result, "status": "exact", "alternatives": alternatives}]}, indent=2, ensure_ascii=False))
+            status = "picked" if args.pick is not None else "exact"
+            print(json.dumps({"meta": provenance(source_url), "results": [{**result, "status": status, "alternatives": alternatives}]}, indent=2, ensure_ascii=False))
         else:
             print_human(result, alternatives)
         return 0

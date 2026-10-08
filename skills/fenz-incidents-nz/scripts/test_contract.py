@@ -3,6 +3,8 @@
 import io
 import json
 import sys
+from datetime import datetime, timezone
+from urllib.parse import parse_qs, urlparse
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
@@ -116,6 +118,42 @@ def test_error_envelopes():
     print("[PASS] contract all-region failures are atomic with failed URL; errors and invalid input use stdout envelopes")
 
 
+def test_published_slices_and_nz_day():
+    for day in cli.DAYS:
+        for region in cli.REPORT_REGIONS.values():
+            url = urlparse(cli.incident_url(day, region))
+            assert url.hostname == "www.fireandemergency.nz"
+            assert parse_qs(url.query) == {"day": [day], "region": [region]}
+    for day, region in (("2026-10-07", "1"), ("Wednesday", "north"), ("Wednesday", "0")):
+        try:
+            cli.incident_url(day, region)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("Invalid report slices must not reach the source")
+    # In NZ these instants are Monday 00:30 NZDT and Monday 00:30 NZST.
+    assert cli.default_report_day(datetime(2026, 10, 4, 11, 30, tzinfo=timezone.utc)) == "Sunday"
+    assert cli.default_report_day(datetime(2026, 7, 5, 12, 30, tzinfo=timezone.utc)) == "Sunday"
+    document = (S / "tests/fixtures/auckland-synthetic.html").read_text()
+    for command in ("search", "region"):
+        out = io.StringIO()
+        with patch.object(cli, "default_report_day", return_value="Wednesday"), \
+             patch.object(cli.nzfetch, "fetch_text", return_value=document) as fetch, redirect_stdout(out):
+            assert cli.main([command, "Auckland", "--report-region", "north", "--json"]) == 0
+        fetch.assert_called_once_with(cli.incident_url("Wednesday", "1"), timeout=10, allowed_hosts=cli.HOSTS)
+        payload = json.loads(out.getvalue())
+        assert len(payload["results"]) == 1 and payload["results"][0]["incident_number"] == "F9990001"
+        assert payload["meta"]["latest_data"] == "2026-10-07"
+        assert payload["meta"]["report_day"] == "Wednesday" and payload["meta"]["report_regions"] == ["north"]
+        assert payload["results"][0]["report_region"] == "north"
+    out = io.StringIO()
+    with patch.object(cli.nzfetch, "fetch_text", return_value=document), redirect_stdout(out):
+        assert cli.main(["region", "No Such Location", "--day", "Wednesday", "--report-region", "north", "--json"]) == 0
+    payload = json.loads(out.getvalue())
+    assert payload["results"] == [] and payload["meta"]["latest_data"] == "2026-10-07"
+    print("[PASS] fixture Auckland query regression, 21 published report slices, NZST/NZDT rollover and scope provenance")
+
+
 if __name__ == "__main__":
     status = run_contract_test(S)
     test_source_fixtures()
@@ -123,4 +161,5 @@ if __name__ == "__main__":
     test_http_400_is_a_failure()
     test_incomplete_records()
     test_error_envelopes()
+    test_published_slices_and_nz_day()
     raise SystemExit(status)

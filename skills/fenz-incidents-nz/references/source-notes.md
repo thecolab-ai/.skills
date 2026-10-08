@@ -21,6 +21,22 @@ South=3. The corrected CLI supplies these published parameters. No extra authent
 special headers are required by the published flow. It requests yesterday in NZ by default;
 `--day` and `--report-region` let callers choose another published slice.
 
+M08 rechecked the official index and North Wednesday report through the web tool on 8 October.
+The index still links `day=Wednesday&region=1`, and the report shows published Auckland records
+dated 7 October (for example F4558395). The direct CLI remains blocked by Incapsula on this
+network, so fresh CLI live assertions remain gated. The previous unparameterised HTTP 400
+cannot be reproduced through that challenge. The parameter repair was already present in the
+starting checkout and is retained. No endpoint, header or date-format change is indicated by
+the current published links.
+
+Additional synthetic regressions check Auckland filtering, all 21 valid day/region URLs,
+invalid slices, NZST/NZDT midnight rollover and the JSON scope fields `report_day` and
+`report_regions`. The bounded smoke now probes an Auckland query in the North report directly.
+Operational envelope `latest_data` is the latest stated date in the fetched report slices,
+including when a local text filter has no matches; each record keeps its own incident date.
+Neither command returns coordinates, so bbox filtering and GeoJSON are unsupported rather
+than inferred from place names.
+
 Hawk verified direct live commands on 2026-10-08 from omarchy, including the blank Location
 records F4557313 (Monday) and F4555835 (Saturday). The repaired parser retains empty optional
 fields and reports `incomplete_fields`; incident number and date/time remain required. Region

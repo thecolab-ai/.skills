@@ -1,0 +1,9 @@
+{
+  "items": [
+    {"id": "10000000005", "address": "42A Example Street, Takapuna"},
+    {"id": "10000000001", "address": "42 Example Road, Mount Eden"},
+    {"id": "10000000003", "address": "42 Example Road, Takapuna"},
+    {"id": "10000000004", "address": "43 Example Road, Mount Eden"},
+    {"id": "10000000002", "address": "42A Example Road, Mount Eden"}
+  ]
+}
