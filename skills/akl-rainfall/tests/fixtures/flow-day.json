@@ -1,0 +1,52 @@
+{
+  "Datasets": [
+    {
+      "Identifier": "River Discharge.Continuous@900003",
+      "Parameter": "River Discharge",
+      "Label": "Synthetic Stream @ Test Bridge",
+      "Unit": "m^3/s",
+      "LocationIdentifier": "900003"
+    }
+  ],
+  "TimeRange": {
+    "StartTime": "2024-02-20T00:00:00+12:00",
+    "EndTime": "2024-02-21T00:00:00+12:00"
+  },
+  "NumRows": 2,
+  "Rows": [
+    {
+      "Timestamp": "2024-02-20T00:00:00+12:00",
+      "Points": [
+        {
+          "Dataset": "River Discharge.Continuous@900003",
+          "Value": "NaN",
+          "GradeCode": 0,
+          "GradeName": "UNDEF",
+          "ApprovalLevel": 0,
+          "ApprovalName": "Working",
+          "Qualifiers": [],
+          "InterpolationType": 1,
+          "InterpolationName": "Linear",
+          "Notes": ""
+        }
+      ]
+    },
+    {
+      "Timestamp": "2024-02-21T00:00:00+12:00",
+      "Points": [
+        {
+          "Dataset": "River Discharge.Continuous@900003",
+          "Value": 0.82,
+          "GradeCode": 200,
+          "GradeName": "Non Verified",
+          "ApprovalLevel": 0,
+          "ApprovalName": "Working",
+          "Qualifiers": [],
+          "InterpolationType": 1,
+          "InterpolationName": "Linear",
+          "Notes": ""
+        }
+      ]
+    }
+  ]
+}

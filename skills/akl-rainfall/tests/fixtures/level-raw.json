@@ -1,0 +1,103 @@
+{
+  "Datasets": [
+    {
+      "Identifier": "River Water Level.Continuous@900003",
+      "Parameter": "River Water Level",
+      "Label": "Synthetic Stream @ Test Bridge",
+      "Unit": "m",
+      "LocationIdentifier": "900003"
+    }
+  ],
+  "TimeRange": {
+    "StartTime": "2024-02-20T00:00:00+12:00",
+    "EndTime": "2024-02-20T00:08:00+12:00"
+  },
+  "NumRows": 5,
+  "Rows": [
+    {
+      "Timestamp": "2024-02-20T00:00:00+12:00",
+      "Points": [
+        {
+          "Dataset": "River Water Level.Continuous@900003",
+          "Value": 0.51,
+          "GradeCode": 200,
+          "GradeName": "Non Verified",
+          "ApprovalLevel": 0,
+          "ApprovalName": "Working",
+          "Qualifiers": [],
+          "InterpolationType": 1,
+          "InterpolationName": "Linear",
+          "Notes": ""
+        }
+      ]
+    },
+    {
+      "Timestamp": "2024-02-20T00:02:00+12:00",
+      "Points": [
+        {
+          "Dataset": "River Water Level.Continuous@900003",
+          "Value": 0.53,
+          "GradeCode": 200,
+          "GradeName": "Non Verified",
+          "ApprovalLevel": 0,
+          "ApprovalName": "Working",
+          "Qualifiers": [],
+          "InterpolationType": 1,
+          "InterpolationName": "Linear",
+          "Notes": ""
+        }
+      ]
+    },
+    {
+      "Timestamp": "2024-02-20T00:04:00+12:00",
+      "Points": [
+        {
+          "Dataset": "River Water Level.Continuous@900003",
+          "Value": 0.52,
+          "GradeCode": 200,
+          "GradeName": "Non Verified",
+          "ApprovalLevel": 0,
+          "ApprovalName": "Working",
+          "Qualifiers": [],
+          "InterpolationType": 1,
+          "InterpolationName": "Linear",
+          "Notes": ""
+        }
+      ]
+    },
+    {
+      "Timestamp": "2024-02-20T00:06:00+12:00",
+      "Points": [
+        {
+          "Dataset": "River Water Level.Continuous@900003",
+          "Value": 0.55,
+          "GradeCode": 200,
+          "GradeName": "Non Verified",
+          "ApprovalLevel": 0,
+          "ApprovalName": "Working",
+          "Qualifiers": [],
+          "InterpolationType": 1,
+          "InterpolationName": "Linear",
+          "Notes": ""
+        }
+      ]
+    },
+    {
+      "Timestamp": "2024-02-20T00:08:00+12:00",
+      "Points": [
+        {
+          "Dataset": "River Water Level.Continuous@900003",
+          "Value": 0.57,
+          "GradeCode": 200,
+          "GradeName": "Non Verified",
+          "ApprovalLevel": 0,
+          "ApprovalName": "Working",
+          "Qualifiers": [],
+          "InterpolationType": 1,
+          "InterpolationName": "Linear",
+          "Notes": ""
+        }
+      ]
+    }
+  ]
+}

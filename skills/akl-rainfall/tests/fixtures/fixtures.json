@@ -1,0 +1,11 @@
+{
+  "synthetic": true,
+  "description": "Hand-written fictional sites, coordinates, timestamps and observations. Shapes mirror AQUARIUS WebPortal Data_List/BulkExportJsonFile responses; no source response data is redistributed.",
+  "fixtures": [
+    "catalogue.json",
+    "rainfall-hour.json",
+    "rainfall-bulk-hour.json",
+    "level-raw.json",
+    "flow-day.json"
+  ]
+}

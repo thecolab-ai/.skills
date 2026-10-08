@@ -2,7 +2,7 @@
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
   "last_verified": "2026-10-08",
-  "skill_count": 152,
+  "skill_count": 153,
   "skills": [
     {
       "name": "airnz-flights",
@@ -64,6 +64,31 @@
       "local_output": [
         "private-json-csv-export"
       ]
+    },
+    {
+      "name": "akl-rainfall",
+      "description": "Query Auckland Council rainfall gauges and river or stream levels and flows. Use for Auckland monitoring sites, observed rainfall or water-level time series, and latest rainfall with spatial filters.",
+      "path": "skills/akl-rainfall",
+      "category": "environment",
+      "source_owner": "Auckland Council",
+      "source_type": "official",
+      "source_url": "https://environmentauckland.org.nz/",
+      "auth": "none",
+      "access_mode": "public-api",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "none",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "environmentauckland.org.nz"
+      ],
+      "last_verified": "2026-10-08",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
     },
     {
       "name": "animates-nz",
