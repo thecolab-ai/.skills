@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Bounded live source/schema and CLI probes; outages skip, parser failures fail."""
 import json
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import subprocess
 import sys
@@ -35,12 +36,25 @@ def source_check(source):
         assert row['publisher']
         assert row['retrieved_at'].endswith('Z')
         assert row.get('licence') is None
-    if source in ('recyclemap', 'wasteminz', 'branz', 'ecycle', 'agrecovery', 'beautification'):
+    if source in ('recyclemap', 'wasteminz', 'branz', 'ecycle', 'agrecovery', 'beautification',
+                  'christchurch', 'zerowaste', 'habitat'):
         assert any(r['lon'] is not None and r['lat'] is not None for r in rows)
     if source == 'recyclemap':
         assert any(cli.material_matches(r, 'battery') for r in rows)
     if source == 'branz':
         assert any('Concrete' in r['materials'] for r in rows)
+    if source == 'christchurch':
+        assert any('Recycling' in r['materials'] for r in rows)
+        assert all('outSR=4326' in r['source_url'] for r in rows)
+    if source == 'trow':
+        assert all(r['lon'] is None for r in rows)
+        assert sum(r['available_items'] + r['pre_sale_items'] for r in rows) > 0
+    if source == 'habitat':
+        assert all('Op Shops' in r['materials'] for r in rows)
+    if source == 'zerowaste':
+        assert all(r['materials'] == ['Resource recovery network member'] for r in rows)
+    if source == 'crc':
+        assert all(r['address'] and r['lon'] is None for r in rows)
     print(f'  {source}: {len(rows)} directory entries')
 
 
@@ -93,8 +107,30 @@ def main():
                                json.loads((fixtures / 'recyclemap-categories.json').read_text()), '2026-10-08T00:00:00Z')
     assert rows[1]['materials'] == ['Batteries']
     print('[PASS] fixture synthetic RecycleMap marker/material join')
-    results = [probe(s, lambda s=s: source_check(s)) for s in
-               ('recyclemap', 'wasteminz', 'branz', 'ecycle', 'agrecovery', 'beautification', 'tyrewise')]
+    stamp = '2026-10-08T00:00:00Z'
+    trow = cli.parse_trow(json.loads((fixtures / 'trow.json').read_text()), stamp)
+    assert len(trow) == 2 and sum(r['available_items'] for r in trow) == 2
+    assert all(r['lon'] is None for r in trow)
+    print('[PASS] fixture synthetic TROW grouping, sold exclusion and unlocated stock')
+    depots = cli.parse_christchurch(json.loads((fixtures / 'christchurch.json').read_text()), stamp)
+    assert depots[0]['materials'] == ['Recycling', 'Refuse']
+    assert depots[0]['latest_data'] == '2026-01-01T00:00:00.123Z'
+    assert depots[0]['lon'] == 172.61
+    print('[PASS] fixture synthetic Christchurch acceptance, edit date and WGS84')
+    members = cli.parse_zerowaste(json.loads((fixtures / 'zerowaste.json').read_text()), stamp)
+    assert len(members) == 1 and members[0]['materials'] == ['Resource recovery network member']
+    print('[PASS] fixture synthetic approved Zero Waste member, no inferred acceptance')
+    shops = cli.parse_habitat((fixtures / 'habitat.html').read_text(), stamp)
+    assert len(shops) == 2 and shops[0]['address'] == '10 Sample Street, Sampletown'
+    print('[PASS] fixture synthetic Habitat cards and unrelated coordinate exclusion')
+    centres = cli.parse_crc((fixtures / 'crc.html').read_text(), stamp)
+    assert len(centres) == 2 and centres[0]['locality'] == 'Sampletown'
+    assert all(r['lon'] is None for r in centres)
+    print('[PASS] fixture synthetic CRC visible addresses and null coordinates')
+    sources = ('recyclemap', 'wasteminz', 'branz', 'ecycle', 'agrecovery', 'beautification',
+               'tyrewise', 'trow', 'christchurch', 'zerowaste', 'habitat', 'crc')
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        results = list(pool.map(lambda s: probe(s, lambda: source_check(s)), sources))
     results.append(probe('repair café sitemap and Auckland detail', repair_check))
     results.append(probe('find Auckland batteries with GeoJSON', cli_find_check))
     try:

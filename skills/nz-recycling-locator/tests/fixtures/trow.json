@@ -1,0 +1,6 @@
+[
+  {"id": "synthetic-one", "title": "Example salvaged beam", "location": "Example Yard, Sampletown", "category": "timber", "status": "available", "updated_date": "2026-09-01T12:30:00.123000"},
+  {"id": "synthetic-two", "title": "Example reclaimed door", "location": "Example Yard, Sampletown", "category": "doors", "status": "pre-sale", "updated_date": "2026-09-02T09:00:00.000000"},
+  {"id": "synthetic-three", "title": "Example sold bricks", "location": "Old Sample Yard", "category": "bricks", "status": "sold", "updated_date": "2026-09-03T09:00:00.000000"},
+  {"id": "synthetic-four", "title": "Example unlocated window", "location": "", "category": "windows", "status": "available", "updated_date": "2026-09-01T09:00:00.000000"}
+]

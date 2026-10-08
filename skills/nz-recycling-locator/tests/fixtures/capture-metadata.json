@@ -69,6 +69,46 @@
         "beautification.json"
       ],
       "fixture": "synthetic, structure captured 2026-10-08"
+    },
+    "trow": {
+      "source_url": "https://base44.app/api/apps/68e5846a599cc4e55639725b/entities/Item?sort=-created_date&limit=1000",
+      "publisher": "TROW Group",
+      "files": [
+        "trow.json"
+      ],
+      "fixture": "synthetic, structure verified 2026-10-08"
+    },
+    "christchurch": {
+      "source_url": "https://gis.ccc.govt.nz/server/rest/services/OpenData/SiteUtility/FeatureServer/9",
+      "publisher": "Christchurch City Council",
+      "files": [
+        "christchurch.json"
+      ],
+      "fixture": "synthetic, structure verified 2026-10-08"
+    },
+    "zerowaste": {
+      "source_url": "https://zerowaste.co.nz/wp-json/wpgmza/v1/markers?map_id=2",
+      "publisher": "Zero Waste Aotearoa",
+      "files": [
+        "zerowaste.json"
+      ],
+      "fixture": "synthetic, structure verified 2026-10-08"
+    },
+    "habitat": {
+      "source_url": "https://www.habitat.org.nz/op-shops",
+      "publisher": "Habitat for Humanity New Zealand",
+      "files": [
+        "habitat.html"
+      ],
+      "fixture": "synthetic, structure verified 2026-10-08"
+    },
+    "crc": {
+      "source_url": "https://www.makingzerowastework.org.nz/find-your-local-crc",
+      "publisher": "Zero Waste T\u0101maki Makaurau Trust",
+      "files": [
+        "crc.html"
+      ],
+      "fixture": "synthetic, structure verified 2026-10-08"
     }
   },
   "fixture": "synthetic, structure captured 2026-10-08"
