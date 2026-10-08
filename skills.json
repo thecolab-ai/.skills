@@ -2,7 +2,7 @@
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
   "last_verified": "2026-10-08",
-  "skill_count": 151,
+  "skill_count": 152,
   "skills": [
     {
       "name": "airnz-flights",
@@ -4482,6 +4482,32 @@
       ],
       "last_verified": "2026-07-19",
       "health": "degraded",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "nz-stac",
+      "description": "Find LINZ elevation and aerial imagery collections and COG tiles from public NZ STAC catalogues. Use for DEM/DSM, RGB/infrared footprints, bbox tile searches and elevation point sampling guidance.",
+      "path": "skills/nz-stac",
+      "category": "geospatial",
+      "source_owner": "Toitū Te Whenua Land Information New Zealand",
+      "source_type": "official",
+      "source_url": "https://nz-elevation.s3.ap-southeast-2.amazonaws.com/catalog.json",
+      "auth": "none",
+      "access_mode": "public-STAC-HTTPS",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "none",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "nz-elevation.s3.ap-southeast-2.amazonaws.com",
+        "nz-imagery.s3.ap-southeast-2.amazonaws.com"
+      ],
+      "last_verified": "2026-10-08",
+      "health": "healthy",
       "maintainer": "@adam91holt"
     },
     {
