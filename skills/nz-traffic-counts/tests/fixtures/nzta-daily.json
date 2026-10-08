@@ -1,0 +1,116 @@
+{
+  "features": [
+    {
+      "attributes": {
+        "OBJECTID": 3,
+        "startDate": 1514721600000,
+        "siteID": 39,
+        "regionName": "05 - Gisborne",
+        "SiteRef": "00200444",
+        "classWeight": "Heavy",
+        "siteDescription": "200 m Nth of Bell Rd",
+        "laneNumber": 1,
+        "flowDirection": 1,
+        "trafficCount": 74
+      }
+    },
+    {
+      "attributes": {
+        "OBJECTID": 1126,
+        "startDate": 1514764800000,
+        "siteID": 39,
+        "regionName": "05 - Gisborne",
+        "SiteRef": "00200444",
+        "classWeight": "Heavy",
+        "siteDescription": "200 m Nth of Bell Rd",
+        "laneNumber": 1,
+        "flowDirection": 1,
+        "trafficCount": 74
+      }
+    },
+    {
+      "attributes": {
+        "OBJECTID": 4,
+        "startDate": 1514721600000,
+        "siteID": 39,
+        "regionName": "05 - Gisborne",
+        "SiteRef": "00200444",
+        "classWeight": "Light",
+        "siteDescription": "200 m Nth of Bell Rd",
+        "laneNumber": 1,
+        "flowDirection": 1,
+        "trafficCount": 3806
+      }
+    },
+    {
+      "attributes": {
+        "OBJECTID": 1127,
+        "startDate": 1514764800000,
+        "siteID": 39,
+        "regionName": "05 - Gisborne",
+        "SiteRef": "00200444",
+        "classWeight": "Light",
+        "siteDescription": "200 m Nth of Bell Rd",
+        "laneNumber": 1,
+        "flowDirection": 1,
+        "trafficCount": 3806
+      }
+    },
+    {
+      "attributes": {
+        "OBJECTID": 2,
+        "startDate": 1514721600000,
+        "siteID": 39,
+        "regionName": "05 - Gisborne",
+        "SiteRef": "00200444",
+        "classWeight": "Heavy",
+        "siteDescription": "200 m Nth of Bell Rd",
+        "laneNumber": 2,
+        "flowDirection": 2,
+        "trafficCount": 73
+      }
+    },
+    {
+      "attributes": {
+        "OBJECTID": 1125,
+        "startDate": 1514764800000,
+        "siteID": 39,
+        "regionName": "05 - Gisborne",
+        "SiteRef": "00200444",
+        "classWeight": "Heavy",
+        "siteDescription": "200 m Nth of Bell Rd",
+        "laneNumber": 2,
+        "flowDirection": 2,
+        "trafficCount": 73
+      }
+    },
+    {
+      "attributes": {
+        "OBJECTID": 1,
+        "startDate": 1514721600000,
+        "siteID": 39,
+        "regionName": "05 - Gisborne",
+        "SiteRef": "00200444",
+        "classWeight": "Light",
+        "siteDescription": "200 m Nth of Bell Rd",
+        "laneNumber": 2,
+        "flowDirection": 2,
+        "trafficCount": 2468
+      }
+    },
+    {
+      "attributes": {
+        "OBJECTID": 1128,
+        "startDate": 1514764800000,
+        "siteID": 39,
+        "regionName": "05 - Gisborne",
+        "SiteRef": "00200444",
+        "classWeight": "Light",
+        "siteDescription": "200 m Nth of Bell Rd",
+        "laneNumber": 2,
+        "flowDirection": 2,
+        "trafficCount": 2468
+      }
+    }
+  ]
+}

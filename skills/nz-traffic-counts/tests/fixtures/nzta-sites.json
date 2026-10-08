@@ -1,0 +1,68 @@
+{
+  "objectIdFieldName": "OBJECTID",
+  "uniqueIdField": {
+    "name": "OBJECTID",
+    "isSystemMaintained": true
+  },
+  "globalIdFieldName": "",
+  "geometryType": "esriGeometryPoint",
+  "spatialReference": {
+    "wkid": 4326,
+    "latestWkid": 4326
+  },
+  "exceededTransferLimit": true,
+  "features": [
+    {
+      "attributes": {
+        "region": "01 - Northland",
+        "sh": "10",
+        "rs": 0,
+        "rp": 7.380000114440918,
+        "description": "Sth of Puketona Rd (SH11)",
+        "lane": "Both",
+        "type": "Non-Continuous",
+        "equipmentcurrent": "Dual Loop",
+        "accepteddays": 27,
+        "siteref": "01000007",
+        "sitetype": "Regional Non-Continuous",
+        "percentheavy": 8.2,
+        "aadt5yearsago": 4954,
+        "aadt4yearsago": 5376,
+        "aadt3yearsago": 5809,
+        "aadt2yearsago": 6169,
+        "aadt1yearago": 6145,
+        "OBJECTID": 1
+      },
+      "geometry": {
+        "x": 173.96336421607188,
+        "y": -35.30429859026514
+      }
+    },
+    {
+      "attributes": {
+        "region": "01 - Northland",
+        "sh": "10",
+        "rs": 7,
+        "rp": 3.009999990463257,
+        "description": "Nth of Wakelin Rd (about 3.5km north of SH11)",
+        "lane": "Both",
+        "type": "Non-Continuous",
+        "equipmentcurrent": "Dual Loop",
+        "accepteddays": 27,
+        "siteref": "01000011",
+        "sitetype": "Regional Non-Continuous",
+        "percentheavy": 6.2,
+        "aadt5yearsago": 9001,
+        "aadt4yearsago": 9761,
+        "aadt3yearsago": 10196,
+        "aadt2yearsago": 10980,
+        "aadt1yearago": 11136,
+        "OBJECTID": 2
+      },
+      "geometry": {
+        "x": 173.95405682589762,
+        "y": -35.27964265355633
+      }
+    }
+  ]
+}

@@ -1,0 +1,76 @@
+{
+  "objectIdFieldName": "OBJECTID",
+  "uniqueIdField": {
+    "name": "OBJECTID",
+    "isSystemMaintained": true
+  },
+  "globalIdFieldName": "",
+  "geometryType": "esriGeometryPoint",
+  "spatialReference": {
+    "wkid": 4326,
+    "latestWkid": 4326
+  },
+  "exceededTransferLimit": true,
+  "features": [
+    {
+      "attributes": {
+        "OBJECTID": 1,
+        "carr_way_no": 23788,
+        "road_id": 50888,
+        "road_name": "BRAMLEY DR",
+        "start_name": "FIELDING CRES (WEST)",
+        "end_name": "FIELDING CRES (EAST)",
+        "location": 522,
+        "latest": "Yes",
+        "count_date": 1016668800000,
+        "peak_hour": null,
+        "count_duration": null,
+        "adt": 451,
+        "peaktraffic": null,
+        "pccar": null,
+        "pclcv": null,
+        "pcmcv": null,
+        "pchcvi": null,
+        "pchcvii": null,
+        "pcbus": null,
+        "pcheavy": null,
+        "NZTMX": 1767774.5143,
+        "NZTMY": 5915373.4751
+      },
+      "geometry": {
+        "x": 174.88287627714192,
+        "y": -36.89271732944452
+      }
+    },
+    {
+      "attributes": {
+        "OBJECTID": 2,
+        "carr_way_no": 58,
+        "road_id": 70028,
+        "road_name": "AWHITU RD",
+        "start_name": "WAIPIPI WHARF RD (POWERPOLE LHS)",
+        "end_name": "CRAIG RD",
+        "location": 5830,
+        "latest": "Yes",
+        "count_date": 1086912000000,
+        "peak_hour": "08:00",
+        "count_duration": null,
+        "adt": 613,
+        "peaktraffic": 86,
+        "pccar": 81,
+        "pclcv": 9,
+        "pcmcv": 3,
+        "pchcvi": 4,
+        "pchcvii": 3,
+        "pcbus": 0,
+        "pcheavy": 10,
+        "NZTMX": 1749564.0701000001,
+        "NZTMY": 5881076.3989
+      },
+      "geometry": {
+        "x": 174.6854127442054,
+        "y": -37.204812176843966
+      }
+    }
+  ]
+}
