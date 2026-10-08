@@ -4512,7 +4512,7 @@
     },
     {
       "name": "nz-recycling-locator",
-      "description": "Find New Zealand reuse and recycling drop-offs by material and location, plus text search of repair cafés and Tyrewise collection sites. Use when locating material collection services or searching local repair events.",
+      "description": "Find New Zealand reuse and recycling drop-offs by material and location, including salvaged building stock locations, op shops and Christchurch collection depots, plus text search of repair cafés and Tyrewise collection sites. Use when locating material collection services or searching local repair events.",
       "path": "skills/nz-recycling-locator",
       "category": "environment",
       "source_owner": "RecycleMap NZ, WasteMINZ and collection networks",
@@ -4540,7 +4540,13 @@
         "services7.arcgis.com",
         "agrecovery.co.nz",
         "api.mapme.com",
-        "techcollect.nz"
+        "techcollect.nz",
+        "base44.app",
+        "trowrestore.com",
+        "gis.ccc.govt.nz",
+        "zerowaste.co.nz",
+        "www.habitat.org.nz",
+        "www.makingzerowastework.org.nz"
       ],
       "last_verified": "2026-10-08",
       "health": "degraded",
