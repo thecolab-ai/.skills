@@ -1,0 +1,22 @@
+[
+  {
+    "id": 1,
+    "type": "layer",
+    "title": "First synthetic layer",
+    "published_at": "2024-01-01T00:00:00Z",
+    "url": "https://data.mfe.govt.nz/services/api/v1/layers/1/"
+  },
+  {
+    "id": 2,
+    "type": "table",
+    "title": "Second synthetic table",
+    "published_at": "2024-02-01T00:00:00Z",
+    "url": "https://data.mfe.govt.nz/services/api/v1/tables/2/"
+  },
+  {
+    "id": 3,
+    "type": "document",
+    "title": "Third synthetic document",
+    "published_at": "2024-03-01T00:00:00Z"
+  }
+]

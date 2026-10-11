@@ -1,0 +1,7 @@
+{
+  "id": 45,
+  "type": "layer",
+  "title": "Synthetic public-domain layer",
+  "license": {"title": "CC0 1.0 Universal", "type": "cc0", "version": "1.0"},
+  "data": {"feature_count": 1, "fields": [{"name": "id", "type": "integer"}]}
+}

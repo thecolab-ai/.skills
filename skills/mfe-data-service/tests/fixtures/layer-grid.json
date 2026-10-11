@@ -1,0 +1,17 @@
+{
+  "id": 125035,
+  "type": "layer",
+  "title": "Synthetic grid layer",
+  "kind": "grid",
+  "published_at": "2026-08-09T21:18:09.254632Z",
+  "url": "https://data.mfe.govt.nz/services/api/v1/layers/125035/",
+  "license": {
+    "title": "Creative Commons Attribution 4.0 International",
+    "type": "CC-BY",
+    "version": "4.0"
+  },
+  "data": {
+    "feature_count": 1,
+    "fields": null
+  }
+}
