@@ -19,7 +19,7 @@ metadata:
   thecolab.pack: "nz-public-data"
   thecolab.source_url: "https://www.ero.govt.nz/review-reports"
   thecolab.allowed_domains: "ero.govt.nz, www.ero.govt.nz"
-  thecolab.last_verified: "2026-09-04"
+  thecolab.last_verified: "2026-10-08"
   thecolab.health: "healthy"
   thecolab.maintainer: "@adam91holt"
 ---

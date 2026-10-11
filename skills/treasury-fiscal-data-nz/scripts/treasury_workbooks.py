@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import math
 import re
 from html import unescape
 from urllib.parse import urljoin, urlparse
@@ -198,36 +199,100 @@ def parse_key_indicators(
     except Exception as exc:
         raise ValueError(f"Treasury workbook could not be opened: {exc}") from exc
 
-    if "Table 1" not in workbook.sheetnames:
-        raise ValueError("Treasury Charts and Data workbook is missing the Table 1 summary")
-    sheet = workbook["Table 1"]
+    # PREFU 2026 moved the summary to Table 2; identify its title, never its
+    # position. Only a unique, explicitly titled summary is accepted.
+    candidates = []
+    for name in workbook.sheetnames:
+        if not re.fullmatch(r"Table \d+", name.strip()):
+            continue
+        sheet = workbook[name]
+        preview = list(sheet.iter_rows(min_row=1, max_row=8, max_col=30, values_only=True))
+        if any(re.fullmatch(r"table \d+(?: \d+)? key economic and fiscal indicators\d*",
+                            _normalise(value)) for row in preview for value in row):
+            candidates.append(sheet)
+    if len(candidates) != 1:
+        raise ValueError(f"Treasury workbook must contain one explicitly titled key economic and fiscal indicators table; found {len(candidates)}")
+    sheet = candidates[0]
+    if sheet.max_row > 100 or sheet.max_column > 30:
+        raise ValueError("Treasury key-indicator summary exceeds the supported bounds")
     rows = list(sheet.iter_rows(values_only=True))
-    if not rows or "key economic and fiscal indicators" not in _normalise(rows[0][1] if len(rows[0]) > 1 else ""):
-        raise ValueError("Treasury Table 1 is not the key economic and fiscal indicators table")
 
-    header_index = next(
-        (
-            index
-            for index, row in enumerate(rows[:-1])
-            if any(isinstance(value, int) and 2000 <= value <= 2200 for value in row)
-            and any("year ending 30 june" in _normalise(value) for value in rows[index + 1])
-        ),
-        None,
-    )
-    if header_index is None:
-        raise ValueError("Treasury Table 1 year and forecast headers changed")
+    def year_value(value):
+        text = clean(str(value or ""))
+        return int(text) if re.fullmatch(r"20\d{2}|21\d{2}|2200", text) else None
 
-    years = rows[header_index]
+    def year_basis(value):
+        return _normalise(value) in {"year ending 30 june", "years ending 30 june"}
+
+    header_indices = [index for index, row in enumerate(rows[:-1])
+                      if sum(year_value(value) is not None for value in row) >= 2
+                      and any(year_basis(value) for value in (*row, *rows[index + 1]))]
+    if len(header_indices) != 1:
+        raise ValueError("Treasury key-indicator year and forecast headers changed")
+    header_index = header_indices[0]
+    years = [year_value(value) for value in rows[header_index]]
+    if len([year for year in years if year]) != len({year for year in years if year}):
+        raise ValueError("Treasury key-indicator summary contains duplicate years")
     statuses = rows[header_index + 1]
-    label_column = next(
-        index for index, value in enumerate(statuses) if "year ending 30 june" in _normalise(value)
-    )
+    label_column = next(index for row in rows[header_index:header_index + 2]
+                        for index, value in enumerate(row) if year_basis(value))
+
+    def numeric_value(value):
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            number = float(value)
+        else:
+            text = clean(str(value or ""))
+            if not text or text in {"-", "–", "…"}:
+                return None
+            if not re.fullmatch(r"-?\d+(?:\.\d+)?|\(\d+(?:\.\d+)?\)", text):
+                raise ValueError(f"Treasury indicator has an unsupported numeric value: {text!r}")
+            number = -float(text[1:-1]) if text.startswith("(") else float(text)
+        if not math.isfinite(number):
+            raise ValueError("Treasury indicator has a non-finite numeric value")
+        return number
+
+    def forecast_status(value, measure, year):
+        status = clean(str(value or "")).casefold()
+        if status in {"actual", "forecast"}:
+            return status
+        match = re.fullmatch(r"forecast(\d+)", status)
+        if not match:
+            raise ValueError(f"Treasury indicator has an unsupported forecast status: {status!r}")
+        notes = [clean(str(row[col + 1])) for row in rows
+                 for col, cell in enumerate(row[:-1]) if str(cell) == match.group(1)]
+        if len(notes) != 1:
+            raise ValueError("Treasury forecast status footnote could not be resolved")
+        note = _normalise(notes[0])
+        if ("fiscal measures" not in note or "unaudited actual results" not in note
+                or "unemployment rate and cpi inflation" not in note or "actual" not in note):
+            raise ValueError("Treasury forecast status footnote changed; refusing to guess")
+        note_year = re.search(r'fiscal measures for the (20\d{2}) fiscal year', note)
+        if not note_year or int(note_year[1]) != year:
+            raise ValueError('Treasury forecast status footnote year does not match the column')
+        actual_measures = {"unemployment rate", "cpi inflation", "obegalx", "obegal",
+                           "net core crown debt", "net worth attributable to the crown"}
+        if measure in actual_measures:
+            return "actual"
+        if measure in {"real production gdp", "current account balance"}:
+            return "forecast"
+        raise ValueError("Treasury status footnote refers to an unrecognised measure; refusing to guess")
+
     seen_measures: set[str] = set()
     records: list[dict[str, object]] = []
     for row_index, row in enumerate(rows[header_index + 2 :], start=header_index + 3):
         label = clean(str(row[label_column] or "")) if label_column < len(row) else ""
+        if _normalise(label) == "notes":
+            break
         if not label:
             continue
+        if label.startswith("("):
+            # Unit continuation belongs to the preceding numeric row.
+            continue
+        next_index = row_index
+        if next_index < len(rows) and label_column < len(rows[next_index]):
+            continuation = clean(str(rows[next_index][label_column] or ""))
+            if continuation.startswith("(") and continuation.endswith(")"):
+                label = f"{label} {continuation}"
         try:
             measure, unit = _measure_definition(label)
         except ComparisonError as exc:
@@ -236,16 +301,16 @@ def parse_key_indicators(
             raise exc
         measure_key = _normalise(measure)
         if measure_key in seen_measures:
-            raise ComparisonError(f"Indicator definition is ambiguous within Table 1: {measure}")
+            raise ComparisonError(f"Indicator definition is ambiguous within key-indicator summary: {measure}")
         seen_measures.add(measure_key)
 
         for column_index, year in enumerate(years, start=1):
-            if not isinstance(year, int) or not 2000 <= year <= 2200 or column_index > len(row):
+            if year is None or column_index > len(row):
                 continue
-            value = row[column_index - 1]
-            if not isinstance(value, (int, float)):
+            value = numeric_value(row[column_index - 1])
+            if value is None:
                 continue
-            status = clean(str(statuses[column_index - 1] or "")).casefold()
+            status = forecast_status(statuses[column_index - 1], measure_key, year)
             records.append(
                 {
                     "measure": measure,
@@ -270,7 +335,7 @@ def parse_key_indicators(
                 }
             )
     if not records:
-        raise ValueError("Treasury Table 1 contained no comparable key-indicator values")
+        raise ValueError("Treasury summary contained no comparable key-indicator values")
     return records
 
 

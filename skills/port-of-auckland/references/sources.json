@@ -1,0 +1,82 @@
+[
+  {
+    "id": "S1372",
+    "name": "Port of Tauranga Port Trade and Statistic Information 2026",
+    "publisher": "Port of Tauranga Limited",
+    "source_url": "https://www.port-tauranga.co.nz/wp-content/uploads/Port-Trade-and-Statistic-Information-2026-ID-38773.docx",
+    "fetch_command": null,
+    "access": "keyless",
+    "verification": "catalogue discovery only; not fetched by this skill",
+    "licence_note": "No verified reuse licence; public access does not establish permission to redistribute."
+  },
+  {
+    "id": "S0541",
+    "name": "Port of Auckland truck turn times",
+    "publisher": "Port of Auckland Ltd",
+    "source_url": "https://www.poal.co.nz/customer-centre/truck-turn-times",
+    "fetch_command": "truck-turns",
+    "access": "keyless",
+    "verification": "live HTTP 200 on 2026-10-08",
+    "licence_note": "No verified reuse licence; public access does not establish permission to redistribute."
+  },
+  {
+    "id": "S1375",
+    "name": "Stats NZ Overseas Cargo Statistics: Total Imports by New Zealand Port (Annual-Jun) 2026",
+    "publisher": "Stats NZ, distributed through Figure.NZ",
+    "source_url": "https://figure.nz/table/7IbK4tnz6oz7uQ2Y/download",
+    "fetch_command": null,
+    "access": "keyless",
+    "verification": "catalogue discovery only; not fetched by this skill",
+    "licence_note": "Catalogue states CC BY 4.0; confirm at source before reuse."
+  },
+  {
+    "id": "S1371",
+    "name": "Port of Tauranga shipping schedules",
+    "publisher": "Port of Tauranga Limited",
+    "source_url": "https://www.port-tauranga.co.nz/operations/shipping-schedules/",
+    "fetch_command": "arrivals --port tauranga",
+    "access": "keyless",
+    "verification": "live HTTP 200 on 2026-10-08",
+    "licence_note": "No verified reuse licence; public access does not establish permission to redistribute."
+  },
+  {
+    "id": "S1370",
+    "name": "Port of Tauranga Truck Turn Time and live queue page",
+    "publisher": "Port of Tauranga Limited",
+    "source_url": "https://www.port-tauranga.co.nz/truck-turn-time/",
+    "fetch_command": "truck-turns --port tauranga",
+    "access": "keyless",
+    "verification": "live HTTP 200 on 2026-10-08",
+    "licence_note": "No verified reuse licence; public access does not establish permission to redistribute."
+  },
+  {
+    "id": "S0540",
+    "name": "Port of Auckland expected arrivals CSV",
+    "publisher": "Port of Auckland Ltd",
+    "source_url": "https://poal.co.nz/operations/schedules/arrivals/download",
+    "fetch_command": "arrivals",
+    "access": "keyless",
+    "verification": "live HTTP 200 on 2026-10-08",
+    "licence_note": "No verified reuse licence; public access does not establish permission to redistribute."
+  },
+  {
+    "id": "S1374",
+    "name": "Ministry of Transport FIGS Port Container Handling dashboard",
+    "publisher": "Ministry of Transport (FIGS) / Mot Analytics",
+    "source_url": "https://mot-analytics.gitlab.io/insights-and-analytics/figs/port-productivity/figs-dashboard/#data",
+    "fetch_command": null,
+    "access": "keyless",
+    "verification": "catalogue discovery only; not fetched by this skill",
+    "licence_note": "No verified reuse licence; public access does not establish permission to redistribute."
+  },
+  {
+    "id": "S0535",
+    "name": "FIGS Containers dashboard",
+    "publisher": "Ministry of Transport",
+    "source_url": "https://mot-analytics.gitlab.io/insights-and-analytics/figs/containers/figs-dashboard/main.html",
+    "fetch_command": null,
+    "access": "keyless",
+    "verification": "catalogue discovery only; not fetched by this skill",
+    "licence_note": "No verified reuse licence; public access does not establish permission to redistribute."
+  }
+]

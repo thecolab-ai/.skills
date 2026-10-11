@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+from datetime import datetime, timezone
 import json
 import os
 import pathlib
@@ -51,7 +52,7 @@ class ClearanceUnavailable(RuntimeError):
 # HTTP helpers
 # ---------------------------------------------------------------------------
 
-def _open(url: str, headers: dict[str, str], timeout: int = 20) -> str:
+def _open(url: str, headers: dict[str, str], timeout: int = 10) -> str:
     """Fetch `url` as text via the shared nzfetch helper. Raises nzfetch.Blocked
     on a bot wall / network error and nzfetch.FetchError on a real HTTP error;
     callers translate those into the skill's own ApiError / clearance flow."""
@@ -158,17 +159,20 @@ def _browser_fetch(url: str) -> tuple[str, str, str]:
                 locale="en-NZ",
             )
             page = browser.new_page()
-            page.goto(url, wait_until="domcontentloaded", timeout=90000)
+            try:
+                page.goto(url, wait_until="domcontentloaded", timeout=10000)
+            except Exception as exc:
+                if 'timeout' in type(exc).__name__.lower() or 'ERR_TIMED_OUT' in str(exc):
+                    raise ClearanceUnavailable('browser_blocked: Beehive browser navigation timed out') from exc
+                raise ApiError(f'Beehive browser navigation failed: {type(exc).__name__}') from exc
             html = ""
             cleared = False
-            for _ in range(7):
-                page.wait_for_timeout(2500)
+            for _ in range(4):
+                page.wait_for_timeout(1000)
                 html = page.content()
                 if not is_incapsula(html) and len(html) > 5000:
                     cleared = True
                     break
-                with contextlib.suppress(Exception):
-                    page.reload(wait_until="domcontentloaded", timeout=60000)
             if not cleared:
                 raise ClearanceUnavailable(
                     "browser_blocked: CloakBrowser could not clear the beehive bot challenge"
@@ -411,6 +415,13 @@ def minister_slug_candidates(value: str) -> list[str]:
 # Commands
 # ---------------------------------------------------------------------------
 
+def with_provenance(payload):
+    payload['meta'] = {'source_url': payload.get('source') or payload.get('url') or BASE,
+                       'publisher': 'New Zealand Government',
+                       'retrieved_at': datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')}
+    return payload
+
+
 def cmd_latest(args: argparse.Namespace) -> int:
     items = parse_rss_items(fetch_rss())
     if args.type:
@@ -418,7 +429,7 @@ def cmd_latest(args: argparse.Namespace) -> int:
     items = items[: args.limit]
     payload = {"source": RSS_URL, "count": len(items), "results": items}
     if args.json:
-        print(json.dumps(payload, indent=2, ensure_ascii=False))
+        print(json.dumps(with_provenance(payload), indent=2, ensure_ascii=False))
     else:
         print(f"Latest NZ government releases ({len(items)})")
         for i in items:
@@ -468,7 +479,7 @@ def cmd_minister(args: argparse.Namespace) -> int:
     profile["recent_articles"] = articles[:5]
     profile["article_count_on_page"] = len(articles)
     if args.json:
-        print(json.dumps(profile, indent=2, ensure_ascii=False))
+        print(json.dumps(with_provenance(profile), indent=2, ensure_ascii=False))
     else:
         print(profile["name"])
         print(f"  {profile['url']}")
@@ -503,7 +514,7 @@ def cmd_roles(args: argparse.Namespace) -> int:
         "roles": roles,
     }
     if args.json:
-        print(json.dumps(payload, indent=2, ensure_ascii=False))
+        print(json.dumps(with_provenance(payload), indent=2, ensure_ascii=False))
     else:
         print(f"{payload['name']} — roles & responsibilities ({len(roles)})")
         for r in roles:
@@ -524,7 +535,7 @@ def cmd_diary(args: argparse.Namespace) -> int:
         "The full diary archive is behind a JavaScript search at archive_url.",
     }
     if args.json:
-        print(json.dumps(payload, indent=2, ensure_ascii=False))
+        print(json.dumps(with_provenance(payload), indent=2, ensure_ascii=False))
     else:
         if diary:
             label = diary.get("published_label") or diary.get("published") or ""
@@ -551,7 +562,7 @@ def cmd_articles(args: argparse.Namespace) -> int:
         "results": articles,
     }
     if args.json:
-        print(json.dumps(payload, indent=2, ensure_ascii=False))
+        print(json.dumps(with_provenance(payload), indent=2, ensure_ascii=False))
     else:
         print(f"Articles by {slug} ({len(articles)})")
         for a in articles:
