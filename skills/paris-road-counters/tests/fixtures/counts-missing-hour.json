@@ -1,0 +1,70 @@
+{
+  "steps": [
+    {
+      "http_status": 200,
+      "body": {
+        "dataset_id": "comptages-routiers-permanents",
+        "metas": {
+          "dcat": {
+            "granularity": "Horaire"
+          },
+          "default": {
+            "title": "Comptage routier - Données trafic issues des capteurs permanents",
+            "license": "Open Database License (ODbL)",
+            "license_url": "http://opendatacommons.org/licenses/odbl/",
+            "publisher": "Direction de la Voirie et des Déplacements - Ville de Paris",
+            "timezone": "Europe/Paris",
+            "data_processed": "2026-01-15T01:02:03+00:00",
+            "records_count": 3,
+            "geometry_types": [
+              "LineString"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "http_status": 200,
+      "body": {
+        "total_count": 1,
+        "results": [
+          {
+            "iu_ac": "900001",
+            "libelle": "Arc_exemple",
+            "q": 100,
+            "k": 10,
+            "etat_trafic": "Fluide",
+            "etat_barre": "Ouvert",
+            "iu_nd_amont": "1",
+            "libelle_nd_amont": "Noeud_amont",
+            "iu_nd_aval": "2",
+            "libelle_nd_aval": "Noeud_aval",
+            "date_debut": "2019-06-07",
+            "date_fin": "2026-12-31",
+            "geo_point_2d": {
+              "lon": 2.35,
+              "lat": 48.86
+            },
+            "geo_shape": {
+              "type": "Feature",
+              "geometry": {
+                "type": "LineString",
+                "coordinates": [
+                  [
+                    2.35,
+                    48.86
+                  ],
+                  [
+                    2.351,
+                    48.861
+                  ]
+                ]
+              },
+              "properties": {}
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
