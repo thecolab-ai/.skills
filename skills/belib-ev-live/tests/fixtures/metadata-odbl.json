@@ -1,0 +1,10 @@
+{
+  "dataset_id": "belib-points-de-recharge-pour-vehicules-electriques-disponibilite-temps-reel",
+  "metas": {
+    "default": {
+      "license": "Open Database License (ODbL)",
+      "license_url": "http://opendatacommons.org/licenses/odbl/",
+      "publisher": "Direction de la Voirie et des Déplacements - Ville de Paris"
+    }
+  }
+}
