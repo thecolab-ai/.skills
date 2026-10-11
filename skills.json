@@ -2,7 +2,7 @@
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
   "last_verified": "2026-10-11",
-  "skill_count": 167,
+  "skill_count": 168,
   "skills": [
     {
       "name": "airnz-flights",
@@ -5167,6 +5167,31 @@
         "www.ombudsman.parliament.nz"
       ],
       "last_verified": "2026-07-19",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "open-food-facts",
+      "description": "Look up a food product by barcode on Open Food Facts, and run a bounded country or category search. Use for keyless public product name, brand, quantity, category and country facts. Do not use for Open Products Facts, product photos, personal nutrition advice, or database dumps.",
+      "path": "skills/open-food-facts",
+      "category": "food",
+      "source_owner": "Open Food Facts",
+      "source_type": "community",
+      "source_url": "https://world.openfoodfacts.org",
+      "auth": "none",
+      "access_mode": "public-api",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "none",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "world.openfoodfacts.org"
+      ],
+      "last_verified": "2026-10-11",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
