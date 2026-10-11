@@ -1,0 +1,15 @@
+{
+  "status": 200,
+  "truncated": false,
+  "contains_live_credentials": false,
+  "contains_personal_data": false,
+  "body": {
+    "type": "FeatureCollection",
+    "features": [],
+    "totalFeatures": 0,
+    "numberMatched": 0,
+    "numberReturned": 0,
+    "timeStamp": "2014-01-01T00:00:00Z",
+    "crs": null
+  }
+}
