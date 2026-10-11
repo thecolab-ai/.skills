@@ -9,7 +9,7 @@ from pathlib import Path
 
 CLI = Path(__file__).resolve().parent / "cli.py"
 ROOT = Path(__file__).resolve().parents[3]
-DAILY_NAME = re.compile(r"^[A-Z][A-Z0-9]{3}_[1-9][0-9]?_[0-9]{4}[0-9]{3}\.zip$")
+DAILY_NAME = re.compile(r"^[A-Z][A-Z0-9]{3}_(?:00|[1-9][0-9]?)_[0-9]{4}[0-9]{3}\.zip$")
 TIMEOUT = "20"
 
 
@@ -136,6 +136,43 @@ def expect_historical(
         "height_m": height,
     }
     print(f"[PASS] live {label} reads the daily zip")
+
+
+def expect_window(
+    arguments: list[str],
+    label: str,
+    *,
+    gauge: str,
+    sensor: str,
+    zip_name: str,
+    first_at: str,
+    first_height: str,
+    latest: str,
+    matched: int,
+    dates: list[str],
+    clock: str = "UTC",
+    extra: dict[str, str] | None = None,
+) -> None:
+    payload = live_json(arguments, label)
+    if payload is None:
+        return
+    meta = payload["meta"]
+    assert meta["retrieval_kind"] == "live" and meta["query_status"] == "ok" and meta["observation_time"] == clock
+    assert meta["archive_date"] == arguments[arguments.index("--date") + 1]
+    assert meta["observation_dates"] == dates and meta["latest_data"] == latest and meta["matched_count"] == matched
+    assert meta["source_url"].endswith("/" + zip_name)
+    assert not meta["source_url"].endswith(f"/{gauge}_{sensor}_{arguments[arguments.index('--date') + 1][:4]}.zip")
+    if len(dates) > 1:
+        assert meta["observation_window"]["first_observed_at"] == first_at
+        assert meta["observation_window"]["last_observed_at"] == latest
+        assert meta["observation_window"]["observation_dates"] == dates
+    else:
+        assert "observation_window" not in meta
+    row = payload["results"][0]
+    assert row["gauge"] == gauge and row["sensor"] == sensor and row["observed_at"] == first_at and row["height_m"] == first_height
+    for key, value in (extra or {}).items():
+        assert row[key] == value
+    print(f"[PASS] live {label}")
 
 
 def main() -> int:
@@ -269,6 +306,126 @@ def main() -> int:
         height="3.603",
         matched=1440,
     )
+
+    expect_window(
+        ["readings", "--gauge", "AUCT", "--date", "2020-06-01", "--sensor", "40", "--limit", "1", "--timeout", TIMEOUT],
+        "AUCT 2020-06-01 sensor 40 spans into the next UTC day",
+        gauge="AUCT",
+        sensor="40",
+        zip_name="AUCT_40_2020153.zip",
+        first_at="2020-06-01T23:54:00Z",
+        first_height="4.736",
+        latest="2020-06-02T23:53:00Z",
+        matched=1440,
+        dates=["2020-06-01", "2020-06-02"],
+    )
+    expect_window(
+        ["readings", "--gauge", "AUCT", "--date", "2020-01-01", "--sensor", "40", "--limit", "1", "--timeout", TIMEOUT],
+        "AUCT 2020-01-01 sensor 40 spans the previous UTC year",
+        gauge="AUCT",
+        sensor="40",
+        zip_name="AUCT_40_2020001.zip",
+        first_at="2019-12-31T23:54:00Z",
+        first_height="6.29",
+        latest="2020-01-01T23:53:00Z",
+        matched=1440,
+        dates=["2019-12-31", "2020-01-01"],
+    )
+    expect_window(
+        ["readings", "--gauge", "WLGT", "--date", "2020-06-01", "--sensor", "40", "--limit", "1", "--timeout", TIMEOUT],
+        "WLGT 2020-06-01 sensor 40 spans into the next UTC day",
+        gauge="WLGT",
+        sensor="40",
+        zip_name="WLGT_40_2020153.zip",
+        first_at="2020-06-01T23:54:00Z",
+        first_height="3.438",
+        latest="2020-06-02T23:53:00Z",
+        matched=1440,
+        dates=["2020-06-01", "2020-06-02"],
+    )
+    expect_window(
+        ["readings", "--gauge", "LOTT", "--date", "2020-06-01", "--sensor", "40", "--limit", "1", "--timeout", TIMEOUT],
+        "LOTT 2020-06-01 sensor 40 spans into the next UTC day",
+        gauge="LOTT",
+        sensor="40",
+        zip_name="LOTT_40_2020153.zip",
+        first_at="2020-06-01T23:54:00Z",
+        first_height="3.335",
+        latest="2020-06-02T23:53:00Z",
+        matched=1440,
+        dates=["2020-06-01", "2020-06-02"],
+    )
+    expect_window(
+        ["readings", "--gauge", "CHIT", "--date", "2020-01-01", "--sensor", "40", "--limit", "1", "--timeout", TIMEOUT],
+        "CHIT 2020-01-01 sensor 40 spans the previous UTC year",
+        gauge="CHIT",
+        sensor="40",
+        zip_name="CHIT_40_2020001.zip",
+        first_at="2019-12-31T23:54:00Z",
+        first_height="2.937",
+        latest="2020-01-01T23:53:00Z",
+        matched=1440,
+        dates=["2019-12-31", "2020-01-01"],
+    )
+    for gauge in ("SCOT", "ROBT"):
+        datasets = live_json(["datasets", "--gauge", gauge, "--timeout", TIMEOUT], f"{gauge} sensor 00 datasets")
+        if datasets is not None:
+            assert datasets["meta"]["query_status"] == "ok" and datasets["results"]
+            assert {row["sensor"] for row in datasets["results"]} == {"00"}
+            print(f"[PASS] live {gauge} datasets keep sensor 00")
+    expect_window(
+        ["readings", "--gauge", "SCOT", "--date", "2020-06-01", "--sensor", "00", "--limit", "1", "--timeout", TIMEOUT],
+        "SCOT 2020-06-01 sensor 00",
+        gauge="SCOT",
+        sensor="00",
+        zip_name="SCOT_00_2020153.zip",
+        first_at="2020-06-01T00:00:00+12:00",
+        first_height="2.144",
+        latest="2020-06-01T23:55:00+12:00",
+        matched=288,
+        dates=["2020-06-01"],
+        clock="NZST",
+    )
+    expect_window(
+        ["readings", "--gauge", "ROBT", "--date", "2015-06-01", "--sensor", "00", "--limit", "1", "--timeout", TIMEOUT],
+        "ROBT 2015-06-01 sensor 00",
+        gauge="ROBT",
+        sensor="00",
+        zip_name="ROBT_00_2015152.zip",
+        first_at="2015-06-01T00:05:00Z",
+        first_height="6.182",
+        latest="2015-06-02T00:00:00Z",
+        matched=288,
+        dates=["2015-06-01", "2015-06-02"],
+        extra={"sample_count": "30", "sea_temperature_c": "-2.234", "pressure_hpa": "1002.8"},
+    )
+    scot_2024 = live_json(
+        ["files", "--gauge", "SCOT", "--year", "2024", "--sensor", "00", "--limit", "5", "--timeout", TIMEOUT],
+        "SCOT 2024 sensor 00 files",
+    )
+    if scot_2024 is not None:
+        assert scot_2024["results"] == [] and scot_2024["meta"]["matched_count"] == 0
+        assert any(bundle["kind"] == "annual" and bundle["name"] == "SCOT_00_2024.zip" for bundle in scot_2024["meta"]["archive_bundles"])
+        print("[PASS] live SCOT 2024 directory placeholder stays out of the daily page")
+    scot_2026 = live_json(
+        ["files", "--gauge", "SCOT", "--year", "2026", "--sensor", "00", "--limit", "5", "--timeout", TIMEOUT],
+        "SCOT 2026 sensor 00 files",
+    )
+    if scot_2026 is not None:
+        assert scot_2026["results"] == []
+        assert any(
+            bundle["kind"] == "month_span" and bundle["name"] == "SCOT_00_2026_01-03.zip" and bundle["month_start"] == "01" and bundle["month_end"] == "03"
+            for bundle in scot_2026["meta"]["archive_bundles"]
+        )
+        print("[PASS] live SCOT 2026 month bundle is labeled and not a daily file")
+    missing_bundle = live_json(
+        ["readings", "--gauge", "ROBT", "--date", "2020-06-01", "--sensor", "00", "--timeout", TIMEOUT],
+        "ROBT 2020-06-01 sensor 00 without a daily zip",
+    )
+    if missing_bundle is not None:
+        assert missing_bundle["results"] == [] and missing_bundle["meta"]["query_status"] == "no_match" and "error" not in missing_bundle
+        assert not missing_bundle["meta"]["source_url"].endswith("/ROBT_00_2020.zip")
+        print("[PASS] live ROBT annual-only year is an empty match")
 
     unknown = live_json(["datasets", "--gauge", "ZZZZ", "--timeout", TIMEOUT], "unknown gauge")
     if unknown is not None:

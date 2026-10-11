@@ -10,7 +10,7 @@ import sys
 import urllib.parse
 import zipfile
 import zlib
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "lib"))
@@ -29,6 +29,9 @@ MAX_RESPONSE_BYTES = 2_000_000
 MAX_LISTED_BUNDLE_BYTES = 1_000_000_000_000
 HEIGHT_RE = re.compile(r"^-?(?:0|[1-9][0-9]{0,3})(?:\.[0-9]{1,4})?$")
 GAUGE_RE = re.compile(r"^[A-Z][A-Z0-9]{3}$")
+# Published tokens are 00 (Scott Base and Cape Roberts) or 1-99 with no leading zero.
+SENSOR_RE = re.compile(r"00|[1-9][0-9]?")
+SAMPLE_COUNT_RE = re.compile(r"(?:0|[1-9]|[12][0-9]|30)")
 FIXTURES = Path(__file__).resolve().parents[1] / "tests" / "fixtures"
 
 
@@ -84,8 +87,8 @@ def year_type(value: str) -> str:
 
 
 def sensor_type(value: str) -> str:
-    if not re.fullmatch(r"[1-9][0-9]?", value):
-        raise argparse.ArgumentTypeError("sensor must be an integer from 1 to 99")
+    if not SENSOR_RE.fullmatch(value):
+        raise argparse.ArgumentTypeError("sensor must be 00 or an integer from 1 to 99")
     return value
 
 
@@ -212,7 +215,7 @@ def parse_datasets(data: dict, gauge: str) -> list[dict[str, str]]:
             raise SchemaError("dataset entry was not an object")
         year, sensor, dataset_id = item.get("year"), item.get("sensor"), item.get("datasetid")
         expected = f"{gauge}/{year}/{sensor}"
-        if not (isinstance(year, str) and re.fullmatch(r"[0-9]{4}", year) and isinstance(sensor, str) and re.fullmatch(r"[1-9][0-9]?", sensor)):
+        if not (isinstance(year, str) and re.fullmatch(r"[0-9]{4}", year) and isinstance(sensor, str) and SENSOR_RE.fullmatch(sensor)):
             raise SchemaError("dataset year or sensor was not in the published form")
         if dataset_id != expected or dataset_id in seen:
             raise SchemaError("dataset id did not match the gauge, year, and sensor")
@@ -262,6 +265,8 @@ def parse_files(data: dict, gauge: str, year: str, sensor: str) -> tuple[list[di
     daily_re = re.compile(rf"^{prefix}([0-9]{{3}})\.zip$")
     annual_re = re.compile(rf"^{prefix}\.zip$")
     part_re = re.compile(rf"^{prefix}_([0-9]{{3}})-([0-9]{{3}})\.zip$")
+    month_re = re.compile(rf"^{prefix}_(0[1-9]|1[0-2])-(0[1-9]|1[0-2])\.zip$")
+    directory_uri = f"/tidegauge/{gauge}/{year}/{sensor}/"
     for item in files:
         if not isinstance(item, dict):
             raise SchemaError("daily file entry was not an object")
@@ -269,10 +274,13 @@ def parse_files(data: dict, gauge: str, year: str, sensor: str) -> tuple[list[di
         if not isinstance(name, str) or name in seen:
             raise SchemaError("daily file name did not match the requested dataset")
         seen.add(name)
+        if name == "" and uri == directory_uri and size == 0:
+            continue
         daily_match = daily_re.fullmatch(name)
         part_match = part_re.fullmatch(name)
         annual_match = annual_re.fullmatch(name)
-        if daily_match is None and annual_match is None and part_match is None:
+        month_match = month_re.fullmatch(name)
+        if daily_match is None and annual_match is None and part_match is None and month_match is None:
             raise SchemaError("daily file name did not match the requested dataset")
         if uri != f"/tidegauge/{gauge}/{year}/{sensor}/{name}":
             raise SchemaError("daily file URI did not match the official tide-gauge path")
@@ -288,10 +296,15 @@ def parse_files(data: dict, gauge: str, year: str, sensor: str) -> tuple[list[di
                     "modified": modified_day,
                 }
             )
-        elif annual_match or part_match:
+        elif annual_match or part_match or month_match:
+            kind = "annual"
+            if part_match:
+                kind = "part_year"
+            elif month_match:
+                kind = "month_span"
             bundle: dict[str, object] = {
                 "name": name,
-                "kind": "part_year" if part_match else "annual",
+                "kind": kind,
                 "size": listed_size(size, daily=False),
                 "modified": modified_day,
             }
@@ -302,57 +315,110 @@ def parse_files(data: dict, gauge: str, year: str, sensor: str) -> tuple[list[di
                     raise SchemaError("part-year archive span is reversed")
                 bundle["utc_start"] = start
                 bundle["utc_end"] = end
+            if month_match:
+                start_month, end_month = month_match.group(1), month_match.group(2)
+                if start_month > end_month:
+                    raise SchemaError("month archive span is reversed")
+                bundle["month_start"] = start_month
+                bundle["month_end"] = end_month
             bundles.append(bundle)
     daily_rows.sort(key=lambda row: str(row["utc_date"]))
     return daily_rows, bundles
 
 
-def parse_daily_csv(text: str, gauge: str, utc_date: str, sensor: str) -> list[dict[str, str]]:
+def observation_clock(gauge: str) -> str:
+    """Scott Base text labels this daily field as NZST. Every other published gauge says UTC."""
+    return "NZST" if gauge == "SCOT" else "UTC"
+
+
+def format_observed(observed: datetime, gauge: str) -> str:
+    """Keep the clock numbers from the CSV. Do not shift Scott Base NZST into Zulu."""
+    civil = observed.strftime("%Y-%m-%dT%H:%M:%S")
+    if observation_clock(gauge) == "NZST":
+        return civil + "+12:00"
+    return civil + "Z"
+
+
+def archive_window(rows: list[dict[str, str]], archive_date: str) -> list[str]:
+    """The filename date must occur. Other dates may only be the adjacent calendar day.
+
+    That admits both published midnight crossings: a file named for day D that
+    starts at D-1 23:54, and a file named for day D that ends at D+1 23:53.
+    It does not join neighbouring zips, and it does not accept an unrelated day.
+    """
+    dates: list[str] = []
+    seen: set[str] = set()
+    for row in rows:
+        day = str(row["observed_at"])[:10]
+        if day not in seen:
+            seen.add(day)
+            dates.append(day)
+    if archive_date not in seen:
+        raise SchemaError("daily CSV did not contain the archive date")
+    anchor = date.fromisoformat(archive_date)
+    allowed = {(anchor + timedelta(days=offset)).isoformat() for offset in (-1, 0, 1)}
+    if any(day not in allowed for day in dates):
+        raise SchemaError("daily CSV timestamp was outside the archive date window")
+    return dates
+
+
+def parse_daily_csv(text: str, gauge: str, archive_date: str, sensor: str) -> list[dict[str, str]]:
     rows: list[dict[str, str]] = []
     seen: set[str] = set()
     for line in text.splitlines():
         if not line.strip():
             continue
         parts = line.split(",")
-        if len(parts) != 3:
-            raise SchemaError("daily CSV row did not have site, UTC minute, and height")
-        site, stamp, height = parts
+        ancillary: tuple[str, str, str] | None = None
+        if len(parts) == 3:
+            site, stamp, height = parts
+        elif gauge == "ROBT" and len(parts) == 6:
+            site, stamp, height, sample_count, temperature, pressure = parts
+            if SAMPLE_COUNT_RE.fullmatch(sample_count) is None:
+                raise SchemaError("daily CSV sample count was not a published 0-30 count")
+            if HEIGHT_RE.fullmatch(temperature) is None or HEIGHT_RE.fullmatch(pressure) is None:
+                raise SchemaError("daily CSV temperature or pressure was not a plain decimal value")
+            ancillary = (sample_count, temperature, pressure)
+        else:
+            raise SchemaError("daily CSV row did not have the published site, time, and height columns")
         if site != gauge:
             raise SchemaError("daily CSV site code did not match the gauge")
         if not stamp.isascii():
-            raise SchemaError("daily CSV timestamp was not a UTC minute in YYYY-MM-DD HH:MM form")
+            raise SchemaError("daily CSV timestamp was not a minute in YYYY-MM-DD HH:MM form")
         try:
-            observed = datetime.strptime(stamp, "%Y-%m-%d %H:%M").replace(tzinfo=timezone.utc)
+            observed = datetime.strptime(stamp, "%Y-%m-%d %H:%M")
         except ValueError as exc:
-            raise SchemaError("daily CSV timestamp was not a UTC minute in YYYY-MM-DD HH:MM form") from exc
-        if observed.date().isoformat() != utc_date:
-            raise SchemaError("daily CSV timestamp was not on the requested UTC date")
-        minute = observed.strftime("%Y-%m-%dT%H:%M:%SZ")
+            raise SchemaError("daily CSV timestamp was not a minute in YYYY-MM-DD HH:MM form") from exc
+        minute = format_observed(observed, gauge)
         if minute in seen:
-            raise SchemaError("daily CSV contained a duplicate UTC minute")
+            raise SchemaError("daily CSV contained a duplicate observation minute")
         seen.add(minute)
         if HEIGHT_RE.fullmatch(height) is None:
             raise SchemaError("daily CSV height was not a plain decimal metre value")
-        rows.append(
-            {
-                "gauge": gauge,
-                "sensor": sensor,
-                "observed_at": observed.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                "height_m": height,
-            }
-        )
+        row = {
+            "gauge": gauge,
+            "sensor": sensor,
+            "observed_at": minute,
+            "height_m": height,
+        }
+        if ancillary is not None:
+            row["sample_count"] = ancillary[0]
+            row["sea_temperature_c"] = ancillary[1]
+            row["pressure_hpa"] = ancillary[2]
+        rows.append(row)
     if not rows:
         raise SchemaError("daily CSV contained no readings")
     stamps = [row["observed_at"] for row in rows]
     if stamps != sorted(stamps):
-        raise SchemaError("daily CSV timestamps were not in ascending UTC order")
+        raise SchemaError("daily CSV timestamps were not in ascending order")
+    archive_window(rows, archive_date)
     return rows
 
 
-def parse_daily_zip(blob: bytes, gauge: str, utc_date: str, sensor: str, year: str) -> list[dict[str, str]]:
+def parse_daily_zip(blob: bytes, gauge: str, archive_date: str, sensor: str, year: str) -> list[dict[str, str]]:
     if len(blob) > MAX_RESPONSE_BYTES:
         raise UnsafeError("daily archive exceeds the size bound")
-    ordinal = f"{date.fromisoformat(utc_date).timetuple().tm_yday:03d}"
+    ordinal = f"{date.fromisoformat(archive_date).timetuple().tm_yday:03d}"
     expected = f"{gauge}_{sensor}_{year}{ordinal}.csv"
     try:
         archive = zipfile.ZipFile(io.BytesIO(blob))
@@ -375,7 +441,7 @@ def parse_daily_zip(blob: bytes, gauge: str, utc_date: str, sensor: str, year: s
             text = raw.decode("utf-8-sig")
         except UnicodeError as exc:
             raise SchemaError("daily CSV was not UTF-8") from exc
-    return parse_daily_csv(text, gauge, utc_date, sensor)
+    return parse_daily_csv(text, gauge, archive_date, sensor)
 
 
 def page(rows: list, offset: int, limit: int) -> tuple[list, int, bool]:
@@ -480,11 +546,16 @@ def run_files(args) -> int:
     note = None
     if bundles:
         note = (
-            "Annual and part-year zip archives are labeled in archive_bundles and are excluded from daily readings. "
+            "Annual, day-of-year, and month zip archives are labeled in archive_bundles and are excluded from daily readings. "
             "Their listed sizes may exceed the daily download bound; this command does not download them."
         )
     meta = with_page_meta(files_url(args.gauge, args.year, args.sensor), latest_data=latest, status="ok", matched=matched, truncated=truncated, kind=kind, note=note)
     meta["latest_data_meaning"] = "newest file modified date in this dataset listing; not an observation time"
+    if args.gauge == "SCOT":
+        meta["filename_date_meaning"] = (
+            "Scott Base filename day-of-year is the NZST calendar date named in the gauge text. "
+            "utc_date is that filename date, not a claim that the CSV clock is UTC."
+        )
     if bundles:
         meta["archive_bundles"] = bundles
     human = [f"{row['utc_date']} {row['name']} modified {row['modified']}" for row in selected]
@@ -493,8 +564,11 @@ def run_files(args) -> int:
     return emit_ok(args.json, selected, meta, human)
 
 
-def add_reading_fields(meta: dict, *, sensor_origin: str) -> None:
-    meta["observation_time"] = "UTC"
+def add_reading_fields(meta: dict, *, sensor_origin: str, gauge: str, archive_date: str, dates: list[str], rows: list[dict[str, str]]) -> None:
+    clock = observation_clock(gauge)
+    meta["observation_time"] = clock
+    meta["archive_date"] = archive_date
+    meta["observation_dates"] = dates
     meta["height_reference"] = "gauge zero (TG0)"
     meta["quality_control"] = "unquality-controlled"
     meta["series_note"] = (
@@ -503,9 +577,34 @@ def add_reading_fields(meta: dict, *, sensor_origin: str) -> None:
     )
     meta["sensor_origin"] = sensor_origin
     meta["sensor_verified"] = sensor_origin == "archive_name"
-    meta["latest_data_meaning"] = "last UTC observation minute in this daily file; not the retrieval time and not a quality-control time"
+    meta["latest_data_meaning"] = (
+        "last observation minute in this daily file, on the stated observation_time; "
+        "not the retrieval time and not a quality-control time"
+    )
+    notes: list[str] = []
     if sensor_origin == "request":
-        meta["note"] = "This CSV fixture has no sensor column. The sensor value is the requested label, not a value read from the file."
+        notes.append("This CSV fixture has no sensor column. The sensor value is the requested label, not a value read from the file.")
+    if clock == "NZST":
+        notes.append(
+            "Scott Base gauge text labels this yyyy-mm-dd hh:mm field as NZST. "
+            "NZST is recorded as a fixed UTC+12 offset, with no daylight-saving conversion."
+        )
+    if len(dates) > 1:
+        meta["observation_window"] = {
+            "first_observed_at": rows[0]["observed_at"],
+            "last_observed_at": rows[-1]["observed_at"],
+            "observation_dates": dates,
+        }
+        notes.append(
+            "--date selects the daily zip by its filename calendar date. "
+            "observed_at is copied from the CSV and is not rewritten onto that filename date."
+        )
+    if any("sample_count" in row for row in rows):
+        notes.append(
+            "sample_count, sea_temperature_c, and pressure_hpa are the Cape Roberts trailing fields named in the gauge text."
+        )
+    if notes:
+        meta["note"] = " ".join(notes)
 
 
 def run_readings(args) -> int:
@@ -529,17 +628,24 @@ def run_readings(args) -> int:
         )
         match = next((row for row in files if row["utc_date"] == args.date), None)
         if match is None:
-            raise NoMatch(f"no daily file is published for {args.gauge} sensor {args.sensor} on UTC date {args.date}")
+            raise NoMatch(f"no daily file is published for {args.gauge} sensor {args.sensor} on filename date {args.date}")
         blob = http_get(zip_url(args.gauge, year, args.sensor, str(match["name"])), expect_json=False, timeout=args.timeout)
         rows = parse_daily_zip(blob, args.gauge, args.date, args.sensor, year)
         kind = "live"
         sensor_origin = "archive_name"
     selected, matched, truncated = page(rows, args.offset, args.limit)
+    dates = archive_window(rows, args.date)
     meta = with_page_meta(source, latest_data=rows[-1]["observed_at"], status="ok", matched=matched, truncated=truncated, kind=kind, note=None)
-    add_reading_fields(meta, sensor_origin=sensor_origin)
+    add_reading_fields(meta, sensor_origin=sensor_origin, gauge=args.gauge, archive_date=args.date, dates=dates, rows=rows)
     human = [f"{row['gauge']} sensor {row['sensor']} {row['observed_at']} {row['height_m']} m" for row in selected]
     if human:
-        human.append("Times are UTC minutes. Heights are unquality-controlled metres above gauge zero (TG0). Sensor series are separate and are not interchangeable.")
+        clock = observation_clock(args.gauge)
+        clock_text = "NZST (UTC+12) minutes, as labelled by the Scott Base gauge text" if clock == "NZST" else "UTC minutes"
+        human.append(
+            f"Times are {clock_text}. Heights are unquality-controlled metres above gauge zero (TG0). "
+            "Sensor series are separate and are not interchangeable. "
+            "--date selects the filename day; a file may also contain the adjacent calendar day."
+        )
     return emit_ok(args.json, selected, meta, human)
 
 
@@ -565,9 +671,9 @@ def build_parser() -> ArgumentParser:
     files.add_argument("--limit", type=bounded_int("limit", 1, 366), default=20)
     files.add_argument("--offset", type=bounded_int("offset", 0, 100000), default=0)
     add_common(files, fixture=True)
-    readings = sub.add_parser("readings", help="read one UTC day's minute heights")
+    readings = sub.add_parser("readings", help="read the daily archive named for one calendar date")
     readings.add_argument("--gauge", required=True, type=gauge_type)
-    readings.add_argument("--date", required=True, type=date_type, help="UTC calendar day, not a New Zealand local day")
+    readings.add_argument("--date", required=True, type=date_type, help="filename calendar date; UTC for every gauge except Scott Base NZST")
     readings.add_argument("--sensor", type=sensor_type, default="40")
     readings.add_argument("--limit", type=bounded_int("limit", 1, 1440), default=60)
     readings.add_argument("--offset", type=bounded_int("offset", 0, 100000), default=0)

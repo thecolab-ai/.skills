@@ -84,7 +84,7 @@ def run_parser_contracts() -> None:
     code, payload, _stderr = invoke(
         ["readings", "--gauge", "AUCT", "--date", "2026-01-02", "--sensor", "40", "--fixture", "daily-excerpt.csv", "--json"]
     )
-    require(code == 6 and payload["error"]["type"] == "schema_failure" and payload["results"] == [], "wrong UTC date was accepted")
+    require(code == 6 and payload["error"]["type"] == "schema_failure" and payload["results"] == [], "CSV with no archive date was accepted")
 
     for arguments, expected in (
         (["readings", "--gauge", "AUCT", "--date", "2026-01-01", "--sensor", "40", "--fixture", "duplicate-daily.csv", "--json"], "duplicate"),
@@ -203,7 +203,8 @@ def run_parser_contracts() -> None:
         ["readings", "--gauge", "auct", "--date", "2026-01-01", "--json"],
         ["readings", "--gauge", "../AU", "--date", "2026-01-01", "--json"],
         ["readings", "--gauge", "AUCT", "--date", "2026-01-01", "--sensor", "100", "--json"],
-        ["readings", "--gauge", "AUCT", "--date", "2026-01-01", "--sensor", "00", "--json"],
+        ["readings", "--gauge", "AUCT", "--date", "2026-01-01", "--sensor", "0", "--json"],
+        ["readings", "--gauge", "AUCT", "--date", "2026-01-01", "--sensor", "01", "--json"],
         ["gauges", "--url", "https://evil.example/api/listGauges", "--json"],
         ["gauges", "--fixture", "/etc/passwd", "--json"],
         ["gauges", "--fixture", "../cli.py", "--json"],
@@ -528,6 +529,224 @@ def run_repair_regressions() -> None:
     prefix = {(date(2026, 1, 1) + timedelta(days=offset)).isoformat() for offset in range(279)}
     require(smoke_test.unpublished_utc_day(prefix, date(2026, 10, 11)) == "2028-01-01", "open 2026 year selected 31 December")
     require(smoke_test.unpublished_utc_day({"2026-01-01", "2026-01-03"}, date(2027, 6, 1)) == "2026-01-02", "published gap was ignored")
+    run_window_and_sensor_regressions()
+
+
+def run_window_and_sensor_regressions() -> None:
+    code, payload, stderr = invoke(
+        ["readings", "--gauge", "AUCT", "--date", "2020-06-01", "--sensor", "40", "--fixture", "span-next-utc-day.csv", "--json"]
+    )
+    require(
+        code == 0
+        and stderr == ""
+        and payload["meta"]["archive_date"] == "2020-06-01"
+        and payload["meta"]["observation_time"] == "UTC"
+        and payload["meta"]["observation_dates"] == ["2020-06-01", "2020-06-02"]
+        and payload["meta"]["latest_data"] == "2020-06-02T23:53:00Z"
+        and payload["meta"]["observation_window"]["first_observed_at"] == "2020-06-01T23:54:00Z"
+        and payload["results"][0]["observed_at"] == "2020-06-01T23:54:00Z"
+        and payload["results"][0]["height_m"] == "4.736"
+        and payload["results"][-1]["observed_at"] == "2020-06-02T23:53:00Z"
+        and "not rewritten" in payload["meta"]["note"],
+        "next-day UTC window was dropped",
+    )
+    code, payload, stderr = invoke(
+        ["readings", "--gauge", "AUCT", "--date", "2020-06-02", "--sensor", "40", "--fixture", "span-next-utc-day.csv", "--limit", "1", "--json"]
+    )
+    require(
+        code == 0
+        and payload["meta"]["archive_date"] == "2020-06-02"
+        and payload["results"][0]["observed_at"] == "2020-06-01T23:54:00Z"
+        and payload["meta"]["latest_data"] == "2020-06-02T23:53:00Z",
+        "neighbouring filename date rewrote the CSV stamps",
+    )
+    code, payload, stderr = invoke(
+        ["readings", "--gauge", "AUCT", "--date", "2020-01-01", "--sensor", "40", "--fixture", "span-previous-utc-day.csv", "--json"]
+    )
+    require(
+        code == 0
+        and stderr == ""
+        and payload["meta"]["observation_dates"] == ["2019-12-31", "2020-01-01"]
+        and payload["results"][0] == {
+            "gauge": "AUCT",
+            "sensor": "40",
+            "observed_at": "2019-12-31T23:54:00Z",
+            "height_m": "6.29",
+        }
+        and payload["meta"]["latest_data"] == "2020-01-01T23:53:00Z",
+        "previous-day year-boundary window was dropped",
+    )
+    outside = "AUCT,2020-06-01 23:54,4.736\nAUCT,2020-06-03 00:00,4.000\n"
+    path = write_fixture("tmp-outside-window.csv", outside.encode())
+    try:
+        code, payload, stderr = invoke(
+            ["readings", "--gauge", "AUCT", "--date", "2020-06-01", "--sensor", "40", "--fixture", path.name, "--json"]
+        )
+    finally:
+        path.unlink(missing_ok=True)
+    require(code == 6 and "window" in payload["error"]["message"] and stderr == "", "date two days away was accepted")
+
+    code, payload, stderr = invoke(
+        ["readings", "--gauge", "SCOT", "--date", "2016-01-05", "--sensor", "00", "--fixture", "scot-nzst.csv", "--json"]
+    )
+    require(
+        code == 0
+        and stderr == ""
+        and payload["meta"]["observation_time"] == "NZST"
+        and payload["results"][0]["observed_at"] == "2016-01-05T15:50:00+12:00"
+        and payload["results"][0]["height_m"] == "1.881"
+        and payload["results"][0]["sensor"] == "00"
+        and payload["meta"]["sensor_verified"] is False
+        and not payload["meta"]["latest_data"].endswith("Z")
+        and payload["meta"]["observation_dates"] == ["2016-01-05"]
+        and "observation_window" not in payload["meta"]
+        and "NZST" in payload["meta"]["note"],
+        "Scott Base NZST stamp was relabelled as Zulu",
+    )
+    archive = io.BytesIO()
+    with zipfile.ZipFile(archive, "w") as handle:
+        handle.writestr("SCOT_00_2016005.csv", (cli.FIXTURES / "scot-nzst.csv").read_text(encoding="utf-8"))
+    path = write_fixture("tmp-scot-00.zip", archive.getvalue())
+    try:
+        code, payload, stderr = invoke(
+            ["readings", "--gauge", "SCOT", "--date", "2016-01-05", "--sensor", "00", "--fixture", path.name, "--json"]
+        )
+        code_other, payload_other, stderr_other = invoke(
+            ["readings", "--gauge", "SCOT", "--date", "2016-01-05", "--sensor", "40", "--fixture", path.name, "--json"]
+        )
+    finally:
+        path.unlink(missing_ok=True)
+    require(
+        code == 0 and stderr == "" and payload["meta"]["sensor_origin"] == "archive_name" and payload["meta"]["sensor_verified"] is True,
+        "Scott Base sensor 00 zip was rejected",
+    )
+    require(code_other == 6 and stderr_other == "" and payload_other["error"]["type"] == "schema_failure", "sensor 40 relabel of a sensor 00 zip was accepted")
+
+    code, payload, stderr = invoke(
+        ["readings", "--gauge", "ROBT", "--date", "2015-06-01", "--sensor", "00", "--fixture", "robt-ancillary.csv", "--json"]
+    )
+    require(
+        code == 0
+        and stderr == ""
+        and payload["meta"]["observation_time"] == "UTC"
+        and payload["meta"]["observation_dates"] == ["2015-06-01", "2015-06-02"]
+        and payload["results"][0] == {
+            "gauge": "ROBT",
+            "sensor": "00",
+            "observed_at": "2015-06-01T00:05:00Z",
+            "height_m": "6.182",
+            "sample_count": "30",
+            "sea_temperature_c": "-2.234",
+            "pressure_hpa": "1002.8",
+        }
+        and payload["meta"]["latest_data"] == "2015-06-02T00:00:00Z",
+        "Cape Roberts sensor 00 row was dropped",
+    )
+    code, payload, stderr = invoke(
+        ["readings", "--gauge", "AUCT", "--date", "2015-06-01", "--sensor", "40", "--fixture", "robt-ancillary.csv", "--json"]
+    )
+    require(code == 6 and stderr == "" and "columns" in payload["error"]["message"], "Cape Roberts columns were applied to Auckland")
+
+    code, payload, stderr = invoke(["datasets", "--gauge", "SCOT", "--fixture", "scot-datasets.json", "--json"])
+    require(
+        code == 0
+        and stderr == ""
+        and {row["sensor"] for row in payload["results"]} == {"00"}
+        and {row["year"] for row in payload["results"]} == {"2016", "2020"},
+        "sensor 00 dataset list failed",
+    )
+    try:
+        cli.parse_datasets(
+            {"gauge": "SCOT", "files": [], "datasets": [{"year": "2020", "sensor": "0", "datasetid": "SCOT/2020/0"}]},
+            "SCOT",
+        )
+    except cli.SchemaError:
+        pass
+    else:
+        raise AssertionError("sensor 0 dataset token was accepted")
+
+    code, payload, stderr = invoke(
+        ["files", "--gauge", "SCOT", "--year", "2024", "--sensor", "00", "--fixture", "scot-2024-files.json", "--json"]
+    )
+    require(
+        code == 0
+        and stderr == ""
+        and payload["results"] == []
+        and payload["meta"]["matched_count"] == 0
+        and payload["meta"]["archive_bundles"] == [
+            {"name": "SCOT_00_2024.zip", "kind": "annual", "size": 1457738, "modified": "2025-04-02"}
+        ],
+        "Scott Base directory placeholder failed the listing",
+    )
+    code, payload, stderr = invoke(
+        ["files", "--gauge", "SCOT", "--year", "2026", "--sensor", "00", "--fixture", "scot-2026-files.json", "--json"]
+    )
+    require(
+        code == 0
+        and stderr == ""
+        and payload["results"] == []
+        and payload["meta"]["archive_bundles"] == [
+            {
+                "name": "SCOT_00_2026_01-03.zip",
+                "kind": "month_span",
+                "size": 344371,
+                "modified": "2026-04-10",
+                "month_start": "01",
+                "month_end": "03",
+            }
+        ],
+        "Scott Base month bundle was treated as a day-of-year span",
+    )
+    poisoned = {
+        "files": [
+            {"name": "", "uri": "https://evil.example/tidegauge/SCOT/2024/00/", "size": 0, "modified": "2025-04-02"},
+            {"name": "SCOT_00_2024.zip", "uri": "/tidegauge/SCOT/2024/00/SCOT_00_2024.zip", "size": 10, "modified": "2025-04-02"},
+        ]
+    }
+    try:
+        cli.parse_files(poisoned, "SCOT", "2024", "00")
+    except cli.SchemaError:
+        pass
+    else:
+        raise AssertionError("off-host directory placeholder was skipped")
+    try:
+        cli.parse_files(
+            {"files": [{"name": "SCOT_00_2026_03-01.zip", "uri": "/tidegauge/SCOT/2026/00/SCOT_00_2026_03-01.zip", "size": 10, "modified": "2026-04-10"}]},
+            "SCOT",
+            "2026",
+            "00",
+        )
+    except cli.SchemaError as exc:
+        require("reversed" in str(exc), "reversed month span was accepted")
+    else:
+        raise AssertionError("reversed month span was accepted")
+
+    calls: list[str] = []
+
+    def fake_month(url: str, *, expect_json: bool, timeout: int) -> bytes:
+        calls.append(url)
+        if url.endswith("/api/listGauges"):
+            return b'{"gauges":["SCOT"]}'
+        if url.endswith("/api/getGaugeData/SCOT"):
+            return (cli.FIXTURES / "scot-datasets.json").read_bytes().replace(b"2020", b"2026").replace(b"2016", b"2024")
+        if url.endswith("/api/listDatasetFiles/SCOT/2026/00"):
+            return (cli.FIXTURES / "scot-2026-files.json").read_bytes()
+        raise AssertionError(url)
+
+    original = cli.http_get
+    cli.http_get = fake_month
+    try:
+        code, payload, stderr = invoke(["readings", "--gauge", "SCOT", "--date", "2026-02-01", "--sensor", "00", "--json"])
+    finally:
+        cli.http_get = original
+    require(
+        code == 0
+        and stderr == ""
+        and payload["meta"]["query_status"] == "no_match"
+        and payload["results"] == []
+        and not any(url.endswith(".zip") for url in calls),
+        "month bundle was downloaded as a daily reading",
+    )
 
 
 def invoke_stdout(arguments: list[str]) -> tuple[int, str, str]:
