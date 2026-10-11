@@ -59,6 +59,12 @@ def download_link(text, page, marker):
         if marker in parsed.path.casefold() and parsed.path.casefold().endswith(".xlsx"):
             if parsed.scheme != "https" or parsed.hostname not in HOSTS or parsed.username or parsed.password:
                 raise SchemaError("Download link leaves the declared public source hosts")
+            try:
+                port = parsed.port
+            except ValueError as exc:
+                raise nzfetch.FetchError("discovered source URL has an invalid port") from exc
+            if port not in (None, 443):
+                raise nzfetch.FetchError("discovered source URL uses a non-default port")
             if url not in links:
                 links.append(url)
     if len(links) != 1:
@@ -89,6 +95,13 @@ def business_inventory(body):
             return list(groups.values())
     except zipfile.BadZipFile as exc:
         raise SchemaError("Business download is not a ZIP archive") from exc
+    except NotImplementedError as exc:
+        raise SchemaError("Business download is not a supported ZIP archive") from exc
+    except RuntimeError as exc:
+        text = str(exc).lower()
+        if "encrypt" not in text and "password" not in text:
+            raise
+        raise SchemaError("Business download is not a supported ZIP archive") from exc
 
 
 def build_parser():

@@ -50,6 +50,12 @@ python3 skills/akl-housing-capacity/scripts/cli.py demolitions --area Auckland -
    The default HUD area is Auckland. Council results include regional consents,
    CCCs, parcel creation and local-board consents. Area matching ignores accents,
    spaces and hyphens; a name substring can match more than one board.
+   These Council consent counts are Auckland Council's monthly datasheet. They
+   are not the Stats NZ building-consents release: use `statsnz-building-consents`
+   for official national and regional counts, values, floor area and seasonal
+   adjustment. Do not add the two series. Council CCCs are completion evidence,
+   not consents, and HUD `Delivery` also includes leases, transfers and stock
+   removals.
 3. `capacity` returns paired plan-enabled/feasible dwelling totals from the PC78
    model. `--detail typology` returns built-form capacity and dwelling prices
    under the alternative `Max_Profit` and `MinDUPrice` selections. Keep scenarios
@@ -71,8 +77,12 @@ no coordinates, so they do not offer `--bbox` or GeoJSON.
 JSON uses `{meta, results}` with source URL, publisher and UTC retrieval time;
 known data licence and latest reporting period appear in `meta`. Errors use the
 same envelope, empty results and a typed `error`, and exit non-zero. Valid filters
-with no matching observations return an empty results array. Missing sheets,
-changed headers and failed downloads are errors, not empty successes.
+with no matching observations return an empty results array. Each required Council
+sheet, and the HUD `Delivery` series, must exist before those filters are applied.
+Missing sheets, renamed series, unexpected local-board headers, implausible
+periods and malformed workbooks are schema failures, not empty successes.
+A discovered download on an allowed host that uses a non-default port is
+upstream unavailable.
 
 Read [references/source-notes.md](references/source-notes.md) for exact downloads,
 field meanings, licensing, overlap and coverage limits. The XLSX reader in

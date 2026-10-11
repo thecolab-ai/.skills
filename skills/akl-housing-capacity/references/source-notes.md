@@ -2,7 +2,10 @@
 
 Authentication: none
 
-Last verified: 2026-10-08
+Last verified: 2026-10-08 in catalogue metadata. The September 2026 Council
+datasheet, the August 2026 HUD workbook and the HUD copyright page were read
+again on 2026-10-12. Catalogue `last_verified` is unchanged because generated
+catalogue files are outside this skill.
 
 Outbound hosts: knowledgeauckland.org.nz, www.knowledgeauckland.org.nz,
 www.hud.govt.nz, www.kaingaora.govt.nz.
@@ -36,11 +39,38 @@ outside its supply focus.
 
 Records contain `sheet`, `area`, `area_type`, `period` (YYYY-MM), `unit` and a
 `measures` object with explicit measure names. Missing or dash cells become
-JSON null, never zero. The current workbook reports consent/CCC data to July
-2026 and parcels to August 2026. `meta.latest_data` is the latest observation
-month across the supported sheets, independent of an area/month filter;
-read each record's `period` for its actual observation month. Historical values
-come from the current workbook and may have been revised.
+JSON null, never zero. The September 2026 workbook reports consent and CCC
+data through July 2026 and parcels through August 2026; the earliest parsed
+observation month in that file is January 2012. `meta.latest_data` is the
+latest observation month across the supported sheets, independent of an
+area/month filter; read each record's `period` for its actual observation
+month. Historical values come from the current workbook and may have been revised.
+
+Date cells may be Excel serials or ISO dates, including OOXML cells of type
+`d`. Each of the four supply sheets must contain observations before any
+area or month filter. A sheet whose dates were removed or replaced fails
+even when the other sheets still parse. A numeric year such as 2026 is not
+treated as an Excel date: serials that fall outside 1990–2100 are rejected.
+
+`Dwellings Consented By LB` accepts only the published board labels and one
+`Monthly total` column. The September 2026 labels are Albert - Eden,
+Devonport - Takapuna, Franklin, Great Barrier, Henderson - Massey,
+Hibiscus and Bays, Howick, Kaipatiki, Mangere - Otahuhu, Manurewa,
+Maungakiekie - Tamaki, Orakei, Otara - Papatoetoe, Papakura, Puketapapa,
+Rodney, Upper Harbour, Waiheke, Waitakere Ranges, Waitemata and Whau.
+Matching ignores case, macrons, spaces and hyphens, and the source spelling
+is preserved. `Monthly Total` is the same aggregate column. `Total`,
+`12 month total` and `% of Auckland` are not boards; those headers fail
+the parse instead of adding a second total. Capacity-model areas are a
+different table and are not limited to this list.
+
+These consent counts are Auckland Council's series. They are not Stats NZ
+building consents. `statsnz-building-consents` reads the official Stats NZ
+release: national and regional new-dwelling counts, values, floor area,
+and actual, seasonally adjusted and trend series, with Stats NZ revision
+rules. Council counts, Council code-compliance certificates and Stats NZ
+consents use different definitions and geography. Do not add them together.
+Council CCCs are evidence of completion, not a consent count.
 
 No file-specific open data licence was verified. Knowledge Auckland links to
 Auckland Council terms; the CLI omits `licence` for Council data rather than
@@ -99,6 +129,11 @@ Verified download: https://www.hud.govt.nz/assets/Housing-dashboard-data-downloa
 
 The CLI resolves the current workbook link again, preserving its public cache
 version query. It streams only `Social housing` and selects the `Delivery` series.
+The series must be present in the workbook before the area or month filter.
+The August 2026 download also contains Stock, tenancy and other series; those
+rows do not satisfy the Delivery check. Renaming Delivery, including to
+Deliveries, is a schema failure. A real Delivery series with no rows for the
+requested area or month is an empty result.
 Output retains `dimensions` as ordered name/value pairs: total/provider,
 delivery supertype and delivery type. Totals and breakdowns overlap; do not sum
 all returned rows. Values can be negative stock adjustments. `Delivery` includes
@@ -134,8 +169,14 @@ access restrictions were bypassed and no authenticated endpoints are used.
 The Council terms page linked from Knowledge Auckland was blocked to this
 network; no open data reuse licence is assumed for its files.
 HTTP requests use shared `nzfetch` with a 10-second timeout and a host allowlist.
+A discovered HTTPS link on an allowed host may use the default port 443. Any
+other explicit port, or a port that is not a valid number, is upstream
+unavailable and is not fetched. A link to any other host remains a schema failure.
 All JSON failures include provenance and codes 2 (input), 4 (blocked/rate-limited),
 5 (network), 6 (schema) or 7 (unsupported). Retry-After is preserved when supplied.
+Encrypted workbooks, unsupported ZIP compression, a missing or negative
+shared-string index, and a non-numeric cell such as `1_000` or `nan` are
+schema failures with JSON on stdout and no traceback.
 
 The XLSX reader limits expanded archives to 256 MiB and streams worksheet rows.
 HUD's current social housing sheet is about 111 MB expanded. Formula results

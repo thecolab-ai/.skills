@@ -18,16 +18,38 @@ class SchemaError(ValueError):
     """A source does not match its supported published format."""
 
 
+# Spreadsheet numbers are plain decimals. Python's float() also accepts
+# underscores, whitespace and non-finite names, which are not cell values.
+_NUMBER_TEXT = re.compile(r"^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$")
+# Auckland supply series start in the 2010s. A bare year such as 2026 is an
+# Excel serial for 1905, not a reporting month.
+MIN_PERIOD_YEAR = 1990
+MAX_PERIOD_YEAR = 2100
+
+
 def number(value):
     if value is None or value == "" or value == "-":
         return None
-    try:
+    if isinstance(value, bool):
+        raise SchemaError(f"Expected a number, received {value!r}")
+    if isinstance(value, (int, float)):
         result = float(value)
-    except (ValueError, TypeError) as exc:
-        raise SchemaError(f"Expected a number, received {value!r}") from exc
+    elif isinstance(value, str) and _NUMBER_TEXT.fullmatch(value):
+        result = float(value)
+    else:
+        raise SchemaError(f"Expected a number, received {value!r}")
     if not math.isfinite(result):
         raise SchemaError("Workbook contains a non-finite number")
     return int(result) if result.is_integer() else result
+
+
+def _unsupported_archive(exc):
+    if isinstance(exc, NotImplementedError):
+        return True
+    if isinstance(exc, RuntimeError):
+        text = str(exc).lower()
+        return "encrypt" in text or "password" in text
+    return False
 
 
 class Workbook:
@@ -57,21 +79,31 @@ class Workbook:
                         if element.tag == f"{{{NS}}}si":
                             self.strings.append("".join(t.text or "" for t in element.iter(f"{{{NS}}}t")))
                             element.clear()
-        except (KeyError, IndexError, ValueError, TypeError, OSError, zlib.error, ET.ParseError, zipfile.BadZipFile) as exc:
+        except (KeyError, IndexError, ValueError, TypeError, OSError, zlib.error, ET.ParseError, zipfile.BadZipFile, NotImplementedError, RuntimeError) as exc:
             if isinstance(exc, SchemaError):
+                raise
+            if isinstance(exc, (NotImplementedError, RuntimeError)) and not _unsupported_archive(exc):
                 raise
             raise SchemaError("Source is not a supported XLSX workbook") from exc
 
     def month(self, value):
         if isinstance(value, str) and re.match(r"^\d{4}-\d{2}-\d{2}", value):
             try:
-                return date.fromisoformat(value[:10]).isoformat()[:7]
+                period = date.fromisoformat(value[:10]).isoformat()[:7]
             except ValueError as exc:
                 raise SchemaError("Invalid workbook reporting date") from exc
-        value = number(value)
-        if value is None or not 0 <= value <= 100000:
-            raise SchemaError("Invalid workbook reporting date")
-        return (self.epoch + timedelta(days=value)).isoformat()[:7]
+        else:
+            value = number(value)
+            if value is None:
+                raise SchemaError("Invalid workbook reporting date")
+            try:
+                period = (self.epoch + timedelta(days=value)).isoformat()[:7]
+            except (OverflowError, ValueError) as exc:
+                raise SchemaError("Invalid workbook reporting date") from exc
+        year = int(period[:4])
+        if year < MIN_PERIOD_YEAR or year > MAX_PERIOD_YEAR:
+            raise SchemaError("Implausible workbook reporting period")
+        return period
 
     def rows(self, sheet):
         if sheet not in self.sheets:
@@ -95,7 +127,12 @@ class Workbook:
                         value_element = cell.find(f"{{{NS}}}v")
                         value = value_element.text if value_element is not None else None
                         if kind == "s":
-                            value = self.strings[int(value)]
+                            if not isinstance(value, str) or not value.isdigit():
+                                raise SchemaError(f"Missing or invalid shared-string index in {sheet}!{reference}")
+                            index = int(value)
+                            if index >= len(self.strings):
+                                raise SchemaError(f"Shared-string index is out of range in {sheet}!{reference}")
+                            value = self.strings[index]
                         elif kind == "inlineStr":
                             value = "".join(t.text or "" for t in cell.iter(f"{{{NS}}}t"))
                         elif kind == "e":
@@ -115,3 +152,9 @@ class Workbook:
             if isinstance(exc, SchemaError):
                 raise
             raise SchemaError(f"Cannot parse worksheet {sheet}: {exc}") from exc
+        except NotImplementedError as exc:
+            raise SchemaError(f"Cannot parse worksheet {sheet}: unsupported archive") from exc
+        except RuntimeError as exc:
+            if not _unsupported_archive(exc):
+                raise
+            raise SchemaError(f"Cannot parse worksheet {sheet}: unsupported archive") from exc

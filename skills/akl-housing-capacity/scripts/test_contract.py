@@ -18,7 +18,7 @@ sys.path.insert(0, str(ROOT / "lib"))
 from contract_test import audit_skill  # noqa: E402
 import cli  # noqa: E402
 from housing import council_records, capacity_records, hud_records, matches, select_periods, typology_records  # noqa: E402
-from workbook import NS, SchemaError, Workbook  # noqa: E402
+from workbook import NS, SchemaError, Workbook, number  # noqa: E402
 
 FIXTURES = Path(__file__).resolve().parents[1] / "tests" / "fixtures"
 
@@ -54,6 +54,60 @@ def changed_cells(body, sheet_path, changes):
                 data = ET.tostring(root)
             output.writestr(info, data)
     return edited.getvalue()
+
+
+def replace_member(body, member, before, after):
+    edited = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(body)) as archive, zipfile.ZipFile(edited, "w") as output:
+        for info in archive.infolist():
+            data = archive.read(info)
+            if info.filename == member:
+                if before not in data:
+                    raise AssertionError(f"{before!r} missing from {member}")
+                data = data.replace(before, after)
+            output.writestr(info, data)
+    return edited.getvalue()
+
+
+def with_date_cells(body, sheet_path, changes):
+    """Write OOXML date cells (t=d) over existing cells."""
+    edited = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(body)) as archive, zipfile.ZipFile(edited, "w") as output:
+        for info in archive.infolist():
+            data = archive.read(info)
+            if info.filename == sheet_path:
+                root = ET.fromstring(data)
+                for cell in root.iter(f"{{{NS}}}c"):
+                    reference = cell.attrib.get("r")
+                    if reference not in changes:
+                        continue
+                    cell.clear()
+                    cell.set("r", reference)
+                    cell.set("t", "d")
+                    ET.SubElement(cell, f"{{{NS}}}v").text = changes[reference]
+                data = ET.tostring(root)
+            output.writestr(info, data)
+    return edited.getvalue()
+
+
+def archive_with(flag=0, method=None):
+    """Synthetic ZIP whose local and central headers advertise encryption or an unknown method."""
+    raw = io.BytesIO()
+    with zipfile.ZipFile(raw, "w") as archive:
+        archive.writestr("xl/workbook.xml", "<workbook/>")
+    data = bytearray(raw.getvalue())
+    local = data.find(b"PK\x03\x04")
+    central = data.find(b"PK\x01\x02")
+    if local < 0 or central < 0:
+        raise AssertionError("zip headers missing")
+    if flag:
+        data[local + 6] |= flag
+        data[central + 8] |= flag
+    if method is not None:
+        encoded = method.to_bytes(2, "little")
+        data[local + 8:local + 10] = encoded
+        data[central + 10:central + 12] = encoded
+    return bytes(data)
 
 
 def fixture_checks(report=False):
@@ -186,6 +240,91 @@ def fixture_checks(report=False):
         check(True, "invalid source ISO reporting date is a schema error")
     else:
         raise AssertionError("Invalid source date accepted")
+    housing_body = (FIXTURES / "housing.xlsx").read_bytes()
+    sheet_paths = Workbook(housing_body).sheets
+
+    def expect_schema(body, parser, label):
+        try:
+            parser(body)
+        except SchemaError:
+            check(True, label)
+        else:
+            raise AssertionError(label + " accepted")
+
+    iso_body = changed_cells(housing_body, sheet_paths["Dwellings Consented By LB"],
+                             {"A2": "2026-06-01", "A3": "2026-07-01"})
+    iso_rows = [r for r in council_records(iso_body) if r["sheet"] == "Dwellings Consented By LB"]
+    check({r["period"] for r in iso_rows} == {"2026-06", "2026-07"},
+          "ISO date strings remain council observations")
+    typed_body = with_date_cells(housing_body, sheet_paths["Dwellings with CCCs"],
+                                 {"A2": "2026-06-01", "A3": "2026-07-01"})
+    typed_rows = [r for r in council_records(typed_body) if r["sheet"] == "Dwellings with CCCs"]
+    check({r["period"] for r in typed_rows} == {"2026-06", "2026-07"},
+          "OOXML date cells remain council observations")
+    expect_schema(changed_cells(housing_body, sheet_paths["Residential Parcels Created"], {"A2": None, "A3": None}),
+                  council_records, "required sheet without dates fails closed")
+    expect_schema(changed_cells(housing_body, sheet_paths["Dwellings Consented"], {"A2": 2026}),
+                  council_records, "numeric year footnote is not a reporting month")
+    relabelled = changed_cells(housing_body, sheet_paths["Dwellings Consented By LB"], {"D1": "Monthly Total"})
+    board_names = {r["area"] for r in council_records(relabelled) if r["area_type"] == "local_board"}
+    check(board_names == {"Henderson - Massey", "Whau"}, "Monthly Total is not a local board")
+    macron = changed_cells(housing_body, sheet_paths["Dwellings Consented By LB"], {"C1": "Kaipātiki"})
+    macron_names = {r["area"] for r in council_records(macron) if r["sheet"] == "Dwellings Consented By LB"}
+    check(macron_names == {"Henderson - Massey", "Kaipātiki"}, "published board spelling variants stay valid areas")
+    for header, label in (
+        ("12 month total", "rolling total is not a local board"),
+        ("Total", "bare Total is not a local board"),
+        ("% of Auckland", "share column is not a local board"),
+    ):
+        expect_schema(changed_cells(housing_body, sheet_paths["Dwellings Consented By LB"], {"C1": header}),
+                      council_records, label)
+    expect_schema(changed_cells(housing_body, sheet_paths["Dwellings Consented"], {"B2": "1_000"}),
+                  council_records, "underscore numbers are rejected")
+    try:
+        number("nan")
+    except SchemaError:
+        check(True, "non-finite number names are rejected")
+    else:
+        raise AssertionError("nan accepted")
+    workbook = Workbook(housing_body)
+    check(workbook.month("2026-07-01") == "2026-07", "ISO reporting month keeps its month")
+    try:
+        workbook.month(2026)
+    except SchemaError:
+        check(True, "Excel serial for a bare year is implausible")
+    else:
+        raise AssertionError("year serial accepted")
+    hud_body = (FIXTURES / "hud.xlsx").read_bytes()
+    renamed = replace_member(hud_body, "xl/sharedStrings.xml", b">Delivery<", b">Deliveries<")
+    try:
+        hud_records(renamed)
+    except SchemaError as exc:
+        check("Delivery" in str(exc), "renamed HUD Delivery series fails before filters")
+    else:
+        raise AssertionError("renamed Delivery series accepted")
+    negative = replace_member(housing_body, sheet_paths["Dwellings Consented"],
+                              b't="s"><ns0:v>1</ns0:v>', b't="s"><ns0:v>-1</ns0:v>')
+    expect_schema(negative, council_records, "negative shared-string index fails")
+    missing_index = replace_member(housing_body, sheet_paths["Dwellings Consented"],
+                                   b'<ns0:c r="A1" t="s"><ns0:v>1</ns0:v></ns0:c>',
+                                   b'<ns0:c r="A1" t="s"></ns0:c>')
+    expect_schema(missing_index, council_records, "missing shared-string index fails")
+    expect_schema(archive_with(flag=1), Workbook, "encrypted workbook fails closed")
+    expect_schema(archive_with(method=99), Workbook, "unsupported ZIP compression fails closed")
+    try:
+        cli.download_link('<a href="https://knowledgeauckland.org.nz:8443/media/housing-update-datasheet.xlsx">x</a>',
+                          cli.HOUSING_PAGE, "housing-update-datasheet")
+    except cli.nzfetch.FetchError:
+        check(True, "non-default explicit port is an upstream failure")
+    except SchemaError:
+        raise AssertionError("explicit port classified as a schema error")
+    else:
+        raise AssertionError("explicit port accepted")
+    default_port = cli.download_link(
+        '<a href="https://knowledgeauckland.org.nz:443/media/housing-update-datasheet.xlsx">x</a>',
+        cli.HOUSING_PAGE, "housing-update-datasheet")
+    check(default_port.startswith("https://knowledgeauckland.org.nz:443/"),
+          "default HTTPS port remains a download candidate")
     return count
 
 
@@ -243,6 +382,52 @@ def provenance_checks():
         assert cli.main(["housing-update", "--json"]) == 4
     payload = json.loads(capture.getvalue())
     assert payload["error"]["retry_after"] == "60" and payload["error"]["type"] == "blocked"
+    housing_body = (FIXTURES / "housing.xlsx").read_bytes()
+    sheet_paths = Workbook(housing_body).sheets
+    malformed = [
+        replace_member(housing_body, sheet_paths["Dwellings Consented"],
+                       b'<ns0:c r="A1" t="s"><ns0:v>1</ns0:v></ns0:c>',
+                       b'<ns0:c r="A1" t="s"></ns0:c>'),
+        archive_with(flag=1),
+        archive_with(method=99),
+        changed_cells(housing_body, sheet_paths["Residential Parcels Created"], {"A2": None, "A3": None}),
+    ]
+    for body in malformed:
+        capture = io.StringIO()
+        error = io.StringIO()
+        with patch.object(cli.nzfetch, "fetch_text", return_value=(FIXTURES / "landing.html").read_text()), \
+             patch.object(cli, "fetch_workbook", return_value=body), \
+             contextlib.redirect_stdout(capture), contextlib.redirect_stderr(error):
+            assert cli.main(["housing-update", "--json"]) == 6
+        assert error.getvalue() == ""
+        payload = json.loads(capture.getvalue())
+        assert payload["error"]["type"] == "schema_failure" and payload["error"]["code"] == 6
+        assert payload["results"] == []
+    renamed = replace_member((FIXTURES / "hud.xlsx").read_bytes(), "xl/sharedStrings.xml", b">Delivery<", b">Deliveries<")
+    capture = io.StringIO()
+    error = io.StringIO()
+    with patch.object(cli.nzfetch, "fetch_text", return_value='<a href="/assets/housing-dashboard-data-download.xlsx">x</a>'), \
+         patch.object(cli, "fetch_workbook", return_value=renamed), \
+         contextlib.redirect_stdout(capture), contextlib.redirect_stderr(error):
+        assert cli.main(["housing-update", "--source", "hud", "--json"]) == 6
+    assert error.getvalue() == ""
+    payload = json.loads(capture.getvalue())
+    assert payload["error"]["type"] == "schema_failure" and payload["results"] == []
+    capture = io.StringIO()
+    error = io.StringIO()
+    with patch.object(cli.nzfetch, "fetch_text", return_value='<a href="https://www.hud.govt.nz:8443/assets/housing-dashboard-data-download.xlsx">x</a>'), \
+         patch.object(cli, "fetch_workbook", side_effect=AssertionError("port URL must not be fetched")), \
+         contextlib.redirect_stdout(capture), contextlib.redirect_stderr(error):
+        assert cli.main(["housing-update", "--source", "hud", "--json"]) == 5
+    assert error.getvalue() == ""
+    payload = json.loads(capture.getvalue())
+    assert payload["error"]["type"] == "upstream_unavailable" and payload["results"] == []
+    capture = io.StringIO()
+    with patch.object(cli, "fetch_workbook", return_value=archive_with(flag=1)), \
+         contextlib.redirect_stdout(capture), contextlib.redirect_stderr(io.StringIO()):
+        assert cli.main(["capacity", "--dataset", "business", "--json"]) == 6
+    payload = json.loads(capture.getvalue())
+    assert payload["error"]["type"] == "schema_failure" and payload["results"] == []
 
 
 def main():

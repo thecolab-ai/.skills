@@ -1,6 +1,7 @@
 """Parsers for the observed Council and HUD workbook layouts."""
 from __future__ import annotations
 
+import re
 import unicodedata
 
 from workbook import SchemaError, Workbook, number
@@ -55,12 +56,55 @@ COUNCIL_COLUMNS = {
     },
 }
 
+# Published "Dwellings Consented By LB" labels in the September 2026 datasheet.
+# Matching ignores case, macrons, spaces and hyphens. Capacity tables are separate.
+LOCAL_BOARD_LABELS = (
+    "Albert - Eden",
+    "Devonport - Takapuna",
+    "Franklin",
+    "Great Barrier",
+    "Henderson - Massey",
+    "Hibiscus and Bays",
+    "Howick",
+    "Kaipatiki",
+    "Mangere - Otahuhu",
+    "Manurewa",
+    "Maungakiekie - Tamaki",
+    "Orakei",
+    "Otara - Papatoetoe",
+    "Papakura",
+    "Puketapapa",
+    "Rodney",
+    "Upper Harbour",
+    "Waiheke",
+    "Waitakere Ranges",
+    "Waitemata",
+    "Whau",
+)
+LOCAL_BOARD_KEYS = {normalise(name) for name in LOCAL_BOARD_LABELS}
+MONTHLY_TOTAL_KEY = normalise("Monthly total")
+
+
+def row_period(workbook, value):
+    """Return YYYY-MM for a supported date cell, or None when the cell is not a date."""
+    if value is None or value == "":
+        return None
+    if isinstance(value, str):
+        if re.fullmatch(r"\d{4}", value):
+            raise SchemaError("Implausible workbook reporting period")
+        if not re.match(r"^\d{4}-\d{2}-\d{2}", value):
+            return None
+    elif isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return workbook.month(value)
+
 
 def council_records(body):
     workbook = Workbook(body)
     records = []
     for sheet, columns in COUNCIL_COLUMNS.items():
         headers_seen = False
+        observed = 0
         for _, row in workbook.rows(sheet):
             if row.get("A") == "Date":
                 for column, (_, expected) in columns.items():
@@ -68,36 +112,62 @@ def council_records(body):
                         raise SchemaError(f"Changed header in {sheet}, column {column}")
                 headers_seen = True
                 continue
-            if not headers_seen or not isinstance(row.get("A"), (int, float)):
+            period = row_period(workbook, row.get("A"))
+            if not headers_seen or period is None:
                 continue
             measures = {key: number(row.get(column)) for column, (key, _) in columns.items()}
             if all(v is None for v in measures.values()):
                 continue
+            observed += 1
             records.append({"sheet": sheet, "area": "Auckland", "area_type": "region",
-                            "period": workbook.month(row["A"]),
+                            "period": period,
                             "unit": "parcels" if sheet == "Residential Parcels Created" else "dwellings",
                             "measures": measures})
         if not headers_seen:
             raise SchemaError(f"No Date header in {sheet}")
+        if observed == 0:
+            raise SchemaError(f"No observations in {sheet}")
     sheet = "Dwellings Consented By LB"
     headers = None
+    observed = 0
     for _, row in workbook.rows(sheet):
         if row.get("A") == "Date":
-            headers = {col: name for col, name in row.items()
-                       if col != "A" and name != "Monthly total"}
-            if not headers or not all(isinstance(v, str) for v in headers.values()):
+            headers = {}
+            total_seen = False
+            for col, name in row.items():
+                if col == "A":
+                    continue
+                if not isinstance(name, str) or not normalise(name):
+                    raise SchemaError("Changed local-board headers")
+                key = normalise(name)
+                if key == MONTHLY_TOTAL_KEY:
+                    if total_seen:
+                        raise SchemaError("Ambiguous local-board total column")
+                    total_seen = True
+                    continue
+                if key not in LOCAL_BOARD_KEYS or key in {normalise(area) for area in headers.values()}:
+                    raise SchemaError(f"Unexpected local-board header: {name}")
+                headers[col] = name
+            if not headers or not total_seen:
                 raise SchemaError("Changed local-board headers")
             continue
-        if not headers or not isinstance(row.get("A"), (int, float)):
+        period = row_period(workbook, row.get("A"))
+        if not headers or period is None:
             continue
+        wrote = False
         for col, area in headers.items():
             value = number(row.get(col))
             if value is not None:
+                wrote = True
                 records.append({"sheet": sheet, "area": area, "area_type": "local_board",
-                                "period": workbook.month(row["A"]), "unit": "dwellings",
+                                "period": period, "unit": "dwellings",
                                 "measures": {"all_dwellings": value}})
-    if not records or headers is None:
-        raise SchemaError("No housing observations found")
+        if wrote:
+            observed += 1
+    if headers is None:
+        raise SchemaError("No Date header in Dwellings Consented By LB")
+    if observed == 0:
+        raise SchemaError("No local-board observations")
     return records
 
 
@@ -175,7 +245,7 @@ def typology_records(body):
 def hud_records(body, area="Auckland", month=None):
     workbook = Workbook(body)
     headers = None
-    observations_seen = False
+    delivery_seen = False
     records = []
     current_period = ""
     required = {"series", "area_type", "area_name", "reporting_month", "value",
@@ -188,9 +258,16 @@ def hud_records(body, area="Auckland", month=None):
             continue
         if not row:
             continue
-        period = workbook.month(row.get(headers["reporting_month"]))
-        observations_seen = True
-        if row.get(headers["series"]) != "Delivery" or not matches(str(row.get(headers["area_name"], "")), area):
+        series = row.get(headers["series"])
+        raw_period = row.get(headers["reporting_month"])
+        if series == "Delivery":
+            delivery_seen = True
+        if raw_period is None or raw_period == "":
+            if series == "Delivery":
+                raise SchemaError("HUD Delivery row has no reporting month")
+            continue
+        period = workbook.month(raw_period)
+        if series != "Delivery" or not matches(str(row.get(headers["area_name"], "")), area):
             continue
         if month and period != month:
             continue
@@ -214,6 +291,6 @@ def hud_records(body, area="Auckland", month=None):
         records.append({"sheet": "Social housing", "series": "Delivery", "period": period,
                         "area": row.get(headers["area_name"]), "area_type": row.get(headers["area_type"]),
                         "unit": "homes", "value": value, "dimensions": dimensions})
-    if not headers or not observations_seen:
-        raise SchemaError("No HUD housing observations found")
+    if not headers or not delivery_seen:
+        raise SchemaError("HUD Delivery series is missing")
     return records, max((r["period"] for r in records), default="")
