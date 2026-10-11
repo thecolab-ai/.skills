@@ -39,24 +39,51 @@ The contract sentinel is synthetic repository-policy metadata.
 
 ## Mapping maintenance
 
-`skill-map.json` contains 82 ordered rules covering 33 existing skills and
+`skill-map.json` contains 83 ordered rules covering 33 existing skills and
 five planned engines. Existing skill names, source URLs and auth modes were
 read from their `skills/<name>/SKILL.md` files, then restricted to known
 capabilities. The rule matches hosts and optional path/ID fragments against
-the same direct or landing URL. Optional name and NZ-scope restrictions also
-apply. Matching rules are returned in order, deduplicated by skill name.
+the same direct or landing URL. `url_contains` entries are alternatives.
+Optional name and NZ-scope restrictions also apply. Matching rules are returned
+in order, deduplicated by skill name, so a narrower rule must be listed first.
 
 Do not route every dataset on a shared host to a specialist: Zenodo is limited
 to SeaRise, CKAN schools use a subject restriction, and ArcGIS rules use
 organisation IDs. `related` mappings require reading that skill's commands;
 `catalogue` mappings discover metadata and do not promise source retrieval.
 `nz-arcgis` rules mirror its runtime allowlist, `skills/nz-arcgis/references/orgs.json`:
-one NZ-scoped rule per organisation root, named by organisation code. Flooded NZ
-routes only its allowlisted service. Tiled maps are `related` because only
-service metadata is supported. The tiled image host is omitted because the
-skill refuses it. Organisations outside that allowlist have no `nz-arcgis` route;
-when `orgs.json` changes, update these rules. `wcc-arcgis-nz` stays restricted
-to its Wellington infrastructure.
+one NZ-scoped rule per organisation root, named by organisation code, plus a
+narrower Auckland Council rule for the aerial basemap tile template. That rule
+is ordered first, so only that template is `related`; other layers on
+`mapspublic.aklc.govt.nz` stay `exact`. Flooded NZ routes only its allowlisted
+service `flooded_nz_gdb_v2_202603181308`. The tiles host routes only the cached
+MapServer services whose `describe` succeeds: NPS-UD proposed zoning,
+post-cyclone imagery, PC120 precincts, walkable catchments, and Policy 3D
+upzoning. Those routes are `related` and metadata-only. Infrared imagery 2024
+and the PC120 proposed-amendments map are not routed: their service JSON has
+`tables: null`, and current `describe` exits 6. SceneServer, VectorTileServer,
+and the tiled image host are not routed. Organisations outside that allowlist
+have no `nz-arcgis` route; when `orgs.json` changes, update these rules.
+`wcc-arcgis-nz` stays restricted to its Wellington infrastructure.
+
+ArcGIS route operations were rechecked on 11 October 2026. `nz-arcgis` accepts
+an exact HTTPS REST URL and refuses a query string, a fragment, credentials,
+and a trailing `/query`. Catalogue endpoints often copy a layer query
+(`/query` with `f`, `where`, `outFields`, `returnGeometry`, `returnCountOnly`,
+`resultOffset`, `resultRecordCount`, or `maxAllowableOffset`) or a service URL
+with `?f=json`. Remove the query string and a trailing `/query` before
+invocation. The dataset identity stays in the path: host, tenant or site root,
+service name, server type, and numeric layer when present. No routed ArcGIS
+catalogue URL identifies its service with a query ID such as `id` or `itemId`.
+Do not strip identity query parameters for other skills. Tile-template URLs
+also need `/tile/{level}/{row}/{column}` removed before `describe`. That does
+not download tiles. On the routed TilesOnly maps, `count` and `query` are not
+successful operations. The aerial basemap is different: after the tile suffix
+is removed, a numeric layer accepts `count` and `query`. A route is not
+permission to connect. `validate_url` still refuses hosts, tenants, services,
+server types, and operations outside the allowlist before any request.
+Substring matching can still flag a synthetic invalid URL; bundled rows that
+remain routed were checked against that validator.
 
 The planned engines are `nz-stac`, `nz-ogc-records`, `gtfs-nz`,
 `nz-recycling-locator` and `akl-rainfall`. They are explicitly

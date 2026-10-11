@@ -565,6 +565,22 @@
     {
       "skill": "nz-arcgis",
       "status": "existing",
+      "relationship": "related",
+      "auth": "none",
+      "match": {
+        "hosts": [
+          "mapspublic.aklc.govt.nz"
+        ],
+        "url_contains": [
+          "/arcgis/rest/services/Basemap/AerialBasemap/MapServer"
+        ],
+        "nz_only": true
+      },
+      "note": "nz-arcgis organisation `akl` (Auckland Council). Catalogue URL is a tile template, not exact tile coverage. Remove /tile/{level}/{row}/{column} before use. describe on the MapServer returns service metadata; count and query use a numeric layer URL, not the tile template. The skill does not download tiles."
+    },
+    {
+      "skill": "nz-arcgis",
+      "status": "existing",
       "relationship": "exact",
       "auth": "none",
       "match": {
@@ -620,11 +636,15 @@
           "tiles.arcgis.com"
         ],
         "url_contains": [
-          "/tiles/n4yPwebTjJCmXB6W/arcgis/rest/services/"
+          "/tiles/n4yPwebTjJCmXB6W/arcgis/rest/services/NPSUDZoningProposedPlanChange/MapServer",
+          "/tiles/n4yPwebTjJCmXB6W/arcgis/rest/services/Auckland_Council_Post_Cyclone_Imagery/MapServer",
+          "/tiles/n4yPwebTjJCmXB6W/arcgis/rest/services/PC120Revised_PROD_Precincts/MapServer",
+          "/tiles/n4yPwebTjJCmXB6W/arcgis/rest/services/PC120Revised_PROD_WalkableCatchment/MapServer",
+          "/tiles/n4yPwebTjJCmXB6W/arcgis/rest/services/PC120Revised_PROD_Policy3D_UpzoningAroundCentreZones/MapServer"
         ],
         "nz_only": true
       },
-      "note": "nz-arcgis organisation `akl` (Auckland Council). Tiled maps: `describe` returns service metadata; `count` and `query` need a numeric FeatureServer/MapServer layer."
+      "note": "nz-arcgis organisation `akl` (Auckland Council). Cached MapServer metadata only for these services. Remove a query string, a trailing /query, and any /tile/{level}/{row}/{column} suffix, then call describe on the service URL. These maps are TilesOnly: describe does not include a record count, and count and query are not successful operations. The skill does not download tiles."
     },
     {
       "skill": "nz-arcgis",
