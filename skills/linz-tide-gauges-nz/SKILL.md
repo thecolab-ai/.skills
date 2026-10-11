@@ -32,7 +32,7 @@ Read published LINZ tide-gauge observations from `scripts/cli.py`. The primary c
 
 1. Use `gauges` to confirm a code is published.
 2. Use `datasets --gauge AUCT` to see which year and sensor pairs exist. Sensors `40` and `41` are both published for Auckland; do not treat them as interchangeable.
-3. Use `files` to page the daily archive, then `readings` for one UTC day.
+3. Use `files` to page the daily archive, then `readings` for one UTC day. A finished year can also list one annual zip, or a part-year zip such as `AUCT_40_2009_085-365.zip`. Those bundles are labeled in `archive_bundles` and are not downloaded as daily readings.
 4. Pass `--json` for the `meta` / `results` envelope. Read [references/api-notes.md](references/api-notes.md) before interpreting a height or a date.
 
 ## Commands
@@ -46,7 +46,7 @@ python3 skills/linz-tide-gauges-nz/scripts/cli.py readings --gauge AUCT --date 2
 
 `--date` is the UTC day in the daily filename and CSV, not a New Zealand local day. `--limit` defaults to 60 readings or 20 files. A published day with no rows on the requested page still reports `matched_count`. A gauge, dataset, or UTC day that LINZ does not publish returns `query_status: no_match` and an empty `results` array. Timeouts, blocks, and non-JSON outages are errors with empty `results`, not matches.
 
-Heights are copied as decimal strings. They are unquality-controlled sensor metres. File `modified` dates are archive dates, not observation times. `latest_data` on `readings` is the last UTC minute in that daily file.
+Heights are copied as decimal strings. They are unquality-controlled metres above gauge zero (TG0), not chart datum and not tide predictions. Sensor 40 and sensor 41 are separate series. On 2026-01-01 at 00:00 UTC, Auckland sensor 40 reads 5.002 m and sensor 41 reads 4.777 m. A raw CSV fixture has no sensor column, so its sensor value is only the requested label and `sensor_verified` is false. File `modified` dates are archive dates, not observation times. `latest_data` on `readings` is the last UTC minute in that daily file. A published day can contain fewer than 1,440 minutes.
 
 ## Checks
 
