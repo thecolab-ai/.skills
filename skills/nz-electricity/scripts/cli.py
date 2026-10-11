@@ -23,6 +23,9 @@ from typing import Any, Callable, Iterable
 
 import pathlib
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+from provenance import error_envelope, provenance, result_envelope  # noqa: E402
+
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
 import nzfetch  # noqa: E402
 
@@ -132,6 +135,61 @@ ENERGY_MARGIN_ALTERNATIVES = [
     },
 ]
 UA = "nz-electricity-skill/1.0 (+https://github.com/thecolab-ai/.skills)"
+
+# EMI public solar-installation snapshots. These are not the GUEHMT dg-* series.
+SOLAR_BLOB_HOST = "emidatasets.blob.core.windows.net"
+SOLAR_REGION_URL = (
+    "https://emidatasets.blob.core.windows.net/publicdata/Datasets/Retail/"
+    "SolarInstallations/SolarInstallationsByRegion.csv"
+)
+SOLAR_STREET_URL = (
+    "https://emidatasets.blob.core.windows.net/publicdata/Datasets/Retail/"
+    "SolarInstallations/SolarInstallationsByStreet.csv"
+)
+SOLAR_PUBLISHER = "Electricity Authority"
+SOLAR_LICENCE = "CC-BY-4.0"
+SOLAR_SUPPRESSED = "3 or less"
+SOLAR_HOSTS = (SOLAR_BLOB_HOST,)
+SOLAR_REGION_MAX_BYTES = 262_144
+SOLAR_STREET_MAX_BYTES = 6_000_000
+SOLAR_REGION_MAX_ROWS = 5_000
+SOLAR_STREET_MAX_ROWS = 100_000
+SOLAR_STREET_DEFAULT_LIMIT = 20
+SOLAR_STREET_MAX_LIMIT = 100
+SOLAR_REGION_TIMEOUT = 20
+SOLAR_STREET_TIMEOUT = 45
+SOLAR_SEGMENTS = ("Res", "Bus", "All")
+SOLAR_SEGMENT_ALIASES = {
+    "res": "Res",
+    "residential": "Res",
+    "bus": "Bus",
+    "business": "Bus",
+    "all": "All",
+}
+SOLAR_REGION_COLUMNS = (
+    "RegionType",
+    "RegionCode",
+    "Region",
+    "MarketSegment",
+    "ICPs",
+    "GenerationCapacityKilowattsAvg",
+    "GenerationCapacityKilowattsSum",
+)
+SOLAR_STREET_COLUMNS = (
+    "StatisticalArea2Code",
+    "StatisticalArea2Name",
+    "PhysicalAddressStreet",
+    "MarketSegment",
+    "ICPs",
+    "GenerationCapacityKilowattsAvg",
+    "GenerationCapacityKilowattsSum",
+)
+SOLAR_UNITS = (
+    "ICP counts are installation counts. Generation capacity is kilowatts, not megawatts."
+)
+SOLAR_SUPPRESSION_NOTE = (
+    'Values published as "3 or less" are left as that literal text and are not converted to the number 3.'
+)
 
 REGION_ALIASES = {
     "northland": 1,
@@ -2229,6 +2287,371 @@ def render_energy_margin(data: dict[str, Any]) -> str:
     return "\n".join(lines).rstrip()
 
 
+class SolarCommandError(Exception):
+    def __init__(self, code: int, message: str, retry_after: str | None = None) -> None:
+        super().__init__(message)
+        self.code = code
+        self.message = message
+        self.retry_after = retry_after
+
+
+def solar_fail(args: argparse.Namespace, exc: SolarCommandError, source_url: str) -> None:
+    if getattr(args, "json", False):
+        meta = provenance(source_url, SOLAR_PUBLISHER, licence=SOLAR_LICENCE)
+        meta["units"] = SOLAR_UNITS
+        meta["suppression"] = SOLAR_SUPPRESSION_NOTE
+        payload = error_envelope(
+            exc.code, exc.message, meta, retry_after=exc.retry_after
+        )
+        print(json.dumps(payload, indent=2, ensure_ascii=False))
+    else:
+        print(f"nz-electricity: {exc.message}", file=sys.stderr)
+    raise SystemExit(exc.code)
+
+
+def solar_fold(value: str) -> str:
+    return re.sub(r"\s+", " ", value.strip()).casefold()
+
+
+def canonical_market_segment(raw: str) -> str:
+    text = raw.strip()
+    if not text:
+        raise SolarCommandError(2, "invalid market segment: value is empty")
+    canonical = SOLAR_SEGMENT_ALIASES.get(text.casefold())
+    if canonical is None:
+        allowed = ", ".join(SOLAR_SEGMENTS)
+        raise SolarCommandError(2, f"invalid market segment {raw!r}; expected one of {allowed}")
+    return canonical
+
+
+def resolve_street_limit(raw: str | None) -> int:
+    if raw is None:
+        return SOLAR_STREET_DEFAULT_LIMIT
+    text = raw.strip()
+    if not re.fullmatch(r"[0-9]+", text):
+        raise SolarCommandError(2, f"invalid street limit {raw!r}; expected a positive integer")
+    value = int(text)
+    if value <= 0:
+        raise SolarCommandError(2, f"invalid street limit {raw!r}; expected a positive integer")
+    if value > SOLAR_STREET_MAX_LIMIT:
+        raise SolarCommandError(
+            7,
+            f"refusing an unbounded street dump: --limit {value} exceeds the hard maximum of {SOLAR_STREET_MAX_LIMIT}",
+        )
+    return value
+
+
+def clean_region_query(raw: str | None) -> str | None:
+    if raw is None:
+        return None
+    text = re.sub(r"\s+", " ", raw.strip())
+    if not text:
+        raise SolarCommandError(2, "invalid region: value is empty")
+    if len(text) > 120:
+        raise SolarCommandError(2, "invalid region: value is too long")
+    return text
+
+
+def clean_sa2(raw: str | None) -> str | None:
+    if raw is None:
+        return None
+    text = raw.strip()
+    if not text:
+        raise SolarCommandError(2, "invalid SA2 code: value is empty")
+    if not re.fullmatch(r"[0-9]{6}", text):
+        raise SolarCommandError(2, f"invalid SA2 code {raw!r}; expected a 6-digit Statistical Area 2 code")
+    return text
+
+
+def parse_solar_measure(raw: str, *, allow_blank: bool) -> int | float | str | None:
+    text = raw.strip()
+    if text == SOLAR_SUPPRESSED:
+        return SOLAR_SUPPRESSED
+    if text == "":
+        if allow_blank:
+            return None
+        raise SolarCommandError(6, "schema failure: solar measure is blank")
+    if re.fullmatch(r"[0-9]+", text):
+        return int(text)
+    if re.fullmatch(r"[0-9]+\.[0-9]+", text):
+        value = float(text)
+        rendered = format(value, "f").rstrip("0").rstrip(".")
+        expected = text.rstrip("0").rstrip(".")
+        if rendered != expected:
+            return text
+        return value
+    raise SolarCommandError(6, f"schema failure: unrecognised solar measure {raw!r}")
+
+
+def parse_solar_row(raw: dict[str, str | None], columns: tuple[str, ...], line_no: int) -> dict[str, Any]:
+    if None in raw:
+        raise SolarCommandError(6, f"schema failure: solar CSV row {line_no} has extra columns")
+    values: dict[str, str] = {}
+    for column in columns:
+        cell = raw.get(column)
+        if cell is None:
+            raise SolarCommandError(6, f"schema failure: solar CSV row {line_no} is missing {column}")
+        values[column] = cell
+    segment = values["MarketSegment"].strip()
+    if segment not in SOLAR_SEGMENTS:
+        raise SolarCommandError(
+            6,
+            f"schema failure: solar CSV row {line_no} has market segment {segment!r}",
+        )
+    icps = parse_solar_measure(values["ICPs"], allow_blank=False)
+    avg = parse_solar_measure(values["GenerationCapacityKilowattsAvg"], allow_blank=False)
+    total = parse_solar_measure(values["GenerationCapacityKilowattsSum"], allow_blank=True)
+    if columns == SOLAR_REGION_COLUMNS:
+        region_type = values["RegionType"].strip()
+        region_code = values["RegionCode"].strip()
+        region = values["Region"].strip()
+        if not region_type or not region_code or not region:
+            raise SolarCommandError(6, f"schema failure: solar CSV row {line_no} has an empty region field")
+        return {
+            "region_type": region_type,
+            "region_code": region_code,
+            "region": region,
+            "market_segment": segment,
+            "icps": icps,
+            "generation_capacity_kilowatts_avg": avg,
+            "generation_capacity_kilowatts_sum": total,
+        }
+    sa2_code = values["StatisticalArea2Code"].strip()
+    sa2_name = values["StatisticalArea2Name"].strip()
+    street = values["PhysicalAddressStreet"].strip()
+    if not re.fullmatch(r"[0-9]{6}", sa2_code):
+        raise SolarCommandError(6, f"schema failure: solar CSV row {line_no} has SA2 code {sa2_code!r}")
+    if not sa2_name or not street:
+        raise SolarCommandError(6, f"schema failure: solar CSV row {line_no} has an empty street field")
+    return {
+        "statistical_area_2_code": sa2_code,
+        "statistical_area_2_name": sa2_name,
+        "physical_address_street": street,
+        "market_segment": segment,
+        "icps": icps,
+        "generation_capacity_kilowatts_avg": avg,
+        "generation_capacity_kilowatts_sum": total,
+    }
+
+
+def iter_solar_rows(text: str, columns: tuple[str, ...], max_rows: int) -> Iterable[dict[str, Any]]:
+    if not text.strip():
+        raise SolarCommandError(6, "schema failure: solar CSV was empty")
+    reader = csv.DictReader(io.StringIO(text))
+    header = list(reader.fieldnames or [])
+    if header != list(columns):
+        raise SolarCommandError(
+            6,
+            f"schema failure: solar CSV header {header} did not match {list(columns)}",
+        )
+    count = 0
+    for raw in reader:
+        count += 1
+        if count > max_rows:
+            raise SolarCommandError(
+                7,
+                f"refusing solar CSV above the {max_rows}-row bound",
+            )
+        yield parse_solar_row(raw, columns, count + 1)
+
+
+def parse_solar_csv(text: str, columns: tuple[str, ...], max_rows: int) -> list[dict[str, Any]]:
+    return list(iter_solar_rows(text, columns, max_rows))
+
+
+def fetch_solar_csv(url: str, max_bytes: int, timeout: int) -> str:
+    try:
+        body, _content_type, final_url = nzfetch.fetch_bytes(
+            url,
+            timeout=timeout,
+            accept="text/csv,text/plain,*/*",
+            headers={"User-Agent": UA},
+            browser_headers=False,
+            allowed_hosts=SOLAR_HOSTS,
+            max_bytes=max_bytes,
+            expect_json=False,
+        )
+    except nzfetch.RateLimited as exc:
+        raise SolarCommandError(
+            4,
+            f"network error: rate limited: {exc}",
+            retry_after=exc.retry_after,
+        ) from exc
+    except nzfetch.Blocked as exc:
+        raise SolarCommandError(4, f"network error: {exc}") from exc
+    except nzfetch.ResponseTooLarge as exc:
+        raise SolarCommandError(
+            7,
+            f"refusing solar CSV larger than {max_bytes} bytes",
+        ) from exc
+    except nzfetch.FetchError as exc:
+        raise SolarCommandError(5, f"upstream unavailable: {exc}") from exc
+    final_host = urllib.parse.urlparse(final_url).hostname
+    if final_host != SOLAR_BLOB_HOST:
+        raise SolarCommandError(
+            5,
+            f"upstream unavailable: solar CSV redirect left {SOLAR_BLOB_HOST}",
+        )
+    if len(body) > max_bytes:
+        raise SolarCommandError(7, f"refusing solar CSV larger than {max_bytes} bytes")
+    stripped = body.lstrip()
+    if not stripped:
+        raise SolarCommandError(6, "schema failure: solar CSV was empty")
+    if stripped.startswith(b"<"):
+        raise SolarCommandError(6, "schema failure: solar response was HTML, not a CSV")
+    try:
+        return body.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise SolarCommandError(6, f"schema failure: solar CSV is not UTF-8: {exc}") from exc
+
+
+def solar_meta(source_url: str, matched_count: int, returned_count: int) -> dict[str, Any]:
+    meta: dict[str, Any] = provenance(source_url, SOLAR_PUBLISHER, licence=SOLAR_LICENCE)
+    meta["units"] = SOLAR_UNITS
+    meta["suppression"] = SOLAR_SUPPRESSION_NOTE
+    meta["matched_count"] = matched_count
+    meta["returned_count"] = returned_count
+    meta["truncated"] = matched_count > returned_count
+    return meta
+
+
+def format_solar_measure(value: Any) -> str:
+    if value is None:
+        return "-"
+    if value == SOLAR_SUPPRESSED:
+        return SOLAR_SUPPRESSED
+    return str(value)
+
+
+def render_solar(data: dict[str, Any], kind: str) -> str:
+    meta = data["meta"]
+    label = "region" if kind == "region" else "street"
+    lines = [
+        f"EMI solar installations by {label}: {meta.get('returned_count')} of {meta.get('matched_count')} row(s)",
+        f"Source: {meta.get('publisher')} ({meta.get('licence')}) {meta.get('source_url')}",
+        str(meta.get("units") or ""),
+        str(meta.get("suppression") or ""),
+    ]
+    if meta.get("truncated"):
+        lines.append(
+            "Result limit reached. Narrow the Statistical Area 2 filter, or raise --limit up to the hard maximum."
+        )
+    lines.append("")
+    for row in data.get("results") or []:
+        measures = (
+            f"ICPs {format_solar_measure(row.get('icps'))}  "
+            f"avg {format_solar_measure(row.get('generation_capacity_kilowatts_avg'))} kW  "
+            f"sum {format_solar_measure(row.get('generation_capacity_kilowatts_sum'))} kW"
+        )
+        if kind == "region":
+            lines.append(
+                f"{row.get('region_type')}  {row.get('region_code')}  {row.get('region')}  "
+                f"{row.get('market_segment')}  {measures}"
+            )
+        else:
+            lines.append(
+                f"{row.get('statistical_area_2_code')}  {row.get('statistical_area_2_name')}  "
+                f"{row.get('physical_address_street')}  {row.get('market_segment')}  {measures}"
+            )
+    return "\n".join(lines).rstrip()
+
+
+def filter_solar_regions(
+    rows: Iterable[dict[str, Any]],
+    *,
+    region: str | None,
+    market_segment: str | None,
+) -> list[dict[str, Any]]:
+    selected: list[dict[str, Any]] = []
+    region_key = solar_fold(region) if region else None
+    for row in rows:
+        if region_key is not None:
+            if solar_fold(str(row["region"])) != region_key and solar_fold(str(row["region_code"])) != region_key:
+                continue
+        if market_segment is not None and row["market_segment"] != market_segment:
+            continue
+        selected.append(row)
+    return selected
+
+
+def filter_solar_streets(
+    rows: Iterable[dict[str, Any]],
+    *,
+    region: str | None,
+    sa2: str | None,
+    market_segment: str | None,
+    limit: int,
+) -> tuple[list[dict[str, Any]], int]:
+    if not region and not sa2:
+        raise SolarCommandError(
+            7,
+            "refusing an unbounded street dump: provide --region (Statistical Area 2 name) or --sa2",
+        )
+    if limit <= 0 or limit > SOLAR_STREET_MAX_LIMIT:
+        raise SolarCommandError(
+            7,
+            f"refusing an unbounded street dump: limit must be 1 to {SOLAR_STREET_MAX_LIMIT}",
+        )
+    region_key = solar_fold(region) if region else None
+    selected: list[dict[str, Any]] = []
+    matched = 0
+    for row in rows:
+        if region_key is not None and solar_fold(str(row["statistical_area_2_name"])) != region_key:
+            continue
+        if sa2 is not None and row["statistical_area_2_code"] != sa2:
+            continue
+        if market_segment is not None and row["market_segment"] != market_segment:
+            continue
+        matched += 1
+        if len(selected) < limit:
+            selected.append(row)
+    return selected, matched
+
+
+def emit_solar(args: argparse.Namespace, source_url: str, results: list[dict[str, Any]], matched_count: int, kind: str) -> None:
+    payload = result_envelope(results, solar_meta(source_url, matched_count, len(results)))
+    emit(payload, args.json, lambda data: render_solar(data, kind))
+
+
+def cmd_solar_regions(args: argparse.Namespace) -> None:
+    try:
+        region = clean_region_query(args.region)
+        segment = canonical_market_segment(args.market_segment) if args.market_segment else None
+        text = fetch_solar_csv(SOLAR_REGION_URL, SOLAR_REGION_MAX_BYTES, SOLAR_REGION_TIMEOUT)
+        rows = parse_solar_csv(text, SOLAR_REGION_COLUMNS, SOLAR_REGION_MAX_ROWS)
+        if not rows:
+            raise SolarCommandError(6, "schema failure: solar region CSV had a header and no data rows")
+        selected = filter_solar_regions(rows, region=region, market_segment=segment)
+    except SolarCommandError as exc:
+        solar_fail(args, exc, SOLAR_REGION_URL)
+    emit_solar(args, SOLAR_REGION_URL, selected, len(selected), "region")
+
+
+def cmd_solar_streets(args: argparse.Namespace) -> None:
+    try:
+        region = clean_region_query(args.region)
+        sa2 = clean_sa2(args.sa2)
+        segment = canonical_market_segment(args.market_segment) if args.market_segment else None
+        limit = resolve_street_limit(args.limit)
+        if not region and not sa2:
+            raise SolarCommandError(
+                7,
+                "refusing an unbounded street dump: provide --region (Statistical Area 2 name) or --sa2",
+            )
+        text = fetch_solar_csv(SOLAR_STREET_URL, SOLAR_STREET_MAX_BYTES, SOLAR_STREET_TIMEOUT)
+        rows = iter_solar_rows(text, SOLAR_STREET_COLUMNS, SOLAR_STREET_MAX_ROWS)
+        selected, matched = filter_solar_streets(
+            rows,
+            region=region,
+            sa2=sa2,
+            market_segment=segment,
+            limit=limit,
+        )
+    except SolarCommandError as exc:
+        solar_fail(args, exc, SOLAR_STREET_URL)
+    emit_solar(args, SOLAR_STREET_URL, selected, matched, "street")
+
+
 def emit(data: dict[str, Any], as_json: bool, render: Callable[[dict[str, Any]], str]) -> None:
     if as_json:
         print(json.dumps(data, indent=2, ensure_ascii=False))
@@ -2255,7 +2678,7 @@ def add_dg_filter_args(sp: argparse.ArgumentParser) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(
-        description="Read-only NZ electricity data CLI using public EM6 JSON feeds and EMI CSV/report data."
+        description="Read-only NZ electricity data CLI using public EM6 JSON feeds, EMI CSV/report data, and EMI solar-installation CSVs."
     )
     sub = ap.add_subparsers(dest="command", required=True)
 
@@ -2315,6 +2738,29 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--all", action="store_true", help="include planned, scheduled, or recent outage records where feeds expose them")
     sp.add_argument("--json", action="store_true")
     sp.set_defaults(func=cmd_outages)
+
+    sp = sub.add_parser("solar-regions", help="EMI solar installation counts and kilowatt capacity by region")
+    sp.add_argument("--region", help="exact region name or region code, for example New Zealand or NZ")
+    sp.add_argument("--market-segment", help="Res, Bus, or All")
+    sp.add_argument("--json", action="store_true")
+    sp.set_defaults(func=cmd_solar_regions)
+
+    sp = sub.add_parser(
+        "solar-streets",
+        help="bounded EMI solar installation counts by street; requires a Statistical Area 2 filter",
+    )
+    sp.add_argument(
+        "--region",
+        help="exact Statistical Area 2 name; the street file has no Region column",
+    )
+    sp.add_argument("--sa2", help="exact 6-digit Statistical Area 2 code")
+    sp.add_argument("--market-segment", help="Res, Bus, or All")
+    sp.add_argument(
+        "--limit",
+        help=f"maximum rows to return (default {SOLAR_STREET_DEFAULT_LIMIT}, hard maximum {SOLAR_STREET_MAX_LIMIT})",
+    )
+    sp.add_argument("--json", action="store_true")
+    sp.set_defaults(func=cmd_solar_streets)
 
     sp = sub.add_parser("energy-margin", help="probe official EA gentailer energy-margin source availability")
     sp.add_argument("--company", help="Contact, Genesis, Manawa, Mercury, Meridian, or Nova")

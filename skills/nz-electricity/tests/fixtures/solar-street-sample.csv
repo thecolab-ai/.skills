@@ -1,0 +1,5 @@
+StatisticalArea2Code,StatisticalArea2Name,PhysicalAddressStreet,MarketSegment,ICPs,GenerationCapacityKilowattsAvg,GenerationCapacityKilowattsSum
+100100,North Cape,EXAMPLE ROAD,Res,3 or less,7.0,
+100100,North Cape,SECOND ROAD,Res,21,5.7,119.6
+100100,North Cape,THREE ROAD,Res,3,5.0,15.0
+100200,Rangaunu Harbour,OTHER ROAD,Bus,4,6.0,24.0
