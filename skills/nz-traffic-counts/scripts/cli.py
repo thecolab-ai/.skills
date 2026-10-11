@@ -42,9 +42,20 @@ TAURANGA = 'https://cemeteryaws.tauranga.govt.nz/server/rest/services/Mapi_Trans
 CHCH = 'https://smartview.ccc.govt.nz/app/router/map_features.php?feat=ecocounter'
 WCC = 'https://gis.wcc.govt.nz/arcgis/rest/services/Transportation/Transport_Sensors/FeatureServer/0'
 WCC_FILES = 'https://gis-snowflake-opendata-public-wcc-arcgis-prod.s3.ap-southeast-2.amazonaws.com/'
+WCC_META = WCC_FILES + 'transport_sensors/countline_meta_info/csv/countline_meta_info.csv'
 CITY_SOURCES = ('hamilton-traffic', 'tauranga-traffic', 'christchurch-cycle', 'wellington-sensors')
+NUMERIC_CITY_SOURCES = ('hamilton-traffic', 'christchurch-cycle', 'wellington-sensors')
 DATE_DERIVED_SOURCES = ('tauranga-traffic', 'wellington-sensors')
 UNKNOWN_DATE_NOTE = 'No survey or observation dates are available in the returned rows; latest_data is unknown.'
+FILTERED_DATE_NOTE = 'No matched row has an observation date. Retrieval time and object LastModified are not used. File currency remains on meta.downloads when that download has one.'
+EMPTY_MATCH_NOTE = 'Site exists but no observations match the requested filters. This is an empty match, not an unknown site.'
+NULL_GEOMETRY_NOTE = 'Sites with null source coordinates stay in the result without geometry and are excluded from nearest. This is missing geometry, not a failed query.'
+HAMILTON_SERIES_NOTE = 'Hamilton Direction=Both rows and compass-direction rows are separate published series. Do not add a Both row to North, South, East or West rows.'
+TAURANGA_SERIES_NOTE = 'Tauranga direction is the published site label. Each row is one site survey. Do not add rows together.'
+CHRISTCHURCH_SERIES_NOTE = 'Christchurch direction=one and direction=both are separate published series and are not additive. The network total feature is omitted. A name containing total is not summed with other rows.'
+HAMILTON_ROLES = {'both': 'both_directions', 'north': 'single_direction', 'south': 'single_direction', 'east': 'single_direction', 'west': 'single_direction'}
+CHRISTCHURCH_ROLES = {'both': 'both_directions', 'one': 'single_direction'}
+TAURANGA_ROLES = {'both lanes': 'both_lanes'}
 ALLOWED = {'at.govt.nz', 'www.hotcity.co.nz', 'services.arcgis.com', 'services2.arcgis.com',
            'services1.arcgis.com', 'cemeteryaws.tauranga.govt.nz', 'smartview.ccc.govt.nz',
            'gis.wcc.govt.nz', urlparse(WCC_FILES).hostname}
@@ -272,7 +283,7 @@ def arc_rows(base, args, where='1=1', bbox=None):
     return rows, warnings
 
 
-def numeric(value):
+def numeric(value, *, nonnegative=False):
     if value in (None, ''):
         return None
     try:
@@ -281,7 +292,49 @@ def numeric(value):
         raise SkillError(f'Invalid count value: {value!r}') from exc
     if not math.isfinite(number):
         raise SkillError('Non-finite count value')
+    if nonnegative and number < 0:
+        raise SkillError(f'Negative count is not a volume and blank cells are the missing-value sentinel: {value!r}')
     return int(number) if number.is_integer() else number
+
+
+def numeric_identity(value):
+    text = str(value).strip() if value is not None else ''
+    if not re.fullmatch(r'\d{1,12}', text):
+        return None
+    return str(int(text))
+
+
+def canonical_numeric_site(site):
+    identity = numeric_identity(site)
+    if identity is None:
+        raise SkillError('Site must be the numeric identifier from sites', 2)
+    return identity
+
+
+def published_series_role(direction, roles):
+    if direction is None:
+        return None
+    return roles.get(str(direction).strip().casefold())
+
+
+def hamilton_published_year(rows):
+    years = [int(key[4:]) for row in rows for key in (row.get('raw') or {}) if re.fullmatch(r'Year\d{4}', key)]
+    return str(max(years)) if years else None
+
+
+def note_null_geometry(rows, warnings):
+    if any('longitude' not in row and 'geometry' not in row for row in rows):
+        warnings.append(NULL_GEOMETRY_NOTE)
+
+
+def finite_coordinate(value):
+    try:
+        number = float(value)
+    except (TypeError, ValueError) as exc:
+        raise SkillError('Source geometry coordinates are not numeric', 6) from exc
+    if not math.isfinite(number):
+        raise SkillError('Source geometry coordinates are not numeric', 6)
+    return number
 
 
 def excel_date(value, epoch):
@@ -644,23 +697,35 @@ def at_site_id(a):
 
 
 def city_spatial(row, geometry):
-    """Keep WCC countlines intact; nearest uses their vertex-mean centre."""
+    """Keep WCC countlines intact; nearest uses their vertex-mean centre.
+
+    Null point coordinates are omitted. They are not a parser crash.
+    """
     if not geometry:
         return row
     if 'paths' in geometry:
-        paths = geometry['paths']
-        points = [p for path in paths for p in path]
-        if not points or any(len(path) < 2 for path in paths):
-            raise SkillError('Empty or incomplete countline geometry')
-        if any(len(p) != 2 or not all(math.isfinite(v) for v in p)
-               or not (-180 <= p[0] <= 180 and -90 <= p[1] <= 90) for p in points):
-            raise SkillError('Countline vertices are outside WGS84 bounds')
+        paths = geometry.get('paths')
+        if not paths or any(not path or len(path) < 2 for path in paths):
+            raise SkillError('Empty or incomplete countline geometry', 6)
+        points = []
+        for path in paths:
+            for point in path:
+                if not isinstance(point, (list, tuple)) or len(point) != 2:
+                    raise SkillError('Countline vertices are outside WGS84 bounds', 6)
+                x, y = finite_coordinate(point[0]), finite_coordinate(point[1])
+                if not (-180 <= x <= 180 and -90 <= y <= 90):
+                    raise SkillError('Countline vertices are outside WGS84 bounds', 6)
+                points.append((x, y))
         row['geometry'] = dict(type='MultiLineString', coordinates=paths)
-        x, y = (sum(p[i] for p in points)/len(points) for i in (0, 1))
+        x, y = (sum(point[i] for point in points) / len(points) for i in (0, 1))
     else:
-        x, y = geometry['x'], geometry['y']
-    if not all(math.isfinite(v) for v in (x, y)) or not (-180 <= x <= 180 and -90 <= y <= 90):
-        raise SkillError('Source geometry is outside WGS84 bounds')
+        if not isinstance(geometry, dict) or ('x' not in geometry and 'y' not in geometry):
+            raise SkillError('Source geometry is not a point or countline', 6)
+        if geometry.get('x') is None or geometry.get('y') is None:
+            return row
+        x, y = finite_coordinate(geometry['x']), finite_coordinate(geometry['y'])
+        if not (-180 <= x <= 180 and -90 <= y <= 90):
+            raise SkillError('Source geometry is outside WGS84 bounds', 6)
     row.update(longitude=x, latitude=y)
     return row
 
@@ -672,6 +737,7 @@ def parse_city_arc(feature, source, url, stamp):
             raise SkillError('Hamilton annual traffic fields changed')
         row = dict(site_id=str(a['OBJECTID']), site_number=a['Site_Number'], name=a['Site_Name'],
                    direction=a.get('Direction'), raw=a)
+        roles = HAMILTON_ROLES
     elif source == 'tauranga-traffic':
         if not {'id', 'road_id', 'count_date', 'ADT'} <= a.keys():
             raise SkillError('Tauranga traffic fields changed')
@@ -679,20 +745,27 @@ def parse_city_arc(feature, source, url, stamp):
             day = date.fromisoformat(a['count_date'][:10]).isoformat() if a['count_date'] else None
         except ValueError as exc:
             raise SkillError('Invalid Tauranga count_date') from exc
-        row = dict(site_id=a['id'], name=a['road_id'], date=day, adt=numeric(a['ADT']),
-                   direction=a.get('direction'), heavy_vehicle_percent=numeric(a.get('PcHeavy')), raw=a)
+        row = dict(site_id=a['id'], name=a['road_id'], date=day, adt=numeric(a['ADT'], nonnegative=True),
+                   direction=a.get('direction'), heavy_vehicle_percent=numeric(a.get('PcHeavy'), nonnegative=True), raw=a)
+        roles = TAURANGA_ROLES
     else:
         if not {'COUNTLINE_ID', 'Status'} <= a.keys():
             raise SkillError('Wellington countline fields changed')
-        row = dict(site_id=str(a['COUNTLINE_ID']), name='Countline ' + str(a['COUNTLINE_ID']),
-                   status=a['Status'], raw=a)
+        identity = numeric_identity(a.get('COUNTLINE_ID'))
+        if identity is None:
+            raise SkillError('Wellington countline id is not numeric', 6)
+        row = dict(site_id=identity, name='Countline ' + identity, status=a['Status'], raw=a)
+        roles = {}
+    role = published_series_role(row.get('direction'), roles)
+    if role:
+        row['series_role'] = role
     return city_spatial(dict(row, **provenance(source, url, stamp, row.get('date'))), feature.get('geometry'))
 
 
 def hamilton_years(row, args):
     years = sorted((k[4:], v) for k, v in row['raw'].items() if re.fullmatch(r'Year\d{4}', k))
     return [dict(row, date=year, period_start=year+'-01-01', period_end=year+'-12-31',
-                 count=numeric(value), granularity='annual source value') for year, value in years
+                 count=numeric(value, nonnegative=True), granularity='annual source value') for year, value in years
             if (not args.date_from or year+'-12-31' >= args.date_from)
             and (not args.date_to or year+'-01-01' <= args.date_to)]
 
@@ -703,13 +776,19 @@ def parse_chch(data, url, stamp):
     rows = []
     for feature in data['features']:
         a, g = feature['properties'], feature.get('geometry')
-        if a.get('total') is True and a.get('oid') == 'total':
+        if a.get('total') is True and str(a.get('oid')) == 'total':
             continue  # The source's network total has a display coordinate, not a counter site.
         if not {'oid', 'name', 'count', 'direction'} <= a.keys() or not g or g.get('type') != 'Point':
             raise SkillError('Christchurch counter fields or point geometry changed')
-        row = dict(site_id=str(a['oid']), name=a['name'], count=numeric(a['count']),
+        site_id = numeric_identity(a.get('oid'))
+        if site_id is None:
+            raise SkillError('Christchurch counter id is not numeric', 6)
+        row = dict(site_id=site_id, name=a['name'], count=numeric(a['count'], nonnegative=True),
                    direction=a['direction'], installed_on=a.get('installed_on'), raw=a,
                    **provenance('christchurch-cycle', url, stamp))
+        role = published_series_role(a.get('direction'), CHRISTCHURCH_ROLES)
+        if role:
+            row['series_role'] = role
         rows.append(city_spatial(row, dict(zip(('x', 'y'), g['coordinates']))))
     return rows
 
@@ -724,11 +803,11 @@ def city_sites(args, bbox=None, site=None):
         if len(rows) > args.max_records:
             raise SkillError('Christchurch inventory exceeds --max-records; increase the bound', 7)
         if bbox:
-            rows = [r for r in rows if bbox[0] <= r['longitude'] <= bbox[2] and bbox[1] <= r['latitude'] <= bbox[3]]
+            rows = [r for r in rows if 'longitude' in r and bbox[0] <= r['longitude'] <= bbox[2] and bbox[1] <= r['latitude'] <= bbox[3]]
         if site is not None:
-            rows = [r for r in rows if r['site_id'] == site]
+            rows = [r for r in rows if r['site_id'] == canonical_numeric_site(site)]
         remember(args, provenance(source, CHCH, stamp))
-        return rows, ['Christchurch snapshot has no observation timestamp or count period; do not interpret it as a daily count.']
+        return rows, ['Christchurch snapshot has no observation timestamp or count period; do not interpret it as a daily count.', CHRISTCHURCH_SERIES_NOTE]
     base = SOURCES[source]['url']
     where = '1=1'
     if site is not None:
@@ -737,8 +816,7 @@ def city_sites(args, bbox=None, site=None):
                 raise SkillError('Tauranga site must be the UUID from sites', 2)
             where = f"id='{site}'"
         else:
-            if not re.fullmatch(r'\d{1,12}', site):
-                raise SkillError('Site must be the numeric identifier from sites', 2)
+            site = canonical_numeric_site(site)
             field = 'OBJECTID' if source == 'hamilton-traffic' else 'COUNTLINE_ID'
             where = f'{field}={int(site)}'
     if source == 'wellington-sensors' and (args.date_from or args.date_to) and args.command != 'counts':
@@ -746,6 +824,11 @@ def city_sites(args, bbox=None, site=None):
     raw, warnings = arc_rows(base, args, where, bbox)
     rows = [parse_city_arc(f, source, u, t) for f, u, t in raw]
     latest = max((r['date'] for r in rows if r.get('date')), default=None)
+    if source == 'hamilton-traffic':
+        latest = hamilton_published_year(rows)
+        warnings.append(HAMILTON_SERIES_NOTE)
+    elif source == 'tauranga-traffic':
+        warnings.append(TAURANGA_SERIES_NOTE)
     remember(args, provenance(source, base, min((t for _, _, t in raw), default=utc_now()), latest))
     if source == 'tauranga-traffic' and site is None:
         rows = [r for r in rows if (r['date'] is not None or not (args.date_from or args.date_to))
@@ -756,6 +839,8 @@ def city_sites(args, bbox=None, site=None):
             row['date'] = observed[-1]['date'] if observed else None
         if args.date_from or args.date_to:
             rows = [r for r in rows if r['date']]
+    if source in ('hamilton-traffic', 'tauranga-traffic'):
+        note_null_geometry(rows, warnings)
     return rows, warnings
 
 
@@ -777,49 +862,93 @@ def wcc_months(body):
     return months
 
 
+def wcc_sort_key(row):
+    return (row.get('date') or '', row.get('hour') if isinstance(row.get('hour'), int) else 99,
+            row.get('site_id') or '', row.get('direction') or '', row.get('transport_class') or '')
+
+
+def wcc_metadata_contains(args, site_id):
+    """Bounded public countline list. Reject unknown ids before a monthly CSV download."""
+    body, _stamp = fetch(WCC_META, args, binary=True)
+    try:
+        reader = csv.DictReader(io.TextIOWrapper(io.BytesIO(body), encoding='utf-8-sig', newline=''))
+        if not reader.fieldnames or 'COUNTLINE_ID' not in reader.fieldnames:
+            raise SkillError('Wellington countline metadata fields changed', 6)
+        for row in reader:
+            if numeric_identity(row.get('COUNTLINE_ID')) == site_id:
+                return True
+    except csv.Error as exc:
+        raise SkillError(f'Wellington countline metadata could not be parsed: {exc}', 6) from exc
+    return False
+
+
 def parse_wcc_csv(body, wanted_site, start=None, end=None):
-    reader = csv.DictReader(io.TextIOWrapper(io.BytesIO(body), encoding='utf-8-sig', newline=''))
-    fields = {'COUNTLINE_ID', 'COUNTLINE_DATE', 'COUNTLINE_HOUR', 'DIRECTION_COUNT', 'COUNTLINE_TRANSPORT_CLASS', 'DIRECTION'}
-    if not reader.fieldnames or not fields <= set(reader.fieldnames):
-        raise SkillError('Wellington CSV fields changed')
-    rows, latest, seen = [], None, False
-    for a in reader:
-        try:
-            day = date.fromisoformat(a['COUNTLINE_DATE']).isoformat()
-        except (TypeError, ValueError) as exc:
-            raise SkillError('Invalid Wellington observation date') from exc
-        latest = max(latest or day, day)
-        if a['COUNTLINE_ID'] != wanted_site:
-            continue
-        seen = True
-        if not in_range(day, start, end):
-            continue
-        hour = int(a['COUNTLINE_HOUR'])
-        if not 0 <= hour <= 23:
-            raise SkillError('Wellington observation hour is outside 0..23')
-        rows.append(dict(site_id=wanted_site, date=day, hour=hour, count=numeric(a['DIRECTION_COUNT']),
-                         transport_class=a['COUNTLINE_TRANSPORT_CLASS'], direction=a['DIRECTION'],
-                         granularity='hourly', raw=a))
+    wanted = canonical_numeric_site(wanted_site)
+    try:
+        reader = csv.DictReader(io.TextIOWrapper(io.BytesIO(body), encoding='utf-8-sig', newline=''))
+        fields = {'COUNTLINE_ID', 'COUNTLINE_DATE', 'COUNTLINE_HOUR', 'DIRECTION_COUNT', 'COUNTLINE_TRANSPORT_CLASS', 'DIRECTION'}
+        if not reader.fieldnames or not fields <= set(reader.fieldnames):
+            raise SkillError('Wellington CSV fields changed')
+        rows, latest, seen = [], None, False
+        for a in reader:
+            try:
+                day = date.fromisoformat(a['COUNTLINE_DATE']).isoformat()
+            except (TypeError, ValueError) as exc:
+                raise SkillError('Invalid Wellington observation date') from exc
+            latest = max(latest or day, day)
+            if numeric_identity(a.get('COUNTLINE_ID')) != wanted:
+                continue
+            seen = True
+            if not in_range(day, start, end):
+                continue
+            raw_hour = a.get('COUNTLINE_HOUR')
+            try:
+                hour = int(raw_hour)
+            except (TypeError, ValueError) as exc:
+                raise SkillError(f'Wellington observation hour is missing or not an integer: {raw_hour!r}', 6) from exc
+            if not 0 <= hour <= 23:
+                raise SkillError('Wellington observation hour is outside 0..23')
+            rows.append(dict(site_id=wanted, date=day, hour=hour, count=numeric(a['DIRECTION_COUNT'], nonnegative=True),
+                             transport_class=a['COUNTLINE_TRANSPORT_CLASS'], direction=a['DIRECTION'],
+                             granularity='hourly', raw=a))
+    except csv.Error as exc:
+        raise SkillError(f'Wellington CSV could not be parsed: {exc}', 6) from exc
     if latest is None:
         raise SkillError('Wellington monthly CSV has no observations')
+    rows.sort(key=wcc_sort_key)
     return rows, latest, seen
 
 
 def city_counts(args):
     # Validate the site independently of spatial/date filtering, so no matches is meaningful.
+    if args.source in NUMERIC_CITY_SOURCES:
+        args.site = canonical_numeric_site(args.site)
     sites, warnings = city_sites(args, site=args.site)
     if not sites and args.source != 'wellington-sensors':
         raise SkillError(f'Unknown site {args.site}; use sites --source to find an identifier', 2)
     if args.source == 'hamilton-traffic':
         rows = [r for site in sites for r in hamilton_years(site, args)]
         warnings.append('Annual source values retain their year precision; null annual values are not zero-filled.')
+        if not rows:
+            warnings.append(EMPTY_MATCH_NOTE)
     elif args.source == 'tauranga-traffic':
         rows = [r for r in sites if (r['date'] is not None or not (args.date_from or args.date_to))
                 and in_range(r['date'], args.date_from, args.date_to)]
+        if not rows:
+            warnings.append(EMPTY_MATCH_NOTE)
     elif args.source == 'christchurch-cycle':
         rows = sites
     else:
         inventory_meta = args._provenances.pop()
+        if not sites:
+            try:
+                listed = wcc_metadata_contains(args, args.site)
+            except SkillError as exc:
+                exc.meta = exc.meta or provenance(args.source, WCC_META)
+                raise
+            if not listed:
+                raise SkillError(f'Unknown site {args.site}; use sites --source to find an identifier', 2)
+            warnings.append('Site is absent from the current mapped countline inventory but present in public countline metadata. Geometry stays null. Monthly counts are still read.')
         listing = WCC_FILES + '?' + urlencode({'list-type': '2', 'prefix': 'transport_sensors/countline_mobility/csv/'})
         body, _ = fetch(listing, args, binary=True)
         months = wcc_months(body)
@@ -851,10 +980,13 @@ def city_counts(args):
         remember(args, inventory_meta)
         if not sites and not seen:
             raise SkillError('Site is absent from the Wellington inventory and selected monthly exports', 2)
+        rows.sort(key=wcc_sort_key)
         if sites:
             geometry = {k: sites[0][k] for k in ('geometry', 'longitude', 'latitude') if k in sites[0]}
             rows = [dict(r, **geometry, geometry_source_url=sites[0]['source_url']) for r in rows]
-        warnings.append('Wellington classes and directions remain separate; gaps are not zero-filled. Nearest measures countline centres.')
+        if not rows:
+            warnings.append(EMPTY_MATCH_NOTE)
+        warnings.append('Wellington classes and directions remain separate and are not summed; gaps are not zero-filled. Rows are ordered by date, hour, site, direction and class before --limit. meta.latest_data is the newest matched observation date before that limit. Nearest measures countline centres.')
     bbox = getattr(args, 'bbox', None)
     if bbox:
         candidates, extra = city_sites(args, bbox=bbox)
@@ -1036,10 +1168,11 @@ def envelope(rows, args, warnings):
         meta['downloads'] = downloads
     warnings = list(dict.fromkeys(warnings + getattr(args, '_warnings', [])))
     if getattr(args, 'source', None) in DATE_DERIVED_SOURCES:
-        meta['latest_data'] = max((r['date'] for r in rows[:args.limit] if r.get('date')), default=None)
+        matched_dates = [r['date'] for r in rows if r.get('date')]
+        meta['latest_data'] = max(matched_dates) if matched_dates else None
         if meta['latest_data'] is None:
-            meta['latest_data_note'] = UNKNOWN_DATE_NOTE
-            warnings.append(UNKNOWN_DATE_NOTE)
+            meta['latest_data_note'] = FILTERED_DATE_NOTE if any(p.get('latest_data') for p in downloads) else UNKNOWN_DATE_NOTE
+            warnings.append(meta['latest_data_note'])
         else:
             meta.pop('latest_data_note', None)
     if len(rows) > args.limit:

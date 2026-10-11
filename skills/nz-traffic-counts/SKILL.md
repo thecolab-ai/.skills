@@ -19,7 +19,7 @@ metadata:
   thecolab.pack: "nz-public-data"
   thecolab.source_url: "https://at.govt.nz/about-us/reports-publications/traffic-counts"
   thecolab.allowed_domains: "at.govt.nz,www.hotcity.co.nz,services.arcgis.com,services2.arcgis.com,services1.arcgis.com,cemeteryaws.tauranga.govt.nz,smartview.ccc.govt.nz,gis.wcc.govt.nz,gis-snowflake-opendata-public-wcc-arcgis-prod.s3.ap-southeast-2.amazonaws.com"
-  thecolab.last_verified: "2026-10-08"
+  thecolab.last_verified: "2026-10-11"
   thecolab.health: "healthy"
   thecolab.maintainer: "@adam91holt"
 ---
@@ -82,17 +82,27 @@ further defines the search area. Workbook `sites --format geojson` emits null
 geometries, since those downloads do not supply coordinates.
 
 - `hamilton-traffic`: annual `Year2000`–`Year2023` fields, preserving nulls.
-  Site IDs use ArcGIS OBJECTID; `site_number` preserves the council label. Date
-  filters use overlap with the whole year; `date` retains year precision.
+  Site IDs use ArcGIS OBJECTID; `site_number` preserves the council label.
+  Leading zeros are the same numeric id. `Direction=Both` and compass-direction
+  rows are separate series; do not add them. Date filters use overlap with the
+  whole year; `date` retains year precision. `latest_data` is the newest
+  `YearYYYY` field on the returned records, not a survey day and not `--limit`.
 - `tauranga-traffic`: latest survey ADT per UUID site, with heavy-vehicle percentage.
-  Survey dates can be decades old even though the layer is refreshed.
-- `christchurch-cycle`: per-direction counter snapshot, keyed by `oid`. No
-  observation date or period is supplied; date filters fail explicitly.
+  Survey dates can be decades old even though the layer is refreshed. The
+  published direction label is kept; do not add site rows together.
+- `christchurch-cycle`: counter snapshot keyed by `oid`. The network total
+  feature is omitted. `direction=one` and `direction=both` are separate
+  non-additive series (12 one and 29 both on 2026-10-11). No observation date
+  or period is supplied; date filters fail explicitly.
 - `wellington-sensors`: monthly public CSV exports discovered from the S3 file
   listing, latest month by default. Counts remain separate by hour, class and
-  direction. Queries may span at most three published months (64 MiB each);
-  missing months fail explicitly. Sites are countlines, with no observation-date
-  filtering. Historical CSV sites absent from the inventory retain null geometry.
+  direction and are ordered by date, hour, site, direction and class before
+  `--limit`. Queries may span at most three published months (64 MiB each);
+  missing months fail explicitly. Numeric ids ignore leading zeros. An id
+  absent from both the mapped inventory and the small public countline metadata
+  file is rejected before a monthly download. Historical metadata sites absent
+  from the inventory retain null geometry. `wcc-arcgis-nz` reads the same
+  mobility exports for general Wellington geospatial queries.
 
 Hamilton pedestrian API S2745 is currently unavailable (timeout/HTTP 502); no
 unverified response parser is bundled. No Dunedin-specific counter was found in
@@ -103,8 +113,10 @@ an `error` object with code, type and message. GeoJSON carries `meta` as a forei
 member. Metadata includes UTC retrieval times, source-stated licences and source
 currency (`latest_data`); record `date` is its observation date.
 For Tauranga and Wellington, `meta.latest_data` is the latest survey or observation
-date in the returned rows, after filtering and `--limit`. Undated responses
+date among rows that match the query, calculated before `--limit`. It is not the
+retrieval time or an object LastModified timestamp. Undated responses
 (including the source registry and Wellington inventory) return null with a note.
+Hamilton `latest_data` is the newest `YearYYYY` field on the returned site records.
 Each record references its exact query/download URL; workbook provenance appears
 once in `meta.downloads`. Source listing is a verified registry,
 not a health probe. Null counts are never converted to zero. Repeated NZTA daily

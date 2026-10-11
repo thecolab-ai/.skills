@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Synthetic city response fixtures: no copied council observations."""
+import csv
 import json
 from copy import deepcopy
 from io import StringIO
@@ -33,12 +34,14 @@ def run():
         if source == 'christchurch-cycle':
             rows = cli.parse_chch(body, cli.CHCH, STAMP)
             assert [r['count'] for r in rows] == [0, None]
+            assert [r['series_role'] for r in rows] == ['single_direction', 'single_direction']
             assert all('date' not in r and 'latest_data' not in r and 'licence' not in r for r in rows)
         else:
             rows = [cli.parse_city_arc(f, source, cli.SOURCES[source]['url'], STAMP) for f in body['features']]
         assert all(r['source_url'] and r['publisher'] and r['retrieved_at'] == STAMP for r in rows)
         assert all(-90 <= r['latitude'] <= 90 for r in rows)
     h = cli.parse_city_arc(fixtures['hamilton-traffic']['features'][0], 'hamilton-traffic', cli.HAMILTON, STAMP)
+    assert h['series_role'] == 'both_directions'
     years = cli.hamilton_years(h, args('counts', '--source', 'hamilton-traffic', '--site', '901'))
     assert [(r['date'], r['count']) for r in years] == [('2000', None), ('2022', 125), ('2023', 0)]
     selected = cli.hamilton_years(h, args('counts', '--source', 'hamilton-traffic', '--site', '901', '--from', '2023-07-01'))
@@ -72,17 +75,21 @@ def run():
     with patch.object(cli, 'arc_rows', return_value=([(lines['features'][0], cli.WCC+'/query', STAMP)], [])), patch.object(cli, 'fetch', side_effect=[(listing, STAMP), (body, STAMP)]):
         result = cli.execute(args('counts', '--source', 'wellington-sensors', '--site', '90001', '--from', '2026-09-02', '--to', '2026-09-02'))
     assert result['results'] == [] and result['meta']['latest_data'] is None
-    assert result['meta']['latest_data_note'] in result['meta']['warnings']
+    assert result['meta']['latest_data_note'] == cli.FILTERED_DATE_NOTE
+    assert cli.EMPTY_MATCH_NOTE in result['meta']['warnings']
 
     tauranga = fixtures['tauranga-traffic']['features'][0]
     newer, undated = deepcopy(tauranga), deepcopy(tauranga)
     newer['attributes']['count_date'] = '2025-04-05T00:00:00'
     undated['attributes'].update(count_date=None, SDE_Load_Date='2026-10-08T00:00:00')
     raw = [(f, cli.TAURANGA+'/query', STAMP) for f in (tauranga, newer, undated)]
-    for limit, expected in [('1', '2024-02-03'), ('3', '2025-04-05')]:
+    tauranga_row = cli.parse_city_arc(tauranga, 'tauranga-traffic', cli.TAURANGA, STAMP)
+    assert tauranga_row['series_role'] == 'both_lanes'
+    for limit in ('1', '3'):
         with patch.object(cli, 'arc_rows', return_value=(raw, [])):
             result = cli.execute(args('sites', '--source', 'tauranga-traffic', '--limit', limit))
-        assert result['meta']['latest_data'] == expected and 'latest_data_note' not in result['meta']
+        assert result['meta']['latest_data'] == '2025-04-05' and result['meta']['matched_count'] == 3
+        assert 'latest_data_note' not in result['meta']
         assert result['results'][0]['latest_data'] == '2024-02-03'
     for command in [('sites',), ('nearest', '--near', '176.17,-37.69'),
                     ('counts', '--site', tauranga['attributes']['id'])]:
@@ -93,7 +100,8 @@ def run():
     with patch.object(cli, 'arc_rows', return_value=([raw[0]], [])):
         result = cli.execute(args('counts', '--source', 'tauranga-traffic', '--site', tauranga['attributes']['id'], '--from', '2025-01-01'))
     assert result['results'] == [] and result['meta']['latest_data'] is None
-    assert result['meta']['latest_data_note'] in result['meta']['warnings']
+    assert result['meta']['latest_data_note'] == cli.FILTERED_DATE_NOTE
+    assert cli.EMPTY_MATCH_NOTE in result['meta']['warnings']
 
     with patch.object(cli, 'fetch', return_value=(json.dumps(fixtures['christchurch-cycle']).encode(), STAMP)):
         result = cli.execute(args('nearest', '--source', 'christchurch-cycle', '--near', '172.63,-43.53', '--radius-km', '0.05', '--format', 'geojson'))
@@ -169,6 +177,85 @@ def run():
         assert cli.main(['counts', '--source', 'wellington-sensors', '--site', '90001', '--from', '2026-09-01', '--to', '2026-09-01', '--json']) == 5
     error = json.loads(output.getvalue())
     assert error['meta']['source_url'] == export and error['results'] == []
+    shuffled = (FIXTURES/'wellington-counts-shuffled.csv').read_bytes()
+    with patch.object(cli, 'arc_rows', return_value=([(lines['features'][0], cli.WCC+'/query', STAMP)], [])), patch.object(cli, 'fetch', side_effect=[(listing, STAMP), (shuffled, STAMP)]):
+        result = cli.execute(args('counts', '--source', 'wellington-sensors', '--site', '090001', '--limit', '1'))
+    first = result['results'][0]
+    assert first['site_id'] == '90001' and first['date'] == '2026-09-01' and first['hour'] == 0
+    assert first['direction'] == 'E' and first['transport_class'] == 'Car' and first['count'] == 2
+    assert result['meta']['latest_data'] == '2026-09-09' and result['meta']['matched_count'] == 4 and result['meta']['count'] == 1
+    assert result['meta']['downloads'][0]['latest_data'] == '2026-10-09'
+
+    meta = b'VIEWPOINT_ID,COUNTLINE_ID,NAME,EARLIEST,LATEST\n1,090001,Synthetic,2026-09-01,2026-09-30\n'
+    with patch.object(cli, 'arc_rows', return_value=([], [])), patch.object(cli, 'fetch', return_value=(meta, STAMP)) as fetched:
+        try:
+            cli.execute(args('counts', '--source', 'wellington-sensors', '--site', '424242'))
+        except cli.SkillError as exc:
+            assert exc.code == 2 and '424242' in str(exc)
+        else:
+            raise AssertionError('Unknown Wellington site must fail before the monthly CSV download')
+        assert fetched.call_count == 1 and fetched.call_args.args[0] == cli.WCC_META
+    with patch.object(cli, 'arc_rows', return_value=([], [])), patch.object(cli, 'fetch', side_effect=[(meta, STAMP), (listing, STAMP), (body, STAMP)]):
+        result = cli.execute(args('counts', '--source', 'wellington-sensors', '--site', '90001', '--from', '2026-09-01', '--to', '2026-09-01'))
+    assert result['results'] and 'longitude' not in result['results'][0]
+    assert any('public countline metadata' in warning for warning in result['meta']['warnings'])
+
+    null_point = deepcopy(fixtures['hamilton-traffic']['features'][0])
+    null_point['geometry'] = {'x': None, 'y': None}
+    omitted = cli.parse_city_arc(null_point, 'hamilton-traffic', cli.HAMILTON, STAMP)
+    assert 'longitude' not in omitted and 'geometry' not in omitted
+    null_point['geometry'] = None
+    omitted = cli.parse_city_arc(null_point, 'hamilton-traffic', cli.HAMILTON, STAMP)
+    assert 'longitude' not in omitted
+    bad_point = deepcopy(fixtures['tauranga-traffic']['features'][0])
+    bad_point['geometry'] = {'x': 'north', 'y': -37.69}
+    try:
+        cli.parse_city_arc(bad_point, 'tauranga-traffic', cli.TAURANGA, STAMP)
+    except cli.SkillError as exc:
+        assert exc.code == 6 and 'not numeric' in str(exc)
+    else:
+        raise AssertionError('Malformed coordinates must be a schema failure')
+    with patch.object(cli, 'arc_rows', return_value=([(null_point, cli.HAMILTON+'/query', STAMP)], [])):
+        result = cli.execute(args('sites', '--source', 'hamilton-traffic', '--limit', '1'))
+    assert 'longitude' not in result['results'][0] and cli.NULL_GEOMETRY_NOTE in result['meta']['warnings']
+    later = deepcopy(fixtures['hamilton-traffic']['features'][0])
+    later['attributes']['Year2024'] = 10
+    with patch.object(cli, 'arc_rows', return_value=([(later, cli.HAMILTON+'/query', STAMP)], [])):
+        result = cli.execute(args('sites', '--source', 'hamilton-traffic', '--limit', '1'))
+    assert result['meta']['latest_data'] == '2024' and result['meta']['count'] == 1
+    with patch.object(cli, 'arc_rows', return_value=([(fixtures['hamilton-traffic']['features'][0], cli.HAMILTON+'/query', STAMP)], [])):
+        result = cli.execute(args('counts', '--source', 'hamilton-traffic', '--site', '0901', '--from', '2024-01-01', '--to', '2024-12-31'))
+    assert result['results'] == [] and result['meta']['latest_data'] == '2023'
+    assert cli.EMPTY_MATCH_NOTE in result['meta']['warnings']
+
+    missing_hour = body.replace(b'90001,2026-09-01,0,0,Car,N', b'90001,2026-09-01,,0,Car,N', 1)
+    negative = body.replace(b'90001,2026-09-01,0,0,Car,N', b'90001,2026-09-01,0,-3,Car,N', 1)
+    for broken in (missing_hour, negative):
+        try:
+            cli.parse_wcc_csv(broken, '090001')
+        except cli.SkillError as exc:
+            assert exc.code == 6
+        else:
+            raise AssertionError('Missing hour and negative counts must fail')
+    output = StringIO()
+    with patch.object(cli, 'arc_rows', return_value=([(lines['features'][0], cli.WCC+'/query', STAMP)], [])), patch.object(cli, 'fetch', side_effect=[(listing, STAMP), (missing_hour, STAMP)]), redirect_stdout(output), redirect_stderr(StringIO()):
+        assert cli.main(['counts', '--source', 'wellington-sensors', '--site', '90001', '--from', '2026-09-01', '--to', '2026-09-01', '--json']) == 6
+    error = json.loads(output.getvalue())
+    assert error['error']['type'] == 'schema_failure' and error['error']['code'] == 6
+    assert error['results'] == [] and error['meta']['source_url'] == months['2026-09']
+    assert 'hour' in error['error']['message']
+    old_limit = csv.field_size_limit()
+    try:
+        csv.field_size_limit(80)
+        wide = b'COUNTLINE_ID,COUNTLINE_DATE,COUNTLINE_HOUR,DIRECTION_COUNT,COUNTLINE_TRANSPORT_CLASS,DIRECTION\n90001,2026-09-01,0,' + (b'9' * 200) + b',Car,N\n'
+        try:
+            cli.parse_wcc_csv(wide, '90001')
+        except cli.SkillError as exc:
+            assert exc.code == 6 and 'could not be parsed' in str(exc)
+        else:
+            raise AssertionError('Oversized CSV fields must be a schema failure')
+    finally:
+        csv.field_size_limit(old_limit)
     print('[PASS] fixture city registries, derived latest dates, unknown-date notes, annual nulls, snapshots, countlines, class/direction CSVs, provenance and schema errors')
 
 

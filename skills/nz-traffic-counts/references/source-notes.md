@@ -3,7 +3,7 @@
 Verified from `akl-catalogue-v4.json` and public HTTP responses on 8 October 2026.
 Authentication: none
 
-Last verified: 2026-10-08
+Last verified: 2026-10-11
 
 All access is keyless. `sources` exposes the pinned registry; active-mode commands discover
 the latest file by default and matching archives with time filters, so discovery failures are explicit.
@@ -133,10 +133,16 @@ limit discovery. Cache writes are optional: failures warn and use downloaded dat
 pruning touches only SHA-256 cache names in `nz-traffic-counts-v1/`.
 
 `meta.latest_data` describes source currency except for Tauranga and Wellington,
-where it is the maximum survey/observation date in the returned rows after date,
-spatial, nearest and output-limit filtering. Responses without dated rows return
-`latest_data: null` with an explanatory note, including source-registry and
-Wellington inventory responses. Layer refresh timestamps do not set this value.
+where it is the maximum survey/observation date among rows that match the site,
+date, spatial and nearest filters. That maximum is taken before `--limit`.
+Responses without dated matched rows return `latest_data: null` with an
+explanatory note, including source-registry and Wellington inventory responses.
+A download entry can still carry the newest date in that file. Layer refresh
+timestamps, retrieval time and object LastModified do not set this value.
+Hamilton query `latest_data` is the newest `YearYYYY` field present on the
+returned site records. It is a published field year, not a survey day, and a
+date filter or `--limit` does not reduce it. The verified layer fields end at
+`Year2023`.
 ArcGIS counts use the verified registry value (AT 2026-06-23, NZTA 2026); NZTA
 inventory retains its stated 2025 year. Workbooks use the maximum numeric date
 in each yearly file's nominal year (or across a monthly file), across all sites
@@ -169,42 +175,83 @@ reports live failures or network skips.
 
 Hamilton has 765 points and annual `Year2000`–`Year2023` fields. `site_id` is
 OBJECTID, since the council's `Site_Number` label need not identify a unique
-feature. Annual values retain year precision and null values. Date filtering
-uses year overlap, without inventing a survey day or treating the value as a
-whole-year volume. Raw fields preserve direction and location descriptions.
+feature. A leading-zero form such as `02893` is the same numeric id. Annual
+values retain year precision and null values. Zero is a published value. A
+negative annual value is not a missing-value sentinel and fails schema
+validation; null remains null. Date filtering uses year overlap, without
+inventing a survey day or treating the value as a whole-year volume. Verified
+direction labels are `Both` (543), `North` (69), `South` (67), `East` (43) and
+`West` (43). `series_role` is `both_directions` or `single_direction` only for
+those exact labels. Do not add a Both row to a compass-direction row, and do
+not treat Both as their sum. Null point coordinates are omitted, with a
+warning; the site remains in the result and is excluded from nearest. Raw
+fields preserve direction and location descriptions.
 
 Tauranga has 969 points with UUID `id`, `road_id`, `ADT`, `PcHeavy`, `count_date`
 and `SDE_Load_Date`. The CLI preserves survey dates, ADT and heavy-vehicle share.
-A load timestamp is not an observation date; currency is derived from the returned
-survey dates rather than the catalogue's layer-refresh year. Some latest surveys
-are decades old. Copyright terms do not establish a Creative Commons licence. The catalogue's flume-results
-caveat on S1373 is unrelated to the live traffic schema and is not repeated.
+A load timestamp is not an observation date; currency is the newest survey date
+among matched rows before `--limit`, not the catalogue's layer-refresh year.
+Some latest surveys are decades old. Every verified row uses direction
+`Both lanes` (`series_role=both_lanes`). That label is not split into lanes,
+and rows are not added together. Negative ADT or heavy-vehicle values fail
+schema validation. Null point coordinates are omitted with a warning rather
+than a traceback. Copyright terms do not establish a Creative Commons licence.
+The catalogue's flume-results caveat on S1373 is unrelated to the live traffic
+schema and is not repeated.
 
-Christchurch supplies 42 GeoJSON features (41 counter series and one network
-total with a display coordinate, omitted from site and nearest results) with `oid`, `name`, string `count`,
-`direction`, `installed_on` and `hide`. The installation date is not the count
-observation date. There is no timestamp or period, so `latest_data` and `date`
-are omitted and date filters fail. No data reuse licence is stated. Directional
-series remain separate. Public GeoJSON access requires no Eco-Counter key.
+Christchurch supplies 42 GeoJSON features with `oid`, `name`, string or numeric
+`count`, `direction`, `installed_on` and `hide`. One feature is the network
+total (`total` true and `oid` `total`) and has a display coordinate. It is
+omitted from site, nearest and count results. The other 41 are counter series:
+29 have `direction=both` and 12 have `direction=one` (verified 2026-10-11).
+They are not all directional series. `series_role` records that published
+label and nothing else. Do not add a both-direction series to a
+single-direction series. Names such as "total cyclists" stay separate rows;
+the name is not evidence that the CLI should sum other series. The installation
+date is not the count observation date. There is no timestamp or period, so
+`latest_data` and `date` are omitted and date filters fail. No data reuse
+licence is stated. Public GeoJSON access requires no Eco-Counter key. Negative
+counts fail schema validation.
 
 Wellington has 408 mapped countlines (polylines, queried with `outSR=4326`).
 GeoJSON preserves those lines; nearest uses the mean of the published vertices,
-not a point-to-line distance. CSV joining uses `COUNTLINE_ID`. The public S3
-ListObjectsV2 listing is filtered to the observed monthly key structure;
-annual and all-history exports are excluded. No-date counts discover the latest
-published month (October 2026 at verification). Date filters select at most three
-monthly files, and missing months or truncated listings fail explicitly.
-Only the requested site's observations are retained. Every monthly download has
-a 64 MiB cap and 10-second HTTP timeout; the rest retain 32 MiB caps. S3 CSVs use a stdlib streaming reader with
-a fixed host/path, disabled redirects and Content-Length completion checks,
-since nzfetch cannot raise its 32 MiB wire ceiling. CSV schema:
+not a point-to-line distance. CSV joining uses numeric `COUNTLINE_ID`: `048346`
+and `48346` are the same site. The public S3 ListObjectsV2 listing is filtered
+to the observed monthly key structure; annual and all-history exports are
+excluded. No-date counts discover the latest published month (October 2026 at
+verification). Date filters select at most three monthly files, and missing
+months or truncated listings fail explicitly. Only the requested site's
+observations are retained. Matched rows are sorted by date, hour, site,
+direction and class before `--limit`. Upstream CSV order is not stable.
+`meta.latest_data` is the newest date among those matched rows before the
+limit. Each CSV's `meta.downloads` entry retains the maximum date across the
+entire downloaded CSV, including other sites. Neither value is LastModified.
+Every monthly download has a 64 MiB cap and 10-second HTTP timeout; the rest
+retain 32 MiB caps. S3 monthly CSVs use a stdlib streaming reader with a fixed
+host/path, disabled redirects and Content-Length completion checks, since
+nzfetch cannot raise its 32 MiB wire ceiling. CSV schema:
 `COUNTLINE_ID,COUNTLINE_DATE,COUNTLINE_HOUR,DIRECTION_COUNT,COUNTLINE_TRANSPORT_CLASS,DIRECTION`.
-Hourly records preserve mode and direction and never fill gaps. Each CSV's
-`meta.downloads` entry retains the maximum date across the entire downloaded CSV,
-independent of filtering; `meta.latest_data` uses the returned observations.
-Inactive historical sites may appear only in CSVs; their geometry remains null.
-WCC metadata states open urban mobility use and directs other uses to WCC;
-no named CC licence is asserted. Nearby sensors can count the same person twice.
+Blank `DIRECTION_COUNT` stays null. A negative count is not a documented
+missing sentinel and fails schema validation. A missing or non-integer hour,
+or a CSV field over the parser field-size cap, is `schema_failure` (exit 6)
+and names the monthly download URL. Hourly records preserve mode and direction
+and never fill gaps. An empty date match says the site exists and that no rows
+matched; it is not an unknown-site error.
+
+Public countline metadata is
+`transport_sensors/countline_meta_info/csv/countline_meta_info.csv` (411 rows
+on 2026-10-11; about 68 KiB). Columns include `COUNTLINE_ID`, `NAME`,
+`PRIMARY_TRANSPORT_CLASS`, line endpoints, `DIRECTION_IN`, `DIRECTION_OUT`,
+`EARLIEST` and `LATEST`. This skill uses that file as the bounded id inventory
+when the mapped FeatureServer does not contain the id, so an unknown numeric
+id is rejected before a monthly CSV of about 15–49 MiB. It does not copy names
+into count records. A metadata id absent from the current map is still read
+from the monthly export and keeps null geometry. `wcc-arcgis-nz` deliberately
+reads these same S3 mobility exports for general Wellington City Council and
+Greater Wellington geospatial queries. This skill is the traffic and
+active-mode count adapter. WCC metadata states open urban mobility use and
+directs other uses to WCC; no named CC licence is asserted. Nearby sensors can
+count the same person twice.
 
 Robots checks found no applicable disallow directives on these public data hosts
 (missing robots files, HTML fallbacks, or ArcGIS's invalid-URL response). Access
