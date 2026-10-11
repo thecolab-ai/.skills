@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
-  "last_verified": "2026-10-08",
+  "last_verified": "2026-10-11",
   "skill_count": 165,
   "skills": [
     {
@@ -4820,10 +4820,10 @@
     },
     {
       "name": "nz-traffic-counts",
-      "description": "Query NZ traffic, cycle and pedestrian count sites and time series, starting with Auckland Transport, NZTA TMS and Heart of the City. Use for historical volumes, active-mode monitoring and nearby count sites.",
+      "description": "Query NZ traffic, cycle and pedestrian count sites and time series, from Auckland Transport, NZTA TMS, Heart of the City, Hamilton, Christchurch, Wellington and Tauranga. Use for historical volumes, active-mode monitoring and nearby count sites.",
       "path": "skills/nz-traffic-counts",
       "category": "transport",
-      "source_owner": "Auckland Transport; NZ Transport Agency; Heart of the City",
+      "source_owner": "Auckland Transport; NZ Transport Agency; Heart of the City; Hamilton City Council; Christchurch City Council; Wellington City Council; Tauranga City Council",
       "source_type": "mixed",
       "source_url": "https://at.govt.nz/about-us/reports-publications/traffic-counts",
       "auth": "none",
@@ -4840,9 +4840,14 @@
         "at.govt.nz",
         "www.hotcity.co.nz",
         "services.arcgis.com",
-        "services2.arcgis.com"
+        "services2.arcgis.com",
+        "services1.arcgis.com",
+        "cemeteryaws.tauranga.govt.nz",
+        "smartview.ccc.govt.nz",
+        "gis.wcc.govt.nz",
+        "gis-snowflake-opendata-public-wcc-arcgis-prod.s3.ap-southeast-2.amazonaws.com"
       ],
-      "last_verified": "2026-10-08",
+      "last_verified": "2026-10-11",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
