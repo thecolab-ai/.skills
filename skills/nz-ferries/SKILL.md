@@ -19,7 +19,7 @@ metadata:
   thecolab.pack: "nz-public-data"
   thecolab.source_url: "https://www.sealink.co.nz"
   thecolab.allowed_domains: "api.at.govt.nz,at.govt.nz,gtfs.at.govt.nz,pim-mobile.fullers.co.nz,www.bluebridge.co.nz,www.fullers.co.nz,www.interislander.co.nz,www.sealink.co.nz"
-  thecolab.last_verified: "2026-07-19"
+  thecolab.last_verified: "2026-10-08"
   thecolab.health: "healthy"
   thecolab.maintainer: "@adam91holt"
 ---

@@ -1,0 +1,126 @@
+{
+  "Table 1": [
+    [
+      null,
+      "Table 1 – Change in OBEGALx since the Budget Update"
+    ],
+    [
+      null,
+      "Year ending 30 June",
+      "2027",
+      "2028"
+    ],
+    [
+      null,
+      "$billions",
+      "Forecast",
+      "Forecast"
+    ],
+    [
+      null,
+      "OBEGALx ($billions)",
+      "(2.0)",
+      "4.0"
+    ]
+  ],
+  "Table 2": [
+    [],
+    [
+      null,
+      "Table 2 – Key economic and fiscal indicators1"
+    ],
+    [
+      null,
+      "Sources: Stats NZ, the Treasury"
+    ],
+    [],
+    [
+      null,
+      "Years ending 30 June",
+      "2025 ",
+      "2026 ",
+      "2027 "
+    ],
+    [
+      null,
+      null,
+      "Actual ",
+      "Forecast2",
+      "Forecast "
+    ],
+    [
+      null,
+      "Real production GDP ",
+      "(1.2) ",
+      "1.8 ",
+      "2.4 "
+    ],
+    [
+      null,
+      "(annual average % change) "
+    ],
+    [
+      null,
+      "Unemployment rate (June quarter) ",
+      "5.1 ",
+      "5.5 ",
+      "5.0 "
+    ],
+    [
+      null,
+      "CPI inflation ",
+      "2.5 ",
+      "3.9 ",
+      "2.0 "
+    ],
+    [
+      null,
+      "(annual % change, June quarter) "
+    ],
+    [
+      null,
+      "Current account balance ",
+      "(3.9) ",
+      "(4.1) ",
+      "(3.6) "
+    ],
+    [
+      null,
+      "(annual, % of GDP) "
+    ],
+    [
+      null,
+      "OBEGALx ($billions) ",
+      "(9.1) ",
+      "(8.4) ",
+      "(6.6) "
+    ],
+    [
+      null,
+      " % of GDP ",
+      "(2.0) ",
+      "(1.8) ",
+      "(1.3) "
+    ],
+    [
+      null,
+      "Net core Crown debt ($billions) ",
+      "181.5 ",
+      "185.9 ",
+      "208.8 "
+    ],
+    [],
+    [
+      null,
+      "Notes",
+      1,
+      "Synthetic fiscal ratios note."
+    ],
+    [
+      null,
+      null,
+      2,
+      "Synthetic note: fiscal measures for the 2026 fiscal year are unaudited actual results. The unemployment rate and CPI inflation are actual. Other measures remain forecasts."
+    ]
+  ]
+}

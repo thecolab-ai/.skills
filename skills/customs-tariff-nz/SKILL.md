@@ -13,13 +13,13 @@ metadata:
   thecolab.writes: "false"
   thecolab.browser: "false"
   thecolab.risk: "medium"
-  thecolab.cache_ttl: "none"
+  thecolab.cache_ttl: "12h"
   thecolab.schema_version: "1"
   thecolab.skill_type: "public-download"
   thecolab.pack: "nz-public-data"
   thecolab.source_url: "https://www.customs.govt.nz/business/tariffs/tariff-classifications-and-rates/"
   thecolab.allowed_domains: "www.customs.govt.nz"
-  thecolab.last_verified: "2026-09-02"
+  thecolab.last_verified: "2026-10-08"
   thecolab.health: "healthy"
   thecolab.maintainer: "@adam91holt"
 ---
@@ -44,6 +44,8 @@ python3 scripts/cli.py formula 2 --prefix --limit 20 --json
 ```
 
 Human-readable output is the default. Add `--json` to every data command for stable machine-readable output. `--limit` accepts 1–100, `--as-of` accepts `YYYY-MM-DD`, and every live request has a 10-second timeout.
+
+The CLI caches a fully validated archive in `.cache/` inside the skill for at most 12 hours. Cached results retain their original retrieval timestamp; an expired or damaged cache is refreshed. The first request validates every source row.
 
 ## Interpretation guardrails
 

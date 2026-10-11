@@ -530,7 +530,7 @@ class OrderedTextParser(HTMLParser):
             self.capture_parts = []
 
 
-def request_text(url: str, *, referer: str | None = None, timeout: int = 25, opener: urllib.request.OpenerDirector | None = None) -> str:
+def request_text(url: str, *, referer: str | None = None, timeout: int = 10, opener: urllib.request.OpenerDirector | None = None) -> str:
     # When an `opener` is supplied, SeaLink is priming / reusing a cookie-jar
     # session that request_json then reuses — nzfetch cannot carry a cookie
     # session, so THAT path MUST stay on urllib (kept below, unchanged).
@@ -587,7 +587,7 @@ def request_json(
     method: str = "GET",
     body: Any | None = None,
     referer: str | None = None,
-    timeout: int = 25,
+    timeout: int = 10,
     opener: urllib.request.OpenerDirector | None = None,
 ) -> Any:
     headers = {
@@ -778,7 +778,7 @@ def fetch_fullers_public_page_with_browser(route: dict[str, Any], day: date) -> 
         )
         page = browser.new_page()
         try:
-            page.goto(url, wait_until="networkidle", timeout=90000)
+            page.goto(url, wait_until="domcontentloaded", timeout=10000)
             html_text = page.content()
             error = None
         except Exception as exc:
@@ -804,9 +804,43 @@ def fetch_fullers_public_page_with_browser(route: dict[str, Any], day: date) -> 
             browser.close()
 
 
+def provenance(data):
+    stamp = now_iso()
+    found = []
+    def annotate(value, operator=None, source=None, retrieved=None):
+        if isinstance(value, list):
+            for item in value:
+                annotate(item, operator, source, retrieved)
+        elif isinstance(value, dict):
+            operator = value.get('operator', operator)
+            source = value.get('source_url', source)
+            retrieved = value.get('source_fetched_at', retrieved) or stamp
+            if source == AT_GTFS_ZIP and AT_GTFS_CACHE:
+                try:
+                    modified = os.path.getmtime(AT_GTFS_CACHE)
+                    if 0 <= time.time() - modified < AT_GTFS_CACHE_TTL_SECONDS:
+                        retrieved = datetime.fromtimestamp(modified, timezone.utc).isoformat().replace('+00:00', 'Z')
+                except OSError:
+                    pass
+            if value.get('source_url'):
+                publisher = 'Auckland Transport' if value['source_url'] == AT_GTFS_ZIP else OPERATORS.get(operator, {}).get('name', 'New Zealand ferry operators')
+                value.update(publisher=publisher, retrieved_at=retrieved)
+                found.append((value['source_url'], publisher, retrieved))
+            for key, item in list(value.items()):
+                if isinstance(item, (dict, list)):
+                    annotate(item, operator, source, retrieved)
+    annotate(data)
+    if found:
+        url, publisher, retrieved = found[0]
+    else:
+        url, publisher, retrieved = 'https://github.com/thecolab-ai/.skills/tree/main/skills/nz-ferries', 'TheColab', stamp
+    data['meta'] = {'source_url': url, 'publisher': publisher, 'retrieved_at': retrieved}
+    return data
+
+
 def emit(data: Any, as_json: bool, render) -> None:  # type: ignore[no-untyped-def]
     if as_json:
-        print(json.dumps(data, indent=2, ensure_ascii=False))
+        print(json.dumps(provenance(data), indent=2, ensure_ascii=False))
     else:
         print(render(data))
 
@@ -842,7 +876,7 @@ def route_handoff_payload(route_id: str, route: dict[str, Any], command: str) ->
     }
 
 
-def at_request_json(path: str, *, timeout: int = 25) -> Any:
+def at_request_json(path: str, *, timeout: int = 10) -> Any:
     url = AT_API_BASE + path
     try:
         raw_bytes, _ct, _final = nzfetch.fetch_bytes(
@@ -877,7 +911,7 @@ def at_gtfs_zip_bytes() -> bytes:
     try:
         data, _ct, _final = nzfetch.fetch_bytes(
             AT_GTFS_ZIP,
-            timeout=60,
+            timeout=10,
             accept="application/zip,*/*",
         )
     except nzfetch.Blocked as e:
@@ -1043,7 +1077,7 @@ def fullers_sailings(route_id: str, route: dict[str, Any], day: date) -> dict[st
 def sealink_opener() -> urllib.request.OpenerDirector:
     cookie_jar = http.cookiejar.CookieJar()
     opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cookie_jar))
-    request_text(SEALINK_SCHEDULES, opener=opener, timeout=20)
+    request_text(SEALINK_SCHEDULES, opener=opener, timeout=10)
     return opener
 
 

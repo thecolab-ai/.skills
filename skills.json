@@ -2,7 +2,7 @@
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
   "last_verified": "2026-10-08",
-  "skill_count": 159,
+  "skill_count": 165,
   "skills": [
     {
       "name": "airnz-flights",
@@ -116,6 +116,33 @@
       ],
       "last_verified": "2026-10-08",
       "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "akl-transport-performance",
+      "description": "Query Auckland Transport patronage by mode and route, monthly punctuality and reliability, car park facility inventory with undated availability, and Wellington Metlink daily bus performance. Use for keyless public transport and parking performance comparisons.",
+      "path": "skills/akl-transport-performance",
+      "category": "transport",
+      "source_owner": "Auckland Transport; Greater Wellington Regional Council / Metlink",
+      "source_type": "official",
+      "source_url": "https://at.govt.nz/about-us/reports-publications/at-metro-patronage-report/",
+      "auth": "none",
+      "access_mode": "public-download",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "24h",
+      "schema_version": "1",
+      "skill_type": "public-download",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "at.govt.nz",
+        "www.metlink.org.nz",
+        "services2.arcgis.com"
+      ],
+      "last_verified": "2026-10-08",
+      "health": "degraded",
       "maintainer": "@adam91holt"
     },
     {
@@ -712,14 +739,14 @@
       "writes": false,
       "browser": false,
       "risk": "medium",
-      "cache_ttl": "none",
+      "cache_ttl": "12h",
       "schema_version": "1",
       "skill_type": "public-download",
       "pack": "nz-public-data",
       "allowed_domains": [
         "www.customs.govt.nz"
       ],
-      "last_verified": "2026-09-02",
+      "last_verified": "2026-10-08",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
@@ -1010,7 +1037,7 @@
         "ero.govt.nz",
         " www.ero.govt.nz"
       ],
-      "last_verified": "2026-09-04",
+      "last_verified": "2026-10-08",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
@@ -2053,6 +2080,34 @@
       ],
       "last_verified": "2026-07-26",
       "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "niwa-rivers-nz",
+      "description": "Query NIWA River Maps hydrology predictions, hourly station metadata, regional flood product coverage and Fish Passage surveys without keys. Use for NZ river flow and flood context, with explicit limits on account-gated observations and rasters.",
+      "path": "skills/niwa-rivers-nz",
+      "category": "environment",
+      "source_owner": "Earth Sciences New Zealand (NIWA)",
+      "source_type": "official",
+      "source_url": "https://data.niwa.co.nz/products/hydro-data-hourly",
+      "auth": "none",
+      "access_mode": "public-api",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "none",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "data.niwa.co.nz",
+        "shiny.niwa.co.nz",
+        "geoserver.niwa.co.nz",
+        "d17fc0a885.execute-api.ap-southeast-2.amazonaws.com"
+      ],
+      "last_verified": "2026-10-08",
+      "health": "degraded",
       "maintainer": "@adam91holt"
     },
     {
@@ -4105,7 +4160,7 @@
         "www.interislander.co.nz",
         "www.sealink.co.nz"
       ],
-      "last_verified": "2026-07-19",
+      "last_verified": "2026-10-08",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
@@ -4320,7 +4375,7 @@
       "allowed_domains": [
         "www.beehive.govt.nz"
       ],
-      "last_verified": "2026-07-19",
+      "last_verified": "2026-10-08",
       "health": "gated",
       "maintainer": "@adam91holt"
     },
@@ -4627,6 +4682,35 @@
       "maintainer": "@adam91holt"
     },
     {
+      "name": "nz-road-safety-reports",
+      "description": "Query keyless NZ cycling near-miss and collision reports and fixed safety camera locations; discover official camera infringement releases with workbook extraction gated. Use for Auckland corridor screening and road safety evidence; use nzta-crash-data-nz for CAS crashes.",
+      "path": "skills/nz-road-safety-reports",
+      "category": "transport",
+      "source_owner": "BikeMaps.org; NZ Transport Agency Waka Kotahi; New Zealand Police; Auckland Transport",
+      "source_type": "mixed",
+      "source_url": "https://bikemaps.org/",
+      "auth": "none",
+      "access_mode": "public-api",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "none",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "bikemaps.org",
+        "nzta.govt.nz",
+        "www.nzta.govt.nz",
+        "www.police.govt.nz",
+        "raw.githubusercontent.com"
+      ],
+      "last_verified": "2026-10-08",
+      "health": "degraded",
+      "maintainer": "@adam91holt"
+    },
+    {
       "name": "nz-schools",
       "description": "Query official Ministry of Education school directory, roll, location and enrolment-zone resources. Use for source-backed school lookup, not rankings.",
       "path": "skills/nz-schools",
@@ -4815,6 +4899,38 @@
       "maintainer": "@adam91holt"
     },
     {
+      "name": "nz-utility-outages",
+      "description": "Query Watercare Auckland water faults and planned shutdowns, Wellington electricity outages, KiwiRail Auckland work notices and the published rail closure calendar. Use for utility interruptions, maintenance windows and nearby outage searches; report Vector and other unavailable source limits explicitly.",
+      "path": "skills/nz-utility-outages",
+      "category": "utilities",
+      "source_owner": "Watercare, Vector, KiwiRail and NZ electricity networks",
+      "source_type": "official",
+      "source_url": "https://www.watercare.co.nz/home/faults-and-outages",
+      "auth": "none",
+      "access_mode": "public-api and bounded public HTML/PDF",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "none",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "www.watercare.co.nz",
+        " webapi.watercare.co.nz",
+        " help.vector.co.nz",
+        " www.welectricity.co.nz",
+        " www.kiwirail.co.nz",
+        " powernet.co.nz",
+        " api.integration.countiesenergy.co.nz",
+        " app.countiesenergy.co.nz"
+      ],
+      "last_verified": "2026-10-08",
+      "health": "degraded",
+      "maintainer": "@adam91holt"
+    },
+    {
       "name": "nzbn-register",
       "description": "Search and lookup public NZBN Register NZ business records: NZBN identity, company/entity status, trading names, addresses, and source-register identifiers. No login or API key required.",
       "path": "skills/nzbn-register",
@@ -4969,7 +5085,7 @@
       "allowed_domains": [
         "www.publicservice.govt.nz"
       ],
-      "last_verified": "2026-07-19",
+      "last_verified": "2026-10-08",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
@@ -5234,6 +5350,33 @@
       "maintainer": "@adam91holt"
     },
     {
+      "name": "port-of-auckland",
+      "description": "Fetch Port of Auckland expected vessel arrivals and live truck turn times for freight demand and congestion analysis. Discover related keyless NZ port sources, fetch Tauranga expected arrivals and road queues, and summarise current port activity.",
+      "path": "skills/port-of-auckland",
+      "category": "transport",
+      "source_owner": "Port of Auckland Ltd; Port of Tauranga Limited",
+      "source_type": "official",
+      "source_url": "https://poal.co.nz/operations/schedules/arrivals/download",
+      "auth": "none",
+      "access_mode": "public CSV download and bounded read-only HTML",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "medium",
+      "cache_ttl": "5m default; 1h maximum; robots 24h",
+      "schema_version": "1",
+      "skill_type": "html-readonly",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "poal.co.nz",
+        "www.poal.co.nz",
+        "www.port-tauranga.co.nz"
+      ],
+      "last_verified": "2026-10-08",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
       "name": "pptx",
       "description": "Use this skill any time a .pptx file is involved in any way — creating, reading, editing, combining, splitting, or updating decks, slides, presentations, templates, layouts, speaker notes, or comments.",
       "path": "skills/pptx",
@@ -5478,7 +5621,7 @@
       "category": "education",
       "source_owner": "Ministry of Education",
       "source_type": "official",
-      "source_url": "https://www.education.govt.nz/school/school-terms-and-holidays",
+      "source_url": "https://www.education.govt.nz/school-terms-and-holidays-dates",
       "auth": "none",
       "access_mode": "html-readonly",
       "data_class": "public",
@@ -5492,7 +5635,7 @@
       "allowed_domains": [
         "www.education.govt.nz"
       ],
-      "last_verified": "2026-09-03",
+      "last_verified": "2026-10-08",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
@@ -5804,7 +5947,7 @@
         "www.treasury.govt.nz",
         "treasury.govt.nz"
       ],
-      "last_verified": "2026-07-19",
+      "last_verified": "2026-10-08",
       "health": "degraded",
       "maintainer": "@adam91holt"
     },
@@ -5983,6 +6126,33 @@
           "www.woolworths.co.nz"
         ]
       }
+    },
+    {
+      "name": "worksafe-nz",
+      "description": "Query WorkSafe New Zealand aggregated workplace incidents, concerns, serious harm notifications and fatalities. Use for construction-sector safety context, regional notification trends and industry comparisons.",
+      "path": "skills/worksafe-nz",
+      "category": "government",
+      "source_owner": "WorkSafe New Zealand",
+      "source_type": "official",
+      "source_url": "https://data.worksafe.govt.nz/",
+      "auth": "none",
+      "access_mode": "public-download",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "24h",
+      "schema_version": "1",
+      "skill_type": "public-download",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "data.worksafe.govt.nz",
+        "data-centre-public.s3.ap-southeast-2.amazonaws.com",
+        "www.worksafe.govt.nz"
+      ],
+      "last_verified": "2026-10-08",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
     },
     {
       "name": "wremo-nz",
