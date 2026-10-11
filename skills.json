@@ -2,7 +2,7 @@
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
   "last_verified": "2026-10-11",
-  "skill_count": 165,
+  "skill_count": 166,
   "skills": [
     {
       "name": "airnz-flights",
@@ -4513,6 +4513,32 @@
         "journals.parliament.nz"
       ],
       "last_verified": "2026-09-12",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "nz-point-clouds",
+      "description": "Find New Zealand airborne LiDAR point-cloud collections on OpenTopography and list bounded public file URLs and sizes. Use for catalogue search, dataset licence, capture interval, and LAZ tile discovery. Do not use for LINZ DEM or DSM rasters, imagery tiles, elevation sampling, or point-cloud downloads.",
+      "path": "skills/nz-point-clouds",
+      "category": "geospatial",
+      "source_owner": "OpenTopography",
+      "source_type": "mixed",
+      "source_url": "https://portal.opentopography.org/API/otCatalog",
+      "auth": "none",
+      "access_mode": "public-api",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "none",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "portal.opentopography.org",
+        "opentopography.s3.sdsc.edu"
+      ],
+      "last_verified": "2026-10-11",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
