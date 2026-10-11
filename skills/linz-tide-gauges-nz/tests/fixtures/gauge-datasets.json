@@ -1,0 +1,17 @@
+{
+  "gauge": "AUCT",
+  "description": "NAME:\t\t\tDevonport Naval Base\nCODE:\t\t\tAUCT\nTIME SYSTEM:\t\tUTC\n",
+  "files": [],
+  "datasets": [
+    {
+      "year": "2026",
+      "sensor": "40",
+      "datasetid": "AUCT/2026/40"
+    },
+    {
+      "year": "2026",
+      "sensor": "41",
+      "datasetid": "AUCT/2026/41"
+    }
+  ]
+}

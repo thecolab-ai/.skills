@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
-  "last_verified": "2026-10-08",
-  "skill_count": 164,
+  "last_verified": "2026-10-11",
+  "skill_count": 168,
   "skills": [
     {
       "name": "airnz-flights",
@@ -64,6 +64,34 @@
       "local_output": [
         "private-json-csv-export"
       ]
+    },
+    {
+      "name": "akl-housing-capacity",
+      "description": "Query Auckland housing supply trends and 2022/23 plan-enabled and feasible housing capacity. Use for monthly housing updates, building consents, HBA, capacity for growth, PC78, local-board growth capacity, social housing delivery and housing demolition source discovery.",
+      "path": "skills/akl-housing-capacity",
+      "category": "housing",
+      "source_owner": "Auckland Council",
+      "source_type": "official",
+      "source_url": "https://knowledgeauckland.org.nz/",
+      "auth": "none",
+      "access_mode": "public-download",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "none",
+      "schema_version": "1",
+      "skill_type": "public-download",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "knowledgeauckland.org.nz",
+        "www.knowledgeauckland.org.nz",
+        "www.hud.govt.nz",
+        "www.kaingaora.govt.nz"
+      ],
+      "last_verified": "2026-10-08",
+      "health": "degraded",
+      "maintainer": "@adam91holt"
     },
     {
       "name": "akl-rainfall",
@@ -1730,6 +1758,31 @@
         "services.arcgis.com"
       ],
       "last_verified": "2026-10-08",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "linz-tide-gauges-nz",
+      "description": "Query official LINZ tide-gauge sea-level observations. Use for Auckland Devonport (AUCT) and other published LINZ gauge codes, daily UTC minute heights, sensor datasets, and file listings. Not tide predictions.",
+      "path": "skills/linz-tide-gauges-nz",
+      "category": "environment",
+      "source_owner": "Toitū Te Whenua Land Information New Zealand (LINZ)",
+      "source_type": "official",
+      "source_url": "https://sealevel-data.linz.govt.nz/index.html?tidegauge=AUCT",
+      "auth": "none",
+      "access_mode": "public-api",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "24h",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "sealevel-data.linz.govt.nz"
+      ],
+      "last_verified": "2026-10-11",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
@@ -4489,6 +4542,32 @@
       "maintainer": "@adam91holt"
     },
     {
+      "name": "nz-point-clouds",
+      "description": "Find New Zealand airborne LiDAR point-cloud collections on OpenTopography and list bounded public file URLs and sizes. Use for catalogue search, dataset licence, capture interval, and LAZ tile discovery. Do not use for LINZ DEM or DSM rasters, imagery tiles, elevation sampling, or point-cloud downloads.",
+      "path": "skills/nz-point-clouds",
+      "category": "geospatial",
+      "source_owner": "OpenTopography",
+      "source_type": "mixed",
+      "source_url": "https://portal.opentopography.org/API/otCatalog",
+      "auth": "none",
+      "access_mode": "public-api",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "none",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "portal.opentopography.org",
+        "opentopography.s3.sdsc.edu"
+      ],
+      "last_verified": "2026-10-11",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
       "name": "nz-police-data",
       "description": "Query official anonymised New Zealand Police victimisation, proceedings and offence statistics with suppression and interpretation context.",
       "path": "skills/nz-police-data",
@@ -4792,10 +4871,10 @@
     },
     {
       "name": "nz-traffic-counts",
-      "description": "Query NZ traffic, cycle and pedestrian count sites and time series, starting with Auckland Transport, NZTA TMS and Heart of the City. Use for historical volumes, active-mode monitoring and nearby count sites.",
+      "description": "Query NZ traffic, cycle and pedestrian count sites and time series, from Auckland Transport, NZTA TMS, Heart of the City, Hamilton, Christchurch, Wellington and Tauranga. Use for historical volumes, active-mode monitoring and nearby count sites.",
       "path": "skills/nz-traffic-counts",
       "category": "transport",
-      "source_owner": "Auckland Transport; NZ Transport Agency; Heart of the City",
+      "source_owner": "Auckland Transport; NZ Transport Agency; Heart of the City; Hamilton City Council; Christchurch City Council; Wellington City Council; Tauranga City Council",
       "source_type": "mixed",
       "source_url": "https://at.govt.nz/about-us/reports-publications/traffic-counts",
       "auth": "none",
@@ -4812,9 +4891,14 @@
         "at.govt.nz",
         "www.hotcity.co.nz",
         "services.arcgis.com",
-        "services2.arcgis.com"
+        "services2.arcgis.com",
+        "services1.arcgis.com",
+        "cemeteryaws.tauranga.govt.nz",
+        "smartview.ccc.govt.nz",
+        "gis.wcc.govt.nz",
+        "gis-snowflake-opendata-public-wcc-arcgis-prod.s3.ap-southeast-2.amazonaws.com"
       ],
-      "last_verified": "2026-10-08",
+      "last_verified": "2026-10-11",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
@@ -5083,6 +5167,31 @@
         "www.ombudsman.parliament.nz"
       ],
       "last_verified": "2026-07-19",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "open-food-facts",
+      "description": "Look up a food product by barcode on Open Food Facts, and run a bounded country or category search. Use for keyless public product name, brand, quantity, category and country facts. Do not use for Open Products Facts, product photos, personal nutrition advice, or database dumps.",
+      "path": "skills/open-food-facts",
+      "category": "food",
+      "source_owner": "Open Food Facts",
+      "source_type": "community",
+      "source_url": "https://world.openfoodfacts.org",
+      "auth": "none",
+      "access_mode": "public-api",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "none",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "world.openfoodfacts.org"
+      ],
+      "last_verified": "2026-10-11",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
