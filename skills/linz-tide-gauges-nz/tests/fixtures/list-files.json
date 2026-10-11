@@ -1,0 +1,22 @@
+{
+  "files": [
+    {
+      "name": "AUCT_40_2026001.zip",
+      "uri": "/tidegauge/AUCT/2026/40/AUCT_40_2026001.zip",
+      "size": 7621,
+      "modified": "2026-01-03"
+    },
+    {
+      "name": "AUCT_40_2026002.zip",
+      "uri": "/tidegauge/AUCT/2026/40/AUCT_40_2026002.zip",
+      "size": 7792,
+      "modified": "2026-01-04"
+    },
+    {
+      "name": "AUCT_40_2026003.zip",
+      "uri": "/tidegauge/AUCT/2026/40/AUCT_40_2026003.zip",
+      "size": 7726,
+      "modified": "2026-01-05"
+    }
+  ]
+}
