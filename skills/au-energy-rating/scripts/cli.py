@@ -448,6 +448,8 @@ def command_preview(resource_id: str, limit: int, as_json: bool, fetch: Fetch) -
     meta["resource_name"] = resource["name"]
     meta["limit"] = limit
     meta["total"] = total
+    if package["licence_url"]:
+        meta["licence_url"] = package["licence_url"]
     payload = result_envelope(records, meta)
     if as_json:
         emit_json(payload)

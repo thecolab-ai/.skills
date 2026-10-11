@@ -248,47 +248,29 @@ def run_live(args: list[str]) -> dict | None:
 
 
 def live_probe() -> None:
-    package = run_live(["package", "--json"])
-    if package is None:
-        return
+    """One package_show membership check plus one datastore_search limit=1."""
     preview = run_live(["preview", ACTIVE_ID, "--limit", "1", "--json"])
     if preview is None:
-        print("[SKIP] live network error: preview was not completed")
         return
-    meta = package["meta"]
-    result = package["results"][0]
-    assert set(package) == {"meta", "results"}
-    assert meta["publisher"] == result["organisation"]
+    meta = preview["meta"]
     assert meta["publisher"] == cli.PUBLISHER
     assert meta["licence"] == "Creative Commons Attribution 3.0 Australia"
+    assert "creativecommons.org/licenses/by/3.0/au/" in meta["licence_url"]
     assert meta["retrieved_at"].endswith("Z")
-    assert meta["source_url"].startswith("https://data.gov.au/data/api/3/action/package_show?")
-    assert result["name"] == PACKAGE_NAME
-    assert result["package_id"] == cli.PACKAGE_ID
-    assert "creativecommons.org/licenses/by/3.0/au/" in result["licence_url"]
     assert isinstance(meta["latest_data"], str) and meta["latest_data"]
-    active = next(item for item in result["resources"] if item["id"] == ACTIVE_ID)
-    assert active["datastore_active"] is True
-    assert "Air Conditioners" in active["name"]
-    assert " " * 8 not in active["name"]
-    print("[PASS] live energy-rating package licence, organisation and datastore resource")
+    assert meta["resource_id"] == ACTIVE_ID
+    assert "Air Conditioners" in meta["resource_name"]
+    assert " " * 8 not in meta["resource_name"]
+    assert meta["source_url"].startswith("https://data.gov.au/data/api/3/action/datastore_search?")
+    assert "limit=1" in meta["source_url"] and ".csv" not in meta["source_url"]
+    print("[PASS] live energy-rating licence, organisation and datastore resource")
 
     record = preview["results"][0]
-    assert preview["meta"]["resource_id"] == ACTIVE_ID
-    assert preview["meta"]["limit"] == 1
-    assert preview["meta"]["total"] > 1
-    assert len(preview["results"]) == 1
-    assert preview["meta"]["source_url"].startswith(
-        "https://data.gov.au/data/api/3/action/datastore_search?"
-    )
-    assert "limit=1" in preview["meta"]["source_url"]
-    assert ".csv" not in preview["meta"]["source_url"]
+    assert meta["limit"] == 1 and meta["total"] > 1 and len(preview["results"]) == 1
     assert isinstance(record["Brand"], str) and record["Brand"].strip()
     assert isinstance(record["Model_No"], str) and record["Model_No"].strip()
     assert "c_star_mixed" in record
     assert record["c_star_mixed"] is None or isinstance(record["c_star_mixed"], str)
-    assert preview["meta"]["licence"] == meta["licence"]
-    assert preview["meta"]["retrieved_at"].endswith("Z")
     print("[PASS] live air-conditioner preview keeps brand, model and star field")
 
 

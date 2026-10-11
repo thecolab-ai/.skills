@@ -52,8 +52,9 @@ python3 skills/au-energy-rating/scripts/cli.py preview 0973a476-eb0c-45e6-9a18-0
 - `preview RESOURCE_ID [--limit N]` checks that id against the same package,
   then calls CKAN `datastore_search`. `N` is an integer from 1 to 20 and
   defaults to 5. `results` is the source records, unchanged, including null and
-  `N/A`. `meta.total` is the source total, which is usually larger than the
-  preview. There is no offset and no CSV download.
+  `N/A`. `meta` also carries the package licence URL, resource id, collapsed
+  resource name, `limit` and `total`. `total` is the source count, usually
+  larger than the preview. There is no offset and no CSV download.
 
 Every data command accepts `--json` and returns `{"meta": {...}, "results": [...]}`.
 `meta` includes `source_url`, `publisher`, `retrieved_at`, and `licence` plus
