@@ -11,6 +11,8 @@ import importlib.util
 import json
 import os
 import subprocess
+import types
+from unittest.mock import patch
 import sys
 from pathlib import Path
 
@@ -19,11 +21,16 @@ CLI = SKILL_DIR / "scripts" / "cli.py"
 MINISTER = "hon-simeon-brown"
 
 
-def run(args, timeout=120):
-    return subprocess.run(
+def run(args, timeout=45):
+    result = subprocess.run(
         [sys.executable, str(CLI)] + args,
         capture_output=True, text=True, cwd=str(SKILL_DIR), timeout=timeout, check=False,
     )
+    if '--browser' not in args and result.returncode != 0 and is_transient(result.stderr):
+        result = subprocess.run([sys.executable, str(CLI)] + args,
+            capture_output=True, text=True, cwd=str(SKILL_DIR), timeout=timeout, check=False)
+    return result
+
 
 
 def test(name, fn):
@@ -66,6 +73,7 @@ def test_transient_skip_line_is_sanitised():
 
 results = []
 WANT_BROWSER = browser_available()
+PROTECTED_UNAVAILABLE = False
 
 
 def test_fixture_rss_parser():
@@ -77,6 +85,36 @@ def test_fixture_rss_parser():
     rows = cli.parse_rss_items("""<rss><channel><item><title>Example release</title><link>https://www.beehive.govt.nz/release/example</link><pubDate>Sun, 19 Jul 2026 00:00:00 GMT</pubDate></item></channel></rss>""")
     return len(rows) == 1 and rows[0]["type"] == "release" and rows[0]["slug"] == "example"
 
+
+def test_bounded_retries():
+    transient = subprocess.CompletedProcess([], 1, '', 'network error: timed out')
+    schema = subprocess.CompletedProcess([], 1, '', 'could not parse beehive RSS')
+    with patch.object(subprocess, 'run', return_value=transient) as probe:
+        assert run(['latest', '--json']).returncode == 1 and probe.call_count == 2
+    with patch.object(subprocess, 'run', return_value=schema) as probe:
+        assert run(['latest', '--json']).returncode == 1 and probe.call_count == 1
+    spec = importlib.util.spec_from_file_location('ministers_budget_cli', CLI)
+    cli = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(cli)
+    calls = []
+    page = types.SimpleNamespace(
+        goto=lambda *a, **kw: calls.append(('goto', kw)),
+        wait_for_timeout=lambda value: calls.append(('wait', value)),
+        content=lambda: '<html>incapsula synthetic blocked page</html>')
+    browser = types.SimpleNamespace(new_page=lambda: page, close=lambda: None)
+    with patch.dict(sys.modules, {'cloakbrowser': types.SimpleNamespace(launch=lambda **kw: browser)}):
+        try:
+            cli._browser_fetch('https://www.beehive.govt.nz/minister/synthetic')
+        except cli.ClearanceUnavailable as exc:
+            assert str(exc).startswith('browser_blocked:')
+        else:
+            raise AssertionError('blocked browser page must fail explicitly')
+    assert {'source_url', 'publisher', 'retrieved_at'} <= cli.with_provenance({'source': cli.RSS_URL})['meta'].keys()
+    assert calls[0][1]['timeout'] == 10000
+    assert [value for kind, value in calls if kind == 'wait'] == [1000] * 4
+    return True
+
+results.append(test('fixture bounded transient retries, schema failures and browser deadline', test_bounded_retries))
 
 results.append(test("fixture Beehive RSS parsing", test_fixture_rss_parser))
 results.append(test("transient skip line is sanitised", test_transient_skip_line_is_sanitised))
@@ -110,14 +148,19 @@ def test_latest():
     return True
 
 
-results.append(test("latest returns government releases (keyless)", test_latest))
+results.append(test("live latest returns government releases (keyless)", test_latest))
 
 
 def test_minister():
+    global PROTECTED_UNAVAILABLE
     args = ["minister", MINISTER, "--json"]
     if WANT_BROWSER:
         args.append("--browser")
     r = run(args)
+    if r.returncode != 0 and is_transient(r.stderr):
+        PROTECTED_UNAVAILABLE = True
+        print(transient_skip_line(r.stderr, browser=WANT_BROWSER))
+        return True
     if WANT_BROWSER:
         if r.returncode != 0:
             if is_transient(r.stderr):
@@ -147,11 +190,11 @@ def test_minister():
     return True
 
 
-results.append(test(f"minister {MINISTER} ({'browser' if WANT_BROWSER else 'blocked-state'})", test_minister))
+results.append(test(f"{'live' if WANT_BROWSER else 'contract'} minister {MINISTER} ({'browser' if WANT_BROWSER else 'blocked-state'})", test_minister))
 
 
 def test_articles():
-    if not WANT_BROWSER:
+    if not WANT_BROWSER or PROTECTED_UNAVAILABLE:
         print("  [SKIP] articles needs browser clearance; not available on this host")
         return True
     r = run(["articles", MINISTER, "--limit", "5", "--browser", "--json"])
@@ -173,11 +216,11 @@ def test_articles():
     return True
 
 
-results.append(test(f"articles {MINISTER}", test_articles))
+results.append(test(f"live articles {MINISTER}", test_articles))
 
 
 def test_roles():
-    if not WANT_BROWSER:
+    if not WANT_BROWSER or PROTECTED_UNAVAILABLE:
         print("  [SKIP] roles needs browser clearance; not available on this host")
         return True
     r = run(["roles", MINISTER, "--browser", "--json"])
@@ -199,11 +242,11 @@ def test_roles():
     return True
 
 
-results.append(test(f"roles {MINISTER}", test_roles))
+results.append(test(f"live roles {MINISTER}", test_roles))
 
 
 def test_diary():
-    if not WANT_BROWSER:
+    if not WANT_BROWSER or PROTECTED_UNAVAILABLE:
         print("  [SKIP] diary needs browser clearance; not available on this host")
         return True
     r = run(["diary", MINISTER, "--browser", "--json"])
@@ -227,7 +270,7 @@ def test_diary():
     return True
 
 
-results.append(test(f"diary {MINISTER}", test_diary))
+results.append(test(f"live diary {MINISTER}", test_diary))
 
 if all(results):
     print("All tests passed.")

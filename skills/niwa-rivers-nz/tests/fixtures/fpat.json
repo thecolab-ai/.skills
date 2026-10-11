@@ -1,0 +1,44 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "fpat_surveys.synthetic-1",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          174.75,
+          -36.91
+        ]
+      },
+      "geometry_name": "geom",
+      "properties": {
+        "id": 999999,
+        "longitude": 174.75001,
+        "latitude": -36.91001,
+        "structure_type": "Culvert",
+        "survey_response_id": 999999,
+        "recorded_date": "2026-01-02T00:00:00Z",
+        "nzsegment": 9999999,
+        "risk_class_num": 2,
+        "risk_class_str": "Moderate",
+        "max_risk": null,
+        "priority": 2,
+        "species": "",
+        "historical": false,
+        "manual_assessment": false,
+        "asset_owner": "Synthetic owner"
+      }
+    }
+  ],
+  "totalFeatures": 2,
+  "numberMatched": 2,
+  "numberReturned": 1,
+  "timeStamp": "2026-02-03T00:00:00.000Z",
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "urn:ogc:def:crs:EPSG::4326"
+    }
+  }
+}

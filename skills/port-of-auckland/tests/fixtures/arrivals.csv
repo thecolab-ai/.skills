@@ -1,0 +1,4 @@
+Vessel,Agent,Wharf,"Vessel Ref","Lloyd's No","Voyage In","Voyage Out","Receivals start","Receivals stop",Arrival,Departs,"Previous Port","Next Port"
+"SYNTHETIC EXPLORER","Example Agent","Example West",EX001,1234567,001S,001N,"Refer to Line","","8 Oct 2026 09:00","9 Oct 2026 16:30",EXAMPLEPORT,TESTPORT
+"SYNTHETIC EXPLORER","Example Agent","Example North",EX001,1234567,001S,001N,"Refer to Line","","9 Oct 2026 16:30","10 Oct 2026 08:00",EXAMPLEPORT,TESTPORT
+"SYNTHETIC VOYAGER","Example Shipping","Example Berth",VO002,7654321,002S,002N,"1 Oct 2026 00:00","7 Oct 2026 12:00","10 Oct 2026 06:00","11 Oct 2026 07:00",TESTPORT,EXAMPLEPORT

@@ -19,7 +19,7 @@ metadata:
   thecolab.pack: "nz-public-data"
   thecolab.source_url: "https://www.beehive.govt.nz"
   thecolab.allowed_domains: "www.beehive.govt.nz"
-  thecolab.last_verified: "2026-07-19"
+  thecolab.last_verified: "2026-10-08"
   thecolab.health: "gated"
   thecolab.maintainer: "@adam91holt"
 ---

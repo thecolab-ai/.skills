@@ -19,7 +19,7 @@ metadata:
   thecolab.pack: "nz-public-data"
   thecolab.source_url: "https://www.treasury.govt.nz/publications/budgets/forecasts"
   thecolab.allowed_domains: "www.treasury.govt.nz,treasury.govt.nz"
-  thecolab.last_verified: "2026-07-19"
+  thecolab.last_verified: "2026-10-08"
   thecolab.health: "degraded"
   thecolab.maintainer: "@adam91holt"
 ---
@@ -58,14 +58,14 @@ Add `--limit N` (1–100) to bound any command. Human output is the default.
 
 `latest` returns primary EFU releases in the official catalogue's newest-first order, while `sources`
 adds each release's official downloadable workbooks and documents. `forecast` returns one structured
-Table 1 value per period. `appropriation` and `vote` return one structured amount per financial year
+key-indicator value per period. `appropriation` and `vote` return one structured amount per financial year
 from the expenditure workbook's Raw Data sheet; Vote names accept either `Health` or `Vote Health`.
 Every value includes its published unit, period, actual/forecast status, publication, workbook,
 worksheet and exact cell provenance.
 
 `compare` resolves two
 primary EFU releases, selects each release's unique Charts and Data workbook, and compares only exact
-shared Table 1 definitions, units, period basis and forecast periods. Every value retains publication,
+shared key-indicator definitions, units, period basis and forecast periods. Every value retains publication,
 workbook, worksheet, row, column and cell provenance. Changed or ambiguous definitions fail closed.
 
 ## Resources
