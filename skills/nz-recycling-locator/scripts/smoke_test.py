@@ -39,7 +39,7 @@ def source_check(source):
         assert row['retrieved_at'].endswith('Z')
         assert row.get('licence') is None
     if source in ('recyclemap', 'wasteminz', 'branz', 'ecycle', 'agrecovery', 'beautification',
-                  'christchurch', 'zerowaste', 'habitat'):
+                  'christchurch', 'habitat'):
         assert any(r['lon'] is not None and r['lat'] is not None for r in rows)
     if source == 'recyclemap':
         assert any(cli.material_matches(r, 'battery') for r in rows)
@@ -48,18 +48,16 @@ def source_check(source):
     if source == 'christchurch':
         assert any('Recycling' in r['materials'] for r in rows)
         assert all('outSR=4326' in r['source_url'] for r in rows)
-    if source == 'trow':
-        assert all(r['lon'] is None for r in rows)
-        assert sum(r['available_items'] + r['pre_sale_items'] for r in rows) > 0
-        assert all(key not in json.dumps(rows) for key in ('seller_email', 'seller_name', 'created_by'))
-        assert sum(r['address'] == 'Trow Group Yard, Ranui' for r in rows) == 1
-        assert not any(r['address'] == 'TROW Yard - Ranui. Auckland 0612' for r in rows)
     if source == 'habitat':
-        assert all('Op Shops' in r['materials'] for r in rows)
-    if source == 'zerowaste':
-        assert all(r['materials'] == ['Resource recovery network member'] for r in rows)
+        assert all(r['materials'] == ['Reuse'] for r in rows)
+        assert all(not cli.material_matches(r, 'clothing') for r in rows)
+        assert sum(r['lon'] is not None for r in rows) >= len(rows) - 1
     if source == 'crc':
-        assert all(r['address'] and r['lon'] is None for r in rows)
+        assert all(r['address'] and r['display_address'] and r['lon'] is None for r in rows)
+        distinct = [r for r in rows if r.get('address_forms_differ')]
+        warnings = rows[0].get('source_warnings') or []
+        assert bool(distinct) == bool(warnings)
+        assert all(r['address'] != r['display_address'] or not r.get('address_forms_differ') for r in rows)
     print(f'  {source}: {len(rows)} directory entries')
 
 
@@ -103,34 +101,23 @@ def council_check():
     print('[PASS] contract Council item guidance is explicitly unsupported')
 
 
-def trow_cli_check():
+def unsupported_feed_check(source):
     with tempfile.TemporaryDirectory() as cache:
         env = {**os.environ, 'XDG_CACHE_HOME': cache}
-        commands = [(['search', 'Ranui', '--refresh'], 'results'),
-                    (['search', 'Ranui', '--format', 'geojson'], 'features'),
-                    (['materials'], 'results'), (['sources'], 'results')]
-        for args, field in commands:
-            result = subprocess.run([sys.executable, str(Path(cli.__file__)), *args,
-                                     '--source', 'trow', '--json'],
-                                    env=env, capture_output=True, text=True, timeout=20)
-            payload = json.loads(result.stdout)
-            if result.returncode:
-                error = payload['error']
-                raise cli.SourceError(error['message'], error['code'])
-            assert payload[field]
-            if args[0] == 'search':
-                assert len(payload[field]) == 1
-                row = payload[field][0] if field == 'results' else payload[field][0]['properties']
-                assert row['address'] == 'Trow Group Yard, Ranui'
-                if field == 'features':
-                    assert payload[field][0]['geometry'] is None
-            for key in ('seller_email', 'seller_name', 'created_by'):
-                assert key not in result.stdout
-        saved = (Path(cache) / 'nz-recycling-locator' / 'trow.json').read_text()
-        assert json.loads(saved)['version'] == cli.PARSER_VERSION
-        assert sum(r['address'] == 'Trow Group Yard, Ranui' for r in json.loads(saved)['records']) == 1
-        assert all(key not in saved for key in ('seller_email', 'seller_name', 'created_by'))
-    print('  TROW explicit search, GeoJSON, materials and sources; one Ranui yard; personal fields absent from output/cache')
+        result = subprocess.run([sys.executable, str(Path(cli.__file__)), 'search', 'Sampletown',
+                                 '--source', source, '--refresh', '--json'],
+                                env=env, capture_output=True, text=True, timeout=10)
+        payload = json.loads(result.stdout)
+        assert result.returncode == 7
+        assert payload['error']['type'] == 'unsupported_operation'
+        assert payload['results'] == []
+        assert payload['meta']['source_url'] == cli.SOURCES[source]['url']
+        assert 'base44.app' not in result.stdout
+        assert 'wp-json/wpgmza' not in result.stdout
+        for key in ('seller_email', 'seller_name', 'created_by'):
+            assert key not in result.stdout
+        assert not (Path(cache) / 'nz-recycling-locator' / (source + '.json')).exists()
+    print(f'  {source} search is unsupported, makes no cache file, and returns {cli.SOURCES[source]["url"]}')
 
 
 def main():
@@ -143,32 +130,32 @@ def main():
     assert rows[1]['materials'] == ['Batteries']
     print('[PASS] fixture synthetic RecycleMap marker/material join')
     stamp = '2026-10-08T00:00:00Z'
-    trow = cli.parse_trow(json.loads((fixtures / 'trow.json').read_text()), stamp)
-    assert len(trow) == 2 and sum(r['available_items'] for r in trow) == 2
-    assert all(r['lon'] is None for r in trow)
-    print('[PASS] fixture synthetic TROW grouping, sold exclusion and unlocated stock')
     depots = cli.parse_christchurch(json.loads((fixtures / 'christchurch.json').read_text()), stamp)
     assert depots[0]['materials'] == ['Recycling', 'Refuse']
     assert depots[0]['latest_data'] == '2026-01-01T00:00:00.123Z'
     assert depots[0]['lon'] == 172.61
     print('[PASS] fixture synthetic Christchurch acceptance, edit date and WGS84')
-    members = cli.parse_zerowaste(json.loads((fixtures / 'zerowaste.json').read_text()), stamp)
-    assert len(members) == 1 and members[0]['materials'] == ['Resource recovery network member']
-    print('[PASS] fixture synthetic approved Zero Waste member, no inferred acceptance')
     shops = cli.parse_habitat((fixtures / 'habitat.html').read_text(), stamp)
-    assert len(shops) == 2 and shops[0]['address'] == '10 Sample Street, Sampletown'
-    print('[PASS] fixture synthetic Habitat cards and unrelated coordinate exclusion')
+    assert len(shops) == 4 and shops[0]['materials'] == ['Reuse']
+    assert shops[2]['lon'] == 174.78 and shops[3]['lon'] is None
+    print('[PASS] fixture synthetic Habitat reuse labels and edge-only coordinate noise')
     centres = cli.parse_crc((fixtures / 'crc.html').read_text(), stamp)
-    assert len(centres) == 2 and centres[0]['locality'] == 'Sampletown'
-    assert all(r['lon'] is None for r in centres)
-    print('[PASS] fixture synthetic CRC visible addresses and null coordinates')
+    assert len(centres) == 3 and centres[2]['address_forms_differ']
+    assert centres[0]['address'] != centres[2]['display_address']
+    print('[PASS] fixture synthetic CRC addresses kept as distinct publisher forms')
     sources = ('recyclemap', 'wasteminz', 'branz', 'ecycle', 'agrecovery', 'beautification',
-               'tyrewise', 'trow', 'christchurch', 'zerowaste', 'habitat', 'crc')
+               'tyrewise', 'christchurch', 'habitat', 'crc')
     with ThreadPoolExecutor(max_workers=4) as pool:
         results = list(pool.map(lambda s: probe(s, lambda: source_check(s)), sources))
     results.append(probe('repair café sitemap and Auckland detail', repair_check))
     results.append(probe('find Auckland batteries with GeoJSON', cli_find_check))
-    results.append(probe('TROW CLI grouping and output/cache privacy', trow_cli_check))
+    for source in ('trow', 'zerowaste'):
+        try:
+            unsupported_feed_check(source)
+            print(f'[PASS] contract {source} feed is explicitly unsupported')
+        except Exception as exc:
+            print(f'[FAIL] contract {source} unsupported state: {type(exc).__name__}: {exc}')
+            results.append(False)
     try:
         council_check()
     except cli.SourceError as exc:

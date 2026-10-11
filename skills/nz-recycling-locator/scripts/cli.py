@@ -25,11 +25,16 @@ from provenance import result_envelope, error_envelope, geojson_envelope
 
 ROOT = Path(__file__).resolve().parents[1]
 CACHE = Path(os.environ.get('XDG_CACHE_HOME') or Path.home() / '.cache') / 'nz-recycling-locator'
-PARSER_VERSION = 4
+PARSER_VERSION = 5
 TTL = 86400
 PRIMARY_URL = 'https://www.recyclemap.co.nz/'
 RM = 'https://www.recyclemap.co.nz/wp-json/wpgmza/v1/'
 COUNCIL = 'https://www.aucklandcouncil.govt.nz/en/rubbish-recycling/get-rid-unwanted-items.html'
+TROW_PUBLIC = 'https://trowrestore.com/'
+ZEROWASTE_PUBLIC = 'https://zerowaste.co.nz/'
+# Identity keys observed on the refused stock feed. A cache containing them is
+# never served and is left on disk for the operator to remove.
+PERSONAL_CACHE_KEYS = frozenset({'seller_email', 'seller_name', 'created_by'})
 SOURCES = {
     'recyclemap': {'url': RM + 'markers', 'publisher': 'RecycleMap NZ', 'kind': 'JSON', 'licence': None},
     'wasteminz': {'url': 'https://www.google.com/maps/d/kml?mid=1ncyWOEWbXMSiycgz48swYqMj4aHJnSE&forcekml=1', 'publisher': 'WasteMINZ', 'kind': 'KML', 'licence': None},
@@ -40,16 +45,19 @@ SOURCES = {
     'branz': {'url': 'https://services7.arcgis.com/vkPf8weODt71Prmb/arcgis/rest/services/Waste_Map_Facility_Locations/FeatureServer/0', 'publisher': 'BRANZ', 'kind': 'ArcGIS JSON', 'licence': None},
     'agrecovery': {'url': 'https://agrecovery.co.nz/wp-json/wp/v2/ag_site?per_page=100&page=1&acf_format=standard&_fields=id,title,acf&orderby=title&order=asc', 'publisher': 'Agrecovery', 'kind': 'JSON', 'licence': None},
     'beautification': {'url': 'https://api.mapme.com/api/stories/aggregated/af29690b-4cd0-484f-a211-8f3e12fa51b4', 'publisher': 'Beautification Trust', 'kind': 'JSON', 'licence': None},
-    'trow': {'url': 'https://base44.app/api/apps/68e5846a599cc4e55639725b/entities/Item?sort=-created_date&limit=1000', 'publisher': 'TROW Group', 'kind': 'JSON stock grouped by location', 'licence': None},
+    'trow': {'url': TROW_PUBLIC, 'publisher': 'TROW Group', 'kind': 'unsupported', 'licence': None,
+             'unsupported': 'TROW stock locations are unsupported. The undocumented stock feed returns seller identity and contact fields and is not requested. Consult ' + TROW_PUBLIC},
     'christchurch': {'url': 'https://gis.ccc.govt.nz/server/rest/services/OpenData/SiteUtility/FeatureServer/9', 'publisher': 'Christchurch City Council', 'kind': 'ArcGIS JSON', 'licence': None},
-    'zerowaste': {'url': 'https://zerowaste.co.nz/wp-json/wpgmza/v1/markers?map_id=2', 'publisher': 'Zero Waste Aotearoa', 'kind': 'JSON member map', 'licence': None},
+    'zerowaste': {'url': ZEROWASTE_PUBLIC, 'publisher': 'Zero Waste Aotearoa', 'kind': 'unsupported', 'licence': None,
+                  'unsupported': 'Zero Waste Aotearoa member markers are unsupported. The map feed mixes membership records and ignores the requested map, so it is not requested. Consult ' + ZEROWASTE_PUBLIC},
     'habitat': {'url': 'https://www.habitat.org.nz/op-shops', 'publisher': 'Habitat for Humanity New Zealand', 'kind': 'HTML directory', 'licence': None},
     'crc': {'url': 'https://www.makingzerowastework.org.nz/find-your-local-crc', 'publisher': 'Zero Waste Tāmaki Makaurau Trust', 'kind': 'HTML directory', 'licence': None},
     'techcollect': {'url': 'https://techcollect.nz/', 'publisher': 'TechCollect NZ', 'kind': 'unsupported', 'licence': None},
 }
-DEFAULT_SOURCES = [s for s in SOURCES if s not in ('council', 'techcollect', 'trow')]
+NOT_FETCHED = frozenset({'council', 'techcollect', 'trow', 'zerowaste'})
+DEFAULT_SOURCES = [s for s in SOURCES if s not in NOT_FETCHED]
 FETCH_HOSTS = {urlparse(spec['url']).hostname for source, spec in SOURCES.items()
-               if source not in ('council', 'techcollect')}
+               if source not in NOT_FETCHED}
 
 
 class SourceError(Exception):
@@ -116,7 +124,18 @@ def clean(text):
     return ' '.join(page(str(text or '')).lines)
 
 
+# Only leading and trailing noise is removed. An internal mark must not join
+# digits into a different coordinate.
+_EDGE_NUMERIC_NOISE = '\ufeff\u200b\u2060\u00a0 \t\r\n\f\v'
+
+
 def number(value):
+    if isinstance(value, bool) or value is None:
+        return None
+    if isinstance(value, str):
+        value = value.strip(_EDGE_NUMERIC_NOISE)
+        if not value or any(ch in _EDGE_NUMERIC_NOISE for ch in value):
+            return None
     try:
         n = float(value)
         return n if math.isfinite(n) else None
@@ -124,16 +143,36 @@ def number(value):
         return None
 
 
+def public_website(value):
+    """Keep an absolute public https link. Drop empty, credential, and non-https values."""
+    if not isinstance(value, str):
+        return None
+    text = value.strip()
+    if not text or any(ord(ch) < 32 or ord(ch) == 127 for ch in text):
+        return None
+    parsed = urlparse(text)
+    host = (parsed.hostname or '').lower()
+    if parsed.scheme != 'https' or parsed.username or parsed.password or not host:
+        return None
+    if host in {'localhost'} or host.endswith('.localhost'):
+        return None
+    return text
+
+
 def record(source, name, address=None, lon=None, lat=None, materials=(), hours=None,
            details=None, url=None, retrieved=None, latest=None, **extra):
     lon, lat = number(lon), number(lat)
     if lon is None or lat is None or not (-180 <= lon <= 180 and -90 <= lat <= 90):
         lon = lat = None
+    website = public_website(extra.pop('website', None))
     p = provenance(source, url, retrieved, latest)
-    return {'name': clean(name), 'address': clean(address) or None, 'lon': lon, 'lat': lat,
-            'materials': sorted(set(clean(x) for x in materials if clean(x))),
-            'hours': clean(hours) or None, 'source': source, 'provenance': p,
-            **p, 'details': clean(details) or None, **extra}
+    row = {'name': clean(name), 'address': clean(address) or None, 'lon': lon, 'lat': lat,
+           'materials': sorted(set(clean(x) for x in materials if clean(x))),
+           'hours': clean(hours) or None, 'source': source, 'provenance': p,
+           **p, 'details': clean(details) or None, **extra}
+    if website:
+        row['website'] = website
+    return row
 
 
 def hours_from(text):
@@ -287,7 +326,7 @@ def parse_beautification(data, retrieved):
 
 
 def parse_trow(data, retrieved):
-    """Return locations with available/pre-sale stock, never seller/account data."""
+    """Offline regression helper. load() must not retrieve or emit this feed."""
     require(isinstance(data, list) and data, 'TROW ReStore stock array is missing')
     require(len(data) < 1000, 'TROW ReStore reached the 1,000-item bound; refusing incomplete data')
     groups = {}
@@ -341,13 +380,13 @@ def parse_christchurch(data, retrieved, url=None):
 
 
 def parse_zerowaste(data, retrieved):
+    """Offline regression helper. load() must not retrieve or emit this feed."""
     require(isinstance(data, list) and data, 'Zero Waste Aotearoa member-marker array is missing')
     rows = []
     for marker in data:
         require(all(k in marker for k in ('id', 'title', 'map_id', 'lat', 'lng')),
                 'Zero Waste Aotearoa marker fields are missing')
-        # The endpoint ignores map_id and returns multiple maps. Select the
-        # published member map locally, rather than mixing other map content.
+        # Offline fixture behaviour only. Filtering map_id is not a release fix.
         if str(marker['map_id']) != '2':
             continue
         if str(marker.get('approved', '1')) != '1':
@@ -371,15 +410,29 @@ def parse_habitat(text, retrieved):
                 return
             require(all(a.get(key) for key in ('data-id', 'data-title', 'data-address')),
                     'Habitat op-shop card fields are missing')
+            # The shared page class is not evidence of clothing or building-material acceptance.
             self.rows.append(record('habitat', a['data-title'], a['data-address'], a.get('data-lng'), a.get('data-lat'),
-                                    materials=['Op Shops', 'Reuse', 'Second hand'],
-                                    details='Pre-loved goods. Confirm donation acceptance and opening hours with the store.',
+                                    materials=['Reuse'],
+                                    details='Reuse store. This listing does not state accepted materials. Confirm clothing, building materials, donations and hours with the store.',
                                     retrieved=retrieved, id=a['data-id']))
     parser = Cards()
     parser.feed(text)
     require(parser.rows, 'Habitat directory contains no op-shop cards')
     require(len({r['id'] for r in parser.rows}) == len(parser.rows), 'Habitat directory contains duplicate store cards')
     return parser.rows
+
+
+def crc_address_relation(address, display_address):
+    """Classify two publisher address forms without merging them into one string."""
+    full = re.sub(r',?\s*New Zealand\s*$', '', address or '', flags=re.I).strip()
+    short = (display_address or '').strip()
+    if not full or not short:
+        return 'missing'
+    if full.casefold() == short.casefold():
+        return 'equivalent'
+    if full.casefold().startswith(short.casefold()):
+        return 'shorter_label'
+    return 'distinct'
 
 
 def parse_crc(text, retrieved):
@@ -393,13 +446,24 @@ def parse_crc(text, retrieved):
     entries = [line for line in lines[start:end] if line.strip('\u200b \xa0')]
     require(entries and len(entries) % 4 == 0, 'Auckland CRC directory name/locality/address structure changed')
     rows = []
+    distinct = 0
     for i in range(0, len(entries), 4):
         name, locality, address, display_address = entries[i:i + 4]
         require(address.endswith('New Zealand') and re.search(r'\d', display_address),
                 'Auckland CRC directory address fields are missing')
+        relation = crc_address_relation(address, display_address)
+        details = 'Community recycling directory; confirm individual material acceptance, charges and hours with the operator.'
+        if relation == 'distinct':
+            distinct += 1
+            details += ' The publisher supplied a second address form that does not match the directory line; both are retained and neither is treated as a correction.'
         rows.append(record('crc', name, address, materials=['Reuse', 'Community recycling centre'],
-                           details='Community recycling directory; confirm individual material acceptance, charges and hours with the operator.',
-                           retrieved=retrieved, locality=locality, display_address=display_address))
+                           details=details, retrieved=retrieved, locality=locality,
+                           display_address=display_address, address_forms_differ=relation == 'distinct'))
+    if distinct:
+        noun = 'entry publishes' if distinct == 1 else 'entries publish'
+        rows[0]['source_warnings'] = [
+            f'{distinct} Auckland CRC {noun} two address forms that do not match; both forms are retained.'
+        ]
     return rows
 
 
@@ -485,13 +549,33 @@ def invalid_agrecovery_page(exc):
     return False
 
 
+def raise_if_unsupported(source):
+    message = SOURCES[source].get('unsupported')
+    if source == 'council':
+        message = f'Council item guidance is not implemented; consult {COUNCIL}'
+    elif source == 'techcollect':
+        message = 'TechCollect is skipped: script access is blocked; no verified keyless feed'
+    if message:
+        raise SourceError(message, 7, source_url=SOURCES[source]['url'], source=source)
+
+
+def cache_is_servable(saved):
+    """Reject stale parser output and any record carrying refused identity keys."""
+    if saved.get('version') != PARSER_VERSION or time.time() - saved['saved_at'] >= TTL:
+        return False
+    records = saved.get('records')
+    if not isinstance(records, list) or not records:
+        return False
+    for row in records:
+        if not isinstance(row, dict) or PERSONAL_CACHE_KEYS.intersection(row):
+            return False
+    return True
+
+
 def load_uncached(source, probe=False):
+    raise_if_unsupported(source)
     spec, retrieved = SOURCES[source], utc_now()
     url = spec['url']
-    if source == 'council':
-        raise SourceError(f'Council item guidance is not implemented; consult {COUNCIL}', 7, source_url=COUNCIL)
-    if source == 'techcollect':
-        raise SourceError('TechCollect is skipped: script access is blocked; no verified keyless feed', 7)
     if source == 'recyclemap':
         data = get(url, True)
         rows = parse_recyclemap(data, get(RM + 'maps', True), get(RM + 'categories', True), retrieved)
@@ -526,13 +610,9 @@ def load_uncached(source, probe=False):
         require(rows, 'Agrecovery returned no active collection sites')
     elif source == 'beautification':
         rows = parse_beautification(get(url, True), retrieved)
-    elif source == 'trow':
-        rows = parse_trow(get(url, True), retrieved)
     elif source == 'christchurch':
         query = url + '/query?where=1%3D1&outFields=*&returnGeometry=true&outSR=4326&f=json'
         rows = parse_christchurch(get(query, True), retrieved, query)
-    elif source == 'zerowaste':
-        rows = parse_zerowaste(get(url, True), retrieved)
     elif source == 'habitat':
         rows = parse_habitat(get(url), retrieved)
     elif source == 'crc':
@@ -575,12 +655,12 @@ def load_uncached(source, probe=False):
 
 
 def load(source, refresh=False):
+    raise_if_unsupported(source)
     cache = CACHE / (source + '.json')
     if not refresh:
         try:
             saved = json.loads(cache.read_text())
-            if saved.get('version') == PARSER_VERSION and time.time() - saved['saved_at'] < TTL:
-                require(isinstance(saved.get('records'), list) and saved['records'], 'Cache records are missing')
+            if cache_is_servable(saved):
                 return saved['records'], True
         except (OSError, ValueError, KeyError, TypeError):
             pass
@@ -718,12 +798,9 @@ def command_sources(args):
     statuses = []
     sources = list(dict.fromkeys(args.source or SOURCES))
     with ThreadPoolExecutor(max_workers=4) as pool:
-        futures = [None if source == 'trow' and not args.source else
-                   pool.submit(load_uncached, source, probe=True) for source in sources]
+        futures = [pool.submit(load_uncached, source, probe=True) for source in sources]
         for source, future in zip(sources, futures):
             try:
-                if future is None:
-                    raise SourceError('TROW is explicit-only: use --source trow; its internal endpoint returns personal seller/account fields.', 7)
                 rows = future.result()
                 url = SOURCES[source]['url'] if source == 'repair' else rows[0]['source_url']
                 statuses.append({'source': source, 'status': 'ok', 'count': len(rows), 'kind': SOURCES[source]['kind'],
@@ -755,11 +832,7 @@ def command_data(args):
     warnings = ['Listings may be stale; confirm material restrictions, charges and opening times with the operator.',
                 'Records remain separate across sources; counts are directory entries, not unique physical sites.']
     if skipped:
-        warnings.append('repair, tyrewise and crc listings have no verified coordinates; use search <town> for them. TROW requires --source trow and has no verified coordinates.')
-    if any(r['source'] == 'trow' for r in rows):
-        warnings.append('TROW lists locations of available/pre-sale stock, not confirmed donation drop-offs; unspecified locations remain unlocated.')
-    if any(r['source'] == 'zerowaste' for r in rows):
-        warnings.append('Zero Waste Aotearoa lists network members, not verified drop-offs. Some map coordinates conflict with addresses; confirm location and services with the operator.')
+        warnings.append('repair, tyrewise and crc listings have no verified coordinates; use search <town> for them.')
     for source in health:
         warnings.extend(source.get('warnings', []))
         if source['status'] != 'ok':
@@ -792,7 +865,7 @@ def command_data(args):
     elif args.command == 'search':
         terms = args.text.casefold().split()
         rows = [r for r in rows if all(t in ' '.join(str(r.get(k) or '') for k in
-                 ('name', 'address', 'materials', 'details', 'region', 'territory')).casefold() for t in terms)]
+                 ('name', 'address', 'display_address', 'locality', 'materials', 'details', 'region', 'territory')).casefold() for t in terms)]
     rows = spatial_filter(rows, args.bbox, getattr(args, 'near', None), getattr(args, 'radius', 20))
     fail_if_empty(rows, health)
     if any(r['source'] == 'branz' and (r.get('facility_type') == 'Service' or r.get('status') != 'Existing') for r in rows):
@@ -882,7 +955,8 @@ def main(argv=None):
             extra = r.get('address') or r.get('status') or str(r.get('count', ''))
             km = f" ({r['distance_km']} km)" if 'distance_km' in r else ''
             facility = f" [type: {r.get('facility_type') or 'unknown'}; status: {r.get('status') or 'unknown'}]" if r.get('source') == 'branz' else ''
-            print(f'{label}: {extra}{km}{facility}')
+            other_form = f"; other published form: {r['display_address']}" if r.get('address_forms_differ') and r.get('display_address') else ''
+            print(f'{label}: {extra}{km}{facility}{other_form}')
         for w in result['warnings']:
             print('Note: ' + w)
         for s in result['source_status']:

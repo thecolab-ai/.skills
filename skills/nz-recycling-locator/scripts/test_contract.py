@@ -8,6 +8,7 @@ from pathlib import Path
 import sys
 import tempfile
 import threading
+import time
 import unittest
 from unittest.mock import patch
 
@@ -151,60 +152,77 @@ class Parsers(unittest.TestCase):
         self.assertTrue(any(r['address'] == 'Other Yard, Ranui' for r in rows))
         self.assertTrue(any(r['address'] is None for r in rows))
 
-    def test_trow_private_fields_never_reach_outputs_or_cache(self):
+    def test_trow_and_zerowaste_are_not_requested_or_served_from_cache(self):
         private = {'seller_email': 'synthetic-private@example.invalid',
                    'seller_name': 'SYNTHETIC PRIVATE SELLER',
                    'created_by': 'synthetic-private-account'}
-        data = [{**item, **private} for item in fixture('trow')]
-        with tempfile.TemporaryDirectory() as temp, patch.object(cli, 'CACHE', Path(temp)), \
-                patch.object(cli, 'get', return_value=data) as fetch:
-            rows, cached = cli.load('trow', refresh=True)
-            self.assertFalse(cached)
-            fetch.assert_called_once_with(cli.SOURCES['trow']['url'], True)
-            saved_path = Path(temp) / 'trow.json'
-            outputs = [json.dumps(rows), saved_path.read_text()]
-            for argv in (['search', 'TROW', '--json'],
-                         ['search', 'TROW', '--format', 'geojson'],
-                         ['search', 'TROW'], ['materials', '--json'],
-                         ['sources', '--json']):
-                with redirect_stdout(io.StringIO()) as out:
-                    self.assertEqual(cli.main(argv + ['--source', 'trow']), 0)
-                outputs.append(out.getvalue())
-            for output in outputs:
-                for key, value in private.items():
-                    self.assertNotIn(key, output)
-                    self.assertNotIn(value, output)
-            # Old cache entries must not bypass the new grouping parser.
-            saved = json.loads(saved_path.read_text())
-            saved['version'] = 3
-            saved['records'][0]['name'] = 'obsolete unmerged yard'
-            saved_path.write_text(json.dumps(saved))
-            reloaded, cached = cli.load('trow')
-            self.assertFalse(cached)
-            self.assertEqual(reloaded, rows)
-
-    def test_trow_requires_explicit_selection_in_queries_and_probes(self):
         self.assertNotIn('trow', cli.DEFAULT_SOURCES)
-        self.assertIn('base44.app', cli.FETCH_HOSTS)
-        rows = cli.parse_trow(fixture('trow'), STAMP)
-        for argv in (['materials', '--json'], ['search', 'TROW', '--json'],
+        self.assertNotIn('zerowaste', cli.DEFAULT_SOURCES)
+        self.assertNotIn('base44.app', cli.FETCH_HOSTS)
+        self.assertNotIn('zerowaste.co.nz', cli.FETCH_HOSTS)
+        self.assertNotIn('base44.app', Path(cli.__file__).read_text())
+        with tempfile.TemporaryDirectory() as temp, patch.object(cli, 'CACHE', Path(temp)), \
+                patch.object(cli, 'get') as fetch, patch.object(cli, 'parse_trow') as parse_trow, \
+                patch.object(cli, 'parse_zerowaste') as parse_zerowaste:
+            for source in ('trow', 'zerowaste'):
+                path = Path(temp) / (source + '.json')
+                path.write_text(json.dumps({
+                    'version': cli.PARSER_VERSION,
+                    'saved_at': time.time(),
+                    'records': [{
+                        'name': 'Synthetic cached member',
+                        'source': source,
+                        'details': private['seller_email'],
+                        **private,
+                    }],
+                }))
+                for refresh in (False, True):
+                    with self.assertRaises(cli.SourceError) as caught:
+                        cli.load(source, refresh=refresh)
+                    self.assertEqual(caught.exception.code, 7)
+                    self.assertEqual(caught.exception.source_url, cli.SOURCES[source]['url'])
+                self.assertTrue(path.is_file())
+                with redirect_stdout(io.StringIO()) as out:
+                    self.assertEqual(cli.main(['search', 'Synthetic', '--source', source, '--json']), 7)
+                payload = json.loads(out.getvalue())
+                self.assertEqual(payload['error']['type'], 'unsupported_operation')
+                self.assertEqual(payload['results'], [])
+                self.assertEqual(payload['meta']['source_url'], cli.SOURCES[source]['url'])
+                self.assertNotIn('wp-json', payload['meta']['source_url'])
+                rendered = out.getvalue()
+                for value in private.values():
+                    self.assertNotIn(value, rendered)
+            with redirect_stdout(io.StringIO()) as out:
+                self.assertEqual(cli.main(['sources', '--source', 'trow', '--source', 'zerowaste', '--json']), 0)
+            statuses = json.loads(out.getvalue())['source_status']
+            self.assertEqual([item['status'] for item in statuses], ['skipped', 'skipped'])
+            self.assertEqual([item['code'] for item in statuses], [7, 7])
+            self.assertEqual(json.loads(out.getvalue())['result_status'], 'ok')
+            fetch.assert_not_called()
+            parse_trow.assert_not_called()
+            parse_zerowaste.assert_not_called()
+        rows = cli.parse_ecycle(fixture('ecycle'), STAMP)
+        with tempfile.TemporaryDirectory() as temp, patch.object(cli, 'CACHE', Path(temp)), \
+                patch.object(cli, 'load_uncached', return_value=rows) as fetch:
+            poisoned = {'version': cli.PARSER_VERSION, 'saved_at': time.time(),
+                        'records': [{**rows[0], **private}]}
+            (Path(temp) / 'ecycle.json').write_text(json.dumps(poisoned))
+            loaded, cached = cli.load('ecycle')
+            self.assertFalse(cached)
+            self.assertNotIn('seller_email', loaded[0])
+            fetch.assert_called_once_with('ecycle')
+
+    def test_personal_feeds_stay_out_of_default_queries(self):
+        rows = cli.parse_ecycle(fixture('ecycle'), STAMP)
+        for argv in (['materials', '--json'], ['search', 'Example', '--json'],
                      ['find', '--material', 'reuse', '--near=174.76,-36.85', '--json'],
-                     ['search', 'TROW', '--bbox=174,-37,175,-36', '--json']):
+                     ['search', 'Example', '--bbox=174,-37,175,-36', '--json']):
             with patch.object(cli, 'load', return_value=(rows, True)) as load, \
                     redirect_stdout(io.StringIO()):
-                self.assertEqual(cli.main(argv), 0)
-            self.assertNotIn('trow', [c.args[0] for c in load.call_args_list])
-        with patch.object(cli, 'load_uncached', return_value=rows) as load, \
-                redirect_stdout(io.StringIO()) as out:
-            self.assertEqual(cli.main(['sources', '--json']), 0)
-        self.assertNotIn('trow', [c.args[0] for c in load.call_args_list])
-        status = next(s for s in json.loads(out.getvalue())['source_status'] if s['source'] == 'trow')
-        self.assertEqual(status['status'], 'skipped')
-        self.assertIn('--source trow', status['error'])
-        with patch.object(cli, 'load_uncached', return_value=rows) as load, \
-                redirect_stdout(io.StringIO()):
-            self.assertEqual(cli.main(['sources', '--source', 'trow', '--json']), 0)
-        load.assert_called_once_with('trow', probe=True)
+                cli.main(argv)
+            called = [c.args[0] for c in load.call_args_list]
+            self.assertNotIn('trow', called)
+            self.assertNotIn('zerowaste', called)
 
     def test_christchurch_flags_dates_wgs84_and_truncation(self):
         data = fixture('christchurch')
@@ -240,10 +258,20 @@ class Parsers(unittest.TestCase):
     def test_habitat_cards_ignore_unrelated_business_coordinates(self):
         text = (FIXTURES / 'habitat.html').read_text()
         rows = cli.parse_habitat(text, STAMP)
-        self.assertEqual(len(rows), 2)
+        self.assertEqual(len(rows), 4)
         self.assertEqual(rows[0]['address'], '10 Sample Street, Sampletown')
         self.assertEqual(rows[0]['lon'], 174.77)
-        self.assertTrue(cli.material_matches(rows[0], 'clothing'))
+        self.assertEqual(rows[0]['materials'], ['Reuse'])
+        self.assertNotIn('Op Shops', rows[0]['materials'])
+        self.assertNotIn('Second hand', rows[0]['materials'])
+        self.assertFalse(cli.material_matches(rows[0], 'clothing'))
+        self.assertTrue(cli.material_matches(rows[0], 'reuse'))
+        coastal = next(row for row in rows if row['id'] == '903')
+        self.assertEqual(coastal['lat'], -36.85)
+        self.assertEqual(coastal['lon'], 174.78)
+        internal = next(row for row in rows if row['id'] == '904')
+        self.assertIsNone(internal['lat'])
+        self.assertIsNone(internal['lon'])
         self.assert_record(rows[0])
         for damaged in ('<html/>', text.replace('data-id="902"', 'data-id="901"'),
                         text.replace('data-title="Example Op Shop"', 'data-title=""')):
@@ -251,8 +279,7 @@ class Parsers(unittest.TestCase):
                 cli.parse_habitat(damaged, STAMP)
 
     def test_new_source_dispatch_and_json_provenance(self):
-        parsers = {'trow': cli.parse_trow, 'christchurch': cli.parse_christchurch,
-                   'zerowaste': cli.parse_zerowaste, 'habitat': cli.parse_habitat, 'crc': cli.parse_crc}
+        parsers = {'christchurch': cli.parse_christchurch, 'habitat': cli.parse_habitat, 'crc': cli.parse_crc}
         for source, parse in parsers.items():
             data = (FIXTURES / (source + '.html')).read_text() if source in ('habitat', 'crc') else fixture(source)
             with patch.object(cli, 'get', return_value=data) as get, patch.object(cli, 'utc_now', return_value=STAMP):
@@ -261,27 +288,39 @@ class Parsers(unittest.TestCase):
             if source == 'christchurch':
                 self.assertIn('outSR=4326', get.call_args.args[0])
                 self.assertEqual(rows[0]['source_url'], get.call_args.args[0])
-            code, payload = self.invoke(['search', 'Example' if source != 'trow' else 'Sampletown',
-                                         '--source', source, '--json'], [(rows, False)])
+            code, payload = self.invoke(['search', 'Example', '--source', source, '--json'], [(rows, False)])
             self.assertEqual(code, 0)
             self.assertEqual(payload['meta']['publisher'], cli.SOURCES[source]['publisher'])
             self.assertEqual(payload['meta']['retrieved_at'], STAMP)
             self.assertGreater(len(payload['results']), 0)
-        rows = cli.parse_trow(fixture('trow'), STAMP)
-        code, payload = self.invoke(['search', 'TROW', '--source', 'trow', '--format', 'geojson'], [(rows, True)])
-        self.assertEqual(code, 0)
-        self.assertTrue(all(f['geometry'] is None for f in payload['features']))
 
     def test_crc_visible_addresses_without_global_coordinates(self):
         text = (FIXTURES / 'crc.html').read_text()
         rows = cli.parse_crc(text, STAMP)
-        self.assertEqual(len(rows), 2)
+        self.assertEqual(len(rows), 3)
         self.assertEqual(rows[0]['name'], 'Example Community Recycling Centre')
         self.assertEqual(rows[0]['address'], '10 Sample Road, Sampletown 0999, New Zealand')
+        self.assertEqual(rows[0]['display_address'], '10 Sample Road, Sampletown')
+        self.assertFalse(rows[0]['address_forms_differ'])
+        self.assertEqual(rows[0]['source_warnings'], [
+            '1 Auckland CRC entry publishes two address forms that do not match; both forms are retained.'
+        ])
+        divergent = rows[2]
+        self.assertEqual(divergent['address'], '10A Sample Road, Sampletown 0999, New Zealand')
+        self.assertEqual(divergent['display_address'], '10B Sample Road, Sampletown')
+        self.assertTrue(divergent['address_forms_differ'])
+        self.assertIn('second address form', divergent['details'])
+        self.assertNotEqual(divergent['address'], divergent['display_address'])
         self.assertEqual(rows[0]['locality'], 'Sampletown')
         self.assertTrue(all(r['lon'] is None for r in rows))
         self.assertTrue(cli.material_matches(rows[0], 'reuse'))
         self.assert_record(rows[0])
+        code, payload = self.invoke(['search', '10B', '--source', 'crc', '--json'], [(rows, False)])
+        self.assertEqual(code, 0)
+        self.assertEqual(payload['results'][0]['name'], 'Example Divergent Recycling Centre')
+        with patch.object(cli, 'load', return_value=(rows, False)), redirect_stdout(io.StringIO()) as out:
+            self.assertEqual(cli.main(['search', '10B', '--source', 'crc']), 0)
+        self.assertIn('other published form: 10B Sample Road, Sampletown', out.getvalue())
         for damaged in ('<html/>', text.replace('<p>Sampletown</p>', ''), text.replace('©', 'Copyright')):
             with self.assertRaises(cli.SourceError):
                 cli.parse_crc(damaged, STAMP)
@@ -557,6 +596,25 @@ class Parsers(unittest.TestCase):
             self.assertEqual(code, 0)
             self.assertEqual(payload['result_status'], 'partial')
             self.assertEqual(payload['source_status'][0]['code'], 7)
+
+    def test_coordinates_strip_edge_noise_only_and_websites_stay_public_https(self):
+        self.assertEqual(cli.number('\ufeff-36.85'), -36.85)
+        self.assertEqual(cli.number('174.78 \ufeff'), 174.78)
+        self.assertEqual(cli.number('\u00a0-41.2\u00a0'), -41.2)
+        self.assertIsNone(cli.number('-36.8\ufeff6'))
+        self.assertIsNone(cli.number('174 79'))
+        self.assertIsNone(cli.number('nan'))
+        self.assertIsNone(cli.number('inf'))
+        self.assertIsNone(cli.number(True))
+        self.assertIsNone(cli.public_website('javascript:alert(1)'))
+        self.assertIsNone(cli.public_website('http://www.habitat.org.nz/op-shops'))
+        self.assertIsNone(cli.public_website('https://user:secret@example.invalid/private'))
+        self.assertIsNone(cli.public_website(''))
+        self.assertEqual(cli.public_website(' https://www.habitat.org.nz/op-shops '), 'https://www.habitat.org.nz/op-shops')
+        row = cli.record('branz', 'Example', website='http://example.invalid/drop', retrieved=STAMP)
+        self.assertNotIn('website', row)
+        row = cli.record('branz', 'Example', website='https://www.habitat.org.nz/op-shops', retrieved=STAMP)
+        self.assertEqual(row['website'], 'https://www.habitat.org.nz/op-shops')
 
     def test_hours_inline_and_unknown(self):
         self.assertEqual(cli.hours_from('<p>Hours: Monday - Friday 0800-1600</p><p>Restrictions: public access</p>'), 'Monday - Friday 0800-1600')

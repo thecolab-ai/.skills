@@ -1,7 +1,7 @@
 # Source notes and output semantics
 
 - Authentication: none
-- Last verified: 2026-10-08
+- Last verified: 2026-10-12
 
 Verified on 8 October 2026 using live public HTTP responses. Directory counts
 are observations, not hard-coded CLI assertions. All sources are keyless and
@@ -16,11 +16,11 @@ an open reuse licence. `SKILL.md`'s MIT licence covers the skill code only.
 | `ecycle` | E-Cycle: `https://www.e-cycle.co.nz/wp-admin/admin-ajax.php?action=store_search&lat=-36.8485&lng=174.7633&max_results=1000&search_radius=5000&autoload=1` | 17 nationwide partners | Without `autoload=1`, the same request returned only one site; acceptance varies and charges may apply |
 | `agrecovery` | Agrecovery: `https://agrecovery.co.nz/wp-json/wp/v2/ag_site?per_page=100&page=1&acf_format=standard&_fields=id,title,acf&orderby=title&order=asc` | 241 active sites across three pages | Programme-specific agricultural packaging; raw scheme labels retained rather than general plastic acceptance |
 | `beautification` | Beautification Trust: `https://api.mapme.com/api/stories/aggregated/af29690b-4cd0-484f-a211-8f3e12fa51b4` | 144 sections, 140 named entries; 43 categories | South and East Auckland focus; four unlabelled sections skipped; no source-stated dataset date |
-| `trow` (explicit-only) | TROW Group: `https://base44.app/api/apps/68e5846a599cc4e55639725b/entities/Item?sort=-created_date&limit=1000` | 88 stock items, grouped into two unsold location records; 54 available, three pre-sale, 31 sold excluded | Undocumented internal Base44 endpoint returns personal seller/account fields; excluded from defaults. One blank location; no verified coordinates, street addresses, donation acceptance or opening hours |
+| `trow` | TROW Group public page: `https://trowrestore.com/` | Not requested | Unsupported (exit 7). The undocumented Base44 stock endpoint returns seller identity and contact fields and has no verified acceptable-use terms. No stock locations are emitted. `find --material salvage` does not query it |
 | `christchurch` | Christchurch City Council: `https://gis.ccc.govt.nz/server/rest/services/OpenData/SiteUtility/FeatureServer/9` | 16 CollectionDepot point features via `/query?where=1%3D1&outFields=*&returnGeometry=true&outSR=4326&f=json` | Broad refuse/recycling/green-waste flags; no street addresses or individual-material acceptance; latest feature edit 2020-09-02T21:55:46.000Z |
-| `zerowaste` | Zero Waste Aotearoa: `https://zerowaste.co.nz/wp-json/wpgmza/v1/markers?map_id=2` | 296 upstream markers across maps 2, 6 and 7; 170 approved member-map records after local filtering | Member directory, not verified drop-offs; category API returned 403; some coordinates conflict with addresses |
-| `habitat` | Habitat for Humanity New Zealand: `https://www.habitat.org.nz/op-shops` | 24 store cards, 21 with valid coordinates | Pre-loved-goods stores; three unlocated shops; confirm store-specific donation acceptance and hours |
-| `crc` | Zero Waste Tāmaki Makaurau Trust: `https://www.makingzerowastework.org.nz/find-your-local-crc` | 13 Auckland CRC names and addresses | No verified per-site coordinates; text search only by default; confirm material acceptance and hours |
+| `zerowaste` | Zero Waste Aotearoa public page: `https://zerowaste.co.nz/` | Not requested | Unsupported (exit 7). The marker endpoint ignores `map_id` and the membership feed is not an organisation-only directory. Names are not classified heuristically |
+| `habitat` | Habitat for Humanity New Zealand: `https://www.habitat.org.nz/op-shops` | 24 store cards on 2026-10-12; coordinates kept when numeric noise is only at the ends | Generic `Reuse` label. The shared page class is not clothing or building-material acceptance. One card had no coordinates |
+| `crc` | Zero Waste Tāmaki Makaurau Trust: `https://www.makingzerowastework.org.nz/find-your-local-crc` | 13 Auckland CRC names and addresses on 2026-10-12 | No verified per-site coordinates. Two centres publish address forms that do not match; both forms are retained. A shorter display line that prefixes the directory line is not a second site |
 | `repair` | Repair Network Aotearoa: `https://www.repairnetworkaotearoa.org.nz/dynamic-localrepaircafes_p_8500816c_6fb3_4424_8161_90ad1ae5b8b2_0_5000-sitemap.xml` | 46 sitemap URLs; Auckland library detail parsed live | Street addresses and schedules; event locations have no verified per-café coordinates |
 | `tyrewise` | Tyrewise: `https://www.tyrewise.co.nz/participant_cat/collection-site/` | 108 archive entries across nine pages | Name, town/region taxonomy labels and operator detail link; no street address, hours or verified coordinates |
 | `council` | Auckland Council: `https://www.aucklandcouncil.govt.nz/en/rubbish-recycling/get-rid-unwanted-items.html` | Guidance not implemented | `item` returns exit 7; Council-only data selection returns exit 7 without fetching; consult the website manually |
@@ -58,26 +58,13 @@ those links. This avoids guessing a street address from a territory or presentin
 - Beautification Trust joins `scene.sections` keys to category `sections`
   membership. Coordinates use each section's `mapView.center`; descriptions,
   addresses and operator links are retained. No map-style settings are cached.
-- TROW requires explicit `--source trow`, including live `sources` probes.
-  The catalogue-linked ReStore stock endpoint is an undocumented internal
-  Base44 app endpoint that returns `seller_email`, `seller_name` and `created_by`
-  for every record. Privacy is the reason it is excluded from default queries
-  and probes, even though it needs no authentication. Its primary marketplace
-  is `https://trowrestore.com/`. Available and pre-sale items are grouped by
-  visible `location` label, with the known aliases “Trow Group Yard, Ranui” and
-  “TROW Yard - Ranui. Auckland 0612” merged as “Trow Group Yard, Ranui”. Counts,
-  categories and stock-edit dates combine across both labels. Other labels are
-  kept separate. Sold items are excluded;
-  blank location labels remain separate, with null address/coordinates. Materials
-  combine the publisher's stock categories with explicit reuse/salvage labels;
-  these describe stock, not accepted donations. The 1,000-item request cap was
-  verified live; reaching it fails rather than returning an incomplete directory.
-  Only normalised location/category/count fields and provenance are output or
-  cached: no seller emails, seller names, creator/account identifiers, images,
-  prices or complete stock payloads. `latest_data`
-  is the maximum `updated_date` of unsold items (observed
-  `2026-09-27T23:59:39.631000`). The upstream omits a timezone, so it is preserved
-  exactly and is not relabelled as UTC. It is a stock-edit date, not a yard date.
+- TROW and Zero Waste Aotearoa member markers are unsupported. The CLI returns
+  exit 7 with the public landing page and does not request, parse, or cache
+  either feed. Changing `map_id` is not a fix: the membership endpoint ignores
+  it. The stock endpoint is an undocumented internal app feed that carries
+  seller identity and contact fields; it is not on the runtime fetch allowlist.
+  Offline fixture parsers remain for regression tests and are not called by
+  `load`. `find --material salvage` therefore has no TROW stock locations.
 - Christchurch requests `outSR=4326` and checks the response spatial reference
   before emitting GeoJSON. `DepotName`, `CollectionDepotID`, `OperatingHours`
   and affirmative `AcceptsRefuse`, `AcceptsRecycling`, `AcceptsGreenWaste` flags
@@ -85,24 +72,35 @@ those links. This avoids guessing a street address from a territory or presentin
   upstream. A transfer-limit response fails. `latest_data` is the maximum
   feature `LastEditDate`, converted from ArcGIS epoch milliseconds to UTC;
   its old date must not be replaced with retrieval or metadata creation dates.
-  Neither the layer copyright field nor its metadata XML states a data licence.
-- Zero Waste Aotearoa's markers endpoint ignores its `map_id` query parameter:
-  filter `map_id == "2"` locally and retain approved markers only. Numeric
-  category IDs remain uninterpreted because `/wp-json/wpgmza/v1/categories`
-  (also with `?map_id=2`) returned 403. The only assigned service label is
-  “Resource recovery network member”; `find --material reuse` does not infer
-  acceptance for every member. The published All Heart NZ (Porirua) address
-  has Auckland coordinates in this feed; a warning calls for operator checks.
+  The observed feature edit timestamp remains 2020-09-02T21:55:46.000Z and is not a
+  retrieval date. Neither the layer copyright field nor its metadata XML states
+  a data licence. The same FeatureServer layer 9 is CollectionDepot, which
+  `nz-arcgis` can query as a general layer. This skill adds the acceptance-flag
+  normalisation and the WGS84/truncation checks; it does not replace `nz-arcgis`.
 - Habitat uses HTML `div.js-op-shop-card` attributes `data-id`, `data-title`,
   `data-address`, `data-lat` and `data-lng`. Nested address markup is cleaned,
   duplicate cards fail and unrelated global business coordinates are ignored.
+  Leading or trailing BOM, NBSP and zero-width marks are stripped from a
+  coordinate; an internal mark rejects that coordinate instead of joining
+  digits. Finite range checks remain. On 2026-10-12 two longitude/latitude
+  attributes had that edge noise and one card had no coordinates. Every card
+  receives the generic `Reuse` label. The shared `card--opshop` class is page
+  membership, not evidence that a store accepts clothing or building materials.
   Hours are left null because the listing cards do not publish them. Store
   detail pages and operator links are not crawled.
 - Auckland CRC uses the bounded visible list after the published list-introduction
   marker and before the copyright footer. Each entry has name, locality, full
   address and display address. Missing/changed four-field structure fails
-  explicitly. Wix global coordinates are ignored. These text-address records
-  join TROW, repair and Tyrewise in the default spatial-source exclusions.
+  explicitly. Wix global coordinates are ignored. A display line that is a
+  case-insensitive prefix of the directory line, after removing a trailing
+  “New Zealand”, stays a shorter label. Any other pair is kept as two published
+  forms, with `address_forms_differ` and a source warning; the strings are not
+  merged. On 2026-10-12, 11 of 13 pairs were shorter labels and 2 differed.
+  Search matches both forms. These text-address records join repair and
+  Tyrewise in the default spatial-source exclusions.
+- Operator `website` values are kept only when they are absolute `https` URLs
+  without userinfo. Empty, `http`, credential, and script values are omitted
+  and are not fetched.
 - Repair café HTML uses visible text between “◀ Back” and “◀ Previous”. This
   avoids Wix's unrelated global business-location fields. Two readers and a
   250 ms pause per request bound load; the sitemap is capped at 150 pages.
@@ -128,12 +126,14 @@ API calls rather than website scraping. Council and TechCollect are not fetched.
 Council remains in the metadata host list because the repository static audit requires hosts of returned URLs;
 the runtime fetch allowlist excludes both unsupported sources.
 
-The new sources were checked on the same date: `trowrestore.com`, `base44.app`,
-`zerowaste.co.nz` and `www.habitat.org.nz` robots permit the paths used here;
-`gis.ccc.govt.nz/robots.txt` returns 404. Requests use the repository HTTP helper
-and 10-second timeouts. The Zero Waste marker endpoint works with an identified
-script User-Agent, although a bare urllib request returned 403; blocked category
-paths are not used or bypassed. No new source needs a browser or key.
+Habitat, Christchurch and the Auckland CRC page remain the added feeds that are
+fetched. `trowrestore.com` and `zerowaste.co.nz` stay in metadata because
+unsupported results return those public pages; the runtime fetch allowlist
+excludes them, `base44.app`, Council and TechCollect. The shared HTTP helper
+sends its normal browser-shaped User-Agent. This skill does not send a separate
+identified script User-Agent, and it does not request the membership or stock
+feeds. `gis.ccc.govt.nz/robots.txt` returns 404. Requests use 10-second timeouts.
+No source needs a browser or key.
 
 ## Additional catalogue directories assessed
 
@@ -157,10 +157,11 @@ single-business service descriptions were excluded from this location connector.
 
 Council item guidance is not implemented. `item` deterministically returns
 `unsupported_operation` (exit 7), without a request, and includes the public
-Council URL for manual consultation. Council-only data selection also exits 7;
-combined selection reports Council in `source_status` and warnings as partial
-when working sources return records. Earlier network-blocked observations are
-not a description of current availability.
+Council URL for manual consultation. Council-only, TechCollect-only, TROW-only
+and Zero Waste-only data selections also exit 7 without a request. Combined
+selection reports each unsupported source in `source_status` and warnings as
+partial when working sources return records. Earlier network-blocked
+observations are not a description of current availability.
 Implementing guidance later requires a verified directory/item parser and
 synthetic or appropriately licensed fixtures; no item taxonomy is guessed.
 
@@ -168,20 +169,24 @@ synthetic or appropriately licensed fixtures; no item taxonomy is guessed.
 
 Only normalised directory records are cached for 24 hours under
 `$XDG_CACHE_HOME/nz-recycling-locator` (fallback `~/.cache/nz-recycling-locator`).
-Parser version 4 invalidates older records, including unmerged Ranui labels;
-writes use unique temporary files and
-atomic replacement so concurrent runs do not share a temporary path. Cache data
-contains public site information and retains source retrieval timestamps.
-`--refresh` never substitutes stale cache after failure. `sources` always
-fetches live and distinguishes record counts from repair sitemap URL counts;
-TROW is reported as skipped without a request unless `--source trow` is supplied.
+Parser version 5 invalidates older records, including Habitat labels and
+coordinates and any previously normalised TROW or Zero Waste cache. Writes use
+unique temporary files and atomic replacement so concurrent runs do not share a
+temporary path. A current-version cache is also ignored when a record contains
+`seller_email`, `seller_name` or `created_by`. Ignored files are not deleted.
+Unsupported sources are rejected before the cache is read, including with
+`--refresh`. Cache data contains public site information and retains source
+retrieval timestamps. `--refresh` never substitutes stale cache after failure.
+`sources` always fetches live supported directories and distinguishes record
+counts from repair sitemap URL counts. TROW and Zero Waste are reported as
+skipped without a request.
 
 A combined query continues with working sources and returns `result_status: partial`
 plus per-source errors. If every selected source fails, or filtering leaves no
 matches while a selected source failed, the command returns an error. HTTP
 blocks/rate limits exit 4 (`retry_after` preserved), network failures exit 5 and
-parser/schema changes exit 6. Council or TechCollect data selections exit 7
-when they are the only selected sources; otherwise they appear in `source_status`
+parser/schema changes exit 6. Council, TechCollect, TROW or Zero Waste data
+selections exit 7 when they are the only selected sources; otherwise they appear in `source_status`
 and warnings as partial (exit 0 when records remain). `sources` reports these as
 skipped; skipped sources alone do not make the status listing partial. Spatial
 filtering excludes unlocated records; GeoJSON without a spatial filter uses null
@@ -189,7 +194,7 @@ geometry for these entries.
 
 `search` is textual discovery, so words may occur in exclusion text. `find`
 uses material labels, but labels are still broad; show `details` before giving
-specific disposal advice. Directory records and stock counts do not guarantee
+specific disposal advice. Directory records do not guarantee
 current availability, capacity or bookings.
 Fixtures in `tests/fixtures/` are synthetic structure examples, clearly marked
 in `capture-metadata.json`. Names, addresses and coordinates are invented; no
