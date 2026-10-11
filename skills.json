@@ -2,7 +2,7 @@
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
   "last_verified": "2026-10-11",
-  "skill_count": 166,
+  "skill_count": 167,
   "skills": [
     {
       "name": "airnz-flights",
@@ -1758,6 +1758,31 @@
         "services.arcgis.com"
       ],
       "last_verified": "2026-10-08",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "linz-tide-gauges-nz",
+      "description": "Query official LINZ tide-gauge sea-level observations. Use for Auckland Devonport (AUCT) and other published LINZ gauge codes, daily UTC minute heights, sensor datasets, and file listings. Not tide predictions.",
+      "path": "skills/linz-tide-gauges-nz",
+      "category": "environment",
+      "source_owner": "Toitū Te Whenua Land Information New Zealand (LINZ)",
+      "source_type": "official",
+      "source_url": "https://sealevel-data.linz.govt.nz/index.html?tidegauge=AUCT",
+      "auth": "none",
+      "access_mode": "public-api",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "24h",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "sealevel-data.linz.govt.nz"
+      ],
+      "last_verified": "2026-10-11",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
