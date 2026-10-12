@@ -2,7 +2,7 @@
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
   "last_verified": "2026-10-12",
-  "skill_count": 174,
+  "skill_count": 175,
   "skills": [
     {
       "name": "airnz-flights",
@@ -1231,6 +1231,31 @@
         "www.firsttable.co.nz"
       ],
       "last_verified": "2026-07-19",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "flamingo-gbfs",
+      "description": "Read Flamingo public Auckland GBFS 3.0 feeds for the feed list, system licence, and current vehicle positions. Use for keyless scooter locations and range in metres. Do not use for trip histories, trajectories, Ride Report aggregates, or GTFS timetables.",
+      "path": "skills/flamingo-gbfs",
+      "category": "transport",
+      "source_owner": "Flamingo",
+      "source_type": "commercial",
+      "source_url": "https://data.rideflamingo.com/gbfs/3/auckland/gbfs.json",
+      "auth": "none",
+      "access_mode": "public-api",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "60s",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "data.rideflamingo.com"
+      ],
+      "last_verified": "2026-10-11",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },

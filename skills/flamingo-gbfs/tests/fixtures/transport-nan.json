@@ -1,0 +1,4 @@
+{
+  "http_status": 200,
+  "body_raw": "{\"last_updated\":\"2026-10-11T00:00:00Z\",\"ttl\":60,\"version\":\"3.0\",\"data\":{\"vehicles\":[{\"vehicle_id\":\"scooter-a\",\"lat\":NaN,\"lon\":174.7}]}}"
+}

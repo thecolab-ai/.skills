@@ -3,7 +3,7 @@
   "name": "nz-public-data",
   "description": "Public, read-only New Zealand data and public-interest sources.",
   "default": true,
-  "skill_count": 126,
+  "skill_count": 127,
   "skills": [
     "akl-housing-capacity",
     "akl-rainfall",
@@ -34,6 +34,7 @@
     "ero-school-reports-nz",
     "fenz-incidents-nz",
     "find-experts-nz",
+    "flamingo-gbfs",
     "fma-nz",
     "fuelclock-nz",
     "fyi-oia-nz",
