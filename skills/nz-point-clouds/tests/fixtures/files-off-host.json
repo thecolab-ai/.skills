@@ -1,0 +1,14 @@
+{
+  "responses": [
+    {
+      "status": 200,
+      "final_url": "https://portal.opentopography.org/lidarDataset?opentopoID=OTLAS.042025.2193.9",
+      "body": "<html><head><title>Fixture dataset</title></head><body><script type=\"application/ld+json\">{\"@type\": \"Dataset\", \"name\": \"Fixture Harbour, New Zealand 2024\", \"alternateName\": \"NZ24_Fixture\", \"fileFormat\": \"Point Cloud Data\", \"temporalCoverage\": \"2024-01-02/2024-03-04\", \"license\": \"CC-BY-4.0\", \"citation\": \"Fixture Council (2024). Fixture Harbour point cloud.\", \"identifier\": {\"@type\": \"PropertyValue\", \"propertyID\": \"opentopoID\", \"value\": \"OTLAS.042025.2193.9\"}, \"publisher\": {\"name\": \"OpenTopography\"}, \"spatialCoverage\": {\"@type\": \"Place\", \"geo\": {\"@type\": \"GeoShape\", \"box\": \"-36.90,174.70 -36.80,174.80\"}}}</script></body></html>"
+    },
+    {
+      "status": 200,
+      "final_url": "https://off-host.invalid/pc-bulk",
+      "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ListBucketResult xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">\n<Name>pc-bulk</Name><Prefix>NZ24_Fixture/</Prefix>\n<NextContinuationToken>FixturePageTwo</NextContinuationToken>\n<KeyCount>2</KeyCount><MaxKeys>2</MaxKeys><IsTruncated>true</IsTruncated>\n<Contents><Key>NZ24_Fixture/tile.json</Key><LastModified>2024-03-04T00:00:00.000Z</LastModified><Size>12</Size></Contents>\n<Contents><Key>NZ24_Fixture/tile.laz</Key><LastModified>2024-03-04T00:00:01.000Z</LastModified><Size>40</Size></Contents>\n</ListBucketResult>\n"
+    }
+  ]
+}

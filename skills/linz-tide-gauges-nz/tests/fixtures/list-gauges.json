@@ -1,0 +1,25 @@
+{
+  "gauges": [
+    "AUCT",
+    "CHIT",
+    "CHST",
+    "CPIT",
+    "GBIT",
+    "GIST",
+    "KAIT",
+    "LOTT",
+    "MNKT",
+    "NAPT",
+    "NBRT",
+    "NCPT",
+    "OTAT",
+    "PUYT",
+    "RBCT",
+    "RFRT",
+    "ROBT",
+    "SCOT",
+    "SUMT",
+    "TAUT",
+    "WLGT"
+  ]
+}
