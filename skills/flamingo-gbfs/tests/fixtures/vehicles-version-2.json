@@ -1,0 +1,11 @@
+{
+  "http_status": 200,
+  "body": {
+    "last_updated": "2026-10-11T18:12:34+00:00",
+    "ttl": 60,
+    "version": "2.0",
+    "data": {
+      "vehicles": []
+    }
+  }
+}

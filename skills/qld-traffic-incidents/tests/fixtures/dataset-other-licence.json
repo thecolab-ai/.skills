@@ -1,0 +1,10 @@
+{
+  "dataset_id": "queensland-traffic-incidents",
+  "metas": {
+    "default": {
+      "license": "CC BY 3.0",
+      "license_url": "https://creativecommons.org/licenses/by/3.0/",
+      "publisher": "Queensland"
+    }
+  }
+}
