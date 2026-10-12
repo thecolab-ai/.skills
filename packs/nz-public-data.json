@@ -3,7 +3,7 @@
   "name": "nz-public-data",
   "description": "Public, read-only New Zealand data and public-interest sources.",
   "default": true,
-  "skill_count": 121,
+  "skill_count": 122,
   "skills": [
     "akl-housing-capacity",
     "akl-rainfall",
@@ -109,6 +109,7 @@
     "property-rates-nz",
     "public-housing-nz",
     "public-trust-grants",
+    "qld-traffic-incidents",
     "rbnz-data",
     "rental-bond-nz",
     "safeswim-nz",

@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
-  "last_verified": "2026-10-11",
-  "skill_count": 169,
+  "last_verified": "2026-10-12",
+  "skill_count": 170,
   "skills": [
     {
       "name": "airnz-flights",
@@ -5587,6 +5587,31 @@
         "00gcmopt4b-dsn.algolia.net"
       ],
       "last_verified": "2026-07-19",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "qld-traffic-incidents",
+      "description": "Read current Queensland traffic incidents from the official OpenDataSoft dataset queensland-traffic-incidents. Use for Queensland road closures, hazards, roadworks and other published traffic incidents when a bounded, keyless record window is enough.",
+      "path": "skills/qld-traffic-incidents",
+      "category": "transport",
+      "source_owner": "Queensland",
+      "source_type": "official",
+      "source_url": "https://queensland.opendatasoft.com/api/explore/v2.1/catalog/datasets/queensland-traffic-incidents",
+      "auth": "none",
+      "access_mode": "public-api",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "none",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "queensland.opendatasoft.com"
+      ],
+      "last_verified": "2026-10-12",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
