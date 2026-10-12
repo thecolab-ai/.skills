@@ -250,6 +250,153 @@ def check_parser_contracts() -> None:
     payload = payload_of(stdout)
     require(code == 6 and "does not intersect" in payload["error"]["message"], payload["error"])
 
+    code, stdout, stderr = invoke(
+        ["units", "--bbox", "174.76,-36.86,174.78,-36.84", "--limit", "2", "--fixture", "units-published-codes", "--json"]
+    )
+    payload = payload_of(stdout)
+    require(code == 0 and stderr == "", stderr)
+    codes = [row["unit_code"] for row in payload["results"]]
+    require(codes == ["tl~", "Qval+tl~"], codes)
+    require(payload["results"][0]["old_unit_c"] == "tl~", payload["results"][0])
+    require("strat_unit" not in payload["results"][0], payload["results"][0])
+    require(payload["results"][1]["strat_unit"] == "Fixture combined unit", payload["results"][1])
+    require(payload["results"][1]["old_unit_c"] == "Qval+tl~", payload["results"][1])
+    require(payload["page"] == {"matched": 2, "returned": 2, "limit": 2, "truncated": False}, payload["page"])
+
+    code, stdout, stderr = invoke([*BBOX, "--fixture", "units-bad-code", "--json"])
+    payload = payload_of(stdout)
+    require(code == 6 and stderr == "", stderr)
+    require(payload["error"]["type"] == "schema_failure" and payload["results"] == [], payload)
+    require("map-unit code" in payload["error"]["message"], payload["error"]["message"])
+    require("~tl" not in stdout, stdout)
+
+
+PUBLISHED_UNIT_CODES = (
+    "eQal",
+    "eQal_t",
+    "eQd",
+    "eQd_t",
+    "Etw",
+    "lQal",
+    "Mtl",
+    "Mtlw",
+    "Mtn",
+    "Mtp",
+    "Mtw",
+    "Mwe",
+    "Mwep",
+    "Mwep~",
+    "Mwe~",
+    "Mwm",
+    "Mwr",
+    "Mwr~",
+    "Mwto",
+    "Mwu",
+    "Mwy",
+    "Pad",
+    "Ptp",
+    "Ptpa",
+    "Ptpp",
+    "Q1al",
+    "Q1al_t",
+    "Q1al~",
+    "Q1ao",
+    "Q1as",
+    "Q1b",
+    "Q1df",
+    "Q1df_t",
+    "Q1dm",
+    "Q1dm_t",
+    "Q1dp",
+    "Q1l",
+    "Q1nc",
+    "Q1nr",
+    "Qvaa",
+    "Qval",
+    "Qval+tl~",
+    "Qval~",
+    "Qvas",
+    "Qvat",
+    "Qvsl",
+    "Qvss",
+    "Qvst",
+    "TJw",
+    "TJwa",
+    "TJwa~",
+    "TJwg",
+    "TJwg~",
+    "TJws~",
+    "TJwt",
+    "TJw~",
+    "tlc~",
+    "tlg~",
+    "tli~",
+    "tlm~",
+    "tls~",
+    "tl~",
+    "tp~",
+)
+
+MALFORMED_UNIT_CODES = (
+    "",
+    " ",
+    "~tl",
+    "+tl",
+    ".tl",
+    "-tl",
+    "_tl",
+    "/tl",
+    "tl~ ",
+    " tl~",
+    "tl~\n",
+    "tl~\t",
+    "Qval + tl~",
+    "Qval+tl~;",
+    "<tl~>",
+    'tl~"x',
+    "tl~'x",
+    "tl~&x",
+    "tl~|x",
+    "tl~$x",
+    "tl~\\x",
+    "tl~%x",
+    "tl~#x",
+    "tl~?x",
+    "tl~=x",
+    "tl~é",
+    "A" + ("b" * 41),
+)
+
+
+def check_unit_code_alphabet() -> None:
+    require(len(PUBLISHED_UNIT_CODES) == 63, "published sample shrank")
+    for code in PUBLISHED_UNIT_CODES:
+        record, _warnings = cli._properties({"unit_code": code, "strat_unit": None, "old_unit_c": code})
+        require(record["unit_code"] == code and record["old_unit_c"] == code, record)
+        require("strat_unit" not in record, record)
+    for code in ("A.b", "A/b", "A-b", "A" + ("b" * 40)):
+        require(cli.UNIT_CODE_RE.fullmatch(code), code)
+    for code in MALFORMED_UNIT_CODES:
+        try:
+            cli._properties({"unit_code": code})
+        except cli.SchemaError as exc:
+            require("map-unit code" in str(exc), f"{code!r}: {exc}")
+        else:
+            raise AssertionError(f"malformed unit code accepted: {code!r}")
+    for value in (None, 1, True, ["tl~"], {"code": "tl~"}):
+        try:
+            cli._properties({"unit_code": value})
+        except cli.SchemaError as exc:
+            require("map-unit code" in str(exc), f"{value!r}: {exc}")
+        else:
+            raise AssertionError(f"non-string unit code accepted: {value!r}")
+    try:
+        cli._properties({})
+    except cli.SchemaError as exc:
+        require("map-unit code" in str(exc), exc)
+    else:
+        raise AssertionError("missing unit code accepted")
+
 
 def main() -> int:
     cli.live_fetch = forbid_network
@@ -257,7 +404,10 @@ def main() -> int:
     if result["ok"]:
         check_provenance_contract()
         check_parser_contracts()
-        result["checks"].extend(("provenance", "json_errors", "cached_metadata", "spatial_contract", "fixtures"))
+        check_unit_code_alphabet()
+        result["checks"].extend(
+            ("provenance", "json_errors", "cached_metadata", "spatial_contract", "fixtures", "unit_code_alphabet")
+        )
     print(json.dumps(result, indent=2, ensure_ascii=False))
     return 0 if result["ok"] else 1
 

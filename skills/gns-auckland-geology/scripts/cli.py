@@ -39,7 +39,9 @@ ACCEPTED_CRS = {
 STRING_FIELDS = ("strat_unit", "strat_age", "descriptio", "old_unit_c", "source")
 NUMBER_FIELDS = ("area", "perimeter", "geol_units", "geol_uni_1", "scale")
 FEATURE_ID_RE = re.compile(r"^NZL-Urban_Auckland_geological_units\.[A-Za-z0-9_.-]{1,40}$")
-UNIT_CODE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_./-]{0,40}$")
+# A 480-feature sample (2026-10-12) used letters, digits, "_", "~", and "+".
+# The first character stays alphanumeric, so a leading mark is still rejected.
+UNIT_CODE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_./~+-]{0,40}$")
 FIXTURE_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,40}$")
 RETRY_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9, :+-]{0,63}$")
 FIXTURE_DIR = Path(__file__).resolve().parents[1] / "tests" / "fixtures"

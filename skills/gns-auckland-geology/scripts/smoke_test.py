@@ -9,7 +9,9 @@ from pathlib import Path
 
 CLI = Path(__file__).resolve().parent / "cli.py"
 ROOT = Path(__file__).resolve().parents[3]
-BBOX = ["units", "--bbox", "174.76,-36.86,174.78,-36.84", "--limit", "1"]
+BOX = "174.76,-36.86,174.78,-36.84"
+BBOX = ["units", "--bbox", BOX, "--limit", "1"]
+LIVE = ["units", "--bbox", BOX, "--limit", "5"]
 LAYER_MIN_LON, LAYER_MAX_LON = 174.39, 175.32
 LAYER_MIN_LAT, LAYER_MAX_LAT = -37.33, -36.69
 NETWORK_MARKERS = (
@@ -85,7 +87,24 @@ def fixture_checks() -> None:
     require(code == 6 and "1750000" not in stdout, payload)
     print("[PASS] fixture NZTM coordinates are rejected")
 
-    code, stdout, _stderr = run(["units", "--bbox", "174.76,-36.86,174.78,-36.84", "--limit", "6", "--json"])
+    code, stdout, stderr = run(
+        ["units", "--bbox", BOX, "--limit", "2", "--fixture", "units-published-codes", "--json"]
+    )
+    payload = json.loads(stdout)
+    require(code == 0 and stderr == "", stderr or stdout[:400])
+    codes = [row["unit_code"] for row in payload["results"]]
+    require(codes == ["tl~", "Qval+tl~"], codes)
+    require("strat_unit" not in payload["results"][0], payload["results"][0])
+    require(payload["results"][1]["strat_unit"] == "Fixture combined unit", payload["results"][1])
+    print("[PASS] fixture published unit codes tl~ and Qval+tl~ are accepted")
+
+    code, stdout, _stderr = run([*BBOX, "--fixture", "units-bad-code", "--json"])
+    payload = json.loads(stdout)
+    require(code == 6 and payload["error"]["type"] == "schema_failure", payload)
+    require("map-unit code" in payload["error"]["message"], payload["error"])
+    print("[PASS] fixture malformed unit code is schema_failure")
+
+    code, stdout, _stderr = run(["units", "--bbox", BOX, "--limit", "6", "--json"])
     payload = json.loads(stdout)
     require(code == 2 and payload["results"] == [], payload)
     print("[PASS] fixture limit above 5 is rejected before a request")
@@ -116,7 +135,7 @@ def first_position(geometry: dict) -> list[float] | None:
 
 def live_checks() -> int:
     try:
-        code, stdout, stderr = run([*BBOX, "--json"])
+        code, stdout, stderr = run([*LIVE, "--json"])
     except subprocess.TimeoutExpired:
         print("[SKIP] live probe skipped: network error: source request timed out")
         return 0
@@ -126,24 +145,33 @@ def live_checks() -> int:
     try:
         payload = json.loads(stdout)
         require(code == 0 and stderr == "", stderr or stdout[:400])
-        require(payload["results"], "live GetFeature returned no Auckland units")
-        record = payload["results"][0]
-        require(isinstance(record.get("unit_code"), str) and record["unit_code"], record)
-        require(isinstance(record.get("strat_unit"), str) and record["strat_unit"], record)
-        require(str(record["feature_id"]).startswith("NZL-Urban_Auckland_geological_units."), record)
-        require(payload["page"]["returned"] == 1 and payload["page"]["matched"] >= 1, payload["page"])
+        results = payload["results"]
+        require(len(results) >= 5, results)
+        codes = []
+        named = []
+        for record in results:
+            require(isinstance(record.get("unit_code"), str) and record["unit_code"], record)
+            require(" " not in record["unit_code"] and "<" not in record["unit_code"], record["unit_code"])
+            codes.append(record["unit_code"])
+            if isinstance(record.get("strat_unit"), str) and record["strat_unit"]:
+                named.append(record["strat_unit"])
+            require(str(record["feature_id"]).startswith("NZL-Urban_Auckland_geological_units."), record)
+            position = first_position(record["geometry"])
+            require(position is not None, record["geometry"])
+            lon, lat = position
+            require(LAYER_MIN_LON <= lon <= LAYER_MAX_LON and LAYER_MIN_LAT <= lat <= LAYER_MAX_LAT, position)
+        require("tl~" in codes, codes)
+        require(named, "live rows omitted every stratigraphic name")
+        require(payload["page"]["returned"] >= 5 and payload["page"]["matched"] >= 5, payload["page"])
+        require(payload["page"]["limit"] == 5, payload["page"])
         require(payload["meta"]["publisher"] == "GNS Science", payload["meta"])
         require("Creative Commons Attribution 3.0 New Zealand" in payload["meta"].get("licence", ""), payload["meta"])
         require("latest_data" not in payload["meta"], "live response time was stored as latest_data")
         require("typeNames=gns%3ANZL-Urban_Auckland_geological_units" in payload["meta"]["source_url"], payload["meta"])
-        require("count=1" in payload["meta"]["source_url"], payload["meta"]["source_url"])
-        position = first_position(record["geometry"])
-        require(position is not None, record["geometry"])
-        lon, lat = position
-        require(LAYER_MIN_LON <= lon <= LAYER_MAX_LON and LAYER_MIN_LAT <= lat <= LAYER_MAX_LAT, position)
+        require("count=5" in payload["meta"]["source_url"], payload["meta"]["source_url"])
         print(
-            f"[PASS] live Auckland box returned unit_code {record['unit_code']} "
-            f"({record['strat_unit']}) inside the published layer extent"
+            f"[PASS] live Auckland box returned {len(results)} units including "
+            f"{', '.join(codes)} ({named[0]}) inside the published layer extent"
         )
     except (AssertionError, KeyError, TypeError, json.JSONDecodeError) as exc:
         print(f"[FAIL] live Auckland geological unit probe: {exc}")

@@ -1,0 +1,81 @@
+{
+  "status": 200,
+  "truncated": false,
+  "contains_live_credentials": false,
+  "contains_personal_data": false,
+  "body": {
+    "type": "FeatureCollection",
+    "features": [
+      {
+        "type": "Feature",
+        "id": "NZL-Urban_Auckland_geological_units.9002",
+        "geometry_name": "geom",
+        "geometry": {
+          "type": "MultiPolygon",
+          "coordinates": [
+            [
+              [
+                [174.77, -36.85],
+                [174.78, -36.85],
+                [174.78, -36.84],
+                [174.77, -36.84],
+                [174.77, -36.85]
+              ]
+            ]
+          ]
+        },
+        "properties": {
+          "area": 1000.0,
+          "perimeter": 400.0,
+          "unit_code": "tl~",
+          "strat_unit": null,
+          "strat_age": "Q1",
+          "descriptio": "Synthetic intertidal unit.",
+          "old_unit_c": "tl~",
+          "source": "Synthetic sheet.",
+          "scale": 50000
+        }
+      },
+      {
+        "type": "Feature",
+        "id": "NZL-Urban_Auckland_geological_units.9003",
+        "geometry_name": "geom",
+        "geometry": {
+          "type": "MultiPolygon",
+          "coordinates": [
+            [
+              [
+                [174.77, -36.85],
+                [174.78, -36.85],
+                [174.78, -36.84],
+                [174.77, -36.84],
+                [174.77, -36.85]
+              ]
+            ]
+          ]
+        },
+        "properties": {
+          "area": 1100.0,
+          "perimeter": 420.0,
+          "unit_code": "Qval+tl~",
+          "strat_unit": "Fixture combined unit",
+          "strat_age": "Q1",
+          "descriptio": "Synthetic combined unit.",
+          "old_unit_c": "Qval+tl~",
+          "source": "Synthetic sheet.",
+          "scale": 50000
+        }
+      }
+    ],
+    "totalFeatures": 2,
+    "numberMatched": 2,
+    "numberReturned": 2,
+    "timeStamp": "2014-01-01T00:00:00Z",
+    "crs": {
+      "type": "name",
+      "properties": {
+        "name": "urn:ogc:def:crs:CRS::84"
+      }
+    }
+  }
+}

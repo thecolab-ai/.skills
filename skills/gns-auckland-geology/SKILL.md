@@ -48,7 +48,9 @@ python3 skills/gns-auckland-geology/scripts/cli.py units --bbox 174.76,-36.86,17
 `--bbox` is `minLon,minLat,maxLon,maxLat` in WGS84 decimal degrees. A box that
 starts with a negative longitude needs the equals form, for example
 `--bbox=-180,-90,180,90`. `--limit` is an integer from 1 to 5. There is no
-paging flag.
+paging flag. Published unit codes may contain `~` and `+`, as in `tl~` and
+`Qval+tl~`. An empty code, a leading mark, or any other character is rejected.
+A null stratigraphic name is omitted.
 
 The WFS `BBOX` is an intersection filter. A returned polygon can have vertices
 outside the box. An empty `results` array means no unit intersects the box.

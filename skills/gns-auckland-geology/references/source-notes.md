@@ -48,9 +48,20 @@ redirect, and only to `https://data.gns.cri.nz/webmaps/gns/wfs`. User-Agent:
 
 Each feature property is copied under the source key. The shapefile field
 `descriptio` is the description; this skill does not rename it. `unit_code` is
-required. `area`, `perimeter`, `geol_units`, `geol_uni_1`, and `scale` are
-passed through as finite numbers when present. The WFS properties do not name
-units for area or perimeter, and this skill does not convert them. `scale` is
+required. A bounded sample on 2026-10-12 of 480 features (`count=80`,
+`propertyName=unit_code`, `startIndex` 0, 80, 400, 800, 1600, and 2400;
+`numberMatched` 2639) contained 63 distinct codes. Every code started with a
+letter or digit. The only characters outside the previous letter, digit, and
+`_./-` set were `~` and `+`, including `tl~`, `Mwe~`, and `Qval+tl~`. The
+check accepts a first letter or digit, then at most 40 characters from
+`A-Za-z0-9_./~+-`. An empty value, a leading mark, whitespace, markup, or any
+other character is a schema failure. Bbox `174.76,-36.86,174.78,-36.84` with
+`count=5` returned five features (`numberMatched` 17). `tl~` and `Q1nc` had
+`strat_unit` null; `Mwe` was East Coast Bays Formation. Null strings are
+omitted, and a missing stratigraphic name is not a schema failure. `area`,
+`perimeter`, `geol_units`, `geol_uni_1`, and `scale` are passed through as
+finite numbers when present. The WFS properties do not name units for area or
+perimeter, and this skill does not convert them. `scale` is
 the source value (observed 50000 on a 1:50 000 map sheet) and is not treated as
 a measured length. `strat_age` is the source code, such as `Mi`, and is not
 expanded. The response `timeStamp` is the WFS response time, not a map revision
