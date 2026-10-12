@@ -2,7 +2,7 @@
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
   "last_verified": "2026-10-12",
-  "skill_count": 181,
+  "skill_count": 182,
   "skills": [
     {
       "name": "airnz-flights",
@@ -4886,6 +4886,33 @@
         "environment.govt.nz"
       ],
       "last_verified": "2026-09-12",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "nz-ridereport",
+      "description": "Read keyless Auckland Ride Report aggregate micromobility metrics for one published vehicle and period. Use for quarterly trip totals, speeds, distances and a short daily series. Do not use for personal trips, street-geometry downloads, BikeMaps incident reports, or traffic-counter time series.",
+      "path": "skills/nz-ridereport",
+      "category": "transport",
+      "source_owner": "Ride Report",
+      "source_type": "commercial",
+      "source_url": "https://public.ridereport.com/auckland",
+      "auth": "none",
+      "access_mode": "public-api",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "none",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "public.ridereport.com",
+        "api.ridereport.com",
+        "public-data-exports-production.s3-us-west-2.amazonaws.com"
+      ],
+      "last_verified": "2026-10-11",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
