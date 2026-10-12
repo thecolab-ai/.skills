@@ -1,67 +1,57 @@
-# CarJam NZ source notes
+# CarJam NZ access restriction
 
-## Source
+## Current behaviour
 
-- Website: `https://www.carjam.co.nz/`
-- Public vehicle report page shape: `https://www.carjam.co.nz/car/?plate=<PLATE>`
-- Also observed to accept `vin=<VIN>` and `chassis=<CHASSIS>` query keys for direct lookup flows.
+`lookup` and `batch` do not retrieve vehicles. After local identifier checks they exit:
 
-This skill uses only the public, no-login HTML page that CarJam renders for a vehicle. It does not call booking/payment/account/report-purchase endpoints.
+| Case | Exit | `error.type` |
+|---|---:|---|
+| Empty or overlong identifier | 2 | `invalid_input` |
+| Any otherwise valid live lookup or batch | 4 | `blocked` |
 
-## Extraction pattern
+The blocked message says live retrieval is access restricted pending a permitted API or provider agreement, and that this skill is not a dependable keyless connector.
 
-The public page renders many vehicle fields as HTML rows using:
+`--json` prints one object:
 
-```html
-<span class="key" data-key="make">Make:</span>
-<span class="value">TOYOTA</span>
+```json
+{
+  "meta": {
+    "source_url": "https://www.carjam.co.nz",
+    "publisher": "CarJam",
+    "retrieved_at": "2026-10-12T00:00:00Z"
+  },
+  "results": [],
+  "error": {
+    "code": 4,
+    "type": "blocked",
+    "message": "CarJam live vehicle retrieval is access restricted pending a permitted API or provider agreement."
+  }
+}
 ```
 
-The CLI extracts the `data-key` and visible value text from each row. It returns:
+`retrieved_at` is the refusal time, not a retrieval time. `results` stays empty. Human output uses the same message on stderr and does not print a vehicle summary.
 
-- `summary` — curated useful public fields for agent/human use
-- `fields` — all parsed public fields when `--raw` is requested
-- `locked_fields` — fields whose visible value is a CarJam gate such as `Get Report`, `May be in Report`, or `Subscribe`
-- `alerts` — a few prominent free-text status snippets when present, such as WOF/licence/registration cancellation messages
+The common runner wraps that payload as `ok: false`, `blocked: true`, and `error.code: 4`.
 
-## Read-only/privacy boundary
+## Why live HTML retrieval stopped
 
-Do not add commands that:
+- Robots rules for `www.carjam.co.nz` disallow `/car/`.
+- The site terms restrict screen scraping and automated reuse, and the API terms require a provider agreement.
+- Smoke run 38192832106 failed `lookup` and `batch` for plate `PSP532` with `no public vehicle fields found for plate 'PSP532'`. The skill diff between the last pass and that failure was empty.
+- A later direct `/car/` response from the repair lane was HTTP 403 challenge HTML. This skill does not request that path again and does not treat either body as a vehicle.
 
-- purchase or trigger a paid report
-- create an account or log in
-- subscribe to plate history or reminders
-- submit stolen-vehicle reports or any write action
-- scrape owner names/addresses or try to bypass paid report gates
-- store bulk vehicle datasets
+Reclassifying every CarJam-branded page with no free fields as a temporary outage would hide that hard parser failure. The offline parser still keeps it.
 
-For gated fields, preserve the gate marker and explain that the information is not visible in the public/basic page.
+## Offline parser
 
-## Stability caveats
+Saved HTML can still be parsed by `parse_vehicle` in tests. It reads `data-key` rows and report-gate markers such as `Get Report`, `May be in Report`, and `Subscribe`. That function is not a command and does not fetch.
 
-- CarJam does not present this as a stable public API; it is public HTML parsing.
-- Some fields vary by vehicle and by whether the free/basic page exposes them or replaces them with a report gate.
-- Public vehicle status can change; include the CarJam source URL and timestamp/context in user-facing reports when important.
-- The CLI validates identifier length/characters only lightly; it relies on CarJam for actual vehicle existence and field availability.
+Synthetic fixture files live in `tests/fixtures/`. They are not live CarJam responses and must not be presented as current vehicle records.
 
-## Live verification examples
+## Out of scope until an agreement exists
 
-Verified during creation:
-
-```bash
-python3 skills/carjam-nz/scripts/cli.py lookup ABC123 --json
-python3 skills/carjam-nz/scripts/cli.py lookup KMM42
-python3 skills/carjam-nz/scripts/cli.py batch ABC123 KMM42 --json
-```
-
-Representative public result at creation time:
-
-- `ABC123` resolved to `1997 MITSUBISHI DELICA SPACE GEAR`
-- Colour: `Green`
-- VIN: `7A8CJ0P0797205527`
-- Registration status: `Cancelled`
-
-Representative gate behaviour:
-
-- `KMM42` resolved to `2006 TOYOTA IST`
-- Several fields such as odometer/registration/WOF showed CarJam report-gated values rather than public values
+- Developer Connection API calls
+- Credential prompts or stored tokens
+- Browser, cookie, or challenge workarounds
+- Owner and personal-information fields
+- Report purchase, accounts, and write actions
