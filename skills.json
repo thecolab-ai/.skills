@@ -2,7 +2,7 @@
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
   "last_verified": "2026-10-12",
-  "skill_count": 175,
+  "skill_count": 176,
   "skills": [
     {
       "name": "airnz-flights",
@@ -404,6 +404,31 @@
         "www.mpi.govt.nz"
       ],
       "last_verified": "2026-07-19",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "bkg-starkregen-wms",
+      "description": "Query the BKG Hinweiskarte Starkregengefahren WMS for Germany heavy-rain hint layers and one extraordinary-event flow-velocity point. Use for GetCapabilities layer names and a single GetFeatureInfo Geschwindigkeit value at a WGS84 latitude and longitude. Distinguish a measured zero from no data, and send EPSG:4326 as latitude then longitude. Not the Berlin or Frankfurt flood services.",
+      "path": "skills/bkg-starkregen-wms",
+      "category": "public-data",
+      "source_owner": "Bundesamt für Kartographie und Geodäsie (BKG)",
+      "source_type": "official",
+      "source_url": "https://sgx.geodatenzentrum.de/wms_starkregen",
+      "auth": "none",
+      "access_mode": "public-api",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "none",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "sgx.geodatenzentrum.de"
+      ],
+      "last_verified": "2026-10-11",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },

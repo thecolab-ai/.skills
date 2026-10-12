@@ -3,7 +3,7 @@
   "name": "nz-public-data",
   "description": "Public, read-only New Zealand data and public-interest sources.",
   "default": true,
-  "skill_count": 127,
+  "skill_count": 128,
   "skills": [
     "akl-housing-capacity",
     "akl-rainfall",
@@ -13,6 +13,7 @@
     "auckland-bin-schedule",
     "berlin-starkregen-wfs",
     "biosecurity-nz",
+    "bkg-starkregen-wms",
     "bluesky-nz",
     "brisbane-intersection-traffic",
     "cab-cabnet-nz",
