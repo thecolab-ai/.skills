@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- CC BY 4.0 excerpt. Polygon coordinates from the official feature are omitted. -->
+<wfs:FeatureCollection xmlns:wfs="http://www.opengis.net/wfs/2.0" xmlns:gml="http://www.opengis.net/gml/3.2" xmlns:ua_srgk="https://gdi.berlin.de/services/wfs/ua_srgk" numberMatched="8" numberReturned="1">
+  <wfs:member>
+    <ua_srgk:a_modellgebiete gml:id="a_modellgebiete.1">
+      <gml:boundedBy>
+        <gml:Envelope srsName="urn:ogc:def:crs:EPSG::25833">
+          <gml:lowerCorner>387468.9392 5813433.4403</gml:lowerCorner>
+          <gml:upperCorner>395427.491 5820435.3265</gml:upperCorner>
+        </gml:Envelope>
+      </gml:boundedBy>
+      <ua_srgk:id>1</ua_srgk:id>
+      <ua_srgk:name>Neukölln</ua_srgk:name>
+      <ua_srgk:geom>
+        <gml:posList>0 0 1 1</gml:posList>
+      </ua_srgk:geom>
+    </ua_srgk:a_modellgebiete>
+  </wfs:member>
+</wfs:FeatureCollection>

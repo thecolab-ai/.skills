@@ -2,7 +2,7 @@
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
   "last_verified": "2026-10-12",
-  "skill_count": 171,
+  "skill_count": 172,
   "skills": [
     {
       "name": "airnz-flights",
@@ -325,6 +325,31 @@
         "www.bargainchemist.co.nz"
       ],
       "last_verified": "2026-07-19",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "berlin-starkregen-wfs",
+      "description": "Read Berlin Starkregen flood model areas from the official Geoportal Berlin WFS. Use for Starkregengefahrenkarte feature types and bounded Modellgebiete names such as Neukölln. Does not download velocity-layer geometry.",
+      "path": "skills/berlin-starkregen-wfs",
+      "category": "environment",
+      "source_owner": "Senatsverwaltung für Stadtentwicklung, Bauen und Wohnen Berlin",
+      "source_type": "official",
+      "source_url": "https://gdi.berlin.de/services/wfs/ua_srgk",
+      "auth": "none",
+      "access_mode": "public-api",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "none",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "gdi.berlin.de"
+      ],
+      "last_verified": "2026-10-11",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
