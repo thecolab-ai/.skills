@@ -1,0 +1,7 @@
+{
+  "id": 42,
+  "type": "layer",
+  "title": "Synthetic closed layer",
+  "license": {"title": "Creative Commons Attribution-NonCommercial 4.0", "type": "cc-by-nc", "version": "4.0"},
+  "data": {"feature_count": 1, "fields": [{"name": "id", "type": "integer"}]}
+}

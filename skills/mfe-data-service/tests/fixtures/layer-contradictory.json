@@ -1,0 +1,7 @@
+{
+  "id": 44,
+  "type": "layer",
+  "title": "Synthetic contradictory licence",
+  "license": {"title": "Creative Commons Attribution-ShareAlike 4.0", "type": "cc-by", "version": "4.0"},
+  "data": {"feature_count": 1, "fields": [{"name": "id", "type": "integer"}]}
+}

@@ -1,0 +1,1 @@
+<https://evil.example/next>; rel="page-next", <https://user:pass@data.mfe.govt.nz/services/api/v1/data/?page=3>; rel="next", <https://data.mfe.govt.nz/services/query/?page=4>; rel="page-last", <not-a-url

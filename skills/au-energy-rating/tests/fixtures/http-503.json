@@ -1,0 +1,4 @@
+{
+  "status": 503,
+  "body_text": "{\"success\": true, \"result\": {\"total\": 1, \"records\": [{\"Brand\": \"not-a-row\"}]}}"
+}
