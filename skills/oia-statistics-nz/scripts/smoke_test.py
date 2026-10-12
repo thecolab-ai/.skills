@@ -64,7 +64,14 @@ def main() -> int:
     print("[PASS] fixture OIA CSV row normalisation")
 
     # Small synthetic OOXML workbook in the current published response shape.
-    from oia_workbooks import parse_release
+    from oia_workbooks import parse_release, published_agency_name
+    assert published_agency_name("Kainga Ora8") == "Kainga Ora"
+    assert published_agency_name("Ministry of Housing and Urban Development6") == "Ministry of Housing and Urban Development"
+    assert published_agency_name("Agency (8)") == "Agency"
+    assert published_agency_name("Unmatched Police") == "Unmatched Police"
+    assert published_agency_name("Health NZ — Te Whatu Ora") == "Health NZ — Te Whatu Ora"
+    assert published_agency_name("COVID-19") == "COVID-19"
+    print("[PASS] fixture trailing workbook footnote digits are not part of the agency name")
     tables = json.loads((ROOT / 'tests/fixtures/release-tables.json').read_text())
     ns = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'
     relns = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
@@ -244,9 +251,60 @@ def main() -> int:
                 assert 'ambiguous' in str(exc)
             else:
                 raise AssertionError(f'{query} must stay ambiguous')
+        # Macron folding is the same agency. A one-word fragment that hits several names is not.
+        assert lookup('Te Puni Kokiri')['agency']['org_id'] == 377
+        assert lookup('Te Puni Ko\u0304kiri')['agency']['org_id'] == 377
         # Period totals are unchanged by the name merge.
         assert module.periods_summary(history)[0]['requests_handled'] == 69
         print('[PASS] fixture null-OrgID release records merge into the matching agency history')
+
+        # OrgID 3118 is Kāinga Ora–Homes and Communities. The short published name
+        # is the same OrgID. Housing New Zealand Corporation is a different OrgID.
+        # An exact second OrgID named Kāinga Ora must not hide 3118.
+        kainga = [
+            rec('3118', 'K?inga Ora–Homes and Communities', '2025-06-30', 481),
+            rec('3118', 'Kāinga Ora–Homes and Communities', '2024-12-31', 400),
+            rec('', 'Kāinga Ora', '2020-06-30', 159),
+            rec('', 'Kainga Ora', '2019-12-31', 180),
+            rec('145', 'Housing New Zealand Corporation', '2019-06-30', 150),
+            rec('3125', 'Oranga Tamariki-Ministry for Children', '2025-06-30', 150),
+        ]
+        module.load_rows = lambda timeout: (kainga, 'fixture')
+        queries = ('Kāinga Ora', 'Kainga Ora', 'KAINGA ORA', 'Kāinga  Ora', 'Ka\u0304inga Ora', 'K?inga Ora')
+        seen_counts = set()
+        for query in queries:
+            result = lookup(query)
+            assert result['agency']['org_id'] == 3118, query
+            periods = [row['survey_period_end'] for row in result['records']]
+            assert periods == ['2025-06-30', '2024-12-31', '2020-06-30', '2019-12-31'], (query, periods)
+            assert {row['org_id'] for row in result['records']} == {3118, None}
+            assert all(row.get('inferred_org_id') == 3118 for row in result['records'] if row['org_id'] is None)
+            assert 145 not in {row['org_id'] for row in result['records']}
+            assert result.get('warnings')
+            seen_counts.add(result['count'])
+        assert seen_counts == {4}
+        housing = lookup('Housing New Zealand')
+        assert housing['agency']['org_id'] == 145
+        assert [row['org_id'] for row in housing['records']] == [145]
+        assert 'warnings' not in housing
+        try:
+            lookup('Ora')
+        except ValueError as exc:
+            assert 'ambiguous' in str(exc)
+        else:
+            raise AssertionError('Ora must stay ambiguous')
+        clash = kainga + [rec('100', 'Kāinga Ora', '2023-06-30', 9)]
+        module.load_rows = lambda timeout: (clash, 'fixture')
+        try:
+            lookup('Kāinga Ora')
+        except ValueError as exc:
+            assert 'ambiguous' in str(exc)
+        else:
+            raise AssertionError('exact Kāinga Ora must not hide OrgID 3118 when another OrgID uses that name')
+        by_id = lookup('3118')
+        assert by_id['agency']['org_id'] == 3118
+        assert 100 not in {row['org_id'] for row in by_id['records']}
+        print('[PASS] fixture macron-insensitive Kāinga Ora lookup keeps OrgID 3118 and leaves Housing New Zealand separate')
     finally:
         module.load_rows = original_load
 
@@ -317,6 +375,52 @@ def main() -> int:
             print(agency.stdout, file=sys.stderr)
             return 1
         print(f"[PASS] live agency lookup by OrgID {org_id} returned {len(agency_data['records'])} rows")
+
+        def live_agency(query: str):
+            proc = run(["agency", query, "--json"], timeout=180)
+            if proc.returncode == 2:
+                skip, message = is_upstream_skip(proc)
+                if skip:
+                    print(f"SKIP: upstream unavailable ({message})")
+                    return None
+                print(proc.stderr or proc.stdout, file=sys.stderr)
+                return False
+            if proc.returncode != 0:
+                print(proc.stderr or proc.stdout, file=sys.stderr)
+                return False
+            return parse_json_output(proc)
+
+        live_names = {}
+        for query in ("Kāinga Ora", "Kainga Ora", "Ka\u0304inga Ora"):
+            payload = live_agency(query)
+            if payload is None:
+                return 0
+            if payload is False:
+                return 1
+            live_names[query] = payload
+            if payload.get("agency", {}).get("org_id") != 3118:
+                print(f"FAIL: {query!r} resolved to {payload.get('agency')}", file=sys.stderr)
+                return 1
+            live_ids = {row.get("org_id") for row in payload.get("records") or []}
+            if 3118 not in live_ids or 145 in live_ids:
+                print(f"FAIL: {query!r} org ids {live_ids}", file=sys.stderr)
+                return 1
+        counts = {item["count"] for item in live_names.values()}
+        if counts != {live_names["Kāinga Ora"]["count"]} or not live_names["Kāinga Ora"]["records"]:
+            print(f"FAIL: macron variants returned different series {counts}", file=sys.stderr)
+            return 1
+        print(f"[PASS] live Kainga Ora / Kāinga Ora lookup is OrgID 3118 ({live_names['Kāinga Ora']['count']} rows)")
+
+        housing_live = live_agency("Housing New Zealand")
+        if housing_live is None:
+            return 0
+        if housing_live is False:
+            return 1
+        housing_ids = {row.get("org_id") for row in housing_live.get("records") or []}
+        if housing_live.get("agency", {}).get("org_id") != 145 or 3118 in housing_ids:
+            print(f"FAIL: Housing New Zealand resolved to {housing_live.get('agency')} ids {housing_ids}", file=sys.stderr)
+            return 1
+        print("[PASS] live Housing New Zealand lookup stays OrgID 145")
 
     totals = run(["totals", "--period", latest_period or "latest", "--json"], timeout=120)
     if totals.returncode == 2:

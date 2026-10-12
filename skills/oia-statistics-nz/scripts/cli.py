@@ -399,6 +399,45 @@ def _name_pattern(key: str) -> re.Pattern[str]:
     return re.compile("".join(f"[{re.escape(ch)}?]" if ch.isalpha() else re.escape(ch) for ch in key))
 
 
+def _keys_equivalent(left: str, right: str) -> bool:
+    """True when two name keys differ only by the CSV '?' macron placeholder."""
+    if not left or not right:
+        return False
+    return bool(_name_pattern(left).fullmatch(right) or _name_pattern(right).fullmatch(left))
+
+
+def _name_relation(query_name: str, stored_name: str) -> str | None:
+    """How a query or release name relates to one stored agency name.
+
+    exact: same name after case, macron and '?' folding.
+    prefix: the query is a two-or-more-word whole-word prefix of the stored name.
+    within: the stored name is a whole word inside the query (12+ characters).
+    """
+    query = _name_key(query_name)
+    stored = _name_key(stored_name)
+    if not query or not stored:
+        return None
+    if _keys_equivalent(query, stored):
+        return "exact"
+    if len(query.split()) >= 2 and re.match(_name_pattern(query).pattern + r"(?![\w?])", stored):
+        return "prefix"
+    if len(stored) >= 12 and re.search(r"(?<![\w?])" + _name_pattern(stored).pattern + r"(?![\w?])", query):
+        return "within"
+    return None
+
+
+def _row_name_relation(query_name: str, row: dict[str, str]) -> str | None:
+    relations = {
+        _name_relation(query_name, name)
+        for name in (_first(row, "Agency"), _first(row, "Agency_Preffered_Name", "Agency_Preferred_Name"))
+    }
+    relations.discard(None)
+    for kind in ("exact", "prefix", "within"):
+        if kind in relations:
+            return kind
+    return None
+
+
 def _has_reused_id(row: dict[str, str]) -> bool:
     return str(row.get("_identity_warning") or "").startswith(REUSED_ID_WARNING_PREFIX)
 
@@ -407,9 +446,11 @@ def infer_org_ids(rows: list[dict[str, str]]) -> dict[int, int]:
     """Map dated release records without an OrgID to an OrgID agency by name.
 
     Keyed by ``id(row)``. A record is merged only when its normalised name
-    equals (or, for names of 12+ characters, is a whole-word part of) the names
-    of exactly one OrgID agency, that agency has no record of its own in the
-    same period, and no other unmatched record claims the same agency/period.
+    equals, is a two-or-more-word whole-word prefix of, or (for names of 12+
+    characters) is a whole-word part of the names of exactly one OrgID agency,
+    that agency has no record of its own in the same period, and no other
+    unmatched record claims the same agency/period. A match that also fits a
+    different OrgID is left unmatched.
     """
     names: dict[int, set[str]] = defaultdict(set)
     occupied: set[tuple[int, str]] = set()
@@ -433,10 +474,24 @@ def infer_org_ids(rows: list[dict[str, str]]) -> dict[int, int]:
         pattern = _name_pattern(key)
         exact = {org for org, known in names.items() if any(pattern.fullmatch(name) for name in known)}
         within = set()
-        if not exact and len(key) >= 12:
+        if len(key) >= 12:
             bounded = re.compile(r"(?<![\w?])" + pattern.pattern + r"(?![\w?])")
             within = {org for org, known in names.items() if any(bounded.search(name) for name in known)}
-        candidates = exact or within
+        prefix = set()
+        if len(key.split()) >= 2:
+            prefixed = re.compile(pattern.pattern + r"(?![\w?])")
+            prefix = {org for org, known in names.items() if any(prefixed.match(name) for name in known)}
+        # An exact hit must not hide a different OrgID whose legal name merely
+        # starts with the same words, and a short prefix must not win when the
+        # same words also sit inside another agency.
+        if exact and (prefix - exact or within - exact):
+            candidates = exact | prefix | within
+        elif exact:
+            candidates = exact
+        elif prefix and not (within - prefix):
+            candidates = prefix
+        else:
+            candidates = within or prefix
         if len(candidates) == 1:
             org_id = next(iter(candidates))
             if (org_id, period) not in occupied:
@@ -463,7 +518,7 @@ def _match_agency_rows(rows: list[dict[str, str]], query: str,
         if exact:
             return exact
 
-    matched = _match_agency_names(rows, norm_query)
+    matched = _match_agency_names(rows, query, inferred)
     identities = {_agency_identity(row, inferred) for row in matched}
     if len(identities) != 1 or not isinstance(next(iter(identities)), int):
         return matched
@@ -476,22 +531,54 @@ def _match_agency_rows(rows: list[dict[str, str]], query: str,
                       and _norm_period(_first(row, "SurveyPeriodEndDate")) and not _has_reused_id(row)]
 
 
-def _match_agency_names(rows: list[dict[str, str]], norm_query: str) -> list[dict[str, str]]:
+def _match_agency_names(rows: list[dict[str, str]], query: str,
+                        inferred: dict[int, int] | None = None) -> list[dict[str, str]]:
+    """Macron-insensitive name match.
+
+    An exact name wins over a looser partial match. It does not win when a
+    different OrgID's published name has the query as a whole-word prefix:
+    those rows stay in the match so the query is ambiguous instead of hiding
+    that OrgID. A short name that is a prefix of exactly one OrgID is that
+    agency (see infer_org_ids) and is not a second agency.
+    """
+    if inferred is None:
+        inferred = infer_org_ids(rows)
+    qkey = _name_key(query)
+    if not qkey:
+        return []
     exact_matches: list[dict[str, str]] = []
+    prefix_matches: list[dict[str, str]] = []
     contains_matches: list[dict[str, str]] = []
+    query_pattern = _name_pattern(qkey)
     for row in rows:
-        agency = re.sub(r"\s+", " ", _first(row, "Agency").lower())
-        preferred = re.sub(r"\s+", " ", _first(row, "Agency_Preffered_Name", "Agency_Preferred_Name").lower())
-        if not agency and not preferred:
-            continue
-        if norm_query == agency or norm_query == preferred:
+        relation = _row_name_relation(query, row)
+        names = (_first(row, "Agency"), _first(row, "Agency_Preffered_Name", "Agency_Preferred_Name"))
+        keys = [_name_key(name) for name in names if _name_key(name)]
+        if relation == "exact":
             exact_matches.append(row)
-        elif norm_query in agency or norm_query in preferred:
+        elif relation == "prefix":
+            prefix_matches.append(row)
+        elif keys and any(query_pattern.search(key) for key in keys):
             contains_matches.append(row)
 
-    if exact_matches:
-        return exact_matches
-    return contains_matches
+    if not exact_matches:
+        if not prefix_matches:
+            return contains_matches
+        # A unique legal-name prefix must not hide a different agency that
+        # contains the same words (for example "Toka Tū Ake" inside both
+        # "Toka Tū Ake EQC" and "Natural Hazards Commission – Toka Tū Ake").
+        prefix_orgs = {org for row in prefix_matches if isinstance(org := _agency_identity(row, inferred), int)}
+        extra = [row for row in contains_matches
+                 if (org := _agency_identity(row, inferred)) not in prefix_orgs]
+        if extra:
+            return prefix_matches + extra
+        return prefix_matches
+
+    exact_orgs = {org for row in exact_matches if isinstance(org := _agency_identity(row, inferred), int)}
+    hidden = [row for row in prefix_matches if isinstance(org := _agency_identity(row, inferred), int) and org not in exact_orgs]
+    if hidden:
+        return exact_matches + hidden
+    return exact_matches
 
 
 def cached_release(url, timeout):
@@ -535,23 +622,6 @@ def recover_release_periods(rows, releases):
     consumed = set()
     recovered = []
     agency_identities = {(row['OrgID'], row['Agency']): row for row in agency_rows(rows)}
-    def name_matches(row, name):
-        def normal(value):
-            return ' '.join(re.sub(r'[^\w?]', ' ', value.casefold().replace('&', ' and ')).split())
-        name = normal(name)
-        names = [_first(row, 'Agency'), _first(row, 'Agency_Preffered_Name', 'Agency_Preferred_Name')]
-        for original in names:
-            candidate = normal(original)
-            if not candidate:
-                continue
-            # The source CSV explicitly replaces some Māori letters with '?'.
-            # Match each such placeholder to exactly one letter, with all other
-            # words exact. This is combined with exact published count matches.
-            pattern = re.escape(candidate).replace(r'\?', r'[^\W\d_]')
-            if re.fullmatch(pattern, name) or (len(candidate) >= 12
-                    and re.search(r'(?<!\w)' + pattern + r'(?!\w)', name)):
-                return True
-        return False
     for period, url, stamp, records in releases:
         for record in records:
             signature = tuple(_as_int(record.get(key)) for key in count_fields[:3])
@@ -560,11 +630,27 @@ def recover_release_periods(rows, releases):
                 if all(_as_int(record.get(key)) is None
                        or _as_int(row.get(key)) == _as_int(record[key])
                        for key in count_fields[3:])]
-            identity_rows = [row for row in agency_identities.values() if name_matches(row, record['Agency'])]
-            if len(identity_rows) == 1:
-                resolved = identity_rows[0]
-                record = dict(record, OrgID=resolved['OrgID'])
-                candidates = [row for row in candidates if row['OrgID'] == resolved['OrgID']]
+            grouped: dict[str, set[str]] = defaultdict(set)
+            for row in agency_identities.values():
+                relation = _row_name_relation(record['Agency'], row)
+                if relation:
+                    grouped[relation].add(row['OrgID'])
+            exact_orgs = grouped['exact']
+            prefix_orgs = grouped['prefix']
+            within_orgs = grouped['within']
+            # A unique exact name supplies the OrgID. A unique whole-word prefix
+            # does too (the published short name of that one agency). Neither
+            # may hide a different OrgID that also matches.
+            resolved_id = None
+            if len(exact_orgs) == 1 and not (prefix_orgs - exact_orgs) and not (within_orgs - exact_orgs):
+                resolved_id = next(iter(exact_orgs))
+            elif not exact_orgs and len(prefix_orgs) == 1 and not (within_orgs - prefix_orgs):
+                resolved_id = next(iter(prefix_orgs))
+            elif not exact_orgs and not prefix_orgs and len(within_orgs) == 1:
+                resolved_id = next(iter(within_orgs))
+            if resolved_id:
+                record = dict(record, OrgID=resolved_id)
+                candidates = [row for row in candidates if row['OrgID'] == resolved_id]
             elif record.get('OrgID'):
                 candidates = [row for row in candidates if row.get('OrgID') == record['OrgID']]
             else:
@@ -826,6 +912,14 @@ def command_agency(args: argparse.Namespace) -> dict[str, object]:
     if args.limit and args.limit > 0:
         series = series[: args.limit]
     identity = next(iter(agency_ids)) if len(agency_ids) == 1 else None
+    warnings = []
+    if not str(args.agency_query).strip().isdigit():
+        name_keys = {_name_key(str(record["agency"])) for record in series}
+        if len(name_keys) > 1:
+            warnings.append(
+                "Abbreviated and longer published names for this one OrgID are returned together. "
+                "Other OrgIDs are not combined."
+            )
 
     return {
         "kind": "oia-agency",
@@ -839,6 +933,7 @@ def command_agency(args: argparse.Namespace) -> dict[str, object]:
         },
         "period": args.period or "all",
         "records": series,
+        **({"warnings": warnings} if warnings else {}),
     }
 
 
