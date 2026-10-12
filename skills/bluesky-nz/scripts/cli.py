@@ -23,6 +23,12 @@ BASE = "https://api.bsky.app/xrpc/"
 SOURCE_NAME = "Bluesky public AppView"
 HANDLE_RE = re.compile(r"^[a-z0-9][a-z0-9.-]{2,252}$")
 DID_RE = re.compile(r"^did:[a-z0-9]+:[A-Za-z0-9._%:-]+$")
+# getAuthorFeed's maximum page size. There is no lexicon filter that drops
+# reposts, so the feed command reads one full page and then applies --limit
+# to posts the account actually authored.
+AUTHOR_FEED_PAGE_LIMIT = 100
+AUTHOR_FEED_FILTER = "posts_no_replies"
+REASON_REPOST = "app.bsky.feed.defs#reasonRepost"
 
 
 def die(message: str, code: int = 1) -> None:
@@ -72,6 +78,53 @@ def normalise_post(post: dict[str, Any]) -> dict[str, Any]:
         "likes": post.get("likeCount"),
         "url": post_web_url(post.get("uri"), handle),
     }
+
+
+class FeedShapeError(ValueError):
+    """Author-feed JSON did not match the AppView response shape."""
+
+
+def is_repost(item: Any) -> bool:
+    """True only for lexicon reasonRepost. reasonPin is the account's own post."""
+    if not isinstance(item, dict):
+        return False
+    reason = item.get("reason")
+    if not isinstance(reason, dict):
+        return False
+    return reason.get("$type") == REASON_REPOST
+
+
+def author_feed_params(actor: str) -> dict[str, Any]:
+    return {"actor": actor, "limit": AUTHOR_FEED_PAGE_LIMIT, "filter": AUTHOR_FEED_FILTER}
+
+
+def select_authored_feed(items: list[Any], limit: int) -> tuple[list[dict[str, Any]], int, int]:
+    """Collect up to `limit` non-repost feed items from one page.
+
+    Returns (authored items, reposts excluded, items scanned). Scanning stops
+    once `limit` authored items are collected, so later reposts are not counted.
+    Non-object items are scanned and skipped.
+    """
+    authored: list[dict[str, Any]] = []
+    excluded = 0
+    scanned = 0
+    for item in items:
+        scanned += 1
+        if not isinstance(item, dict):
+            continue
+        if is_repost(item):
+            excluded += 1
+            continue
+        authored.append(item)
+        if len(authored) >= limit:
+            break
+    return authored, excluded, scanned
+
+
+def authored_posts_from_page(data: Any, limit: int) -> tuple[list[dict[str, Any]], int, int]:
+    if not isinstance(data, dict) or not isinstance(data.get("feed"), list):
+        raise FeedShapeError("author feed response missing a feed array")
+    return select_authored_feed(data["feed"], limit)
 
 
 def clean_handle(raw: str) -> str:
@@ -134,19 +187,23 @@ def cmd_search(args: argparse.Namespace) -> None:
 
 def cmd_feed(args: argparse.Namespace) -> None:
     handle = clean_handle(args.handle)
-    data, url = get("app.bsky.feed.getAuthorFeed", {"actor": handle, "limit": args.limit, "filter": "posts_no_replies"})
-    # The API still returns the account's REPOSTS of other authors (marked by a
-    # `reason`); drop them so every row is genuinely authored by the account.
-    items = data.get("feed", [])
-    own = [item for item in items if not item.get("reason")]
-    posts = [normalise_post(item.get("post") or {}) for item in own]
+    # posts_no_replies drops replies only. Reposts stay on the page as
+    # reasonRepost, so a small API limit can be entirely reposts even when the
+    # account has its own posts further down the same page.
+    data, url = get("app.bsky.feed.getAuthorFeed", author_feed_params(handle))
+    try:
+        authored, excluded, scanned = authored_posts_from_page(data, args.limit)
+    except FeedShapeError as exc:
+        die(f"upstream unavailable: {exc}", 5)
+    posts = [normalise_post(item.get("post") or {}) for item in authored]
     payload = {
         "kind": "feed",
         "source": SOURCE_NAME,
         "source_url": url,
         "handle": handle,
         "count": len(posts),
-        "reposts_excluded": len(items) - len(own),
+        "reposts_excluded": excluded,
+        "feed_items_scanned": scanned,
         "posts": posts,
     }
     emit(

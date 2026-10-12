@@ -1,0 +1,49 @@
+{
+  "feed": [
+    {
+      "reason": {
+        "$type": "app.bsky.feed.defs#reasonRepost",
+        "indexedAt": "2026-10-11T00:00:00.000Z"
+      },
+      "post": {
+        "uri": "at://did:plc:syntheticrepost000000001/app.bsky.feed.post/repost1",
+        "author": {"handle": "other.example"},
+        "record": {"text": "Reposted by the account", "createdAt": "2026-10-11T00:00:00.000Z"},
+        "likeCount": 1
+      }
+    },
+    {
+      "reason": {"$type": "app.bsky.feed.defs#reasonRepost"},
+      "post": {
+        "uri": "at://did:plc:syntheticrepost000000002/app.bsky.feed.post/repost2",
+        "author": {"handle": "second.example"},
+        "record": {"text": "Another repost", "createdAt": "2026-10-10T00:00:00.000Z"}
+      }
+    },
+    {
+      "reason": {"$type": "app.bsky.feed.defs#reasonPin"},
+      "post": {
+        "uri": "at://did:plc:syntheticself0000000001/app.bsky.feed.post/pinned",
+        "author": {"handle": "agency.example"},
+        "record": {"text": "Pinned status", "createdAt": "2026-01-01T00:00:00.000Z"},
+        "likeCount": 3
+      }
+    },
+    {
+      "post": {
+        "uri": "at://did:plc:syntheticself0000000001/app.bsky.feed.post/original",
+        "author": {"handle": "agency.example"},
+        "record": {"text": "Original update", "createdAt": "2026-10-09T00:00:00.000Z"},
+        "likeCount": 4
+      }
+    },
+    {
+      "reason": {"$type": "app.bsky.feed.defs#reasonRepost"},
+      "post": {
+        "uri": "at://did:plc:syntheticrepost000000003/app.bsky.feed.post/later",
+        "author": {"handle": "later.example"},
+        "record": {"text": "Not scanned once the limit is filled", "createdAt": "2026-10-08T00:00:00.000Z"}
+      }
+    }
+  ]
+}
