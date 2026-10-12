@@ -3,7 +3,7 @@
   "name": "nz-public-data",
   "description": "Public, read-only New Zealand data and public-interest sources.",
   "default": true,
-  "skill_count": 135,
+  "skill_count": 136,
   "skills": [
     "akl-housing-capacity",
     "akl-ontrack",
@@ -12,6 +12,7 @@
     "at-transport",
     "au-energy-rating",
     "auckland-bin-schedule",
+    "belib-ev-live",
     "berlin-starkregen-wfs",
     "biosecurity-nz",
     "bkg-starkregen-wms",

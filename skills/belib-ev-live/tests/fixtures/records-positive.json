@@ -1,0 +1,15 @@
+{
+  "total_count": 1,
+  "results": [
+    {
+      "id_pdc": "FR*V75*E9012*06*3",
+      "statut_pdc": "Occupé (en charge)",
+      "url_description_pdc": "https://parisdata.opendatasoft.com/explore/dataset/belib-points-de-recharge-pour-vehicules-electriques-donnees-statiques/table/?q=FR*V75*E9012*06*3",
+      "last_updated": "2026-10-11T18:12:05+00:00",
+      "arrondissement": "12e Arrondissement",
+      "adresse_station": "4 Rue Changarnier 75012 Paris",
+      "coordonneesxy": {"lon": 2.411238, "lat": 48.845264},
+      "code_insee_commune": "75056"
+    }
+  ]
+}

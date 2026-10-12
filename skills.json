@@ -2,7 +2,7 @@
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
   "last_verified": "2026-10-12",
-  "skill_count": 183,
+  "skill_count": 184,
   "skills": [
     {
       "name": "airnz-flights",
@@ -376,6 +376,31 @@
         "www.bargainchemist.co.nz"
       ],
       "last_verified": "2026-07-19",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "belib-ev-live",
+      "description": "Look up live Belib electric-vehicle charge-point availability in Paris. Use when the task needs current Belib point status, charge-point identifiers, or Paris locations from the Ville de Paris open data feed. This is Paris Belib, not the New Zealand EECA charger register.",
+      "path": "skills/belib-ev-live",
+      "category": "transport",
+      "source_owner": "Direction de la Voirie et des Déplacements - Ville de Paris",
+      "source_type": "official",
+      "source_url": "https://parisdata.opendatasoft.com/explore/dataset/belib-points-de-recharge-pour-vehicules-electriques-disponibilite-temps-reel/",
+      "auth": "none",
+      "access_mode": "keyless OpenDataSoft Explore API v2.1 records",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "none",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "parisdata.opendatasoft.com"
+      ],
+      "last_verified": "2026-10-11",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
