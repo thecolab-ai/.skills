@@ -28,8 +28,16 @@ positions in that order. The collection `crs` name was
 `urn:ogc:def:crs:CRS::84`. The same server labelled an equivalent HTTP CRS84
 request as `urn:ogc:def:crs:EPSG::4326` while still emitting longitude,
 latitude. Both names are accepted. Positions are accepted only when they are finite
-WGS84 longitude and latitude pairs, the ring is closed, and the geometry
-envelope overlaps the requested box. NZTM easting/northing values fail closed.
+WGS84 longitude and latitude pairs and the ring is closed. The server bbox
+filter decides intersection. An envelope within 0.002 degrees of the requested
+box is kept. That slack covers the farthest miss in a full read of the 92
+features for bbox `174.9,-37.05,174.98,-36.98` on 2026-10-12 (0.000809 degrees,
+90 m, feature `.1490`). A farther envelope is omitted and counted in
+`page.dropped_outside_bbox`. Those omissions do not discard units whose
+envelopes overlap the box. If the server returned features and every envelope
+is farther than the slack, the command is a schema failure. `page.matched` is
+the server `numberMatched`. `page.returned` is the number of units in
+`results`. NZTM easting/northing values fail closed.
 
 `outputFormat` is `application/json`. `count` is `--limit` (1 to 5). There is
 no `startIndex` parameter, so the command cannot walk the layer. A live
@@ -48,14 +56,18 @@ redirect, and only to `https://data.gns.cri.nz/webmaps/gns/wfs`. User-Agent:
 
 Each feature property is copied under the source key. The shapefile field
 `descriptio` is the description; this skill does not rename it. `unit_code` is
-required. A bounded sample on 2026-10-12 of 480 features (`count=80`,
-`propertyName=unit_code`, `startIndex` 0, 80, 400, 800, 1600, and 2400;
-`numberMatched` 2639) contained 63 distinct codes. Every code started with a
-letter or digit. The only characters outside the previous letter, digit, and
-`_./-` set were `~` and `+`, including `tl~`, `Mwe~`, and `Qval+tl~`. The
-check accepts a first letter or digit, then at most 40 characters from
-`A-Za-z0-9_./~+-`. An empty value, a leading mark, whitespace, markup, or any
-other character is a schema failure. Bbox `174.76,-36.86,174.78,-36.84` with
+required. A property-only read of all 2639 features on 2026-10-12 (`count=200`,
+`propertyName=unit_code`, `startIndex` 0, 200, through 2600; `numberMatched`
+2639) contained 103 distinct codes. The characters were letters, digits, `_`,
+`+`, `~`, and a leading `?` on `?Pks~` (features `.1896` and `.1935`, stratigraphic
+name `Kawaa Formation`). `?` is the GNS uncertainty marker. The skill keeps the
+raw code and sets `uncertain` to true only when `unit_code` starts with `?`.
+A question mark anywhere else, including `tl~?x`, is rejected. A code is at
+most 41 characters: a letter or digit plus at most 40 characters from
+`A-Za-z0-9_./~+-`, or `?`, a letter or digit, and at most 39 characters from
+that set. `.` `/` `-` did not occur in the 2639-feature read; they remain
+allowed after the first letter or digit. An empty value, a leading `~` or
+`+`, whitespace, markup, or any other character is a schema failure. Bbox `174.76,-36.86,174.78,-36.84` with
 `count=5` returned five features (`numberMatched` 17). `tl~` and `Q1nc` had
 `strat_unit` null; `Mwe` was East Coast Bays Formation. Null strings are
 omitted, and a missing stratigraphic name is not a schema failure. `area`,
@@ -88,7 +100,7 @@ licence, not the data licence. Attribute GNS Science.
 | Bad bbox, bad limit, unknown fixture name | 2 | invalid_input |
 | HTTP 429 | 4 | blocked |
 | Timeout, DNS failure, HTTP 5xx, body over 512 KiB | 5 | upstream_unavailable |
-| Malformed JSON, XML exception, wrong CRS, NZTM coordinates, extra features, unclosed ring | 6 | schema_failure |
+| Malformed JSON, XML exception, wrong CRS, NZTM coordinates, extra features, unclosed ring, every feature far outside the box | 6 | schema_failure |
 | Redirect or final URL off the WFS path | 7 | unsupported_operation |
 
 Fixtures are synthetic. A fixture warning is present on success. An upstream

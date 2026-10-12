@@ -49,11 +49,15 @@ python3 skills/gns-auckland-geology/scripts/cli.py units --bbox 174.76,-36.86,17
 starts with a negative longitude needs the equals form, for example
 `--bbox=-180,-90,180,90`. `--limit` is an integer from 1 to 5. There is no
 paging flag. Published unit codes may contain `~` and `+`, as in `tl~` and
-`Qval+tl~`. An empty code, a leading mark, or any other character is rejected.
-A null stratigraphic name is omitted.
+`Qval+tl~`. A leading `?` is the GNS uncertainty marker, as in `?Pks~`. The
+raw code is kept and `uncertain` is true. An empty code, a leading `~` or
+`+`, whitespace, or markup is rejected. A null stratigraphic name is omitted.
 
-The WFS `BBOX` is an intersection filter. A returned polygon can have vertices
-outside the box. An empty `results` array means no unit intersects the box.
+The WFS `BBOX` is the intersection filter. A feature a short distance outside
+the box is kept. A feature far outside is omitted and counted in
+`dropped_outside_bbox`. One such feature does not discard the other units.
+If every feature is far outside the box, the command fails with a schema
+error. An empty `results` array means the server reported no intersection.
 
 ## Boundaries
 
@@ -66,5 +70,5 @@ outside the box. An empty `results` array means no unit intersects the box.
 
 - `scripts/cli.py` — canonical command entrypoint
 - `scripts/test_contract.py` — deterministic contract and parser fixtures
-- `scripts/smoke_test.py` — fixture checks and one bounded live probe
+- `scripts/smoke_test.py` — fixture checks and bounded live probes
 - `references/source-notes.md` — licence, CRS, fields, and errors

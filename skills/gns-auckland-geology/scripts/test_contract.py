@@ -143,14 +143,17 @@ def check_parser_contracts() -> None:
     payload = payload_of(stdout)
     require(code == 0 and stderr == "", stderr)
     record = payload["results"][0]
-    require(record["unit_code"] == "FIX", record["unit_code"])
+    require(record["unit_code"] == "FIX" and record["uncertain"] is False, record)
     require(record["strat_unit"] == "Fixture Conglomerate", record["strat_unit"])
     require(record["descriptio"] == "Synthetic pebble description for the parser.", "source field was renamed")
     require(record["area"] == 1000.0 and record["perimeter"] == 400.0, "area or perimeter was converted")
     require(record["scale"] == 50000 and record["strat_age"] == "Mi", record)
     require(record["geometry"]["type"] == "MultiPolygon", record["geometry"])
     require(record["geometry"]["coordinates"][0][0][0] == [174.77, -36.85], "geojson axis order changed")
-    require(payload["page"] == {"matched": 3, "returned": 1, "limit": 1, "truncated": True}, payload["page"])
+    require(
+        payload["page"] == {"matched": 3, "returned": 1, "limit": 1, "truncated": True, "dropped_outside_bbox": 0},
+        payload["page"],
+    )
     require(any(item.startswith("fixture: units-positive") for item in payload["warnings"]), payload["warnings"])
     require(any("does not page" in item for item in payload["warnings"]), payload["warnings"])
     require("latest_data" not in payload["meta"], payload["meta"])
@@ -261,7 +264,10 @@ def check_parser_contracts() -> None:
     require("strat_unit" not in payload["results"][0], payload["results"][0])
     require(payload["results"][1]["strat_unit"] == "Fixture combined unit", payload["results"][1])
     require(payload["results"][1]["old_unit_c"] == "Qval+tl~", payload["results"][1])
-    require(payload["page"] == {"matched": 2, "returned": 2, "limit": 2, "truncated": False}, payload["page"])
+    require(
+        payload["page"] == {"matched": 2, "returned": 2, "limit": 2, "truncated": False, "dropped_outside_bbox": 0},
+        payload["page"],
+    )
 
     code, stdout, stderr = invoke([*BBOX, "--fixture", "units-bad-code", "--json"])
     payload = payload_of(stdout)
@@ -270,53 +276,116 @@ def check_parser_contracts() -> None:
     require("map-unit code" in payload["error"]["message"], payload["error"]["message"])
     require("~tl" not in stdout, stdout)
 
+    code, stdout, stderr = invoke(
+        ["units", "--bbox", "174.76,-36.86,174.78,-36.84", "--limit", "3", "--fixture", "units-near-miss", "--json"]
+    )
+    payload = payload_of(stdout)
+    require(code == 0 and stderr == "", stderr or stdout[:400])
+    codes = [row["unit_code"] for row in payload["results"]]
+    require(codes == ["Q1l", "Mwe"], codes)
+    require("Qvat" not in stdout, stdout)
+    require(all(row["uncertain"] is False for row in payload["results"]), payload["results"])
+    require(payload["page"]["dropped_outside_bbox"] == 1, payload["page"])
+    require(payload["page"]["returned"] == 2 and payload["page"]["matched"] == 3, payload["page"])
+    require(any("dropped 1 feature outside" in item for item in payload["warnings"]), payload["warnings"])
+    south = (174.9, -37.05, 174.98, -36.98)
+    require(not cli._envelope_outside([174.962006, -36.979707, 174.967516, -36.968782], south), "32 m miss")
+    require(not cli._envelope_outside([174.963862, -36.979191, 174.97639, -36.970704], south), "90 m miss")
+    require(cli._envelope_outside([174.983, -37.0, 174.99, -36.99], south), "slack boundary")
 
+    code, stdout, stderr = invoke(
+        ["units", "--bbox", "174.76,-36.86,174.78,-36.84", "--limit", "1", "--fixture", "units-uncertain-code", "--json"]
+    )
+    payload = payload_of(stdout)
+    require(code == 0 and stderr == "", stderr or stdout[:400])
+    record = payload["results"][0]
+    require(record["unit_code"] == "?Pks~" and record["uncertain"] is True, record)
+    require(record["strat_unit"] == "Kawaa Formation" and record["old_unit_c"] == "?uk", record)
+    require(record["strat_age"] == "Pi" and record["scale"] == 50000, record)
+    require(payload["page"]["dropped_outside_bbox"] == 0 and payload["page"]["returned"] == 1, payload["page"])
+    code, stdout, stderr = invoke(
+        ["units", "--bbox", "174.76,-36.86,174.78,-36.84", "--limit", "1", "--fixture", "units-uncertain-code"]
+    )
+    require(code == 0 and stderr == "", stderr)
+    require("?Pks~ | Kawaa Formation | age Pi | scale 50000 | uncertain" in stdout, stdout)
+
+
+# Every distinct unit_code from the 2639-feature property read on 2026-10-12.
 PUBLISHED_UNIT_CODES = (
-    "eQal",
-    "eQal_t",
-    "eQd",
-    "eQd_t",
+    "?Pks~",
     "Etw",
-    "lQal",
+    "Mkm",
     "Mtl",
     "Mtlw",
     "Mtn",
+    "Mtns",
     "Mtp",
+    "Mtp~",
+    "Mtt",
     "Mtw",
+    "Mtwm",
+    "Mtwt",
+    "Mtww",
+    "Mwc",
+    "Mwc~",
     "Mwe",
     "Mwep",
     "Mwep~",
     "Mwe~",
+    "Mwk",
     "Mwm",
     "Mwr",
     "Mwr~",
+    "Mwt",
     "Mwto",
     "Mwu",
+    "Mww",
     "Mwy",
+    "Otg",
+    "Oti",
+    "Otm",
+    "Otms",
     "Pad",
+    "Pks",
+    "Pks~",
     "Ptp",
     "Ptpa",
+    "Ptpa+",
     "Ptpp",
+    "Ptpp+",
+    "Ptpp~",
+    "Ptps",
+    "Ptp~",
     "Q1al",
     "Q1al_t",
     "Q1al~",
     "Q1ao",
+    "Q1ap",
     "Q1as",
     "Q1b",
+    "Q1b_f",
     "Q1df",
+    "Q1df_f",
+    "Q1df_ft",
     "Q1df_t",
     "Q1dm",
     "Q1dm_t",
     "Q1dp",
+    "Q1dp_t",
     "Q1l",
     "Q1nc",
+    "Q1nc+",
+    "Q1nc~",
     "Q1nr",
     "Qvaa",
+    "Qvaa~",
     "Qval",
     "Qval+tl~",
     "Qval~",
     "Qvas",
+    "Qvas~",
     "Qvat",
+    "Qvat~",
     "Qvsl",
     "Qvss",
     "Qvst",
@@ -328,12 +397,23 @@ PUBLISHED_UNIT_CODES = (
     "TJws~",
     "TJwt",
     "TJw~",
+    "eQal",
+    "eQal_t",
+    "eQd",
+    "eQd_t",
+    "lQal",
+    "tl",
     "tlc~",
+    "tlg",
     "tlg~",
     "tli~",
+    "tlm",
     "tlm~",
+    "tls",
     "tls~",
     "tl~",
+    "tp+tl~",
+    "tpm~",
     "tp~",
 )
 
@@ -365,17 +445,27 @@ MALFORMED_UNIT_CODES = (
     "tl~=x",
     "tl~é",
     "A" + ("b" * 41),
+    "?",
+    "?~tl",
+    "??Pks",
+    "?Pks~ ",
+    " ?Pks~",
+    "?" + "A" + ("b" * 40),
 )
 
 
 def check_unit_code_alphabet() -> None:
-    require(len(PUBLISHED_UNIT_CODES) == 63, "published sample shrank")
+    require(len(PUBLISHED_UNIT_CODES) == 103, "published code census changed")
+    require(len(set(PUBLISHED_UNIT_CODES)) == 103, "published code census has duplicates")
     for code in PUBLISHED_UNIT_CODES:
         record, _warnings = cli._properties({"unit_code": code, "strat_unit": None, "old_unit_c": code})
         require(record["unit_code"] == code and record["old_unit_c"] == code, record)
+        require(record["uncertain"] is code.startswith("?"), record)
         require("strat_unit" not in record, record)
-    for code in ("A.b", "A/b", "A-b", "A" + ("b" * 40)):
+    for code in ("A.b", "A/b", "A-b", "A" + ("b" * 40), "?Pks~", "?" + "A" + ("b" * 39)):
         require(cli.UNIT_CODE_RE.fullmatch(code), code)
+    plain, _warnings = cli._properties({"unit_code": "Pks~", "old_unit_c": "?uk"})
+    require(plain["uncertain"] is False and plain["old_unit_c"] == "?uk", plain)
     for code in MALFORMED_UNIT_CODES:
         try:
             cli._properties({"unit_code": code})

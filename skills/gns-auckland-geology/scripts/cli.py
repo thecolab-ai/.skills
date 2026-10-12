@@ -39,9 +39,19 @@ ACCEPTED_CRS = {
 STRING_FIELDS = ("strat_unit", "strat_age", "descriptio", "old_unit_c", "source")
 NUMBER_FIELDS = ("area", "perimeter", "geol_units", "geol_uni_1", "scale")
 FEATURE_ID_RE = re.compile(r"^NZL-Urban_Auckland_geological_units\.[A-Za-z0-9_.-]{1,40}$")
-# A 480-feature sample (2026-10-12) used letters, digits, "_", "~", and "+".
-# The first character stays alphanumeric, so a leading mark is still rejected.
-UNIT_CODE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_./~+-]{0,40}$")
+# All 2639 features on 2026-10-12 (103 codes) used letters, digits, "_", "+",
+# "~", and a leading "?" on ?Pks~. "?" is the GNS uncertainty marker and is
+# rejected anywhere else. The whole code is at most 41 characters. "." "/" "-"
+# were absent from that read and remain allowed only after the first letter
+# or digit. A leading "~" or "+" is still rejected.
+UNIT_CODE_RE = re.compile(
+    r"^(?:\?[A-Za-z0-9][A-Za-z0-9_./~+-]{0,39}|[A-Za-z0-9][A-Za-z0-9_./~+-]{0,40})$"
+)
+# The 92 features for bbox 174.9,-37.05,174.98,-36.98 included three envelopes
+# outside the box. The farthest was 0.000809 degrees (90 m). The server bbox
+# filter is authoritative inside this slack. A quarter-degree miss still fails
+# when every feature is that far outside.
+BBOX_SLACK_DEGREES = 0.002
 FIXTURE_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,40}$")
 RETRY_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9, :+-]{0,63}$")
 FIXTURE_DIR = Path(__file__).resolve().parents[1] / "tests" / "fixtures"
@@ -392,10 +402,7 @@ def _polygon(value: Any, bounds: list[float], counter: list[int]) -> list[list[l
     return [_ring(ring, bounds, counter) for ring in value]
 
 
-def validate_geometry(
-    geometry: Any,
-    box: tuple[float, float, float, float],
-) -> dict[str, Any]:
+def validate_geometry(geometry: Any) -> tuple[dict[str, Any], list[float]]:
     if not isinstance(geometry, dict):
         raise SchemaError("feature geometry was not an object")
     kind = geometry.get("type")
@@ -410,16 +417,19 @@ def validate_geometry(
         parsed = [_polygon(polygon, bounds, counter) for polygon in coordinates]
     else:
         raise SchemaError("feature geometry was not a Polygon or MultiPolygon")
+    return {"type": kind, "coordinates": parsed}, bounds
+
+
+def _envelope_outside(bounds: list[float], box: tuple[float, float, float, float]) -> bool:
+    """True when the envelope is farther than BBOX_SLACK_DEGREES from the box."""
     min_lon, min_lat, max_lon, max_lat = box
-    separated = (
-        bounds[2] < min_lon
-        or bounds[0] > max_lon
-        or bounds[3] < min_lat
-        or bounds[1] > max_lat
+    slack = BBOX_SLACK_DEGREES
+    return (
+        bounds[2] < min_lon - slack
+        or bounds[0] > max_lon + slack
+        or bounds[3] < min_lat - slack
+        or bounds[1] > max_lat + slack
     )
-    if separated:
-        raise SchemaError("feature geometry does not intersect the requested bounding box")
-    return {"type": kind, "coordinates": parsed}
 
 
 def _properties(properties: Any) -> tuple[dict[str, Any], list[str]]:
@@ -430,6 +440,7 @@ def _properties(properties: Any) -> tuple[dict[str, Any], list[str]]:
     if not isinstance(unit_code, str) or not UNIT_CODE_RE.fullmatch(unit_code):
         raise SchemaError("unit_code was missing or not a map-unit code")
     record["unit_code"] = unit_code
+    record["uncertain"] = unit_code.startswith("?")
     for label in STRING_FIELDS:
         if label not in properties or properties[label] is None:
             continue
@@ -497,32 +508,43 @@ def normalise_collection(
     _crs_name(payload, bool(features))
     warnings: list[str] = []
     records: list[dict[str, Any]] = []
+    dropped = 0
     for feature in features:
         if not isinstance(feature, dict) or feature.get("type") != "Feature":
             raise SchemaError("feature was not a GeoJSON Feature")
         feature_id = feature.get("id")
         if not isinstance(feature_id, str) or not FEATURE_ID_RE.fullmatch(feature_id):
             raise SchemaError("feature id was not an Auckland geological unit id")
-        geometry = validate_geometry(feature.get("geometry"), box)
+        geometry, bounds = validate_geometry(feature.get("geometry"))
         properties, extra = _properties(feature.get("properties"))
-        warnings.extend(extra)
-        record: dict[str, Any] = {"feature_id": feature_id, **properties, "geometry": geometry}
         geometry_name = feature.get("geometry_name")
         if geometry_name is not None:
             if not isinstance(geometry_name, str) or not re.fullmatch(r"[A-Za-z0-9_]{1,40}", geometry_name):
                 raise SchemaError("geometry_name was not a short field name")
+        if _envelope_outside(bounds, box):
+            dropped += 1
+            continue
+        warnings.extend(extra)
+        record: dict[str, Any] = {"feature_id": feature_id, **properties, "geometry": geometry}
+        if geometry_name is not None:
             record["geometry_name"] = geometry_name
         records.append(record)
+    if features and not records:
+        raise SchemaError("feature geometry does not intersect the requested bounding box")
     if matched > returned:
         warnings.append(
             f"returned {returned} of {matched} intersecting units; "
             "this command does not page the remaining matches"
         )
+    if dropped:
+        noun = "feature" if dropped == 1 else "features"
+        warnings.append(f"dropped {dropped} {noun} outside the requested bounding box")
     page = {
         "matched": matched,
-        "returned": returned,
+        "returned": len(records),
         "limit": limit,
         "truncated": matched > returned,
+        "dropped_outside_bbox": dropped,
     }
     return records, page, warnings
 
@@ -557,7 +579,8 @@ def human(payload: dict[str, Any]) -> str:
         name = record.get("strat_unit") or ""
         scale = record.get("scale")
         scale_text = "" if scale is None else str(scale)
-        lines.append(f"{record['unit_code']} | {name} | age {age} | scale {scale_text}")
+        uncertain = " | uncertain" if record.get("uncertain") else ""
+        lines.append(f"{record['unit_code']} | {name} | age {age} | scale {scale_text}{uncertain}")
     lines.append(f"licence: {payload['meta'].get('licence', 'unspecified')}")
     lines.append("Attribute GNS Science. Geometry is available in --json and --format geojson.")
     return "\n".join(lines)

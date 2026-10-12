@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import subprocess
 import sys
 from pathlib import Path
@@ -10,8 +11,12 @@ from pathlib import Path
 CLI = Path(__file__).resolve().parent / "cli.py"
 ROOT = Path(__file__).resolve().parents[3]
 BOX = "174.76,-36.86,174.78,-36.84"
+SOUTH_BOX = "174.9,-37.05,174.98,-36.98"
+SOUTH_BOUNDS = (174.9, -37.05, 174.98, -36.98)
+BBOX_SLACK_DEGREES = 0.002
 BBOX = ["units", "--bbox", BOX, "--limit", "1"]
 LIVE = ["units", "--bbox", BOX, "--limit", "5"]
+LIVE_SOUTH = ["units", "--bbox", SOUTH_BOX, "--limit", "5"]
 LAYER_MIN_LON, LAYER_MAX_LON = 174.39, 175.32
 LAYER_MIN_LAT, LAYER_MAX_LAT = -37.33, -36.69
 NETWORK_MARKERS = (
@@ -109,6 +114,28 @@ def fixture_checks() -> None:
     require(code == 2 and payload["results"] == [], payload)
     print("[PASS] fixture limit above 5 is rejected before a request")
 
+    code, stdout, stderr = run(
+        ["units", "--bbox", BOX, "--limit", "3", "--fixture", "units-near-miss", "--json"]
+    )
+    payload = json.loads(stdout)
+    require(code == 0 and stderr == "", stderr or stdout[:400])
+    codes = [row["unit_code"] for row in payload["results"]]
+    require(codes == ["Q1l", "Mwe"], codes)
+    require("Qvat" not in stdout, stdout)
+    require(payload["page"]["dropped_outside_bbox"] == 1, payload["page"])
+    require(payload["page"]["returned"] == 2, payload["page"])
+    print("[PASS] fixture near-miss geometry keeps overlapping units")
+
+    code, stdout, stderr = run(
+        ["units", "--bbox", BOX, "--limit", "1", "--fixture", "units-uncertain-code", "--json"]
+    )
+    payload = json.loads(stdout)
+    require(code == 0 and stderr == "", stderr or stdout[:400])
+    record = payload["results"][0]
+    require(record["unit_code"] == "?Pks~" and record["uncertain"] is True, record)
+    require(record["strat_unit"] == "Kawaa Formation", record)
+    print("[PASS] fixture uncertain unit code ?Pks~ is accepted")
+
 
 def transport_failure(code: int, stdout: str, stderr: str) -> bool:
     if code not in {4, 5}:
@@ -151,6 +178,7 @@ def live_checks() -> int:
         named = []
         for record in results:
             require(isinstance(record.get("unit_code"), str) and record["unit_code"], record)
+            require(record["uncertain"] is record["unit_code"].startswith("?"), record)
             require(" " not in record["unit_code"] and "<" not in record["unit_code"], record["unit_code"])
             codes.append(record["unit_code"])
             if isinstance(record.get("strat_unit"), str) and record["strat_unit"]:
@@ -163,6 +191,7 @@ def live_checks() -> int:
         require("tl~" in codes, codes)
         require(named, "live rows omitted every stratigraphic name")
         require(payload["page"]["returned"] >= 5 and payload["page"]["matched"] >= 5, payload["page"])
+        require(payload["page"]["dropped_outside_bbox"] >= 0, payload["page"])
         require(payload["page"]["limit"] == 5, payload["page"])
         require(payload["meta"]["publisher"] == "GNS Science", payload["meta"])
         require("Creative Commons Attribution 3.0 New Zealand" in payload["meta"].get("licence", ""), payload["meta"])
@@ -179,13 +208,103 @@ def live_checks() -> int:
     return 0
 
 
+def geometry_bounds(geometry: dict) -> list[float]:
+    bounds = [math.inf, math.inf, -math.inf, -math.inf]
+
+    def walk(value: object) -> None:
+        if (
+            isinstance(value, list)
+            and len(value) == 2
+            and isinstance(value[0], (int, float))
+            and not isinstance(value[0], bool)
+            and isinstance(value[1], (int, float))
+            and not isinstance(value[1], bool)
+        ):
+            bounds[0] = min(bounds[0], float(value[0]))
+            bounds[1] = min(bounds[1], float(value[1]))
+            bounds[2] = max(bounds[2], float(value[0]))
+            bounds[3] = max(bounds[3], float(value[1]))
+            return
+        if isinstance(value, list):
+            for item in value:
+                walk(item)
+
+    walk(geometry.get("coordinates"))
+    return bounds
+
+
+def outside_slack(bounds: list[float], box: tuple[float, float, float, float]) -> bool:
+    min_lon, min_lat, max_lon, max_lat = box
+    slack = BBOX_SLACK_DEGREES
+    return (
+        bounds[2] < min_lon - slack
+        or bounds[0] > max_lon + slack
+        or bounds[3] < min_lat - slack
+        or bounds[1] > max_lat + slack
+    )
+
+
+def overlaps_box(bounds: list[float], box: tuple[float, float, float, float]) -> bool:
+    min_lon, min_lat, max_lon, max_lat = box
+    return not (
+        bounds[2] < min_lon
+        or bounds[0] > max_lon
+        or bounds[3] < min_lat
+        or bounds[1] > max_lat
+    )
+
+
+def live_south_checks() -> int:
+    """South Auckland box that returns a polygon a few tens of metres outside."""
+    try:
+        code, stdout, stderr = run([*LIVE_SOUTH, "--json"])
+    except subprocess.TimeoutExpired:
+        print("[SKIP] south Auckland live probe skipped: network error: source request timed out")
+        return 0
+    if transport_failure(code, stdout, stderr):
+        print("[SKIP] south Auckland live probe skipped: upstream unavailable or rate limited")
+        return 0
+    try:
+        payload = json.loads(stdout)
+        require(code == 0 and stderr == "", stderr or stdout[:400])
+        results = payload["results"]
+        require(len(results) == 5, results)
+        overlaps = 0
+        for record in results:
+            require(isinstance(record.get("unit_code"), str) and record["unit_code"], record)
+            require(record["uncertain"] is record["unit_code"].startswith("?"), record)
+            require(" " not in record["unit_code"] and "<" not in record["unit_code"], record["unit_code"])
+            bounds = geometry_bounds(record["geometry"])
+            require(not outside_slack(bounds, SOUTH_BOUNDS), bounds)
+            if overlaps_box(bounds, SOUTH_BOUNDS):
+                overlaps += 1
+        require(overlaps >= 1, "south box dropped every overlapping unit")
+        require(payload["page"]["limit"] == 5, payload["page"])
+        require(payload["page"]["returned"] == 5, payload["page"])
+        require(payload["page"]["dropped_outside_bbox"] == 0, payload["page"])
+        require(payload["page"]["matched"] >= 5, payload["page"])
+        require("error" not in payload, payload)
+        require(payload["meta"]["publisher"] == "GNS Science", payload["meta"])
+        require("Creative Commons Attribution 3.0 New Zealand" in payload["meta"].get("licence", ""), payload["meta"])
+        print(
+            f"[PASS] live south Auckland box returned {len(results)} units "
+            f"including {overlaps} that overlap the box"
+        )
+    except (AssertionError, KeyError, TypeError, json.JSONDecodeError) as exc:
+        print(f"[FAIL] live south Auckland geological unit probe: {exc}")
+        return 1
+    return 0
+
+
 def main() -> int:
     try:
         fixture_checks()
     except (AssertionError, json.JSONDecodeError, subprocess.TimeoutExpired) as exc:
         print(f"[FAIL] fixture {exc}")
         return 1
-    return live_checks()
+    if live_checks():
+        return 1
+    return live_south_checks()
 
 
 if __name__ == "__main__":

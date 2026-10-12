@@ -1,0 +1,96 @@
+{
+  "status": 200,
+  "truncated": false,
+  "contains_live_credentials": false,
+  "contains_personal_data": false,
+  "body": {
+    "type": "FeatureCollection",
+    "features": [
+      {
+        "type": "Feature",
+        "id": "NZL-Urban_Auckland_geological_units.9101",
+        "geometry_name": "geom",
+        "geometry": {
+          "type": "MultiPolygon",
+          "coordinates": [
+            [
+              [
+                [174.77, -36.85],
+                [174.775, -36.85],
+                [174.775, -36.845],
+                [174.77, -36.845],
+                [174.77, -36.85]
+              ]
+            ]
+          ]
+        },
+        "properties": {
+          "unit_code": "Q1l",
+          "strat_unit": "Fixture overlapping unit",
+          "strat_age": "Q1",
+          "scale": 50000
+        }
+      },
+      {
+        "type": "Feature",
+        "id": "NZL-Urban_Auckland_geological_units.9102",
+        "geometry_name": "geom",
+        "geometry": {
+          "type": "MultiPolygon",
+          "coordinates": [
+            [
+              [
+                [174.765, -36.8396],
+                [174.77, -36.8396],
+                [174.77, -36.8393],
+                [174.765, -36.8393],
+                [174.765, -36.8396]
+              ]
+            ]
+          ]
+        },
+        "properties": {
+          "unit_code": "Mwe",
+          "strat_unit": "Fixture near miss",
+          "strat_age": "Mi",
+          "scale": 50000
+        }
+      },
+      {
+        "type": "Feature",
+        "id": "NZL-Urban_Auckland_geological_units.9103",
+        "geometry_name": "geom",
+        "geometry": {
+          "type": "MultiPolygon",
+          "coordinates": [
+            [
+              [
+                [174.77, -36.5],
+                [174.78, -36.5],
+                [174.78, -36.49],
+                [174.77, -36.49],
+                [174.77, -36.5]
+              ]
+            ]
+          ]
+        },
+        "properties": {
+          "unit_code": "Qvat",
+          "strat_unit": "Fixture distant unit",
+          "strat_age": "Qv",
+          "scale": 50000
+        }
+      }
+    ],
+    "totalFeatures": 3,
+    "numberMatched": 3,
+    "numberReturned": 3,
+    "timeStamp": "2014-01-01T00:00:00Z",
+    "crs": {
+      "type": "name",
+      "properties": {
+        "name": "urn:ogc:def:crs:CRS::84"
+      }
+    }
+  }
+}
