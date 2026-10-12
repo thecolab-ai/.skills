@@ -2,13 +2,13 @@
   "total_count": 1,
   "results": [
     {
-      "id_pdc": "FR*TEST*NULL*INSEE*1",
-      "statut_pdc": "Inconnu",
-      "url_description_pdc": null,
-      "last_updated": "2026-06-08T05:25:57+00:00",
+      "id_pdc": "FR*V75*EPX16*36*4",
+      "statut_pdc": "Mise en service planifiée",
+      "url_description_pdc": "https://parisdata.opendatasoft.com/explore/dataset/belib-points-de-recharge-pour-vehicules-electriques-donnees-statiques/table/?disjunctive.nbre_pdc&disjunctive.accessibilite&disjunctive.horaires_sav&disjunctive.postal_code&disjunctive.acces_recharge&disjunctive.type_prise&disjunctive.puiss_max&q=FR*V75*EPX16*36*4",
+      "last_updated": "2026-10-11T02:30:10+00:00",
       "arrondissement": null,
       "adresse_station": null,
-      "coordonneesxy": {"lon": 2.35, "lat": 48.86},
+      "coordonneesxy": null,
       "code_insee_commune": null
     }
   ]

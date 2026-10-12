@@ -115,12 +115,81 @@ def fixture_checks() -> int:
         raise AssertionError("truncated JSON was accepted")
 
     def null_insee() -> None:
-        payload = json.loads((FIXTURES / "records-null-insee.json").read_text(encoding="utf-8"))
-        records, total = cli.parse_records_payload(payload, 1, cli.datetime.now(cli.timezone.utc))
-        if total != 1 or records[0]["code_insee_commune"] is not None:
-            raise AssertionError(records)
-        if records[0]["statut_pdc"] != "Inconnu" or records[0]["adresse_station"] is not None:
-            raise AssertionError(records[0])
+        completed = run_cli([
+            "availability", "--limit", "1", "--fixture", "tests/fixtures/records-null-insee.json", "--json",
+        ])
+        if completed.returncode != 0 or completed.stderr:
+            raise AssertionError(completed.stderr or completed.stdout)
+        record = json.loads(completed.stdout)["results"][0]
+        if record["id_pdc"] != "FR*V75*EPX16*36*4":
+            raise AssertionError(record["id_pdc"])
+        if record["statut_pdc"] != "Mise en service planifiée":
+            raise AssertionError(record["statut_pdc"])
+        if record["code_insee_commune"] is not None or record["adresse_station"] is not None or record["arrondissement"] is not None:
+            raise AssertionError(record)
+        if record["longitude"] is not None or record["latitude"] is not None:
+            raise AssertionError((record["longitude"], record["latitude"]))
+        static_url = record.get("static_description_url") or ""
+        if not static_url.startswith(f"https://{cli.ALLOWED_HOST}/"):
+            raise AssertionError(static_url)
+
+    def null_coordinates_page_and_bbox() -> None:
+        geo = run_cli([
+            "availability", "--limit", "1", "--fixture", "tests/fixtures/records-null-insee.json",
+            "--format", "geojson",
+        ])
+        if geo.returncode != 0 or geo.stderr:
+            raise AssertionError(geo.stderr or geo.stdout)
+        feature = json.loads(geo.stdout)["features"][0]
+        if feature["geometry"] is not None or feature["properties"]["statut_pdc"] != "Mise en service planifiée":
+            raise AssertionError(feature)
+        if feature["properties"]["longitude"] is not None or feature["properties"]["latitude"] is not None:
+            raise AssertionError(feature["properties"])
+
+        mixed = run_cli([
+            "availability", "--limit", "2", "--fixture", "tests/fixtures/records-mixed-null-coordinates.json", "--json",
+        ])
+        if mixed.returncode != 0 or mixed.stderr:
+            raise AssertionError(mixed.stderr or mixed.stdout)
+        rows = json.loads(mixed.stdout)["results"]
+        by_id = {row["id_pdc"]: row for row in rows}
+        if set(by_id) != {"FR*V75*E9012*06*3", "FR*V75*EPX16*36*4"}:
+            raise AssertionError(rows)
+        if by_id["FR*V75*E9012*06*3"]["longitude"] != 2.411238:
+            raise AssertionError(by_id["FR*V75*E9012*06*3"])
+        null_row = by_id["FR*V75*EPX16*36*4"]
+        if null_row["longitude"] is not None or null_row["latitude"] is not None or null_row["code_insee_commune"] is not None:
+            raise AssertionError(null_row)
+        if null_row["statut_pdc"] != "Mise en service planifiée":
+            raise AssertionError(null_row)
+
+        boxed = run_cli([
+            "availability", "--limit", "2", "--fixture", "tests/fixtures/records-mixed-null-coordinates.json",
+            "--bbox=2.40,48.84,2.42,48.85", "--json",
+        ])
+        if boxed.returncode != 0 or boxed.stderr:
+            raise AssertionError(boxed.stderr or boxed.stdout)
+        boxed_rows = json.loads(boxed.stdout)["results"]
+        if len(boxed_rows) != 1 or boxed_rows[0]["id_pdc"] != "FR*V75*E9012*06*3":
+            raise AssertionError(boxed_rows)
+
+        outside = run_cli([
+            "availability", "--limit", "1", "--fixture", "tests/fixtures/records-null-insee.json",
+            "--bbox=174.0,-37.0,175.0,-36.0", "--json",
+        ])
+        if outside.returncode != 0 or json.loads(outside.stdout)["results"] != []:
+            raise AssertionError(outside.stderr or outside.stdout)
+
+    def incomplete_coordinates() -> None:
+        payload = json.loads((FIXTURES / "records-positive.json").read_text(encoding="utf-8"))
+        payload["results"][0]["coordonneesxy"] = {"lon": 2.35}
+        try:
+            cli.parse_records_payload(payload, 1, cli.datetime.now(cli.timezone.utc))
+        except cli.SkillError as exc:
+            if exc.code != 6 or "lon and lat" not in str(exc):
+                raise AssertionError(exc) from exc
+            return
+        raise AssertionError("incomplete coordinates were accepted")
 
     def bad_commune() -> None:
         assert_error(
@@ -241,7 +310,9 @@ def fixture_checks() -> int:
     check("empty result is an empty array", empty)
     check("malformed payload is schema_failure", malformed)
     check("truncated JSON is schema_failure", truncated)
-    check("null INSEE stays null and Inconnu is kept", null_insee)
+    check("null coordinates and null INSEE stay null and the published status is kept", null_insee)
+    check("a null point stays on the page and a bbox does not crash", null_coordinates_page_and_bbox)
+    check("incomplete coordinates are schema_failure", incomplete_coordinates)
     check("non-Paris commune code is schema_failure", bad_commune)
     check("HTTP 429 is blocked and keeps Retry-After", http_429)
     check("HTTP 503 is upstream_unavailable", http_503)
@@ -329,11 +400,58 @@ def live_check() -> int:
     return 0
 
 
+def live_null_coordinates() -> int:
+    point_id = "FR*V75*EPX16*36*4"
+    try:
+        completed = subprocess.run(
+            [sys.executable, str(CLI), "availability", "--limit", "1", "--id", point_id, "--json"],
+            capture_output=True,
+            text=True,
+            timeout=40,
+            check=False,
+        )
+    except subprocess.TimeoutExpired as exc:
+        fail("live", f"network error: source request timed out: {exc}")
+        return 1
+    text = "\n".join(part for part in (completed.stdout, completed.stderr) if part)
+    if completed.returncode != 0:
+        lowered = text.lower()
+        if any(marker in lowered for marker in ("network error", "timed out", "http 429", "http 503", "http 5")):
+            fail("live", f"network error: {text[:400]}")
+        else:
+            fail("live", text[:400])
+        return 1
+    try:
+        payload = json.loads(completed.stdout)
+        meta = payload["meta"]
+        if len(payload["results"]) != 1:
+            raise AssertionError(payload["results"])
+        record = payload["results"][0]
+        if record["id_pdc"] != point_id or not record["statut_pdc"].strip():
+            raise AssertionError(record)
+        if record["longitude"] is not None or record["latitude"] is not None:
+            raise AssertionError((record["longitude"], record["latitude"]))
+        if record["code_insee_commune"] is not None or record["adresse_station"] is not None or record["arrondissement"] is not None:
+            raise AssertionError(record)
+        if meta["licence"] != cli.EXPECTED_LICENCE or "Ville de Paris" not in meta["attribution"]:
+            raise AssertionError(meta)
+        if not meta["source_url"].startswith(f"https://{cli.ALLOWED_HOST}/"):
+            raise AssertionError(meta["source_url"])
+        static_url = record.get("static_description_url")
+        if static_url and urllib.parse.urlparse(static_url).hostname != cli.ALLOWED_HOST:
+            raise AssertionError(static_url)
+    except Exception as exc:
+        fail("live", f"null-coordinate point was not returned with a null location: {exc}")
+        return 1
+    ok("live", f"{point_id} keeps a null location and its published status")
+    return 0
+
+
 def main() -> int:
     failures = fixture_checks() + contract_check()
     if failures:
         return 1
-    return live_check()
+    return live_check() + live_null_coordinates()
 
 
 if __name__ == "__main__":

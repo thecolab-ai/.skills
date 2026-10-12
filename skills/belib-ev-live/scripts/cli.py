@@ -316,7 +316,9 @@ def optional_text(record: dict[str, Any], key: str) -> str | None:
     return value
 
 
-def parse_coordinates(value: Any) -> tuple[float, float]:
+def parse_coordinates(value: Any) -> tuple[float | None, float | None]:
+    if value is None:
+        return None, None
     if not isinstance(value, dict) or set(value) != {"lon", "lat"}:
         raise SkillError("availability record coordonneesxy must contain lon and lat", 6)
     lon = value.get("lon")
@@ -415,7 +417,10 @@ def local_filter(records: list[dict[str, Any]], point_id: str | None, bbox: tupl
         min_lon, min_lat, max_lon, max_lat = bbox
         selected = [
             record for record in selected
-            if min_lon <= record["longitude"] <= max_lon and min_lat <= record["latitude"] <= max_lat
+            if record["longitude"] is not None
+            and record["latitude"] is not None
+            and min_lon <= record["longitude"] <= max_lon
+            and min_lat <= record["latitude"] <= max_lat
         ]
     return selected
 
@@ -470,9 +475,13 @@ def features_for(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
     for record in public_records(records):
         longitude = record["longitude"]
         latitude = record["latitude"]
+        if longitude is None or latitude is None:
+            geometry = None
+        else:
+            geometry = {"type": "Point", "coordinates": [longitude, latitude]}
         features.append({
             "type": "Feature",
-            "geometry": {"type": "Point", "coordinates": [longitude, latitude]},
+            "geometry": geometry,
             "properties": record,
         })
     return features
@@ -493,11 +502,15 @@ def human_text(records: list[dict[str, Any]], meta: dict[str, Any]) -> str:
         lines.append("No charge points matched.")
         return "\n".join(lines)
     for index, record in enumerate(records, start=1):
-        place = record.get("adresse_station") or record.get("arrondissement") or "Paris"
+        has_location = record["latitude"] is not None and record["longitude"] is not None
+        place = record.get("adresse_station") or record.get("arrondissement")
+        if place is None:
+            place = "Paris" if has_location else "location not published"
+        coords = f" | {record['latitude']}, {record['longitude']}" if has_location else ""
         lines.append(
             f"{index}. {record['id_pdc']} | {record['statut_pdc']} | "
             f"updated {record['last_updated']} | age {record['update_age_seconds']}s | "
-            f"{place} | {record['latitude']}, {record['longitude']}"
+            f"{place}{coords}"
         )
     return "\n".join(lines)
 

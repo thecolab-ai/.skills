@@ -31,8 +31,10 @@ timestamps with a numeric offset; the newest point observed was
 `2026-06-08T05:25:57+00:00` with status `Inconnu`. About 1975 points were
 present. Status counts at that read were Disponible 1083, Occupé (en charge)
 781, En maintenance 58, Inconnu 50, and Mise en service planifiée 3.
-`code_insee_commune` was `75056` for 1968 points and null for 7. Do not fill
-a null commune code.
+`code_insee_commune` was `75056` for 1968 points and null for 7. Those 7 also
+had null `coordonneesxy`, address, and arrondissement, including
+`FR*V75*EPX16*36*4` with status `Mise en service planifiée`. Do not fill a
+null commune code and do not invent coordinates for a null location.
 
 The live command refuses the records unless metadata `dataset_id` is this
 dataset and `license` is exactly `Open Database License (ODbL)`. A different
@@ -74,9 +76,12 @@ Occupé (en charge), En maintenance, Inconnu, and Mise en service planifiée.
 New non-empty status text is kept. Records are not dropped for being occupied,
 in maintenance, unknown, or planned.
 
-Coordinates are WGS84 longitude then latitude in `coordonneesxy`. GeoJSON uses
-the same order. `--format geojson` emits a FeatureCollection with the same
-provenance `meta`.
+Coordinates are WGS84 longitude then latitude in `coordonneesxy`. A published
+null `coordonneesxy` is returned as null longitude and latitude. GeoJSON uses
+the same order for a located point and `"geometry": null` when the source
+coordinates are null. A null location is not inside a bounding box, and it
+does not drop the other points on the page. `--format geojson` emits a
+FeatureCollection with the same provenance `meta`.
 
 ## Errors
 
@@ -85,7 +90,7 @@ provenance `meta`.
 | Malformed limit, id, bbox, or fixture path | 2 | invalid_input |
 | HTTP 429, with raw Retry-After when present | 4 | blocked |
 | Timeout, other network failure, HTTP 503 and other 5xx | 5 | upstream_unavailable |
-| Non-JSON, truncated JSON, unexpected fields, bad coordinates, row cap | 6 | schema_failure |
+| Non-JSON, truncated JSON, unexpected fields, coordinates present but not a finite lon/lat pair, row cap | 6 | schema_failure |
 | Licence is not ODbL, off-host redirect, or `--require-current` fails | 7 | unsupported_operation |
 
 An empty `results` array is a successful empty match. It is not a fabricated
@@ -94,6 +99,11 @@ row and it is not a pass of the live freshness check.
 ## Fixtures
 
 `tests/fixtures/records-positive.json` is one public record retrieved
-2026-10-11 from this ODbL dataset (point `FR*V75*E9012*06*3`). The other
-fixtures are synthetic parser and HTTP cases. They contain no personal fields.
-The positive excerpt is shared here with the attribution above.
+2026-10-11 from this ODbL dataset (point `FR*V75*E9012*06*3`).
+`tests/fixtures/records-null-insee.json` is public point `FR*V75*EPX16*36*4`
+as published: status `Mise en service planifiée`, null coordinates, null
+address, null arrondissement, and null INSEE.
+`tests/fixtures/records-mixed-null-coordinates.json` pairs that shape with the
+positive excerpt. The other fixtures are synthetic parser and HTTP cases. They
+contain no personal fields. The public excerpts are shared here with the
+attribution above.

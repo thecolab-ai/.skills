@@ -55,8 +55,11 @@ Each live command reads dataset metadata first and returns records only when
 the licence is still the Open Database License (ODbL). JSON `meta` carries the
 records URL, publisher, retrieval time, licence, attribution, and the newest
 `last_updated` in the page as `latest_data`. Status text stays in the source
-wording. Null `code_insee_commune` stays null. A commune code other than
-Paris `75056` is an error.
+wording. Null `code_insee_commune` stays null. Null `coordonneesxy` stays
+null: longitude, latitude, and GeoJSON geometry are null, and the status is
+kept. A null location is outside every bounding box. One null point does not
+remove the located points on the same page. A commune code other than Paris
+`75056` is an error.
 
 `--fixture` reads a local records document inside this skill and does not use
 the network. It is the offline parser path. The CLI has no URL argument.
