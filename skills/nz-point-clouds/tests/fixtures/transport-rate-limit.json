@@ -1,0 +1,4 @@
+{
+  "fault": "rate_limit",
+  "retry_after": "30"
+}

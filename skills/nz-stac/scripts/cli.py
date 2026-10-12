@@ -17,6 +17,7 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 ROOTS = {
     "elevation": "https://nz-elevation.s3.ap-southeast-2.amazonaws.com/catalog.json",
     "imagery": "https://nz-imagery.s3.ap-southeast-2.amazonaws.com/catalog.json",
+    "coastal": "https://nz-coastal.s3.ap-southeast-2.amazonaws.com/catalog.json",
 }
 HOSTS = {urlparse(url).hostname for url in ROOTS.values()}
 PUBLISHER = "Toitū Te Whenua Land Information New Zealand"
@@ -36,7 +37,7 @@ def safe_url(url):
     if (parsed.scheme != "https" or parsed.hostname not in HOSTS
             or parsed.username or parsed.password or parsed.port not in (None, 443)
             or parsed.query or parsed.fragment):
-        raise SourceError("Only public LINZ elevation/imagery bucket HTTPS URLs are supported", 2)
+        raise SourceError("Only public LINZ elevation, imagery, or coastal bucket HTTPS URLs are supported", 2)
     return url
 
 
@@ -100,7 +101,7 @@ def collection_url(value):
         return url
     kind, sep, path = value.partition(":")
     if not sep or kind not in ROOTS or not path or ".." in path or path.startswith("/"):
-        raise SourceError("Use elevation:<path> or imagery:<path> from collections", 2)
+        raise SourceError("Use elevation:<path>, imagery:<path>, or coastal:<path> from collections", 2)
     url = urljoin(ROOTS[kind], path.rstrip("/") + "/collection.json")
     safe_url(url)
     return url
