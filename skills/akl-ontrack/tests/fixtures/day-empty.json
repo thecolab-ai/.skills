@@ -1,0 +1,28 @@
+{
+  "v": 1,
+  "service_date": "2026-07-09",
+  "t0": 1783512000,
+  "feed_versions": [],
+  "fields": {
+    "trip": [
+      "trip_id",
+      "route_id",
+      "direction_id",
+      "trip_rel",
+      "feed_version",
+      "stops"
+    ],
+    "stop": [
+      "stop_sequence",
+      "stop",
+      "state",
+      "stop_rel",
+      "arrival_delay",
+      "departure_delay",
+      "arrival",
+      "departure"
+    ]
+  },
+  "stops": [],
+  "trips": []
+}

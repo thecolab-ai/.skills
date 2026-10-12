@@ -1,0 +1,15 @@
+{
+  "success": true,
+  "result": {
+    "total": 2,
+    "records": [
+      {
+        "_id": 1,
+        "Brand": "Example Brand",
+        "Model_No": "MODEL-1",
+        "c_star_mixed": "N/A",
+        "Family Name": null
+      }
+    ]
+  }
+}

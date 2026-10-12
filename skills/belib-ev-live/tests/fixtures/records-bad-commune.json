@@ -1,0 +1,12 @@
+{
+  "total_count": 1,
+  "results": [
+    {
+      "id_pdc": "FR*TEST*OTHER*INSEE*1",
+      "statut_pdc": "Disponible",
+      "last_updated": "2026-10-11T18:12:05+00:00",
+      "coordonneesxy": {"lon": 174.7, "lat": -36.8},
+      "code_insee_commune": "75001"
+    }
+  ]
+}
