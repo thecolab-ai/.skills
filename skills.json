@@ -4840,7 +4840,7 @@
     },
     {
       "name": "nz-stac",
-      "description": "Find LINZ elevation and aerial imagery collections and COG tiles from public NZ STAC catalogues. Use for DEM/DSM, RGB/infrared footprints, bbox tile searches and elevation point sampling guidance.",
+      "description": "Find LINZ elevation, coastal LiDAR, and aerial imagery collections and COG tiles from public NZ STAC catalogues. Use for DEM/DSM, coastal elevation footprints, RGB/infrared footprints, bbox tile searches and elevation point sampling guidance.",
       "path": "skills/nz-stac",
       "category": "geospatial",
       "source_owner": "Toitū Te Whenua Land Information New Zealand",
@@ -4858,9 +4858,10 @@
       "pack": "nz-public-data",
       "allowed_domains": [
         "nz-elevation.s3.ap-southeast-2.amazonaws.com",
-        "nz-imagery.s3.ap-southeast-2.amazonaws.com"
+        "nz-imagery.s3.ap-southeast-2.amazonaws.com",
+        "nz-coastal.s3.ap-southeast-2.amazonaws.com"
       ],
-      "last_verified": "2026-10-08",
+      "last_verified": "2026-10-12",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
