@@ -1,0 +1,18 @@
+{
+  "http_status": 200,
+  "body": {
+    "status": "failure",
+    "result": {
+      "id": "product_not_found",
+      "name": "Product not found"
+    },
+    "errors": [
+      {
+        "message": {
+          "id": "product_not_found"
+        }
+      }
+    ],
+    "warnings": []
+  }
+}

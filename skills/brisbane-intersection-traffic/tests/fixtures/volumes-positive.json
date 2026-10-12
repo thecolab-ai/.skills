@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "headers": {},
+  "body": {
+    "total_count": 2,
+    "results": [
+      {
+        "dbid": "fixture-volume-1",
+        "recorded": "2026-10-11T18:09:00+00:00",
+        "ct": "40",
+        "link_plan": 0,
+        "married": "N",
+        "ss": "2870",
+        "tsc": "757",
+        "lane": "SA-267",
+        "ds1": "3",
+        "mf1": "2",
+        "rf1": "1",
+        "ds2": "0",
+        "mf2": "0",
+        "rf2": "0",
+        "ds3": null,
+        "mf3": null,
+        "rf3": null,
+        "ds4": null,
+        "mf4": null,
+        "rf4": null
+      }
+    ]
+  }
+}
