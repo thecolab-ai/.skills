@@ -1,0 +1,56 @@
+{
+  "http_status": 200,
+  "body": {
+    "last_updated": "2026-10-11T18:12:34+00:00",
+    "ttl": 60,
+    "version": "3.0",
+    "data": {
+      "vehicles": [
+        {
+          "vehicle_id": "scooter-a",
+          "lat": -36.85,
+          "lon": 174.76,
+          "current_range_meters": 12000,
+          "is_reserved": false,
+          "is_disabled": false,
+          "vehicle_type_id": "flamingo-scooter",
+          "pricing_plan_id": "2-standard",
+          "last_reported": "2026-10-11T18:11:55+00:00",
+          "rental_uris": {"android": "https://example.invalid/v/not-a-position"},
+          "route": [[174.76, -36.85], [174.77, -36.86]]
+        },
+        {
+          "vehicle_id": "scooter-a",
+          "lat": -36.84,
+          "lon": 174.75,
+          "current_range_meters": 1000,
+          "is_reserved": false,
+          "is_disabled": false,
+          "last_reported": "2026-10-11T18:12:00+00:00"
+        },
+        {
+          "vehicle_id": "scooter-b",
+          "lat": -41.29,
+          "lon": 174.78,
+          "is_reserved": false,
+          "is_disabled": true,
+          "last_reported": "2026-10-11T18:00:00+00:00"
+        },
+        {
+          "vehicle_id": "scooter-c",
+          "lat": -36.86,
+          "lon": 174.77,
+          "current_range_meters": -5,
+          "is_reserved": false,
+          "is_disabled": false,
+          "last_reported": "2026-10-11T18:00:00"
+        },
+        {
+          "vehicle_id": "bad id",
+          "lat": -36.8,
+          "lon": 174.7
+        }
+      ]
+    }
+  }
+}

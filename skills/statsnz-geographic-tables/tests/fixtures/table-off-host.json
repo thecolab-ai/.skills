@@ -1,0 +1,20 @@
+{
+  "id": 122777,
+  "type": "table",
+  "kind": "table",
+  "title": "Current Geographic Boundaries Table",
+  "url_html": "https://datafinder.stats.govt.nz/table/122777-current-geographic-boundaries-table/",
+  "published_at": "2026-03-29T20:36:31.056278Z",
+  "license": {
+    "title": "Creative Commons Attribution 4.0 International",
+    "type": "cc-by",
+    "version": "4.0",
+    "url_html": "https://datafinder.stats.govt.nz/license/attribution-4-0-international/"
+  },
+  "version": {"id": 1},
+  "data": {
+    "feature_count": 47,
+    "sample": "https://example.com/stolen-sample",
+    "fields": []
+  }
+}

@@ -1,6 +1,6 @@
 ---
 name: nz-electricity
-description: "Query NZ electricity market data: EM6 wholesale spot prices, grid demand, carbon intensity, historical nodal prices, monthly generation by fuel type, distributed-generation solar uptake, gentailer energy-margin source status, and NZ lines-company outage records. No login or API key."
+description: "Query NZ electricity market data: EM6 wholesale spot prices, grid demand, carbon intensity, historical nodal prices, monthly generation by fuel type, distributed-generation solar uptake, EMI solar installation counts by region and by street, gentailer energy-margin source status, and NZ lines-company outage records. No login or API key."
 license: MIT
 compatibility: "Requires Python 3.10+ and network access for live data"
 metadata:
@@ -18,8 +18,8 @@ metadata:
   thecolab.skill_type: "public-api"
   thecolab.pack: "nz-public-data"
   thecolab.source_url: "https://api.em6.co.nz/ords/em6/data_api"
-  thecolab.allowed_domains: "api.em6.co.nz,api.integration.countiesenergy.co.nz,contact.co.nz,media.genesisenergy.co.nz,outage-centre.api.vector.co.nz,outagereporter.api.vector.co.nz,outages.powerco.co.nz,outages.topenergy.co.nz,public.tableau.com,server.ourpower.co.nz,www.auroraenergy.co.nz,www.ea.govt.nz,www.emi.ea.govt.nz,www.mercury.co.nz,www.meridianenergy.co.nz,www.nzier.org.nz,www.oriongroup.co.nz,www.unison.co.nz,www.welectricity.co.nz"
-  thecolab.last_verified: "2026-07-19"
+  thecolab.allowed_domains: "api.em6.co.nz,api.integration.countiesenergy.co.nz,contact.co.nz,emidatasets.blob.core.windows.net,media.genesisenergy.co.nz,outage-centre.api.vector.co.nz,outagereporter.api.vector.co.nz,outages.powerco.co.nz,outages.topenergy.co.nz,public.tableau.com,server.ourpower.co.nz,www.auroraenergy.co.nz,www.ea.govt.nz,www.emi.ea.govt.nz,www.mercury.co.nz,www.meridianenergy.co.nz,www.nzier.org.nz,www.oriongroup.co.nz,www.unison.co.nz,www.welectricity.co.nz"
+  thecolab.last_verified: "2026-10-12"
   thecolab.health: "healthy"
   thecolab.maintainer: "@adam91holt"
 ---
@@ -38,6 +38,7 @@ This skill ships support for:
 - Electricity Authority EMI final/interim historical energy prices by point of connection
 - Electricity Authority EMI monthly generation output by plant, aggregated by fuel type
 - Electricity Authority EMI installed distributed-generation trends, including rooftop solar uptake
+- Electricity Authority EMI solar installation counts and kilowatt capacity by region and by street
 - Electricity Authority gentailer energy-margin official-source availability checks
 - Public outage feeds for supported NZ lines companies
 
@@ -49,6 +50,7 @@ This skill ships support for:
 - A user wants historical wholesale spot prices for a node or point of connection
 - A user wants monthly NZ generation output by fuel type or generation plant
 - A user wants installed distributed-generation or rooftop-solar trends by market segment or capacity band
+- A user wants the current EMI solar installation snapshot by region, or a bounded street extract for one Statistical Area 2
 - A user asks for gentailer energy-margin data and needs to know whether the official Authority source currently exposes machine-readable rows
 - A user asks for current or planned public outages from supported NZ lines companies
 - A workflow needs public, no-login, machine-readable NZ electricity data
@@ -59,6 +61,8 @@ This skill ships support for:
 - Authenticated EMI API products, EM6 paid feeds, private user data, or account actions
 - Current real-time node load, current node generation, or current generation mix; the documented EM6 endpoints for those returned unauthorized in live testing
 - Reconstructing gentailer energy margins from spot prices, generation volumes, hedge positions, or retail demand; the `energy-margin` command reports official source availability and points to official alternatives, but does not derive the per-company split
+- Turning a published ICP value of `3 or less` into the number 3, or estimating the suppressed count
+- An unbounded dump of the street solar file; `solar-streets` requires a Statistical Area 2 name or code and a small result limit
 - ICP-specific outage status, outage subscriptions, outage reporting, or fault logging
 - Redistributing public-data extracts as a standalone dataset
 
@@ -70,10 +74,11 @@ This skill ships support for:
 4. Use `prices --node ... --from ... --to ...` for historical nodal prices
 5. Use `generation --month ... --type ...` for generation by fuel type from EMI monthly data
 6. Use `dg-trends`, `dg-latest`, or `dg-summary` for installed distributed-generation and rooftop-solar EMI retail report data
-7. Use `energy-margin --json` when a task needs the current official status of the Authority gentailer energy-margin source
-8. Use `outages --company ...` or `outages --region ...` for lines-company public outage records
-9. Use `--json` when another tool or agent needs machine-readable output
-10. Mention the upstream source and whether the value is current EM6 data, EMI report/dataset data, EMI retail report data, Authority dashboard status, or a distributor outage feed
+7. Use `solar-regions` for the EMI solar installation snapshot by region, and `solar-streets` only with a Statistical Area 2 name or code
+8. Use `energy-margin --json` when a task needs the current official status of the Authority gentailer energy-margin source
+9. Use `outages --company ...` or `outages --region ...` for lines-company public outage records
+10. Use `--json` when another tool or agent needs machine-readable output
+11. Mention the upstream source and whether the value is current EM6 data, EMI report/dataset data, an EMI solar-installation CSV, Authority dashboard status, or a distributor outage feed
 
 ## CLI
 
@@ -93,6 +98,8 @@ python3 skills/nz-electricity/scripts/cli.py <command> [flags]
 - `dg-trends [--fuel solar_all] [--market-segment All|Res|SME|Com|Ind] [--capacity All_Total|Small|Large] [--region-type NZ|ZONE|...] [--from DATE] [--to DATE] [--json]` — EMI GUEHMT installed distributed-generation trends
 - `dg-latest [--fuel solar_all] [--market-segment All|Res|SME|Com|Ind] [--capacity All_Total|Small|Large] [--region-type NZ|ZONE|...] [--json]` — latest GUEHMT distributed-generation rows
 - `dg-summary [--fuel solar_all] [--market-segment All|Res|SME|Com|Ind] [--capacity All_Total|Small|Large] [--region-type NZ|ZONE|...] [--from DATE] [--to DATE] [--yearly] [--json]` — summarise GUEHMT distributed-generation trends
+- `solar-regions [--region REGION] [--market-segment Res|Bus|All] [--json]` — EMI solar installation ICP counts and kilowatt capacity by region
+- `solar-streets (--region SA2_NAME | --sa2 SA2_CODE) [--market-segment Res|Bus|All] [--limit N] [--json]` — bounded EMI solar installation rows for one Statistical Area 2; default limit 20, hard maximum 100
 - `energy-margin [--company COMPANY] [--from DATE] [--to DATE] [--json]` — probe the official EA gentailer energy-margin source; when the exact per-company split is not machine-retrievable, return guidance plus the official alternatives (EA per-company net profit, gentailer segment financials, retail gross margin, the aggregate figure, and the post-5-Jul-2026 feed)
 - `outages [--company COMPANY] [--region REGION] [--all] [--json]` — current public outage records from supported NZ lines companies; `--all` also includes planned, scheduled, or recent records where feeds expose them
 
@@ -108,6 +115,9 @@ python3 skills/nz-electricity/scripts/cli.py generation --month 2026-04 --type h
 python3 skills/nz-electricity/scripts/cli.py dg-trends --fuel solar_all --market-segment Res --capacity All_Total --from 2025-01-01 --to 2025-12-31 --json
 python3 skills/nz-electricity/scripts/cli.py dg-latest --fuel solar_all --market-segment All --json
 python3 skills/nz-electricity/scripts/cli.py dg-summary --fuel solar_all --yearly --json
+python3 skills/nz-electricity/scripts/cli.py solar-regions --region "New Zealand" --market-segment Res --json
+python3 skills/nz-electricity/scripts/cli.py solar-streets --sa2 100100 --limit 20 --json
+python3 skills/nz-electricity/scripts/cli.py solar-streets --region "North Cape" --json
 python3 skills/nz-electricity/scripts/cli.py energy-margin --company meridian --json
 python3 skills/nz-electricity/scripts/cli.py outages --company vector
 python3 skills/nz-electricity/scripts/cli.py outages --region tahawai --json
@@ -117,6 +127,7 @@ python3 skills/nz-electricity/scripts/cli.py outages --region tahawai --json
 
 - CLI entrypoint: `scripts/cli.py`
 - API and dataset notes: `references/api-notes.md`
+- Source and licence notes: `references/source-notes.md`
 
 ## Notes
 
@@ -125,6 +136,12 @@ python3 skills/nz-electricity/scripts/cli.py outages --region tahawai --json
 - `demand` uses the public Electricity Authority EMI Demand trends CSV report from `https://www.emi.ea.govt.nz/Wholesale/Reports/W_GD_C`
 - `prices` and `generation` use public Electricity Authority EMI CSV dataset files from `https://www.emi.ea.govt.nz`
 - `dg-trends`, `dg-latest`, and `dg-summary` use the public Electricity Authority EMI GUEHMT retail CSV report from `https://www.emi.ea.govt.nz/Retail/Reports/guehmt`
+- `solar-regions` and `solar-streets` use the public Electricity Authority EMI solar-installation CSVs on `emidatasets.blob.core.windows.net`. Attribute the Electricity Authority. The files are licensed CC-BY 4.0 under the Authority website terms unless a specific collection says otherwise; the listed exceptions do not name these solar CSVs
+- Solar-installation capacity is in kilowatts. GUEHMT distributed-generation capacity is in megawatts. Do not mix the two units
+- The street CSV has `StatisticalArea2Code` and `StatisticalArea2Name`. It has no Region column. `--region` on `solar-streets` matches the Statistical Area 2 name exactly
+- `solar-streets` refuses a request with no Statistical Area 2 filter, and it refuses `--limit` above 100. The download stops at 6000000 bytes and the scan stops at 100000 rows
+- An ICP value of `3 or less` is copied through as that text. A blank generation-capacity sum stays null. Neither one is turned into 3 or into 0
+- The solar CSVs do not include a publication date. `retrieved_at` is the fetch time, not a data vintage
 - `energy-margin` probes the Electricity Authority energy-margin dashboard/article and linked Tableau public workbook; it returns explicit source-unavailable status while those public official surfaces do not expose machine-readable per-company rows, and points to official alternatives (per-company net profit and segment financials, retail gross margin, the EA aggregate, and the aggregate-only feed due from 5 July 2026) so a caller is not left empty-handed
 - `outages` uses clean public distributor feeds for Vector, Wellington Electricity, Orion, Powerco, Aurora Energy, WEL Networks, Unison, Counties Energy, and Top Energy
 - Vector's public map exposes outage shapes only, so Vector records may only have an approximate centroid and outage type

@@ -1,0 +1,12 @@
+{
+  "http_status": 404,
+  "body": {
+    "status": "failure",
+    "result": {
+      "id": "product_found_with_a_different_product_type",
+      "name": "Product found with a different product type"
+    },
+    "errors": [],
+    "warnings": []
+  }
+}

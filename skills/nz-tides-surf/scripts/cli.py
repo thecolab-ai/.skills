@@ -22,7 +22,9 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import nzfetch  # noqa: E402
+from standard_port_levels import LevelsError, error_payload, load_levels_table  # noqa: E402
 
 try:
     from zoneinfo import ZoneInfo
@@ -730,6 +732,53 @@ def print_marine(data: dict[str, Any]) -> None:
     print(f"MetOcean docs: {data['metocean_docs']}")
 
 
+def emit_levels_error(as_json: bool, exc: LevelsError) -> None:
+    if as_json:
+        json.dump(error_payload(exc), sys.stdout, indent=2, ensure_ascii=False)
+        print()
+    else:
+        print(f"nz-tides-surf: {exc.message}", file=sys.stderr)
+    raise SystemExit(exc.code)
+
+
+def cmd_levels(args: argparse.Namespace) -> None:
+    try:
+        payload = load_levels_table(args.port)
+    except LevelsError as exc:
+        emit_levels_error(args.json, exc)
+    emit(payload, args.json, print_levels)
+
+
+def print_levels(data: dict[str, Any]) -> None:
+    meta = data["meta"]
+    rows = data["results"]
+    print(f"LINZ standard-port tidal levels: {len(rows)} port(s)")
+    print(f"Datum: {rows[0]['datum']} ({rows[0]['unit']}). {rows[0]['datum_note']}")
+    print(
+        "MHWS, MHWN, MLWN, MLWS and ranges: predicted reference levels for "
+        f"{rows[0]['mhws_mhwn_mlwn_mlws_period']}."
+    )
+    print(
+        "HAT and LAT: predicted extremes for "
+        f"{rows[0]['hat_lat_period']}."
+    )
+    print("MSL: derived from tidal observations. The observation period is not on this page and is not fetched.")
+    print("These rows are not daily tide predictions and not observed sea-level gauge readings.")
+    print("Not for cadastral or administrative boundaries.")
+    print(f"Source: {meta['source_url']}")
+    print(f"Licence: {meta['licence']}")
+    print(f"Retrieved: {meta['retrieved_at']}")
+    print()
+    print(f"{'Port':<16} {'MHWS':>6} {'MHWN':>6} {'MLWN':>6} {'MLWS':>6} {'Spring':>7} {'Neap':>6} {'MSL':>6} {'HAT':>6} {'LAT':>6}")
+    for row in rows:
+        print(
+            f"{row['standard_port']:<16} "
+            f"{row['mhws_m']:6.2f} {row['mhwn_m']:6.2f} {row['mlwn_m']:6.2f} {row['mlws_m']:6.2f} "
+            f"{row['spring_range_m']:7.2f} {row['neap_range_m']:6.2f} {row['msl_m']:6.2f} "
+            f"{row['hat_m']:6.2f} {row['lat_m']:6.2f}"
+        )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Read-only NZ LINZ tide tables and SwellMap surf forecasts")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -737,6 +786,23 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("ports", help="list available LINZ tide ports")
     p.add_argument("--json", action="store_true", help="emit JSON")
     p.set_defaults(func=cmd_ports)
+
+    p = sub.add_parser(
+        "levels",
+        help="LINZ standard-port tidal levels in metres on Chart Datum",
+        description=(
+            "Published LINZ standard-port reference levels in metres on Chart Datum. "
+            "Chart Datum is the zero of the tidal predictions. "
+            "This is not a daily tide prediction and not an observed gauge reading."
+        ),
+    )
+    p.add_argument(
+        "port",
+        nargs="?",
+        help="published standard port, for example Auckland; omit to list the table",
+    )
+    p.add_argument("--json", action="store_true", help="emit JSON")
+    p.set_defaults(func=cmd_levels)
 
     p = sub.add_parser("tides", help="LINZ tide predictions for a port")
     p.add_argument("port", help="LINZ port or surf alias, e.g. Auckland, Piha, Raglan")

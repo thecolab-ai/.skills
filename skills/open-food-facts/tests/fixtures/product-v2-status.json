@@ -1,0 +1,9 @@
+{
+  "http_status": 200,
+  "body": {
+    "status": 1,
+    "product": {
+      "product_name": "Deprecated envelope"
+    }
+  }
+}

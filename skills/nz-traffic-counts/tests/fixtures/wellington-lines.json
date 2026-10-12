@@ -1,0 +1,26 @@
+{
+  "features": [
+    {
+      "attributes": {
+        "OBJECTID": 901,
+        "COUNTLINE_ID": 90001,
+        "Status": "Active",
+        "Shape__Length": 3.0
+      },
+      "geometry": {
+        "paths": [
+          [
+            [
+              174.77,
+              -41.29
+            ],
+            [
+              174.771,
+              -41.291
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}
