@@ -5925,7 +5925,7 @@
     },
     {
       "name": "stats-nz",
-      "description": "Query official Stats NZ data: CPI, GDP, population estimates/projections, migration, and CSV catalogue. No API key or browser session required.",
+      "description": "Query official Stats NZ data: CPI, GDP, population estimates/projections, migration, place-summary travel to work, and CSV catalogue. No API key or browser session required.",
       "path": "skills/stats-nz",
       "category": "public-data",
       "source_owner": "Stats NZ",
@@ -5945,7 +5945,7 @@
         "tools.summaries.stats.govt.nz",
         "www.stats.govt.nz"
       ],
-      "last_verified": "2026-07-19",
+      "last_verified": "2026-10-11",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
