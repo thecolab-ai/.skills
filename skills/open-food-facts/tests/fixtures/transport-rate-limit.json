@@ -1,0 +1,4 @@
+{
+  "transport": "rate_limited",
+  "retry_after": "17"
+}

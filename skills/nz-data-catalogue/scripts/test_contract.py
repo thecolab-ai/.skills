@@ -9,6 +9,7 @@ import sys
 import tempfile
 import unittest
 import urllib.error
+import urllib.parse
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -106,8 +107,20 @@ class CatalogueTests(unittest.TestCase):
         route('S0351', 'charities-services-nz', 'existing', 'none')
         route('S1589', 'nz-road-closures', 'existing', 'none')
         route('S1186', 'statsnz-classifications-nz', 'existing', 'none')
-        for id, skill in [('C0001','nz-arcgis'),('C0064','nz-stac'),('C0028','gtfs-nz'),('S1213','nz-ogc-records'),('C0043','akl-rainfall'),('C0106','nz-recycling-locator')]:
+        for id, skill in [('C0064','nz-stac'),('C0028','gtfs-nz'),('S1213','nz-ogc-records'),('C0043','akl-rainfall'),('C0106','nz-recycling-locator')]:
             route(id, skill, 'planned', 'none')
+        for id in ('C0001', 'C0012', 'S0131', 'S0618', 'S1098', 'S2932', 'S2686', 'S1097'):
+            route(id, 'nz-arcgis', 'existing', 'none')
+        for id in ('S0312', 'S0754', 'S0790', 'S0791', 'S0792', 'C0073'):
+            routed = next(r for r in cli.mapped_skills(self.rows[id], self.skill_map) if r['skill'] == 'nz-arcgis')
+            self.assertEqual(routed['relationship'], 'related')
+            self.assertNotIn('need a numeric', routed['note'])
+        self.assertIn('numeric layer', next(r for r in cli.mapped_skills(self.rows['C0073'], self.skill_map) if r['skill'] == 'nz-arcgis')['note'])
+        self.assertEqual(next(r for r in cli.mapped_skills(self.rows['C0061'], self.skill_map) if r['skill'] == 'nz-arcgis')['relationship'], 'exact')
+        for id in ('S2687', 'C0070', 'C0102', 'C0072', 'S0122', 'S0444', 'C0069', 'S0789'):
+            # Unlisted Flooded service, refused tiled-image host, unlisted organisation,
+            # SceneServer, VectorTileServer, and MapServers whose describe exits 6.
+            self.assertNotIn('nz-arcgis', [s['skill'] for s in cli.mapped_skills(self.rows[id], self.skill_map)])
         for id in ('C0002', 'C0018', 'C0019', 'C0032', 'C0033', 'S0207', 'S0182'):
             route(id, 'nz-traffic-counts', 'existing', 'none')
         overseas = dict(self.rows['C0001'], scope='Overseas')
@@ -116,6 +129,135 @@ class CatalogueTests(unittest.TestCase):
         self.assertEqual(cli.mapped_skills(other, self.skill_map), [])
         cross_url = dict(self.rows['C0024'], direct_endpoint='https://trafficnz.info/some-other-path', url='https://github.com/service/traffic/rest/4/events')
         self.assertEqual(cli.mapped_skills(cross_url, self.skill_map), [])
+
+    def test_arcgis_routes_stay_within_runtime_allowlist(self):
+        orgs_path = ROOT.parent / 'nz-arcgis/references/orgs.json'
+        self.assertTrue(orgs_path.is_file(), 'nz-arcgis must be present in this repository')
+        orgs = json.loads(orgs_path.read_text())
+        roots = {(urllib.parse.urlsplit(root).hostname, urllib.parse.urlsplit(root).path + '/'): (code, org)
+                 for code, org in orgs.items() for root in org['roots']}
+        routed = set()
+        server_types = {'FeatureServer', 'MapServer', 'ImageServer', 'SceneServer', 'VectorTileServer'}
+        for rule in (r for r in self.skill_map['rules'] if r['skill'] == 'nz-arcgis'):
+            self.assertEqual(rule['status'], 'existing')
+            hosts, paths = rule['match']['hosts'], rule['match']['url_contains']
+            self.assertEqual(len(hosts), 1)
+            self.assertTrue(paths)
+            matched = set()
+            for path in paths:
+                root = next((key for key in roots if key[0] == hosts[0] and path.casefold().startswith(key[1].casefold())), None)
+                self.assertIsNotNone(root, (hosts[0], path))
+                matched.add(root)
+                kind = path.rstrip('/').rsplit('/', 1)[-1]
+                if kind in server_types:
+                    self.assertIn(kind, {'FeatureServer', 'MapServer', 'ImageServer'})
+            self.assertEqual(len(matched), 1)
+            root = next(iter(matched))
+            code, org = roots[root]
+            self.assertIn(f'`{code}`', rule['note'])
+            for service in org.get('service_allowlist') or []:
+                self.assertTrue(any(f'/{service}/'.casefold() in path.casefold() for path in paths), service)
+            routed.add(root)
+        self.assertEqual(set(roots) - routed, {('tiledimageservices1.arcgis.com', '/n4yPwebTjJCmXB6W/arcgis/rest/services/')})
+        self.assertEqual(len(self.skill_map['rules']), 83)
+
+    def test_arcgis_routes_match_allowlisted_operations(self):
+        import importlib.util
+        arc_dir = ROOT.parent / 'nz-arcgis/scripts'
+        self.assertTrue((arc_dir / 'cli.py').is_file(), 'nz-arcgis CLI must be present in this repository')
+        sys.path.insert(0, str(arc_dir))
+        spec = importlib.util.spec_from_file_location('nz_arcgis_cli', arc_dir / 'cli.py')
+        arc = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(arc)
+        operational_query = {'f', 'where', 'outFields', 'returnGeometry', 'returnCountOnly', 'resultOffset', 'resultRecordCount', 'maxAllowableOffset', 'outSR'}
+        identity_query = {'id', 'itemid', 'item', 'token', 'key', 'access_token', 'apikey', 'layerid'}
+        seen_query = set()
+        needs_query_strip = 0
+
+        def invocation_url(url):
+            parsed = urllib.parse.urlsplit(url.strip())
+            path = parsed.path
+            if path.rstrip('/').endswith('/query'):
+                path = path.rstrip('/')[:-len('/query')]
+            if '/tile/' in path:
+                path = path.split('/tile/')[0]
+            return urllib.parse.urlunsplit((parsed.scheme, parsed.netloc, path, '', ''))
+
+        def accepts(url):
+            found = {}
+            for kind in ('layer', 'service'):
+                try:
+                    found[kind] = arc.validate_url(url, kind)
+                except arc.ClientError:
+                    pass
+            return found
+
+        for row in self.rows.values():
+            skills = cli.mapped_skills(row, self.skill_map)
+            hit = next((item for item in skills if item['skill'] == 'nz-arcgis'), None)
+            if hit is None:
+                continue
+            matched = None
+            for rule in self.skill_map['rules']:
+                if rule.get('skill') != 'nz-arcgis' or rule.get('note') != hit.get('note'):
+                    continue
+                match = rule['match']
+                for url in (row.get('direct_endpoint'), row.get('url')):
+                    if not url:
+                        continue
+                    host = urllib.parse.urlsplit(url).hostname
+                    if match.get('hosts') and host not in match['hosts']:
+                        continue
+                    if match.get('url_contains') and not any(part.casefold() in url.casefold() for part in match['url_contains']):
+                        continue
+                    matched = url
+                    break
+                if matched:
+                    break
+            self.assertIsNotNone(matched, row['id'])
+            self.assertNotIn(';', matched, row['id'])
+            if hit['relationship'] == 'exact':
+                self.assertNotIn('/tile/', matched)
+            parsed = urllib.parse.urlsplit(matched)
+            keys = {key for key, _ in urllib.parse.parse_qsl(parsed.query, keep_blank_values=True)}
+            seen_query.update(keys)
+            self.assertFalse(keys & identity_query, row['id'])
+            if parsed.query or parsed.path.rstrip('/').endswith('/query'):
+                needs_query_strip += 1
+            found = accepts(invocation_url(matched))
+            self.assertTrue(found, row['id'])
+            code = next(iter(found.values()))[0]
+            self.assertIn(f'`{code}`', hit['note'])
+            if row['id'] in {'S0312', 'S0754', 'S0790', 'S0791', 'S0792'}:
+                self.assertEqual(set(found), {'service'})
+                self.assertIn('not successful', hit['note'])
+            if row['id'] == 'C0073':
+                self.assertIn('service', found)
+                self.assertNotIn('layer', found)
+                self.assertIn('/tile/', matched)
+        self.assertTrue(seen_query <= operational_query)
+        self.assertEqual(needs_query_strip, 198)
+        related = sorted(row['id'] for row in self.rows.values()
+                         if any(item['skill'] == 'nz-arcgis' and item['relationship'] == 'related' for item in cli.mapped_skills(row, self.skill_map)))
+        self.assertEqual(related, ['C0073', 'S0312', 'S0754', 'S0790', 'S0791', 'S0792'])
+        routed_count = sum(any(item['skill'] == 'nz-arcgis' for item in cli.mapped_skills(row, self.skill_map)) for row in self.rows.values())
+        self.assertEqual(routed_count, 226)
+        precincts = 'https://tiles.arcgis.com/tiles/n4yPwebTjJCmXB6W/arcgis/rest/services/PC120Revised_PROD_Precincts/MapServer'
+        base = self.rows['S0790']
+        for url in (
+            precincts.replace('PC120Revised_PROD_Precincts/MapServer', 'Other/SceneServer'),
+            precincts.replace('PC120Revised_PROD_Precincts/MapServer', 'Other/VectorTileServer'),
+            precincts.replace('PC120Revised_PROD_Precincts/MapServer', 'AucklandInfraredImagery2024/MapServer'),
+            'https://services-ap1.arcgis.com/eqbFSejuTufXDr0E/arcgis/rest/services/Other_Project/FeatureServer/0',
+        ):
+            synthetic = dict(base, url=url, direct_endpoint=url)
+            self.assertNotIn('nz-arcgis', [item['skill'] for item in cli.mapped_skills(synthetic, self.skill_map)])
+        kept = dict(base, url=precincts + '/tile/{level}/{row}/{column}', direct_endpoint=None)
+        self.assertEqual(next(item['relationship'] for item in cli.mapped_skills(kept, self.skill_map) if item['skill'] == 'nz-arcgis'), 'related')
+        scene = precincts.replace('PC120Revised_PROD_Precincts/MapServer', 'Akl_CBD_to_Airport_3D_Mesh_Zone1B/SceneServer')
+        with self.assertRaises(arc.ClientError) as refused:
+            arc.validate_url(scene, 'service')
+        self.assertEqual(refused.exception.code, 7)
 
     def test_json_commands_and_provenance(self):
         for args in (['search','roadworks'], ['filter','--problem','F1'], ['get','c0001'], ['stats'], ['top','--problem','F1','--n','10']):

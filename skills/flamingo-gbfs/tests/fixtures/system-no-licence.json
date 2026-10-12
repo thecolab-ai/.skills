@@ -1,0 +1,12 @@
+{
+  "http_status": 200,
+  "body": {
+    "last_updated": "2026-10-11T18:12:33+00:00",
+    "ttl": 3600,
+    "version": "3.0",
+    "data": {
+      "system_id": "flamingo_auckland",
+      "name": [{"text": "Flamingo", "language": "en"}]
+    }
+  }
+}

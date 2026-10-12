@@ -1,0 +1,24 @@
+{
+  "total_count": 1,
+  "results": [
+    {
+      "id": "fixture-1001",
+      "status": "Published",
+      "incident_category": "Hazard",
+      "advicea": "Road damage",
+      "adviceb": "Use an alternative route",
+      "otheradvice": "Synthetic fixture closure for parser tests",
+      "roads_main_street": "Fixture Road",
+      "roads_suburb": "Fixture Suburb",
+      "lga": "Fixture Council",
+      "impact_impact_type": "Closures",
+      "impact_impact_subtype": "Road closed",
+      "event_priority": "Low",
+      "duration_start": "2026-01-02T03:04:05+00:00",
+      "duration_end": null,
+      "last_updated": "2026-10-11T07:02:05+00:00",
+      "geo_point_2d": {"lon": 153.0, "lat": -27.5},
+      "url": "https://queensland.opendatasoft.com/explore/dataset/queensland-traffic-incidents/"
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+Error {
+    code=404;
+    message="Not Found: Your query produced no matching results. (time<1800-01-01T01:00:00Z is outside of the variable's actual_range: 1800-01-01T07:40:00Z to 2026-07-15T16:30:00Z)";
+}

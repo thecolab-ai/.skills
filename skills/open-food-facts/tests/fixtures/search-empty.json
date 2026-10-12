@@ -1,0 +1,11 @@
+{
+  "http_status": 200,
+  "body": {
+    "count": 0,
+    "page": 1,
+    "page_count": 0,
+    "page_size": 5,
+    "products": [],
+    "skip": 0
+  }
+}
