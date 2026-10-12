@@ -1,0 +1,17 @@
+{
+  "gauge": "SCOT",
+  "description": "NAME:\t\t\tScott Base\nCODE:\t\t\tSCOT\n",
+  "files": [],
+  "datasets": [
+    {
+      "year": "2020",
+      "sensor": "00",
+      "datasetid": "SCOT/2020/00"
+    },
+    {
+      "year": "2016",
+      "sensor": "00",
+      "datasetid": "SCOT/2016/00"
+    }
+  ]
+}
