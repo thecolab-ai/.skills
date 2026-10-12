@@ -2,7 +2,7 @@
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
   "last_verified": "2026-10-12",
-  "skill_count": 170,
+  "skill_count": 171,
   "skills": [
     {
       "name": "airnz-flights",
@@ -5216,6 +5216,32 @@
       "pack": "nz-public-data",
       "allowed_domains": [
         "world.openfoodfacts.org"
+      ],
+      "last_verified": "2026-10-11",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "osm-notes",
+      "description": "Read OpenStreetMap map notes inside a small WGS84 bounding box. Use when the task needs open or recently closed OSM notes, note text, status, and coordinates for a place such as central Auckland. Read-only GET of the notes API. Do not use for Overpass places, geocoding, or creating, commenting on, closing, or reopening notes.",
+      "path": "skills/osm-notes",
+      "category": "public-data",
+      "source_owner": "OpenStreetMap contributors",
+      "source_type": "community",
+      "source_url": "https://api.openstreetmap.org/api/0.6/notes.json",
+      "auth": "none",
+      "access_mode": "public-api",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "none",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "api.openstreetmap.org",
+        "www.openstreetmap.org"
       ],
       "last_verified": "2026-10-11",
       "health": "healthy",

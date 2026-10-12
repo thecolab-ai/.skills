@@ -3,7 +3,7 @@
   "name": "nz-public-data",
   "description": "Public, read-only New Zealand data and public-interest sources.",
   "default": true,
-  "skill_count": 122,
+  "skill_count": 123,
   "skills": [
     "akl-housing-capacity",
     "akl-rainfall",
@@ -103,6 +103,7 @@
     "oia-statistics-nz",
     "ombudsman-nz",
     "open-food-facts",
+    "osm-notes",
     "osm-nz",
     "pharmac-schedule-nz",
     "port-of-auckland",
