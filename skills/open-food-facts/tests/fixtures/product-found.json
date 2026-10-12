@@ -1,0 +1,27 @@
+{
+  "http_status": 200,
+  "body": {
+    "status": "success",
+    "result": {
+      "id": "product_found",
+      "name": "Product found"
+    },
+    "warnings": [],
+    "errors": [],
+    "product": {
+      "code": "00012345678905",
+      "product_name": "Fixture cocoa spread",
+      "brands": "Fixture Foods",
+      "quantity": "200 g",
+      "categories_tags": [
+        "en:spreads"
+      ],
+      "countries_tags": [
+        "en:new-zealand"
+      ],
+      "ingredients_text": "sugar, hazelnuts",
+      "nutriscore_grade": "e",
+      "last_modified_t": 1710000000
+    }
+  }
+}
