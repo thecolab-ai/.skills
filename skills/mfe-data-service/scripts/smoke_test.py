@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import urllib.parse
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -49,6 +50,16 @@ def live_command(args: list[str]) -> tuple[str, dict | None]:
     return "ok", payload
 
 
+def _same_host_data_url(url: object) -> None:
+    assert isinstance(url, str) and url
+    parsed = urllib.parse.urlsplit(url)
+    assert parsed.scheme == "https"
+    assert parsed.hostname == "data.mfe.govt.nz"
+    assert parsed.username is None and parsed.password is None
+    assert parsed.path.rstrip("/") == "/services/api/v1/data"
+    assert "/query" not in parsed.path
+
+
 def assert_live_search(payload: dict) -> None:
     if payload.get("results") == []:
         raise AssertionError("live search returned no catalogue rows")
@@ -61,6 +72,13 @@ def assert_live_search(payload: dict) -> None:
     assert isinstance(row["title"], str) and row["title"].strip()
     assert isinstance(row["type"], str) and row["type"].strip()
     assert len(payload["results"]) == 1
+    assert payload["truncated"] is True
+    page = payload.get("page")
+    assert isinstance(page, dict)
+    _same_host_data_url(page.get("next"))
+    _same_host_data_url(page.get("last"))
+    assert page["next"] != page["last"]
+    assert "page=" in urllib.parse.urlsplit(page["next"]).query
 
 
 def assert_live_layer(payload: dict) -> None:
@@ -106,7 +124,7 @@ def main() -> int:
     except AssertionError as exc:
         print(f"[FAIL] live layer {exc}")
         return 1
-    print("[PASS] live search flood page_size 1 returned one catalogue card with an integer id")
+    print("[PASS] live search flood page_size 1 reports truncated with one catalogue card")
     print("[PASS] live layer 117733 reports cc-by, field name Shape, and a positive feature count")
     return 0
 

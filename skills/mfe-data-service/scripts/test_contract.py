@@ -50,6 +50,29 @@ def run(argv: list[str], transport=None) -> tuple[int, dict | None, str]:
     return code, payload, error_text
 
 
+def run_text(argv: list[str], transport=None) -> tuple[int, str, str]:
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+        code = cli.main(argv, transport=transport)
+    return code, stdout.getvalue(), stderr.getvalue()
+
+
+def link_fixture(name: str) -> str:
+    return (FIXTURES / name).read_text(encoding="utf-8").strip()
+
+
+def linked_transport(body_name: str, link: str | None):
+    calls: list[str] = []
+    body = json.loads((FIXTURES / body_name).read_text(encoding="utf-8"))
+
+    def transport(url: str):
+        calls.append(url)
+        return cli.CatalogueDocument(body, link_header=link)
+
+    return calls, transport
+
+
 def assert_json_error(payload: dict, code: int, error_type: str) -> None:
     assert payload["results"] == []
     assert payload["error"]["code"] == code
@@ -207,6 +230,132 @@ def assert_deterministic_contracts() -> list[str]:
     assert code == redirect["exit_code"]
     assert "data.mfe.govt.nz" in message
 
+    calls, transport = linked_transport("search-one.json", link_fixture("link-page-next.txt"))
+    code, payload, errors = run(["search", "flood", "--limit", "1", "--json"], transport=transport)
+    assert code == 0 and errors == "" and payload is not None
+    assert [row["id"] for row in payload["results"]] == [125035]
+    assert payload["truncated"] is True
+    assert payload["page"]["next"] == "https://data.mfe.govt.nz/services/api/v1/data/?q=flood&page_size=1&page=2"
+    assert payload["page"]["last"] == "https://data.mfe.govt.nz/services/api/v1/data/?q=flood&page_size=1&page=102"
+    assert "sort=" not in json.dumps(payload["page"])
+    assert len(calls) == 1
+    assert calls[0].startswith("https://data.mfe.govt.nz/services/api/v1/data/")
+    assert "page=2" not in calls[0] and "/query" not in calls[0]
+    code, text, errors = run_text(["search", "flood", "--limit", "1"], transport=transport)
+    assert code == 0 and errors == ""
+    assert "More catalogue rows exist; this command does not page further." in text
+    assert "next page: https://data.mfe.govt.nz/services/api/v1/data/?q=flood&page_size=1&page=2" in text
+    assert "last page: https://data.mfe.govt.nz/services/api/v1/data/?q=flood&page_size=1&page=102" in text
+    assert len(calls) == 2
+    assert all("page=2" not in url and "/query" not in url for url in calls)
+
+    calls, transport = linked_transport("search-empty.json", link_fixture("link-sort-only.txt"))
+    code, payload, errors = run(
+        ["search", "__no_such_mfe_layer_zzqq__", "--limit", "1", "--json"],
+        transport=transport,
+    )
+    assert code == 0 and errors == "" and payload is not None
+    assert payload["results"] == [] and payload["truncated"] is False and "page" not in payload
+    assert len(calls) == 1
+    calls, transport = linked_transport("search-one.json", link_fixture("link-sort-only.txt"))
+    code, payload, errors = run(["search", "flood", "--limit", "1", "--json"], transport=transport)
+    assert code == 0 and payload is not None
+    assert payload["truncated"] is False and "page" not in payload and len(payload["results"]) == 1
+    assert len(calls) == 1
+
+    calls, transport = linked_transport("search-one.json", link_fixture("link-malformed.txt"))
+    code, payload, errors = run(["search", "flood", "--limit", "1", "--json"], transport=transport)
+    assert code == 0 and errors == "" and payload is not None
+    dumped = json.dumps(payload)
+    assert payload["truncated"] is True and "page" not in payload
+    assert "evil.example" not in dumped and "user:pass" not in dumped
+    assert "/query" not in dumped and "not-a-url" not in dumped
+    assert len(calls) == 1 and "page=3" not in calls[0]
+
+    next_only = '<https://data.mfe.govt.nz/services/api/v1/data/?q=flood&page_size=1&page=2>; rel="next"'
+    calls, transport = linked_transport("search-one.json", next_only)
+    code, payload, errors = run(["search", "flood", "--limit", "1", "--json"], transport=transport)
+    assert code == 0 and payload is not None and payload["truncated"] is True
+    assert payload["page"] == {
+        "next": "https://data.mfe.govt.nz/services/api/v1/data/?q=flood&page_size=1&page=2",
+    }
+    assert len(calls) == 1
+
+    last_only = '<https://data.mfe.govt.nz/services/api/v1/data/?q=flood&page_size=1&page=9>; rel="page-last"'
+    calls, transport = linked_transport("search-one.json", last_only)
+    code, payload, errors = run(["search", "flood", "--limit", "1", "--json"], transport=transport)
+    assert code == 0 and payload is not None and payload["truncated"] is False
+    assert payload["page"] == {
+        "last": "https://data.mfe.govt.nz/services/api/v1/data/?q=flood&page_size=1&page=9",
+    }
+
+    rows, truncated, _latest, page = cli.parse_search_document(
+        {
+            "results": [{
+                "id": 1,
+                "type": "layer",
+                "title": "Synthetic",
+                "published_at": "2024-01-01T00:00:00Z",
+            }],
+            "next": "https://evil.example/next",
+        },
+        limit=1,
+    )
+    assert truncated is True and page == {} and rows[0]["id"] == 1
+
+    planted = "https://data.mfe.govt.nz/services/api/v1/data/?q=flood&page_size=1&page=2"
+    early = f'<{planted}>; rel="page-next"'
+    assert cli.parse_link_header(early + ("x" * 9000)) == (planted, None, True)
+    assert cli.parse_link_header(("x" * 9000) + early) == (None, None, False)
+    assert cli.parse_link_header("<<<") == (None, None, False)
+    assert cli.parse_link_header(None) == (None, None, False)
+    assert cli.parse_link_header(
+        '<https://user:pass@data.mfe.govt.nz/services/api/v1/data/?page=2>; rel="page-next"'
+    ) == (None, None, True)
+    assert cli.parse_link_header(
+        '<https://data.mfe.govt.nz/services/query/?page=2>; rel="page-last"'
+    ) == (None, None, False)
+
+    original_fetch = cli.nzfetch.fetch_json
+    original_reader = cli.nzfetch._read_response_limited
+    fetch_calls: list[str] = []
+
+    def fake_fetch(url, **kwargs):
+        fetch_calls.append(url)
+        assert kwargs["timeout"] == cli.TIMEOUT
+        assert kwargs["max_bytes"] == cli.MAX_BYTES
+        assert set(kwargs["allowed_hosts"]) == {cli.HOST}
+
+        class Headers:
+            def get_all(self, name):
+                if str(name).lower() == "link":
+                    return [link_fixture("link-page-next.txt")]
+                return []
+
+            def get(self, name, default=None):
+                found = self.get_all(name)
+                return found[0] if found else default
+
+        class Response:
+            headers = Headers()
+
+            def read(self, _size):
+                return b""
+
+        cli.nzfetch._read_response_limited(Response(), kwargs["max_bytes"])
+        return json.loads((FIXTURES / "search-one.json").read_text(encoding="utf-8"))
+
+    cli.nzfetch.fetch_json = fake_fetch
+    try:
+        code, payload, errors = run(["search", "flood", "--limit", "1", "--json"])
+        assert code == 0 and errors == "" and payload is not None
+        assert payload["truncated"] is True
+        assert payload["page"]["next"].endswith("page=2")
+        assert len(fetch_calls) == 1 and "page=2" not in fetch_calls[0]
+    finally:
+        cli.nzfetch.fetch_json = original_fetch
+    assert cli.nzfetch._read_response_limited is original_reader
+
     try:
         cli.catalogue_url("services/query/")
     except cli.SkillFailure as exc:
@@ -221,6 +370,12 @@ def assert_deterministic_contracts() -> list[str]:
         "fixture positive search card keeps id, title and published_at",
         "fixture empty search is an empty result",
         "fixture search page is truncated to the requested limit",
+        "fixture Link page-next marks one catalogue page truncated after a single request",
+        "fixture sort-only Link stays complete for an empty page and a full page",
+        "fixture malformed Link omits off-host, userinfo and query targets",
+        "fixture rel=next is truncated and page-last alone is not",
+        "contract Link header parsing is bounded and host-limited",
+        "contract catalogue transport keeps the Link header from the same response",
         "fixture open layer keeps field names, feature count and cc-by licence",
         "fixture grid layer reports absent fields without inventing names",
         "fixture closed, missing, contradictory and cc0 licences are refused",

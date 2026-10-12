@@ -6,16 +6,16 @@
 - Declared outbound hosts: data.mfe.govt.nz
 - Access mode: public-api
 - Authentication: none
-- Last verified: 2026-10-11
+- Last verified: 2026-10-12
 
 ## What was verified
 
 On 11 October 2026, unauthenticated GETs with a 15-second timeout returned:
 
-- `GET /services/api/v1/data/?q=flood&page_size=1` — HTTP 200, a one-element JSON list. The card included integer `id`, `type` `layer`, `title`, and `published_at`. It did not include `license`.
+- `GET /services/api/v1/data/?q=flood&page_size=1` — HTTP 200, a one-element JSON list. The `Link` header included `rel="page-next"`, `rel="page-last"`, and sort relations (`sort-name`, `sort-recently-added`, and others). The card included integer `id`, `type` `layer`, `title`, and `published_at`. It did not include `license`. Checked again on 12 October 2026: still one object, `page-next` at `page=2`, and `page-last` at `page=102`.
 - `GET /services/api/v1/layers/125035/` — HTTP 200 JSON. `license.type` was `cc-by`, `license.version` was `4.0`, `license.title` was `Creative Commons Attribution 4.0 International`. `data.feature_count` was an integer. `data.fields` was JSON null (a grid layer, not an attribute table).
 - `GET /services/api/v1/layers/117733/` — HTTP 200 JSON for a vector layer. `license.type` was `cc-by`, `license.version` was `4.0`, `data.feature_count` was a positive integer, and `data.fields` was a list of objects with string `name` and `type`. The first field name was `Shape`.
-- `GET /services/api/v1/data/?q=__no_such_mfe_layer_zzqq__&page_size=1` — HTTP 200 body `[]`.
+- `GET /services/api/v1/data/?q=__no_such_mfe_layer_zzqq__&page_size=1` — HTTP 200 body `[]`. Its `Link` header has sort relations only, with no `page-next`. Checked again on 12 October 2026.
 - `GET /services/query/` — HTTP 404 `Not found`. This skill does not call a query path. A keyed query service is out of scope even where a deployment answers 403.
 
 Search cards mix `layer`, `table` and `document` types. `layer` reads only `/layers/{id}/`. A table id is not treated as a layer.
@@ -23,10 +23,11 @@ Search cards mix `layer`, `table` and `document` types. `layer` reads only `/lay
 ## Behaviour
 
 - Timeout 15 seconds. Response cap 512 KiB. Search limit 1–20, sent as `page_size`, and also applied locally if the payload is longer.
+- The search `Link` header is kept from that same response. `rel="page-next"` or `rel="next"` sets `truncated` true. `rel="page-last"` or `rel="last"` is reported when the target is `https://data.mfe.govt.nz/services/api/v1/data/` with no userinfo and no query-service path. Parsing stops at 8192 characters and 32 links. The next page is not requested. A body `next` flag still sets `truncated`, and its URL is not copied.
 - Redirects must stay on `data.mfe.govt.nz`. Any other host is an error.
 - `published_at` is the Koordinates publication timestamp copied through unchanged. It is not a monitoring period and not the year embedded in a title.
 - `feature_count` is the integer in `data.feature_count`. It is not calculated from a feature download. `fields_state` is `absent` when `data.fields` is null, `empty` when the list is empty, and `present` when names were read. Names stay in source order.
-- No bulk export, no paging through `next`, and no feature geometry. `nz-arcgis` may read `arcgis.mfe.govt.nz` feature services; this skill does not. `data-govt-nz` searches `catalogue.data.govt.nz`. This is not the reserved `mfe-waste-data` skill.
+- No bulk export, no request of a `page-next` URL, and no feature geometry. `nz-arcgis` may read `arcgis.mfe.govt.nz` feature services; this skill does not. `data-govt-nz` searches `catalogue.data.govt.nz`. This is not the reserved `mfe-waste-data` skill.
 - Live smoke is one search (`flood`, `page_size=1`) and one layer GET (`117733`). An outage, an empty flood search, or a licence that is not open attribution is not a pass.
 
 ## Errors

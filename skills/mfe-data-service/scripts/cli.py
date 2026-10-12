@@ -28,6 +28,12 @@ TIMEOUT = 15
 MAX_BYTES = 512 * 1024
 MAX_LIMIT = 20
 MAX_QUERY_LENGTH = 200
+MAX_LINK_HEADER = 8192
+MAX_LINK_VALUES = 32
+MAX_LINK_URL = 2048
+NEXT_RELS = frozenset({"next", "page-next"})
+LAST_RELS = frozenset({"last", "page-last"})
+_LINK_SPACE = " \t\r\n"
 OPEN_ATTRIBUTION_TYPE = "cc-by"
 OPEN_ATTRIBUTION_VERSIONS = frozenset({"1.0", "2.0", "2.5", "3.0", "4.0"})
 CLOSED_TITLE_MARKERS = (
@@ -40,6 +46,14 @@ CLOSED_TITLE_MARKERS = (
     "public domain",
     "cc0",
 )
+
+class CatalogueDocument:
+    """Catalogue JSON plus the response Link header from the same GET."""
+
+    def __init__(self, body: Any, link_header: str | None = None):
+        self.body = body
+        self.link_header = link_header if isinstance(link_header, str) else None
+
 
 Transport = Callable[[str], Any]
 
@@ -156,7 +170,201 @@ def _http_status(message: str) -> int | None:
     return int("".join(digits))
 
 
-def default_transport(url: str) -> Any:
+def _read_link_param_value(text: str, index: int) -> tuple[str, int]:
+    if index >= len(text):
+        return "", index
+    if text[index] != '"':
+        start = index
+        while index < len(text) and text[index] not in _LINK_SPACE + ";,":
+            index += 1
+            if index - start > MAX_LINK_URL:
+                break
+        return text[start:index], index
+    index += 1
+    chars: list[str] = []
+    while index < len(text) and len(chars) <= MAX_LINK_URL:
+        char = text[index]
+        if char == "\\":
+            index += 1
+            if index >= len(text):
+                break
+            chars.append(text[index])
+            index += 1
+            continue
+        if char == '"':
+            return "".join(chars), index + 1
+        chars.append(char)
+        index += 1
+    return "".join(chars), index
+
+
+def _skip_link_separator(text: str, index: int) -> int:
+    quote = False
+    while index < len(text):
+        char = text[index]
+        if char == "\\" and quote:
+            index = min(len(text), index + 2)
+            continue
+        if char == '"':
+            quote = not quote
+            index += 1
+            continue
+        if char == "," and not quote:
+            return index + 1
+        index += 1
+    return index
+
+
+def _same_host_catalogue_url(url: str) -> str | None:
+    """Return a catalogue page URL only when it is https on the official host."""
+    if not isinstance(url, str) or not url or len(url) > MAX_LINK_URL or "\\" in url:
+        return None
+    if any(ord(char) < 32 or char.isspace() for char in url):
+        return None
+    try:
+        parsed = urllib.parse.urlsplit(url)
+        port = parsed.port
+    except ValueError:
+        return None
+    hostname = (parsed.hostname or "").lower().rstrip(".")
+    if (
+        parsed.scheme != "https"
+        or hostname != HOST
+        or parsed.username is not None
+        or parsed.password is not None
+        or port not in (None, 443)
+        or parsed.fragment
+        or "/query" in parsed.path
+        or parsed.path.rstrip("/") != "/services/api/v1/data"
+    ):
+        return None
+    return url
+
+
+def parse_link_header(header: str | None) -> tuple[str | None, str | None, bool]:
+    """Parse one Link header into same-host next and last catalogue URLs.
+
+    The scan stops at a fixed character and link count. ``has_next`` is true when
+    a parsed ``next`` or ``page-next`` relation is present, including when its
+    target is omitted because it is not an official catalogue URL.
+    """
+    if not isinstance(header, str) or not header.strip():
+        return None, None, False
+    text = header[:MAX_LINK_HEADER]
+    next_url: str | None = None
+    last_url: str | None = None
+    has_next = False
+    index = 0
+    produced = 0
+    length = len(text)
+    while index < length and produced < MAX_LINK_VALUES:
+        start = index
+        while index < length and text[index] in _LINK_SPACE + ",":
+            index += 1
+        if index >= length:
+            break
+        if text[index] != "<":
+            index = _skip_link_separator(text, index)
+            if index <= start:
+                index = start + 1
+            continue
+        url_end = text.find(">", index + 1, index + 2 + MAX_LINK_URL)
+        if url_end < 0:
+            break
+        url = text[index + 1:url_end]
+        index = url_end + 1
+        rels: list[str] = []
+        while index < length and text[index] != ",":
+            if text[index] in _LINK_SPACE:
+                index += 1
+                continue
+            if text[index] != ";":
+                index += 1
+                continue
+            index += 1
+            while index < length and text[index] in _LINK_SPACE:
+                index += 1
+            name_start = index
+            while index < length and text[index] not in _LINK_SPACE + "=;,":
+                index += 1
+            name = text[name_start:index].casefold()
+            while index < length and text[index] in _LINK_SPACE:
+                index += 1
+            value = ""
+            if index < length and text[index] == "=":
+                index += 1
+                while index < length and text[index] in _LINK_SPACE:
+                    index += 1
+                value, index = _read_link_param_value(text, index)
+            if name == "rel":
+                rels.extend(part.casefold() for part in value.split() if part)
+        produced += 1
+        folded = frozenset(rels)
+        if folded & NEXT_RELS:
+            has_next = True
+            if next_url is None:
+                safe = _same_host_catalogue_url(url)
+                if safe:
+                    next_url = safe
+        if folded & LAST_RELS and last_url is None:
+            safe = _same_host_catalogue_url(url)
+            if safe:
+                last_url = safe
+        if index <= start:
+            index = start + 1
+    return next_url, last_url, has_next
+
+
+def _link_header_from_response(response: Any) -> str | None:
+    headers = getattr(response, "headers", None)
+    if headers is None:
+        return None
+    values: list[str] = []
+    get_all = getattr(headers, "get_all", None)
+    if callable(get_all):
+        raw_values = get_all("Link") or []
+        if isinstance(raw_values, str):
+            raw_values = [raw_values]
+        for item in raw_values:
+            if isinstance(item, str) and item.strip():
+                values.append(item.strip())
+    if not values:
+        getter = getattr(headers, "get", None)
+        if callable(getter):
+            raw = getter("Link")
+            if isinstance(raw, str) and raw.strip():
+                values.append(raw.strip())
+    if not values:
+        return None
+    joined = ", ".join(values)
+    if len(joined) > MAX_LINK_HEADER:
+        return joined[: MAX_LINK_HEADER + 1]
+    return joined
+
+
+def fetch_catalogue_json(url: str) -> tuple[Any, str | None]:
+    """GET one catalogue document and keep the Link header fetch_json drops."""
+    captured: dict[str, str | None] = {"link": None}
+    original = nzfetch._read_response_limited
+
+    def capture(response: Any, max_bytes: int | None = None) -> bytes:
+        captured["link"] = _link_header_from_response(response)
+        return original(response, max_bytes)
+
+    nzfetch._read_response_limited = capture
+    try:
+        payload = nzfetch.fetch_json(
+            url,
+            timeout=TIMEOUT,
+            max_bytes=MAX_BYTES,
+            allowed_hosts=ALLOWED_HOSTS,
+        )
+    finally:
+        nzfetch._read_response_limited = original
+    return payload, captured["link"]
+
+
+def default_transport(url: str) -> CatalogueDocument:
     parsed = urllib.parse.urlsplit(url)
     if parsed.scheme != "https" or parsed.hostname != HOST or "/query" in parsed.path:
         raise SkillFailure(7, "refusing an unsupported catalogue request")
@@ -166,12 +374,8 @@ def default_transport(url: str) -> Any:
     query_keys = set(urllib.parse.parse_qs(parsed.query, keep_blank_values=True))
     if not query_keys <= {"q", "page_size"}:
         raise SkillFailure(7, "refusing an unsupported catalogue parameter")
-    return nzfetch.fetch_json(
-        url,
-        timeout=TIMEOUT,
-        max_bytes=MAX_BYTES,
-        allowed_hosts=ALLOWED_HOSTS,
-    )
+    body, link_header = fetch_catalogue_json(url)
+    return CatalogueDocument(body, link_header=link_header)
 
 
 def load_fixture(path: str) -> Any:
@@ -227,7 +431,12 @@ def _count(value: Any, label: str) -> int:
     return value
 
 
-def parse_search_document(payload: Any, *, limit: int) -> tuple[list[dict[str, Any]], bool, str | None]:
+def parse_search_document(
+    payload: Any,
+    *,
+    limit: int,
+    link_header: str | None = None,
+) -> tuple[list[dict[str, Any]], bool, str | None, dict[str, str]]:
     next_page = False
     if isinstance(payload, list):
         rows = payload
@@ -236,7 +445,8 @@ def parse_search_document(payload: Any, *, limit: int) -> tuple[list[dict[str, A
         next_page = bool(payload.get("next"))
     else:
         raise SkillFailure(6, "catalogue search was not a JSON list")
-    truncated = next_page or len(rows) > limit
+    next_url, last_url, has_next = parse_link_header(link_header)
+    truncated = next_page or has_next or len(rows) > limit
     selected = rows[:limit]
     results = []
     published_values: list[str] = []
@@ -262,7 +472,12 @@ def parse_search_document(payload: Any, *, limit: int) -> tuple[list[dict[str, A
             record["url"] = official
         results.append(record)
     latest = published_values[0] if published_values and all(value == published_values[0] for value in published_values) else None
-    return results, truncated, latest
+    page: dict[str, str] = {}
+    if next_url:
+        page["next"] = next_url
+    if last_url:
+        page["last"] = last_url
+    return results, truncated, latest, page
 
 
 def _licence_record(document: dict[str, Any]) -> dict[str, str]:
@@ -395,6 +610,14 @@ def emit_success(payload: dict[str, Any], *, as_json: bool) -> int:
             print(f"- {row['id']} {row['type']} {row['title']} | published: {published or 'unknown'}")
         if payload.get("truncated"):
             print("More catalogue rows exist; this command does not page further.")
+        page = payload.get("page")
+        if isinstance(page, dict):
+            next_page = page.get("next")
+            last_page = page.get("last")
+            if isinstance(next_page, str):
+                print(f"next page: {next_page}")
+            if isinstance(last_page, str):
+                print(f"last page: {last_page}")
         return 0
     row = payload["results"][0]
     print(f"{row['id']} {row['title']}")
@@ -404,32 +627,41 @@ def emit_success(payload: dict[str, Any], *, as_json: bool) -> int:
     return 0
 
 
-def load_document(url: str, fixture: str | None, transport: Transport) -> Any:
+def load_document(url: str, fixture: str | None, transport: Transport) -> CatalogueDocument:
     if fixture is not None:
-        return load_fixture(fixture)
+        return CatalogueDocument(load_fixture(fixture))
     try:
-        return transport(url)
+        result = transport(url)
     except SkillFailure:
         raise
     except (nzfetch.FetchError, nzfetch.Blocked, TimeoutError, OSError) as exc:
         code, message, retry_after = outcome_for_exception(exc)
         raise SkillFailure(code, message, retry_after=retry_after) from exc
+    if isinstance(result, CatalogueDocument):
+        return result
+    return CatalogueDocument(result)
 
 
 def run_search(query: str, limit: int, fixture: str | None, transport: Transport) -> dict[str, Any]:
     source_url = catalogue_url("data/", {"q": query, "page_size": str(limit)})
-    payload = load_document(source_url, fixture, transport)
-    results, truncated, latest = parse_search_document(payload, limit=limit)
+    document = load_document(source_url, fixture, transport)
+    results, truncated, latest, page = parse_search_document(
+        document.body,
+        limit=limit,
+        link_header=document.link_header,
+    )
     envelope = result_envelope(results, _meta(source_url, latest_data=latest))
     envelope["query"] = {"command": "search", "text": query, "limit": limit}
     envelope["truncated"] = truncated
+    if page:
+        envelope["page"] = page
     return envelope
 
 
 def run_layer(layer_id: str, fixture: str | None, transport: Transport) -> dict[str, Any]:
     source_url = catalogue_url(f"layers/{layer_id}/")
-    payload = load_document(source_url, fixture, transport)
-    record, licence, latest = parse_layer_document(payload, layer_id=layer_id)
+    document = load_document(source_url, fixture, transport)
+    record, licence, latest = parse_layer_document(document.body, layer_id=layer_id)
     envelope = result_envelope([record], _meta(source_url, licence=licence, latest_data=latest))
     envelope["query"] = {"command": "layer", "id": layer_id}
     return envelope
