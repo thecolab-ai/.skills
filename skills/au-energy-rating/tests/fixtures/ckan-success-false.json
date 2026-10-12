@@ -1,0 +1,10 @@
+{
+  "success": false,
+  "error": {
+    "message": "not used"
+  },
+  "result": {
+    "total": 0,
+    "records": []
+  }
+}

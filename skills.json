@@ -2,7 +2,7 @@
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
   "last_verified": "2026-10-12",
-  "skill_count": 172,
+  "skill_count": 173,
   "skills": [
     {
       "name": "airnz-flights",
@@ -193,6 +193,31 @@
       ],
       "last_verified": "2026-07-19",
       "health": "gated",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "au-energy-rating",
+      "description": "Look up Australian and New Zealand Energy Rating labelled appliance registrations from the Australian Government data.gov.au CKAN package. Use for package metadata, resource names, the stated licence, and a short datastore preview of air conditioners, whitegoods, televisions, monitors, pool pumps, lamps or commercial ice-makers. Read-only, no API key, and it does not download the large CSV files.",
+      "path": "skills/au-energy-rating",
+      "category": "public-data",
+      "source_owner": "Australian Government Department of Climate Change, Energy, the Environment and Water",
+      "source_type": "official",
+      "source_url": "https://data.gov.au/data/api/3/action/package_show?id=559708e5-480e-4f94-8429-c49571e82761",
+      "auth": "none",
+      "access_mode": "public-api",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "none",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "data.gov.au"
+      ],
+      "last_verified": "2026-10-12",
+      "health": "healthy",
       "maintainer": "@adam91holt"
     },
     {
