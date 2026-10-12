@@ -1,0 +1,9 @@
+{
+  "responses": [
+    {
+      "status": 200,
+      "final_url": "https://portal.opentopography.org/lidarDataset?opentopoID=OTLAS.062016.2193.9",
+      "body": "<html><head><title>Fixture dataset</title></head><body><script type=\"application/ld+json\">{\"@type\": \"Dataset\", \"name\": \"Fixture City, New Zealand 2013\", \"alternateName\": \"Fixture_2013\", \"fileFormat\": \"Point Cloud Data\", \"temporalCoverage\": \"2013-01-01/2013-02-02\", \"license\": \"Not-Provided\", \"citation\": \"Fixture City 2013. Reuse terms were not provided.\", \"identifier\": {\"@type\": \"PropertyValue\", \"propertyID\": \"opentopoID\", \"value\": \"OTLAS.062016.2193.9\"}, \"publisher\": {\"name\": \"OpenTopography\"}}</script></body></html>"
+    }
+  ]
+}

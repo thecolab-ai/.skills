@@ -75,6 +75,29 @@ def probe(name, arguments, check):
     return True
 
 
+def probe_unknown_wellington():
+    """An unknown numeric id must fail from the small metadata file, not a monthly CSV."""
+    try:
+        p = subprocess.run([sys.executable, str(CLI), 'counts', '--source', 'wellington-sensors',
+                            '--site', '999999999', '--json', '--max-age', '0'],
+                           text=True, capture_output=True, timeout=20)
+    except subprocess.TimeoutExpired:
+        print('[FAIL] live Wellington unknown site: timed out before metadata rejection')
+        return False
+    if p.returncode in (4, 5):
+        print(f'[SKIP] live Wellington unknown site: {p.stderr.strip()[:180]}')
+        return True
+    try:
+        data = json.loads(p.stdout)
+        assert p.returncode == 2 and data['error']['code'] == 2 and data['error']['type'] == 'invalid_input'
+        assert data['results'] == [] and '999999999' in data['error']['message']
+    except (AssertionError, ValueError, KeyError, TypeError) as exc:
+        print(f'[FAIL] live Wellington unknown site: {exc}; stderr={p.stderr.strip()[:180]}')
+        return False
+    print('[PASS] live Wellington unknown site: rejected before monthly CSV download')
+    return True
+
+
 def main():
     try:
         fixture_tests()
@@ -82,7 +105,16 @@ def main():
         print(f'[FAIL] fixture parser checks: {exc}')
         return 1
     checks = [
-        ('sources registry', ['sources'], lambda d: d['meta']['count'] == 6),
+        ('sources registry', ['sources'], lambda d: d['meta']['count'] == len(cli.SOURCES)),
+        ('Hamilton annual traffic', ['counts','--source','hamilton-traffic','--site','02893','--from','2023-01-01','--to','2023-12-31'], lambda d: len(d['results']) == 1 and d['results'][0]['site_id'] == '2893' and d['results'][0]['count'] == 17000 and d['results'][0]['date'] == '2023' and d['results'][0]['series_role'] == 'both_directions' and d['meta']['latest_data'] == '2023'),
+        ('Hamilton spatial sites', ['nearest','--source','hamilton-traffic','--near','175.27,-37.77','--radius-km','0.5','--format','geojson','--limit','2'], lambda d: d['features'] and d['features'][0]['geometry']['type'] == 'Point'),
+        ('Tauranga latest survey', ['counts','--source','tauranga-traffic','--site','411d227d-8458-4677-88d2-6cb552094cc1'], lambda d: d['results'] and d['results'][0]['adt'] == 18290 and d['results'][0]['date'] == '2005-11-11' and d['meta']['latest_data'] == '2005-11-11'),
+        ('Tauranga spatial sites', ['sites','--source','tauranga-traffic','--bbox','176.12,-37.74,176.13,-37.73','--format','geojson','--limit','2'], lambda d: d['features'] and d['features'][0]['geometry']['type'] == 'Point'),
+        ('Christchurch cycle snapshot', ['counts','--source','christchurch-cycle','--site','100045582'], lambda d: d['results'] and isinstance(d['results'][0]['count'], (int,float)) and d['results'][0]['direction'] == 'one' and d['results'][0]['series_role'] == 'single_direction' and 'date' not in d['results'][0] and 'latest_data' not in d['meta'] and any('not additive' in w for w in d['meta']['warnings'])),
+        ('Christchurch nearby counters', ['nearest','--source','christchurch-cycle','--near','172.6277,-43.5335','--radius-km','0.1','--format','geojson','--limit','2'], lambda d: d['features'] and d['features'][0]['properties']['distance_km'] < 0.1),
+        ('Wellington countline geometry', ['nearest','--source','wellington-sensors','--near','174.7754,-41.3199','--radius-km','0.1','--format','geojson','--limit','2'], lambda d: d['features'] and d['features'][0]['geometry']['type'] == 'MultiLineString' and d['meta']['latest_data'] is None and d['meta']['latest_data_note'] in d['meta']['warnings']),
+        ('Wellington September hourly counts', ['counts','--source','wellington-sensors','--site','048346','--from','2026-09-01','--to','2026-09-01','--limit','2'], lambda d: d['results'] and d['results'][0]['site_id'] == '48346' and d['results'][0]['date'] == '2026-09-01' and d['results'][0]['hour'] == 0 and d['results'][0]['count'] == 0 and d['results'][1]['hour'] == 0 and d['meta']['latest_data'] == '2026-09-01' and d['meta']['matched_count'] == 280),
+        ('Wellington latest-month freshness', ['counts','--source','wellington-sensors','--site','48346','--limit','2'], lambda d: d['results'] and d['results'][0]['date'] <= d['meta']['latest_data'] and d['meta']['latest_data'] >= '2026-10-09' and d['meta']['matched_count'] > d['meta']['count']),
         ('AT traffic workbook', ['sites','--source','at-traffic','--limit','2'], lambda d: d['meta']['matched_count'] > 20000 and d['results'][0]['name'] == 'Access Road #2'),
         ('AT traffic survey values', ['counts','--source','at-traffic','--site','6f28d534b38283b7'], lambda d: d['results'] and d['results'][0]['adt_7_day'] == 1603.4285714285716),
         ('AT ADT survey values', ['counts','--source','at-adt','--site','23788:522'], lambda d: d['results'] and any(r['adt'] == 451 for r in d['results'])),
@@ -94,7 +126,7 @@ def main():
         ('NZTA daily traffic', ['counts','--source','nzta-tms','--site','00200444','--from','2018-01-01','--to','2018-01-01'], lambda d: d['results'] and all(r['date'] == '2018-01-01' for r in d['results']) and any(r['count'] == 2468 for r in d['results'])),
         ('Heart of the City hourly counts', ['counts','--source','hotcity','--site','107 Quay Street','--from','2026-09-01','--to','2026-09-01'], lambda d: d['meta']['matched_count'] == 24 and d['results'][0]['count'] == 211 and d['meta']['latest_data'] >= '2026-09-30'),
     ]
-    good = probe_cycle_links()
+    good = probe_cycle_links() and probe_unknown_wellington()
     for name,args,check in checks:
         good = probe(name,args,check) and good
     return 0 if good else 1
