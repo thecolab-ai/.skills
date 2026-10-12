@@ -1,6 +1,6 @@
 ---
 name: nz-tides-surf
-description: "Query New Zealand LINZ tide predictions and SwellMap surf forecasts through a lightweight read-only CLI. Use when the task involves NZ tide times, next high/low tide, surf forecasts, swell trend, or choosing the best nearby surf break for a drive."
+description: "Query New Zealand LINZ tide predictions, LINZ standard-port tidal levels, and SwellMap surf forecasts through a lightweight read-only CLI. Use when the task involves NZ tide times, next high/low tide, standard-port levels such as MHWS, MSL, HAT or LAT, surf forecasts, swell trend, or choosing the best nearby surf break for a drive."
 license: MIT
 compatibility: "Requires Python 3.10+ and network access for live data"
 metadata:
@@ -19,7 +19,7 @@ metadata:
   thecolab.pack: "nz-public-data"
   thecolab.source_url: "https://www.linz.govt.nz"
   thecolab.allowed_domains: "developer.metservice.com,niwa.co.nz,static.charts.linz.govt.nz,www.linz.govt.nz,www.surfline.com,www.swellmap.com"
-  thecolab.last_verified: "2026-07-19"
+  thecolab.last_verified: "2026-10-12"
   thecolab.health: "healthy"
   thecolab.maintainer: "@adam91holt"
 ---
@@ -47,16 +47,19 @@ The main workflow is answering "is Piha worth a drive tomorrow morning?" by comb
 - Authenticated Surfline features, subscriptions, cameras, or personalised forecasts
 - MetOcean/MetService point marine API data when an API key is available; use `metservice-nz` for that
 - Historical tide or surf analysis beyond the published forecast/table windows
+- Observed sea-level gauge archives, sensor files, or historical gauge ZIPs; use `linz-tide-gauges-nz`
+- Treating `levels` as a daily tide prediction or as a measured gauge height. `levels` publishes reference heights in metres on Chart Datum. `tides` remains the prediction timetable. Chart Datum is the zero of those predictions.
 
 ## Preferred workflow
 
 1. Run `scripts/cli.py` with the narrowest subcommand that answers the task
 2. Use `tides` or `next-tide` for official LINZ tide predictions
-3. Use `surf` for a specific break forecast
-4. Use `best-break` when the user asks where to drive tomorrow morning
-5. Use `breaks` to see the curated surf breaks and their companion LINZ tide ports
-6. Use `--json` for agent chaining, comparisons, and reports
-7. Mention that surf ratings are SwellMap forecast snapshots and tide rows are official LINZ predictions
+3. Use `levels` for published standard-port reference heights (MHWS, MHWN, MLWN, MLWS, ranges, MSL, HAT, LAT) in metres on Chart Datum
+4. Use `surf` for a specific break forecast
+5. Use `best-break` when the user asks where to drive tomorrow morning
+6. Use `breaks` to see the curated surf breaks and their companion LINZ tide ports
+7. Use `--json` for agent chaining, comparisons, and reports
+8. Mention that surf ratings are SwellMap forecast snapshots, `tides` rows are official LINZ predictions, and `levels` rows are published reference heights rather than gauge observations
 
 ## CLI
 
@@ -69,6 +72,7 @@ python3 skills/nz-tides-surf/scripts/cli.py <command> [flags]
 ## Commands
 
 - `ports [--json]` - list available LINZ tide ports and common surf aliases
+- `levels [port] [--json]` - published LINZ standard-port tidal levels in metres on Chart Datum; omit the port to return the whole small table
 - `tides <port> [--date YYYY-MM-DD] [--days N] [--json]` - LINZ tide predictions for a port or surf alias
 - `next-tide <port> [--json]` - next high tide and next low tide from now
 - `breaks [--json]` - list known NZ surf breaks and companion LINZ tide ports
@@ -79,6 +83,8 @@ python3 skills/nz-tides-surf/scripts/cli.py <command> [flags]
 ## Examples
 
 ```bash
+python3 skills/nz-tides-surf/scripts/cli.py levels Auckland --json
+python3 skills/nz-tides-surf/scripts/cli.py levels
 python3 skills/nz-tides-surf/scripts/cli.py tides Auckland --date 2026-05-24
 python3 skills/nz-tides-surf/scripts/cli.py tides Piha --date 2026-05-24 --json
 python3 skills/nz-tides-surf/scripts/cli.py next-tide "Mt Maunganui" --json
@@ -106,7 +112,9 @@ Common surf questions are mapped to the closest practical source:
 
 ## Notes
 
-- LINZ source: `https://www.linz.govt.nz/products-services/tides-and-tidal-streams/tide-predictions`, using `https://www.linz.govt.nz/api/v1/tp` and `https://static.charts.linz.govt.nz/tide-tables/maj-ports/csv/...`.
+- LINZ tide predictions: `https://www.linz.govt.nz/products-services/tides-and-tidal-streams/tide-predictions`, using `https://www.linz.govt.nz/api/v1/tp` and `https://static.charts.linz.govt.nz/tide-tables/maj-ports/csv/...`.
+- LINZ standard-port levels: `https://www.linz.govt.nz/guidance/marine-information/tide-prediction-guidance/standard-port-tidal-levels`. One page, 10-second timeout, 256 KiB cap, 24-hour cache. Heights are metres on Chart Datum. MHWS, MHWN, MLWN, MLWS and the ranges are predicted reference levels. HAT and LAT are predicted extremes. MSL is derived from tidal observations; this command does not fetch the separate observation-period page and does not read gauge archives.
+- LINZ website content is Creative Commons Attribution 4.0 International. Attribute Toitū Te Whenua Land Information New Zealand. Do not reproduce emblems. LINZ Data Service datasets keep their own licences.
 - SwellMap source: `https://www.swellmap.com/surf-forecasts/new-zealand`, using the public no-login Next.js forecast payload embedded in each surf forecast page.
 - MetService/MetOcean source: `https://developer.metservice.com/docs/api-catalog/point-forecast-api/`; the existing `metservice-nz` skill already covers key-backed marine/wave variables.
 - NIWA source: `https://niwa.co.nz`; a no-key NIWA public marine wave forecast endpoint was not confirmed during implementation, so this skill does not duplicate the `metservice-nz marine` command.

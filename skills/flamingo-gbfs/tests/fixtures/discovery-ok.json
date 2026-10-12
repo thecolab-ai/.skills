@@ -1,0 +1,28 @@
+{
+  "http_status": 200,
+  "body": {
+    "last_updated": "2025-02-15T10:17:01+00:00",
+    "ttl": 3600,
+    "version": "3.0",
+    "data": {
+      "feeds": [
+        {
+          "name": "vehicle_status",
+          "url": "https://data.rideflamingo.com/gbfs/3/auckland/vehicle_status.json"
+        },
+        {
+          "name": "system_information",
+          "url": "https://data.rideflamingo.com/gbfs/3/auckland/system_information.json"
+        },
+        {
+          "name": "elsewhere",
+          "url": "https://evil.example/gbfs.json"
+        },
+        {
+          "name": "other_city",
+          "url": "https://data.rideflamingo.com/gbfs/3/wellington/vehicle_status.json"
+        }
+      ]
+    }
+  }
+}

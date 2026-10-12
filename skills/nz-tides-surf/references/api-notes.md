@@ -141,6 +141,33 @@ Sort order:
 
 The output is a forecast comparison, not a guarantee. Local banks, wind shelter, crowding, road conditions, and ability level still matter.
 
+## LINZ standard-port tidal levels
+
+Official page, and the only request made by `levels`:
+
+```text
+GET https://www.linz.govt.nz/guidance/marine-information/tide-prediction-guidance/standard-port-tidal-levels
+```
+
+Timeout 10 seconds. Response cap 256 KiB. Redirects must stay on `https://www.linz.govt.nz` and on that path. The command reads the one HTML table and the notes under that table. It does not fetch any other LINZ guidance page.
+
+Columns, in order: Standard Port, MHWS, MHWN, MLWN, MLWS, Spring Range, Neap Range, MSL, HAT, LAT.
+
+Published meaning, taken from the notes on that page:
+
+- Every height is in metres on Chart Datum.
+- Chart Datum is the zero of the tidal predictions. A level is still not a daily prediction event.
+- MHWS, MHWN, MLWN and MLWS are averages of predicted spring and neap tides for the period printed on the page.
+- Spring range and neap range are deduced from those level values.
+- MSL is derived from analysis of tidal observations. The observation period is cited on another page and is not fetched, so the command leaves that period empty.
+- HAT and LAT are the highest and lowest levels predicted under average meteorological conditions for the period printed on the page.
+- The table is not for cadastral or administrative boundaries.
+- These rows are not observed sea-level gauge readings. Gauge archives belong to `linz-tide-gauges-nz`.
+
+`levels` with no port returns every row in the table. `levels Auckland` returns that one published port. Matching is the published name only; `Piha` and other surf aliases are rejected. Unknown names, blank names, names longer than 80 characters, and URL-like names are invalid input. A missing table, a changed header, a non-numeric cell, a duplicate port, or a missing datum/period note is a schema failure, not an empty success.
+
+JSON uses the direct CLI envelope: `meta` includes `source_url`, `publisher`, `retrieved_at`, `licence`, and `latest_data`. `results` is the row array. Cached reuse keeps the original `retrieved_at` and sets `meta.cached` to `"true"`.
+
 ## Stability and safety
 
 - Treat LINZ tide predictions as official predictions, not observed tide-gauge measurements.

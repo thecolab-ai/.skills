@@ -1,0 +1,19 @@
+{
+  "page_html": "<script id=\"__NEXT_DATA__\" type=\"application/json\">{\"props\":{\"pageProps\":{\"timePeriodsAvailableByVehicleClass\":{\"scooter\":[{\"key\":\"all\",\"name\":\"All Data\"},{\"key\":\"2026-Q3\",\"name\":\"Q3 2026\"}],\"e-bike\":[{\"key\":\"2024-Q2\",\"name\":\"Q2 2024\"}]}}}}</script>",
+  "settings": {
+    "name": "Auckland, NZ",
+    "population": 1000001,
+    "currently_active_operators": [
+      "Example Operator"
+    ],
+    "measurement_system": "metric",
+    "earliest_available_metrics": "2019-02-13",
+    "max_bounds": [
+      173.6,
+      -37.8,
+      175.8,
+      -35.6
+    ]
+  },
+  "metrics_raw": "{\"totalTripCount\": NaN}"
+}

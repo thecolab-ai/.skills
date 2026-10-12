@@ -1,0 +1,4 @@
+Results for FeatureType 'http://bkg.bund.de/starkregen:ni_geschw_agw':
+--------------------------------------------
+Geschwindigkeit = 0.0
+--------------------------------------------

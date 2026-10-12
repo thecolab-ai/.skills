@@ -1,0 +1,57 @@
+{
+  "v": 1,
+  "service_date": "2026-07-23",
+  "t0": 1784721600,
+  "feed_versions": [
+    "VDV_fixture_version"
+  ],
+  "fields": {
+    "trip": [
+      "trip_id",
+      "route_id",
+      "direction_id",
+      "trip_rel",
+      "feed_version",
+      "stops"
+    ],
+    "stop": [
+      "stop_sequence",
+      "stop",
+      "state",
+      "stop_rel",
+      "arrival_delay",
+      "departure_delay",
+      "arrival",
+      "departure"
+    ]
+  },
+  "stops": [
+    "9322-6bc7f9b8"
+  ],
+  "trips": [
+    [
+      "247-810047-18480-2-7101501",
+      "WEST-201",
+      0,
+      0,
+      0,
+      [
+        [
+          1,
+          0,
+          0
+        ],
+        [
+          2,
+          0,
+          3,
+          7,
+          -5,
+          0,
+          19000,
+          19040
+        ]
+      ]
+    ]
+  ]
+}

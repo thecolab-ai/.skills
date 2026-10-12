@@ -1,7 +1,7 @@
 {
   "captured_at": "2026-10-08T01:09:28Z",
   "licence": "CC-BY-4.0",
-  "trim_note": "Catalogue children limited to seven target collections. Collection item links limited to Mt Albert candidates and first source item. All other source fields unchanged.",
+  "trim_note": "Catalogue children limited to seven target collections. Collection item links limited to Mt Albert candidates and first source item. Coastal catalogue children limited to the Mangawhai to Snells 1 m DEM and 1 m DSM links so listing bounds can be tested. Only the 1 m DEM collection document and item AY31_10000_0103 are included. All other source fields unchanged.",
   "responses": {
     "https://nz-elevation.s3.ap-southeast-2.amazonaws.com/catalog.json": {
       "stac_version": "1.0.0",
@@ -3138,6 +3138,209 @@
         -36.8980578
       ],
       "collection": "01KJ3SCS6GC16B1NNJ0BBSSY1R"
+    },
+    "https://nz-coastal.s3.ap-southeast-2.amazonaws.com/catalog.json": {
+      "stac_version": "1.0.0",
+      "type": "Catalog",
+      "id": "nz-coastal",
+      "description": "Toitū Te Whenua Land Information New Zealand makes New Zealand's publicly owned coastal elevation archive freely available to use under an open licence. This public S3 bucket has been made available to enable bulk access and cloud-based data processing.",
+      "links": [
+        {
+          "rel": "self",
+          "href": "https://nz-coastal.s3.ap-southeast-2.amazonaws.com/catalog.json"
+        },
+        {
+          "rel": "root",
+          "href": "./catalog.json"
+        },
+        {
+          "rel": "child",
+          "href": "./auckland/mangawhai-to-snells_2025/dem_1m/2193/collection.json",
+          "title": "Auckland - Mangawhai to Snells Coastal LiDAR 1m DEM (2025)",
+          "file:checksum": "1220fb15bc4b0bed43332555de8929ace27dd5e8cc1e40bf4166f2b26e42dd35a014",
+          "file:size": 5929
+        },
+        {
+          "rel": "child",
+          "href": "./auckland/mangawhai-to-snells_2025/dsm_1m/2193/collection.json",
+          "title": "Auckland - Mangawhai to Snells Coastal LiDAR 1m DSM (2025)",
+          "file:checksum": "12202f3e8978840a947c01619c3010b53a961fafd7e1f735ab3af22fa04f3a49c975",
+          "file:size": 4897
+        }
+      ],
+      "stac_extensions": [
+        "https://stac-extensions.github.io/file/v2.1.0/schema.json"
+      ]
+    },
+    "https://nz-coastal.s3.ap-southeast-2.amazonaws.com/auckland/mangawhai-to-snells_2025/dem_1m/2193/collection.json": {
+      "type": "Collection",
+      "stac_version": "1.0.0",
+      "id": "01KGZEQTHQ02B1ZJS35F1WFBCG",
+      "title": "Auckland - Mangawhai to Snells Coastal LiDAR 1m DEM (2025)",
+      "description": "Coastal Digital Elevation Model within the Auckland region captured in 2025.",
+      "license": "CC-BY-4.0",
+      "links": [
+        {
+          "rel": "root",
+          "href": "https://nz-coastal.s3.ap-southeast-2.amazonaws.com/catalog.json",
+          "type": "application/json"
+        },
+        {
+          "rel": "self",
+          "href": "./collection.json",
+          "type": "application/json"
+        },
+        {
+          "href": "./AY31_10000_0103.json",
+          "rel": "item",
+          "type": "application/geo+json",
+          "file:checksum": "12208c1857ef9e67d9cdc000836f2dc6af46f9abcba37e89d22b1e944b4bfe0d6690"
+        }
+      ],
+      "providers": [
+        {
+          "name": "Toitū Te Whenua Land Information New Zealand",
+          "roles": [
+            "host",
+            "licensor",
+            "processor"
+          ]
+        },
+        {
+          "name": "Woolpert",
+          "roles": [
+            "producer"
+          ]
+        }
+      ],
+      "linz:lifecycle": "completed",
+      "linz:geospatial_category": "dem",
+      "linz:region": "auckland",
+      "linz:security_classification": "unclassified",
+      "linz:slug": "mangawhai-to-snells_2025",
+      "gsd": 1,
+      "created": "2026-02-08T20:22:55Z",
+      "updated": "2026-02-08T20:22:55Z",
+      "linz:geographic_description": "Mangawhai to Snells",
+      "extent": {
+        "spatial": {
+          "bbox": [
+            [
+              174.5185161,
+              -36.4241373,
+              174.9007196,
+              -35.9714453
+            ]
+          ]
+        },
+        "temporal": {
+          "interval": [
+            [
+              "2025-03-06T11:00:00Z",
+              "2025-03-15T11:00:00Z"
+            ]
+          ]
+        }
+      },
+      "assets": {
+        "capture_area": {
+          "href": "./capture-area.geojson",
+          "title": "Capture area",
+          "description": "Boundary of the total capture area for this collection. May include some areas of nodata where capture was attempted but unsuccessful. Geometries are simplified.",
+          "type": "application/geo+json",
+          "roles": [
+            "metadata"
+          ],
+          "file:checksum": "1220795fa02397b537a5e3578fd7799e4ed826bd3ce2a7cdd47d4c15249f550374c3",
+          "file:size": 376793
+        }
+      },
+      "stac_extensions": [
+        "https://stac-extensions.github.io/file/v2.0.0/schema.json"
+      ]
+    },
+    "https://nz-coastal.s3.ap-southeast-2.amazonaws.com/auckland/mangawhai-to-snells_2025/dem_1m/2193/AY31_10000_0103.json": {
+      "type": "Feature",
+      "stac_version": "1.0.0",
+      "id": "AY31_10000_0103",
+      "links": [
+        {
+          "href": "./AY31_10000_0103.json",
+          "rel": "self",
+          "type": "application/geo+json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "collection",
+          "type": "application/json"
+        },
+        {
+          "href": "./collection.json",
+          "rel": "parent",
+          "type": "application/json"
+        }
+      ],
+      "assets": {
+        "visual": {
+          "href": "./AY31_10000_0103.tiff",
+          "file:checksum": "12205c3128b5f0adcc48b76c6af3394071fa66ea8977504e33ac4deb48e930cebe31",
+          "created": "2026-02-08T20:22:55Z",
+          "updated": "2026-02-08T20:22:55Z",
+          "type": "image/tiff; application=geotiff; profile=cloud-optimized"
+        }
+      },
+      "stac_extensions": [
+        "https://stac-extensions.github.io/file/v2.0.0/schema.json",
+        "https://stac-extensions.github.io/processing/v1.2.0/schema.json"
+      ],
+      "properties": {
+        "created": "2026-02-08T20:22:55Z",
+        "updated": "2026-02-08T20:22:55Z",
+        "processing:datetime": "2026-02-08T20:22:55Z",
+        "processing:software": {
+          "gdal": "GDAL 3.10.3, released 2025/04/01",
+          "linz/topo-imagery": "https://github.com/linz/topo-imagery/commit/bb1ef993534b689138ecb8937364f3bd5060996c"
+        },
+        "processing:version": "v7.16.0",
+        "start_datetime": "2025-03-06T11:00:00Z",
+        "end_datetime": "2025-03-15T11:00:00Z",
+        "datetime": null
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              174.570492,
+              -35.9721538
+            ],
+            [
+              174.5717797,
+              -36.0370441
+            ],
+            [
+              174.6250414,
+              -36.0363339
+            ],
+            [
+              174.6237101,
+              -35.9714453
+            ],
+            [
+              174.570492,
+              -35.9721538
+            ]
+          ]
+        ]
+      },
+      "bbox": [
+        174.570492,
+        -36.0370441,
+        174.6250414,
+        -35.9714453
+      ],
+      "collection": "01KGZEQTHQ02B1ZJS35F1WFBCG"
     }
-  }
+  },
+  "coastal_captured_at": "2026-10-11T18:19:45Z"
 }
