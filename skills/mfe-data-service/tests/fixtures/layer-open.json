@@ -1,0 +1,24 @@
+{
+  "id": 117733,
+  "type": "layer",
+  "title": "Synthetic land-use layer",
+  "kind": "vector",
+  "public_access": "download",
+  "published_at": "2024-06-01T12:00:00Z",
+  "url": "https://data.mfe.govt.nz/services/api/v1/layers/117733/",
+  "license": {
+    "title": "Creative Commons Attribution 4.0 International",
+    "type": "cc-by",
+    "version": "4.0"
+  },
+  "group": {"name": "MfE Data Management - Public"},
+  "data": {
+    "feature_count": 3,
+    "geometry_type": "multipolygon",
+    "crs": "EPSG:2193",
+    "fields": [
+      {"name": "Shape", "type": "geometry"},
+      {"name": "class_name", "type": "string"}
+    ]
+  }
+}

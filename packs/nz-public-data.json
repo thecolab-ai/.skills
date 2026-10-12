@@ -3,7 +3,7 @@
   "name": "nz-public-data",
   "description": "Public, read-only New Zealand data and public-interest sources.",
   "default": true,
-  "skill_count": 134,
+  "skill_count": 135,
   "skills": [
     "akl-housing-capacity",
     "akl-ontrack",
@@ -60,6 +60,7 @@
     "medsafe-recalls-nz",
     "mental-health-data-nz",
     "metservice-nz",
+    "mfe-data-service",
     "mot-fleet-statistics-nz",
     "msd-benefits-nz",
     "niwa-coastal-nz",
