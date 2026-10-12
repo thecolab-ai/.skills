@@ -4867,7 +4867,7 @@
     },
     {
       "name": "nz-tides-surf",
-      "description": "Query New Zealand LINZ tide predictions and SwellMap surf forecasts through a lightweight read-only CLI. Use when the task involves NZ tide times, next high/low tide, surf forecasts, swell trend, or choosing the best nearby surf break for a drive.",
+      "description": "Query New Zealand LINZ tide predictions, LINZ standard-port tidal levels, and SwellMap surf forecasts through a lightweight read-only CLI. Use when the task involves NZ tide times, next high/low tide, standard-port levels such as MHWS, MSL, HAT or LAT, surf forecasts, swell trend, or choosing the best nearby surf break for a drive.",
       "path": "skills/nz-tides-surf",
       "category": "environment",
       "source_owner": "Toitū Te Whenua LINZ and SwellMap",
@@ -4891,7 +4891,7 @@
         "www.surfline.com",
         "www.swellmap.com"
       ],
-      "last_verified": "2026-07-19",
+      "last_verified": "2026-10-12",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
