@@ -2,7 +2,7 @@
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
   "last_verified": "2026-10-11",
-  "skill_count": 168,
+  "skill_count": 169,
   "skills": [
     {
       "name": "airnz-flights",
@@ -405,6 +405,31 @@
         "www.bookme.co.nz"
       ],
       "last_verified": "2026-07-19",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "brisbane-intersection-traffic",
+      "description": "Read keyless Brisbane City Council real-time intersection lane volume, occupancy and traffic-signal locations from data.brisbane.qld.gov.au. Use for SCATS traffic signal controller site readings, lane flow, degree of saturation, or signal point locations. Not Queensland-wide incidents, flood, bikeway or other Brisbane datasets.",
+      "path": "skills/brisbane-intersection-traffic",
+      "category": "transport",
+      "source_owner": "Brisbane City Council",
+      "source_type": "official",
+      "source_url": "https://data.brisbane.qld.gov.au/",
+      "auth": "none",
+      "access_mode": "public-api",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "none",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "data.brisbane.qld.gov.au"
+      ],
+      "last_verified": "2026-10-11",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
