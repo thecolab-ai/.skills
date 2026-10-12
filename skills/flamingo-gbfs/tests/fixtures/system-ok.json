@@ -1,0 +1,17 @@
+{
+  "http_status": 200,
+  "body": {
+    "last_updated": "2026-10-11T18:12:33+00:00",
+    "ttl": 3600,
+    "version": "3.0",
+    "data": {
+      "system_id": "flamingo_auckland",
+      "languages": ["en"],
+      "name": [{"text": "Flamingo", "language": "en"}],
+      "timezone": "Etc/UTC",
+      "opening_hours": "Mo-Su,PH 00:00-24:00",
+      "url": "https://rideflamingo.com",
+      "license_id": "CC-BY-4.0"
+    }
+  }
+}

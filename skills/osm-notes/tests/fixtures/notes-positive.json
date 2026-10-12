@@ -1,0 +1,58 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {"type": "Point", "coordinates": [174.77, -36.85]},
+      "properties": {
+        "id": 102,
+        "url": "https://api.openstreetmap.org/api/0.6/notes/102.json",
+        "comment_url": "https://api.openstreetmap.org/api/0.6/notes/102/comment.json",
+        "close_url": "https://api.openstreetmap.org/api/0.6/notes/102/close.json",
+        "date_created": "2026-02-03 04:05:06 UTC",
+        "status": "open",
+        "comments": [
+          {
+            "date": "2026-02-04 05:06:07 UTC",
+            "uid": 999001,
+            "user": "synthetic-account",
+            "user_url": "https://api.openstreetmap.org/user/synthetic-account",
+            "action": "opened",
+            "text": "Synthetic kerb is missing at this corner.",
+            "html": "<p>Synthetic kerb is missing at this corner.</p>"
+          }
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {"type": "Point", "coordinates": [174.765, -36.855]},
+      "properties": {
+        "id": 101,
+        "url": "https://api.openstreetmap.org/api/0.6/notes/101.json",
+        "comment_url": "https://api.openstreetmap.org/api/0.6/notes/101/comment.json",
+        "close_url": "https://api.openstreetmap.org/api/0.6/notes/101/close.json",
+        "reopen_url": "https://api.openstreetmap.org/api/0.6/notes/101/reopen.json",
+        "date_created": "2026-01-02 03:04:05 UTC",
+        "date_closed": "2026-01-03 03:04:05 UTC",
+        "status": "closed",
+        "comments": [
+          {
+            "date": "2026-01-02 03:04:05 UTC",
+            "action": "opened",
+            "text": "Synthetic anonymous note."
+          },
+          {
+            "date": "2026-01-03 03:04:05 UTC",
+            "uid": 999002,
+            "user": "synthetic-account",
+            "user_url": "https://www.openstreetmap.org/user/synthetic-account",
+            "action": "closed",
+            "text": "Synthetic closure.",
+            "html": "<p>Synthetic closure.</p>"
+          }
+        ]
+      }
+    }
+  ]
+}
