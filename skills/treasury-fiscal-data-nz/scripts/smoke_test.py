@@ -3,6 +3,8 @@ import io
 import json
 import subprocess
 import sys
+from contextlib import redirect_stdout
+from unittest.mock import patch
 from pathlib import Path
 
 import openpyxl
@@ -139,6 +141,61 @@ except ComparisonError as exc:
     assert "Refusing to align changed definition" in str(exc)
 else:
     raise AssertionError("changed fiscal definitions must fail closed")
+
+def fixture_workbook(tables):
+    workbook = openpyxl.Workbook()
+    workbook.remove(workbook.active)
+    for name, rows in tables.items():
+        sheet = workbook.create_sheet(name)
+        for row in rows:
+            sheet.append(row)
+    buffer = io.BytesIO()
+    workbook.save(buffer)
+    return buffer.getvalue()
+
+prefu_tables = json.loads((SKILL / 'tests/fixtures/prefu-summary.json').read_text())
+prefu_records = parse_key_indicators(fixture_workbook(prefu_tables),
+    {'title': 'PREFU synthetic', 'url': BEFU_PAGE}, BEFU_PAGE + '/synthetic.xlsx', STAMP)
+assert len(prefu_records) == 18 and all(row['sheet'] == 'Table 2' for row in prefu_records)
+assert next(row for row in prefu_records if row['cell'] == 'C7')['value'] == -1.2
+assert next(row for row in prefu_records if row['cell'] == 'D16')['forecast_status'] == 'actual'
+assert next(row for row in prefu_records if row['cell'] == 'D7')['forecast_status'] == 'forecast'
+assert next(row for row in prefu_records if row['cell'] == 'D9')['forecast_status'] == 'actual'
+assert next(row for row in prefu_records if row['cell'] == 'E16')['value'] == 208.8
+for broken in (
+    {'Table 1': prefu_tables['Table 1']},
+    {**prefu_tables, 'Table 3': prefu_tables['Table 2']},
+):
+    try:
+        parse_key_indicators(fixture_workbook(broken), befu, BEFU_PAGE, STAMP)
+    except ValueError as exc:
+        assert 'one explicitly titled' in str(exc)
+    else:
+        raise AssertionError('wrong or duplicate key-indicator tables must fail closed')
+for changed_value in ('Forecast99', 'Estimate'):
+    broken = json.loads(json.dumps(prefu_tables))
+    broken['Table 2'][5][3] = changed_value
+    try:
+        parse_key_indicators(fixture_workbook(broken), befu, BEFU_PAGE, STAMP)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError('unresolved forecast-status notes must fail closed')
+broken = json.loads(json.dumps(prefu_tables))
+broken['Table 2'][5][4] = 'Forecast2'
+try:
+    parse_key_indicators(fixture_workbook(broken), befu, BEFU_PAGE, STAMP)
+except ValueError as exc:
+    assert 'year does not match' in str(exc)
+else:
+    raise AssertionError('footnoted actual year cannot migrate to another forecast column')
+import cli as treasury_cli
+with patch.object(treasury_cli, 'get_publications', return_value=(catalogue_rows, primary)), patch.object(sys, 'argv', ['cli.py', 'latest', '--json']):
+    output = io.StringIO()
+    with redirect_stdout(output):
+        assert treasury_cli.main() == 0
+    assert json.loads(output.getvalue())['meta']['source_url'] == CATALOGUE
+print('[PASS] fixture PREFU Table 2, text numbers, split units and measure-specific actuals; wrong/ambiguous tables rejected')
 
 appropriation_publication = {
     "title": "Budget 2026 Data: Estimates and Appropriations 2026/27",

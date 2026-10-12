@@ -1,0 +1,35 @@
+{
+  "objectIdFieldName": "OBJECTID",
+  "geometryType": "esriGeometryPoint",
+  "spatialReference": {
+    "wkid": 4326
+  },
+  "features": [
+    {
+      "attributes": {
+        "OBJECTID": 1,
+        "SHORTDESCRIPTION": "Synthetic civic facility",
+        "SUBURB": "Test",
+        "TOTALSPACES": 20,
+        "AVAILABLESPACES": 0
+      },
+      "geometry": {
+        "x": 174.76,
+        "y": -36.85
+      }
+    },
+    {
+      "attributes": {
+        "OBJECTID": 2,
+        "SHORTDESCRIPTION": "Synthetic west facility",
+        "SUBURB": "Test",
+        "TOTALSPACES": 10,
+        "AVAILABLESPACES": null
+      },
+      "geometry": {
+        "x": 174.64,
+        "y": -36.88
+      }
+    }
+  ]
+}

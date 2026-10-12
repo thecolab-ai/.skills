@@ -61,8 +61,10 @@ def main():
             if not ident:
                 raise ValueError("report/latest/history/actions requires a numeric ERO institution ID or URL")
             url = resolve_institution_url(ident)
-            page = parse_page(nzfetch.fetch_text(url, timeout=30, allowed_hosts={"ero.govt.nz", "www.ero.govt.nz"}), url, stamp)
+            page = parse_page(nzfetch.fetch_text(url, timeout=10, allowed_hosts={"ero.govt.nz", "www.ero.govt.nz"}), url, stamp)
             reports = report_sections(page)
+            if not reports:
+                raise ValueError("ERO institution page contained no recognisable dated reports")
             if args.command == "latest":
                 data = reports[:1]
             elif args.command == "history":
@@ -75,6 +77,9 @@ def main():
                 data = [section for section in sections if any(key in section["heading"].casefold() for key in keys)][: args.limit]
 
         env = result_envelope(ok=True, source_name="Education Review Office", source_url=url, retrieved_at=stamp, freshness="publication-specific", query=vars(args), data=data, warnings=WARN, blocked=False)
+        env["meta"] = {"source_url": url, "publisher": "Education Review Office", "retrieved_at": stamp}
+        if args.command == "latest" and data[0].get("published_on"):
+            env["meta"]["latest_data"] = data[0]["published_on"]
         if args.json:
             print(json.dumps(env, indent=2, ensure_ascii=False))
         else:

@@ -1,0 +1,23 @@
+{
+  "id": 123518,
+  "type": "table",
+  "kind": "table",
+  "title": "Geographic Areas Table 2026",
+  "url_html": "https://datafinder.stats.govt.nz/table/123518-geographic-areas-table-2026/",
+  "published_at": "2026-03-31T21:23:43.468268Z",
+  "license": {
+    "title": "Creative Commons Attribution 4.0 International",
+    "type": "cc-by",
+    "version": "4.0",
+    "url_html": "https://datafinder.stats.govt.nz/license/attribution-4-0-international/"
+  },
+  "version": {"id": 435042},
+  "data": {
+    "feature_count": 57575,
+    "sample": "https://datafinder.stats.govt.nz/services/api/v1/tables/123518/versions/435042/data/sample/",
+    "fields": [
+      {"name": "MB2026_code", "type": "string"},
+      {"name": "SA22026_name", "type": "string"}
+    ]
+  }
+}

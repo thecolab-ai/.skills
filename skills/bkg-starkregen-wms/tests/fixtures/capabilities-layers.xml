@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<WMS_Capabilities version="1.3.0" xmlns="http://www.opengis.net/wms">
+  <Service>
+    <Name>WMS</Name>
+    <Title>WMS Hinweiskarte Starkregengefahren (HWK_SRG)</Title>
+    <Fees>Die Daten werden geldleistungsfrei gemäß der Datenlizenz Deutschland Namensnennung 2.0 (https://www.govdata.de/dl-de/by-2-0) zur Verfügung gestellt.</Fees>
+    <AccessConstraints>Es gelten keine Zugriffsbeschränkungen</AccessConstraints>
+  </Service>
+  <Capability>
+    <Layer>
+      <Title>WMS Hinweiskarte Starkregengefahren (HWK_SRG)</Title>
+      <CRS>EPSG:4326</CRS>
+      <CRS>CRS:84</CRS>
+      <Layer queryable="1">
+        <Name>geschwindigkeit_agw</Name>
+        <Title>Fliessgeschwindigkeit aussergewöhnliches Ereignis</Title>
+        <BoundingBox CRS="EPSG:4326" minx="48.76108728003403" miny="5.379125554394207" maxx="55.0660230561541" maxy="15.93920847357809"/>
+        <BoundingBox CRS="CRS:84" minx="5.379125554394207" miny="48.76108728003403" maxx="15.93920847357809" maxy="55.0660230561541"/>
+      </Layer>
+      <Layer queryable="1">
+        <Name>ni_geschw_agw</Name>
+        <Title>NI: Fliessgeschwindigkeit Außergewöhnlich</Title>
+      </Layer>
+      <Layer queryable="1">
+        <Name>hh_geschw_agw</Name>
+        <Title>HH: Fliessgeschwindigkeit Außergewöhnlich</Title>
+      </Layer>
+    </Layer>
+  </Capability>
+</WMS_Capabilities>

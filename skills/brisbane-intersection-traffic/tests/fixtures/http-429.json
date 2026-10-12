@@ -1,0 +1,7 @@
+{
+  "http_status": 429,
+  "headers": {
+    "Retry-After": "30"
+  },
+  "body": ""
+}

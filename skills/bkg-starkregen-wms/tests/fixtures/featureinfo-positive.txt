@@ -1,0 +1,4 @@
+Results for FeatureType 'http://bkg.bund.de/starkregen:he_geschw_agw':
+--------------------------------------------
+Geschwindigkeit = 0.6899999976158142
+--------------------------------------------

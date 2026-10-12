@@ -1,0 +1,22 @@
+{
+  "v": 1,
+  "generated_at": "2026-10-11T14:32:10.675Z",
+  "base_url": "https://data.aklontrack.com/open/v1/",
+  "licence": {
+    "name": "CC BY 4.0",
+    "url": "https://creativecommons.org/licenses/by/4.0/",
+    "attribution": "AKLOnTrack (aklontrack.com), from Auckland Transport's GTFS and GTFS-Realtime feeds"
+  },
+  "days": [
+    {
+      "path": "observations/2026/07/09.json",
+      "bytes": 442,
+      "sha256": "5102dfd078996ea80f21afe49d9c993a8b163662822c404b3c1c4605c9180e85",
+      "rev": 1,
+      "written_at": "2026-09-26T06:53:42.452Z",
+      "date": "2026-07-09",
+      "rows": 0,
+      "trips": 0
+    }
+  ]
+}

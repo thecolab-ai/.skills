@@ -1,0 +1,4 @@
+Results for FeatureType 'http://bkg.bund.de/starkregen:nw_geschw_agw':
+--------------------------------------------
+Geschwindigkeit = -9999.0
+--------------------------------------------
