@@ -4162,7 +4162,7 @@
     },
     {
       "name": "nz-electricity",
-      "description": "Query NZ electricity market data: EM6 wholesale spot prices, grid demand, carbon intensity, historical nodal prices, monthly generation by fuel type, distributed-generation solar uptake, gentailer energy-margin source status, and NZ lines-company outage records. No login or API key.",
+      "description": "Query NZ electricity market data: EM6 wholesale spot prices, grid demand, carbon intensity, historical nodal prices, monthly generation by fuel type, distributed-generation solar uptake, EMI solar installation counts by region and by street, gentailer energy-margin source status, and NZ lines-company outage records. No login or API key.",
       "path": "skills/nz-electricity",
       "category": "environment",
       "source_owner": "Electricity Authority and participating market operators",
@@ -4182,6 +4182,7 @@
         "api.em6.co.nz",
         "api.integration.countiesenergy.co.nz",
         "contact.co.nz",
+        "emidatasets.blob.core.windows.net",
         "media.genesisenergy.co.nz",
         "outage-centre.api.vector.co.nz",
         "outagereporter.api.vector.co.nz",
@@ -4199,7 +4200,7 @@
         "www.unison.co.nz",
         "www.welectricity.co.nz"
       ],
-      "last_verified": "2026-07-19",
+      "last_verified": "2026-10-12",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
