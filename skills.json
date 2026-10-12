@@ -2,7 +2,7 @@
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
   "last_verified": "2026-10-12",
-  "skill_count": 179,
+  "skill_count": 180,
   "skills": [
     {
       "name": "airnz-flights",
@@ -91,6 +91,32 @@
       ],
       "last_verified": "2026-10-08",
       "health": "degraded",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "akl-ontrack",
+      "description": "Read AKLOnTrack's public Auckland train observation archive. Use for daily stop-by-stop lateness, cancellations and skipped stops from data.aklontrack.com, not the live Auckland Transport API or a GTFS timetable.",
+      "path": "skills/akl-ontrack",
+      "category": "public-data",
+      "source_owner": "AKLOnTrack",
+      "source_type": "community",
+      "source_url": "https://aklontrack.com/data",
+      "auth": "none",
+      "access_mode": "public-api",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "none",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "data.aklontrack.com",
+        "aklontrack.com"
+      ],
+      "last_verified": "2026-10-11",
+      "health": "healthy",
       "maintainer": "@adam91holt"
     },
     {

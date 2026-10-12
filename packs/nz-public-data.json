@@ -3,9 +3,10 @@
   "name": "nz-public-data",
   "description": "Public, read-only New Zealand data and public-interest sources.",
   "default": true,
-  "skill_count": 131,
+  "skill_count": 132,
   "skills": [
     "akl-housing-capacity",
+    "akl-ontrack",
     "akl-rainfall",
     "akl-transport-performance",
     "at-transport",
