@@ -2,7 +2,7 @@
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
   "last_verified": "2026-10-12",
-  "skill_count": 173,
+  "skill_count": 174,
   "skills": [
     {
       "name": "airnz-flights",
@@ -6157,6 +6157,31 @@
       ],
       "last_verified": "2026-10-08",
       "health": "degraded",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "uhslc-gesla-nz",
+      "description": "Read a short University of Hawaii Sea Level Center GESLA sea-level series for one New Zealand station. Use for hourly or sub-hourly sea level in metres with quality flags. Not for LINZ tide predictions, the LINZ minute archive, or a global download.",
+      "path": "skills/uhslc-gesla-nz",
+      "category": "environment",
+      "source_owner": "University of Hawaii Sea Level Center",
+      "source_type": "official",
+      "source_url": "https://uhslc.soest.hawaii.edu/erddap/info/global_hourly_gesla/index.html",
+      "auth": "none",
+      "access_mode": "public-api",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "none",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "uhslc.soest.hawaii.edu"
+      ],
+      "last_verified": "2026-10-11",
+      "health": "healthy",
       "maintainer": "@adam91holt"
     },
     {
