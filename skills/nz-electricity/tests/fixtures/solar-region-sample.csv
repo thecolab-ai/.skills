@@ -1,0 +1,5 @@
+RegionType,RegionCode,Region,MarketSegment,ICPs,GenerationCapacityKilowattsAvg,GenerationCapacityKilowattsSum
+NZ,NZ,New Zealand,Res,120,5.9,708.0
+NZ,NZ,New Zealand,Bus,10,80.0,800.0
+NWK_REPORTING_REGION,24,Nelson (Nelson Electricity),Bus,3 or less,10.0,
+REG_COUNCIL,02,Auckland,All,40,6.0,240.0

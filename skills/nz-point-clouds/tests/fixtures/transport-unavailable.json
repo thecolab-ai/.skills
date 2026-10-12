@@ -1,0 +1,9 @@
+{
+  "responses": [
+    {
+      "status": 503,
+      "final_url": "https://portal.opentopography.org/API/otCatalog?productFormat=PointCloud&detail=false",
+      "body": "<html>busy</html>"
+    }
+  ]
+}

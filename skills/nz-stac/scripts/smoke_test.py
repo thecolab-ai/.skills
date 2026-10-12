@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import argparse
 import copy
+import io
 import json
 import subprocess
 import sys
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 from urllib.error import HTTPError, URLError
@@ -23,6 +25,8 @@ PART2_DEM = "elevation:auckland/auckland-part-2_2024/dem_1m/2193"
 PART2_DSM = "elevation:auckland/auckland-part-2_2024/dsm_1m/2193"
 RGB = "imagery:auckland/auckland_2024_0.075m/rgb/2193"
 NIR = "imagery:auckland/auckland_2024_0.075m/rgbnir/2193"
+COASTAL = "coastal:auckland/mangawhai-to-snells_2025/dem_1m/2193"
+COASTAL_BBOX = [174.59, -36.01, 174.60, -36.00]
 PROVENANCE = {"source_url", "publisher", "licence", "retrieved_at", "latest_data"}
 
 
@@ -105,7 +109,26 @@ def fixture_checks():
                 check(exc.code == 7 and "smaller bbox" in str(exc), "oversized candidate set fails before item retrieval")
             else:
                 raise AssertionError("candidate cap ignored")
-    for url in ("https://example.invalid/collection.json", "https://nz-elevation.s3.ap-southeast-2.amazonaws.com/catalog.json?token=x", "http://nz-elevation.s3.ap-southeast-2.amazonaws.com/catalog.json"):
+        coastal_list = cli.list_collections("coastal", "auckland")
+        check(any(r["collection"] == COASTAL and r["product"] == "DEM" and r["resolution_m"] == 1 and r["year"] == "2025" and r["licence"] is None for r in coastal_list["collections"]), "coastal catalogue lists the contracted DEM and leaves licence unset")
+        coastal_page = cli.list_collections("coastal", limit=1)
+        check(coastal_page["count"] == 1 and coastal_page["matched"] == 2 and coastal_page["truncated"] and PROVENANCE <= coastal_page.keys(), "coastal catalogue page is bounded")
+        coastal_url = cli.collection_url(COASTAL)
+        coastal_summary = cli.collection_summary(offline(coastal_url), coastal_url)
+        check(coastal_summary["licence"] == "CC-BY-4.0" and coastal_summary["latest_data"] == "2025-03-15T11:00:00Z" and coastal_summary["stac_id"] == "01KGZEQTHQ02B1ZJS35F1WFBCG" and cli.selector(coastal_url) == COASTAL, "coastal collection licence, published capture end and STAC id")
+        coastal_tiles = cli.find_tiles(COASTAL, COASTAL_BBOX)
+        coastal_tile = coastal_tiles["tiles"][0]
+        check(coastal_tiles["count"] == 1 and coastal_tiles["items_inspected"] == 1 and coastal_tile["id"] == "AY31_10000_0103" and coastal_tile["cog_assets"][0]["url"].endswith("/AY31_10000_0103.tiff") and coastal_tile["licence"] == "CC-BY-4.0", "coastal bbox returns one COG href without a raster fetch")
+        check(cli.find_tiles(COASTAL, BBOX)["count"] == 0, "coastal bbox outside the fixture tile is an empty result")
+        try:
+            cli.point_result(COASTAL, 174.595, -36.005)
+        except cli.SourceError as exc:
+            check(exc.code == 2, "point rejects a coastal collection")
+        else:
+            raise AssertionError("point accepted a coastal collection")
+    hillshade = cli.title_fields("New Zealand Coastal DEM Hillshade", "https://nz-coastal.s3.ap-southeast-2.amazonaws.com/new-zealand/new-zealand/dem-hillshade/2193/collection.json")
+    check(hillshade["product"] == "unknown", "coastal hillshade path is not labelled DEM")
+    for url in ("https://example.invalid/collection.json", "https://nz-elevation.s3.ap-southeast-2.amazonaws.com/catalog.json?token=x", "http://nz-elevation.s3.ap-southeast-2.amazonaws.com/catalog.json", "https://nz-coastal.s3.ap-southeast-2.amazonaws.com/catalog.json?X-Amz-Signature=abc"):
         try:
             cli.safe_url(url)
         except cli.SourceError:
@@ -113,6 +136,123 @@ def fixture_checks():
         else:
             raise AssertionError("unsafe URL accepted")
     check(True, "foreign, non-HTTPS and query-bearing URLs rejected")
+
+    def opener_raising(exc):
+        class Opener:
+            def open(self, request, timeout=None):
+                if timeout != 10:
+                    raise AssertionError(f"timeout was {timeout}")
+                raise exc
+        return Opener()
+
+    cli.fetch_json.cache_clear()
+    with patch.object(cli, "build_opener", return_value=opener_raising(URLError("down"))):
+        try:
+            cli.fetch_json(cli.ROOTS["coastal"])
+        except cli.SourceError as exc:
+            check(exc.code == 5 and str(exc).startswith("network error:"), "coastal outage is an upstream error")
+        else:
+            raise AssertionError("coastal outage returned a document")
+    cli.fetch_json.cache_clear()
+    with patch.object(cli, "build_opener", return_value=opener_raising(TimeoutError("slow"))):
+        try:
+            cli.fetch_json(cli.ROOTS["coastal"])
+        except cli.SourceError as exc:
+            check(exc.code == 5, "coastal timeout is an upstream error")
+        else:
+            raise AssertionError("coastal timeout returned a document")
+    cli.fetch_json.cache_clear()
+    rate_error = HTTPError(cli.ROOTS["coastal"], 429, "rate", {"Retry-After": "12"}, None)
+    with patch.object(cli, "build_opener", return_value=opener_raising(rate_error)):
+        try:
+            cli.fetch_json(cli.ROOTS["coastal"])
+        except cli.SourceError as exc:
+            check(exc.code == 4 and exc.retry_after == "12", "coastal rate limit keeps Retry-After")
+        else:
+            raise AssertionError("rate limit returned a document")
+
+    class BytesOpener:
+        def __init__(self, payload):
+            self.payload = payload
+
+        def open(self, request, timeout=None):
+            body = self.payload
+
+            class Response:
+                def read(self, _n):
+                    return body
+
+                def __enter__(self):
+                    return self
+
+                def __exit__(self, *_args):
+                    return False
+
+            return Response()
+
+    for payload, name in ((b"[]", "coastal JSON array is a schema error"), (b"{", "truncated coastal JSON is a schema error")):
+        cli.fetch_json.cache_clear()
+        with patch.object(cli, "build_opener", return_value=BytesOpener(payload)):
+            try:
+                cli.fetch_json(cli.ROOTS["coastal"])
+            except cli.SourceError as exc:
+                check(exc.code == 6, name)
+            else:
+                raise AssertionError(name)
+    cli.fetch_json.cache_clear()
+    with patch.object(cli, "MAX_JSON_BYTES", 8), patch.object(cli, "build_opener", return_value=BytesOpener(b'{"type":"Catalog","links":[]}')):
+        try:
+            cli.fetch_json(cli.ROOTS["coastal"])
+        except cli.SourceError as exc:
+            check(exc.code == 7 and "limit" in str(exc), "oversized coastal JSON is rejected")
+        else:
+            raise AssertionError("oversized JSON accepted")
+
+    def empty_catalog(url):
+        if url != cli.ROOTS["coastal"]:
+            raise AssertionError(url)
+        return {"type": "Catalog", "id": "nz-coastal", "links": []}
+
+    with patch.object(cli, "fetch_json", side_effect=empty_catalog):
+        empty = cli.list_collections("coastal")
+    check(empty["matched"] == 0 and empty["count"] == 0 and empty["collections"] == [] and empty["truncated"] is False, "empty coastal catalogue is an empty page")
+
+    def missing_links(url):
+        return {"type": "Catalog", "id": "nz-coastal"}
+
+    with patch.object(cli, "fetch_json", side_effect=missing_links):
+        try:
+            cli.list_collections("coastal")
+        except cli.SourceError as exc:
+            check(exc.code == 6, "coastal catalogue without links is a schema error")
+        else:
+            raise AssertionError("missing links accepted")
+
+    stdout, stderr = io.StringIO(), io.StringIO()
+
+    def boom(_url):
+        raise cli.SourceError("network error: could not retrieve coastal catalogue", 5)
+
+    with redirect_stdout(stdout), redirect_stderr(stderr), patch.object(sys, "argv", ["cli.py", "collections", "--kind", "coastal", "--limit", "1", "--json"]), patch.object(cli, "fetch_json", side_effect=boom):
+        code = cli.main()
+    payload = json.loads(stdout.getvalue())
+    check(code == 5 and payload["ok"] is False and payload["exit_code"] == 5 and "collections" not in payload, "coastal outage is not an empty catalogue")
+
+    with redirect_stderr(io.StringIO()):
+        for arguments in (
+            ["collections", "--kind", "coastal", "--limit", "0"],
+            ["collections", "--kind", "coastal", "--limit", "201"],
+            ["collections", "--kind", "coastal", "--offset=-1"],
+            ["tiles", COASTAL, "--bbox", "174.60,-36.00,174.59,-36.01"],
+        ):
+            try:
+                cli.parser().parse_args(arguments)
+            except SystemExit as exc:
+                if exc.code in (0, None):
+                    raise AssertionError(f"accepted out-of-bounds arguments {arguments}")
+            else:
+                raise AssertionError(f"accepted out-of-bounds arguments {arguments}")
+    check(True, "coastal limit, offset and reversed bbox are rejected")
     return passed
 
 
@@ -143,7 +283,7 @@ def main():
         print(f"[FAIL] fixture {exc}")
         return 1
 
-    for kind in cli.ROOTS:
+    for kind in ("elevation", "imagery"):
         try:
             result = run_cli(["collections", "--kind", kind, "--region", "auckland"])
             assert result["matched"] >= 8 and result["count"] > 0 and PROVENANCE <= result.keys()
@@ -207,6 +347,68 @@ def main():
             print("[FAIL] live COG did not honour a 16-byte TIFF range"); failures += 1
     else:
         print("[SKIP] no live DEM tile available for the COG range probe")
+
+    coastal_cog = None
+    try:
+        listing = run_cli(["collections", "--kind", "coastal", "--region", "auckland", "--limit", "20"])
+        assert 1 <= listing["count"] <= 20 and listing["matched"] >= 1 and PROVENANCE <= listing.keys()
+        match = next(row for row in listing["collections"] if row["collection"] == COASTAL)
+        assert match["product"] == "DEM" and match["resolution_m"] == 1 and match["year"] == "2025" and match["licence"] is None
+        print(f"[PASS] live coastal Auckland catalogue: {listing['matched']} collections")
+    except cli.SourceError as exc:
+        print(f"[SKIP] {exc}")
+    except (AssertionError, KeyError, StopIteration, ValueError, subprocess.TimeoutExpired) as exc:
+        print(f"[FAIL] live coastal catalogue: {exc}"); failures += 1
+
+    try:
+        bounded = run_cli(["collections", "--kind", "coastal", "--limit", "1"])
+        assert bounded["count"] == 1 and bounded["matched"] > bounded["count"] and bounded["truncated"] is True
+        print(f"[PASS] live coastal catalogue page: 1 of {bounded['matched']}")
+    except cli.SourceError as exc:
+        print(f"[SKIP] {exc}")
+    except (AssertionError, KeyError, ValueError, subprocess.TimeoutExpired) as exc:
+        print(f"[FAIL] live coastal catalogue page: {exc}"); failures += 1
+
+    try:
+        info = run_cli(["info", COASTAL])
+        assert info["licence"] == "CC-BY-4.0" and info["latest_data"] == "2025-03-15T11:00:00Z"
+        assert info["stac_id"] == "01KGZEQTHQ02B1ZJS35F1WFBCG" and info["tile_count"] >= 1
+        assert info["source_url"].endswith("/auckland/mangawhai-to-snells_2025/dem_1m/2193/collection.json")
+        print(f"[PASS] live coastal collection: licence={info['licence']}, tiles={info['tile_count']}")
+    except cli.SourceError as exc:
+        print(f"[SKIP] {exc}")
+    except (AssertionError, KeyError, ValueError, subprocess.TimeoutExpired) as exc:
+        print(f"[FAIL] live coastal collection: {exc}"); failures += 1
+
+    try:
+        tiles = run_cli(["tiles", COASTAL, "--bbox", ",".join(map(str, COASTAL_BBOX)), "--format", "geojson", "--limit", "5"])
+        features = tiles["features"]
+        assert tiles["type"] == "FeatureCollection" and 1 <= len(features) <= 5 and not tiles["truncated"]
+        feature = next(item for item in features if item["id"] == "AY31_10000_0103")
+        assert feature["geometry"]["type"] in ("Polygon", "MultiPolygon") and feature["properties"]["licence"] == "CC-BY-4.0"
+        coastal_cog = feature["properties"]["cog_assets"][0]["url"]
+        assert coastal_cog.startswith("https://nz-coastal.s3.ap-southeast-2.amazonaws.com/") and coastal_cog.endswith("/AY31_10000_0103.tiff")
+        print(f"[PASS] live coastal tile AY31_10000_0103: COG href only, inspected={tiles['items_inspected']}")
+    except cli.SourceError as exc:
+        print(f"[SKIP] {exc}")
+    except (AssertionError, KeyError, StopIteration, ValueError, subprocess.TimeoutExpired) as exc:
+        print(f"[FAIL] live coastal tiles: {exc}"); failures += 1
+
+    if coastal_cog:
+        try:
+            cli.safe_url(coastal_cog)
+            request = Request(coastal_cog, headers={"Range": "bytes=0-15", "User-Agent": "TheColab-nz-stac-smoke/1"})
+            with build_opener(cli.SafeRedirect()).open(request, timeout=10) as response:
+                assert response.status == 206 and response.headers.get("Content-Range", "").startswith("bytes 0-15/")
+                header = response.read(17)
+            assert len(header) == 16 and header[:4] in (b"II*\x00", b"MM\x00*", b"II+\x00", b"MM\x00+")
+            print(f"[PASS] live coastal COG HTTP 206 range: 16 bytes, TIFF header={header[:4].hex()}")
+        except (HTTPError, URLError, OSError, TimeoutError) as exc:
+            print(f"[SKIP] network error: coastal COG range probe ({type(exc).__name__})")
+        except AssertionError:
+            print("[FAIL] live coastal COG did not honour a 16-byte TIFF range"); failures += 1
+    else:
+        print("[SKIP] no live coastal tile available for the COG range probe")
     return 1 if failures else 0
 
 

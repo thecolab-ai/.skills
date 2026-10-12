@@ -18,14 +18,31 @@ import urllib.parse
 from collections import defaultdict
 from typing import Any, Callable, Iterable
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "lib"))
 import nzfetch  # noqa: E402
+from provenance import error_envelope, provenance, result_envelope  # noqa: E402
 
 STATS_BASE = "https://www.stats.govt.nz"
 CSV_PAGE = STATS_BASE + "/large-datasets/csv-files-for-download/"
 POPULATION_INDICATOR = STATS_BASE + "/indicators/population-of-nz/"
 POPULATION_PROJECTION = STATS_BASE + "/information-releases/national-population-projections-2024base2078/"
 PLACE_BASE = "https://tools.summaries.stats.govt.nz/places/RC"
+PLACE_HOST = "tools.summaries.stats.govt.nz"
+PLACE_INDEX_URL = f"https://{PLACE_HOST}/places"
+PLACE_TRAVEL_TIMEOUT = 15
+PLACE_TRAVEL_MAX_BYTES = 2_000_000
+PLACE_TRAVEL_MAX_ROWS = 40
+PLACE_PATH = re.compile(r"^[A-Z]{2}/[a-z0-9]+(?:-[a-z0-9]+)*$")
+TRAVEL_CONCEPT = "Main means of travel to work"
+TRAVEL_SECTIONS = {
+    "usual": "Main means of travel to work (usual residence address)",
+    "workplace": "Main means of travel to work (workplace address)",
+}
+PLACE_LICENCE = (
+    "CC BY 4.0. Unless noted otherwise, content on stats.govt.nz is licensed "
+    "under the Creative Commons 4.0 International Licence. Attribute Stats NZ."
+)
 UA = "stats-nz-skill/1.0 (+https://github.com/thecolab-ai/.skills)"
 
 CPI_SERIES = "CPIQ.SE9A"
@@ -786,6 +803,310 @@ def cmd_search(args: argparse.Namespace) -> None:
     output(payload, args.json, render)
 
 
+class PlaceTravelError(Exception):
+    """Typed failure for the place-travel command. Other commands keep die()."""
+
+    def __init__(self, code: int, message: str, source_url: str, retry_after: str | None = None):
+        super().__init__(message)
+        self.code = code
+        self.message = message
+        self.source_url = source_url
+        self.retry_after = retry_after
+
+
+def normalize_place_token(raw: str) -> str:
+    text = raw.strip() if isinstance(raw, str) else ""
+    if (
+        not text
+        or len(text) > 64
+        or any(ord(ch) < 32 for ch in text)
+        or "://" in text
+        or text.startswith("/")
+        or ".." in text
+        or "?" in text
+        or "#" in text
+        or "\\" in text
+        or " " in text
+    ):
+        raise PlaceTravelError(
+            2,
+            "place must be one official CLASS/slug path, for example UR/auckland",
+            PLACE_INDEX_URL,
+        )
+    parts = text.split("/")
+    if len(parts) != 2:
+        raise PlaceTravelError(
+            2,
+            "place must be one official CLASS/slug path, for example UR/auckland",
+            PLACE_INDEX_URL,
+        )
+    token = f"{parts[0].upper()}/{parts[1].lower()}"
+    if not PLACE_PATH.fullmatch(token):
+        raise PlaceTravelError(
+            2,
+            "place must be one official CLASS/slug path, for example UR/auckland",
+            PLACE_INDEX_URL,
+        )
+    return token
+
+
+def place_travel_url(token: str) -> str:
+    return f"https://{PLACE_HOST}/places/{token}"
+
+
+def _published_number(raw: Any, *, suppressed: bool) -> int | float | None:
+    if raw is None:
+        return None
+    if isinstance(raw, bool):
+        raise ValueError("boolean is not a statistic")
+    if isinstance(raw, int):
+        return raw
+    if isinstance(raw, float):
+        if raw != raw or raw in (float("inf"), float("-inf")):
+            raise ValueError("non-finite number")
+        return raw
+    text = str(raw).strip().replace(",", "")
+    if not text:
+        return None
+    if not re.fullmatch(r"-?\d+(?:\.\d+)?", text):
+        if suppressed:
+            return None
+        raise ValueError(f"not a number: {raw!r}")
+    if "." in text:
+        return float(text)
+    return int(text)
+
+
+def _require_text(value: Any, label: str, url: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise PlaceTravelError(6, f"place page omitted {label}", url)
+    return value.strip()
+
+
+def parse_place_travel_html(text: str, *, url: str, address: str) -> list[dict[str, Any]]:
+    section_title = TRAVEL_SECTIONS[address]
+    opener = '<script id="__NEXT_DATA__"'
+    if opener in text and not re.search(
+        r'<script id="__NEXT_DATA__" type="application/json">.*?</script>',
+        text,
+        re.S,
+    ):
+        raise PlaceTravelError(6, "truncated place page: __NEXT_DATA__ script was not closed", url)
+    match = re.search(
+        r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>',
+        text,
+        re.S,
+    )
+    if not match:
+        raise PlaceTravelError(6, "could not find __NEXT_DATA__ JSON in place page", url)
+    try:
+        data = json.loads(html.unescape(match.group(1)))
+    except json.JSONDecodeError as exc:
+        raise PlaceTravelError(6, f"invalid embedded __NEXT_DATA__ JSON: {exc.msg}", url) from exc
+    if not isinstance(data, dict):
+        raise PlaceTravelError(6, "place page __NEXT_DATA__ was not an object", url)
+    place = data.get("props", {}).get("pageProps", {}).get("place") if isinstance(data.get("props"), dict) else None
+    if not isinstance(place, list) or not place:
+        raise PlaceTravelError(6, "place page did not include a place summary", url)
+
+    topic = None
+    concept = None
+    for candidate in place:
+        if not isinstance(candidate, dict):
+            continue
+        for item in candidate.get("concepts") or []:
+            if isinstance(item, dict) and item.get("concept_title") == TRAVEL_CONCEPT:
+                topic = candidate
+                concept = item
+                break
+        if concept is not None:
+            break
+    if topic is None or concept is None:
+        raise PlaceTravelError(6, "place page has no Main means of travel to work concept", url)
+
+    section = None
+    for item in concept.get("sections") or []:
+        if isinstance(item, dict) and item.get("section_title") == section_title:
+            section = item
+            break
+    if section is None:
+        raise PlaceTravelError(6, f"place page has no travel section for {address} address", url)
+    numbers_data = section.get("numbers_data") or {}
+    if not isinstance(numbers_data, dict):
+        raise PlaceTravelError(6, f"place page has no main-means-of-travel-to-work rows for {address} address", url)
+    numbers = numbers_data.get("numbers")
+    if not isinstance(numbers, list) or not numbers:
+        raise PlaceTravelError(6, f"place page has no main-means-of-travel-to-work rows for {address} address", url)
+    if len(numbers) > PLACE_TRAVEL_MAX_ROWS:
+        raise PlaceTravelError(
+            7,
+            f"travel section exceeded the {PLACE_TRAVEL_MAX_ROWS} row bound",
+            url,
+        )
+
+    place_name = _require_text(topic.get("classification_descriptor"), "the place name", url)
+    classification = _require_text(topic.get("classification_label"), "the place classification", url)
+    code = topic.get("classification_code")
+    if isinstance(code, int) and not isinstance(code, bool):
+        classification_code = str(code)
+    else:
+        classification_code = _require_text(code, "the place classification code", url)
+    percent_unit = numbers_data.get("value_label") or section.get("graph_value_type") or "percent"
+    if not isinstance(percent_unit, str) or not percent_unit.strip():
+        percent_unit = "percent"
+    collection = numbers_data.get("duration")
+    collection_text = collection.strip() if isinstance(collection, str) and collection.strip() else None
+
+    rows: list[dict[str, Any]] = []
+    for number in numbers:
+        if not isinstance(number, dict):
+            raise PlaceTravelError(6, "travel row was not an object", url)
+        indicator = number.get("confidentiality_indicator")
+        if indicator is not None and not isinstance(indicator, str):
+            raise PlaceTravelError(6, "travel row confidentiality indicator was not text", url)
+        suppressed = bool(indicator)
+        try:
+            percent = _published_number(number.get("value"), suppressed=suppressed)
+            count = _published_number(number.get("count_value"), suppressed=suppressed)
+            lower = _published_number(number.get("lower_bounds"), suppressed=suppressed)
+            upper = _published_number(number.get("upper_bounds"), suppressed=suppressed)
+        except ValueError as exc:
+            raise PlaceTravelError(6, f"travel row had an unreadable measure: {exc}", url) from exc
+        mode = _require_text(number.get("variable1_descriptor"), "a travel mode label", url)
+        mode_code = number.get("variable1_code")
+        if isinstance(mode_code, int) and not isinstance(mode_code, bool):
+            mode_code = str(mode_code)
+        mode_code = _require_text(mode_code, "a travel mode code", url)
+        period = _require_text(number.get("period"), "a travel period", url)
+        row = {
+            "place": place_name,
+            "classification": classification,
+            "classification_code": classification_code,
+            "address": address,
+            "concept": TRAVEL_CONCEPT,
+            "mode": mode,
+            "mode_code": mode_code,
+            "period": period,
+            "percent": percent,
+            "count": count,
+            "percent_unit": percent_unit.strip(),
+            "count_unit": "people",
+            "suppressed": suppressed,
+            "confidentiality_indicator": indicator if suppressed else None,
+            "lower_bounds": lower,
+            "upper_bounds": upper,
+        }
+        if collection_text:
+            row["collection"] = collection_text
+        rows.append(row)
+    if not any(row["percent"] is not None or row["count"] is not None or row["suppressed"] for row in rows):
+        raise PlaceTravelError(6, "place page travel rows had no percent, count, or confidentiality indicator", url)
+    return rows
+
+
+def fetch_place_html(url: str) -> tuple[str, str]:
+    try:
+        body, _content_type, final_url = nzfetch.fetch_bytes(
+            url,
+            timeout=PLACE_TRAVEL_TIMEOUT,
+            accept="text/html",
+            allowed_hosts=frozenset({PLACE_HOST}),
+            max_bytes=PLACE_TRAVEL_MAX_BYTES,
+        )
+    except nzfetch.RateLimited as exc:
+        raise PlaceTravelError(4, f"upstream unavailable: HTTP 429 {exc}", url, exc.retry_after) from exc
+    except nzfetch.ResponseTooLarge as exc:
+        raise PlaceTravelError(
+            7,
+            f"place page exceeded the {PLACE_TRAVEL_MAX_BYTES} byte bound: {exc}",
+            url,
+        ) from exc
+    except nzfetch.Blocked as exc:
+        raise PlaceTravelError(4, f"upstream unavailable: {exc}", url) from exc
+    except nzfetch.FetchError as exc:
+        message = str(exc)
+        if "HTTP 404" in message:
+            raise PlaceTravelError(2, f"place was not found: {url}", url) from exc
+        raise PlaceTravelError(5, f"upstream unavailable: {message}", url) from exc
+    requested = urllib.parse.urlsplit(url)
+    final = urllib.parse.urlsplit(final_url)
+    if final.scheme != "https" or (final.hostname or "").lower().rstrip(".") != PLACE_HOST:
+        raise PlaceTravelError(4, f"redirect left the official place host: {final_url}", url)
+    if final.path.rstrip("/") != requested.path.rstrip("/") or final.query or final.fragment:
+        raise PlaceTravelError(6, f"place page redirected away from the requested place: {final_url}", url)
+    if len(body) > PLACE_TRAVEL_MAX_BYTES:
+        raise PlaceTravelError(7, f"place page exceeded the {PLACE_TRAVEL_MAX_BYTES} byte bound", url)
+    return body.decode("utf-8", "replace"), urllib.parse.urlunsplit((final.scheme, final.netloc, final.path, "", ""))
+
+
+def load_place_travel(
+    place: str,
+    address: str,
+    *,
+    fetcher: Callable[[str], tuple[str, str]] | None = None,
+) -> dict[str, Any]:
+    address_key = address.strip().lower() if isinstance(address, str) else ""
+    if address_key not in TRAVEL_SECTIONS:
+        raise PlaceTravelError(2, "address must be usual or workplace", PLACE_INDEX_URL)
+    token = normalize_place_token(place)
+    url = place_travel_url(token)
+    text, final_url = (fetcher or fetch_place_html)(url)
+    rows = parse_place_travel_html(text, url=final_url, address=address_key)
+    periods: list[str] = []
+    for row in rows:
+        if row["period"] not in periods:
+            periods.append(row["period"])
+    latest = periods[0] if len(periods) == 1 else ", ".join(periods)
+    meta = provenance(final_url, "Stats NZ", licence=PLACE_LICENCE, latest_data=latest)
+    return result_envelope(rows, meta)
+
+
+def fmt_travel_percent(value: int | float) -> str:
+    if isinstance(value, int) or (isinstance(value, float) and value.is_integer()):
+        return f"{int(value):,}%"
+    text = f"{value:,.10f}".rstrip("0").rstrip(".")
+    return f"{text}%"
+
+
+def render_place_travel(payload: dict[str, Any]) -> None:
+    rows = payload["results"]
+    meta = payload["meta"]
+    first = rows[0]
+    address_label = "usual residence" if first["address"] == "usual" else "workplace"
+    print(f"Stats NZ {first['concept']}: {first['place']} ({first['classification']})")
+    print(f"Address: {address_label}")
+    print(f"Period: {meta.get('latest_data') or first['period']}")
+    for row in rows:
+        if row["suppressed"] and row["percent"] is None and row["count"] is None:
+            print(f"{row['mode']}: suppressed ({row['confidentiality_indicator']})")
+            continue
+        percent = "n/a" if row["percent"] is None else fmt_travel_percent(row["percent"])
+        count = "n/a" if row["count"] is None else f"{fmt_int(row['count'])} people"
+        suffix = f" suppressed ({row['confidentiality_indicator']})" if row["suppressed"] else ""
+        print(f"{row['mode']}: {percent} ({count}){suffix}")
+    print(f"Source: {meta['publisher']}")
+    if meta.get("licence"):
+        print(f"Licence: {meta['licence']}")
+    print(meta["source_url"])
+
+
+def cmd_place_travel(args: argparse.Namespace) -> None:
+    try:
+        payload = load_place_travel(args.place, args.address)
+    except PlaceTravelError as exc:
+        if args.json:
+            meta = provenance(exc.source_url, "Stats NZ", licence=PLACE_LICENCE)
+            emit_json(error_envelope(exc.code, exc.message, meta, retry_after=exc.retry_after))
+        else:
+            print(f"stats-nz: {exc.message}", file=sys.stderr)
+        raise SystemExit(exc.code)
+
+    def render(p: dict[str, Any]) -> None:
+        render_place_travel(p)
+
+    output(payload, args.json, render)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Read-only CLI for public Stats NZ data.")
     sub = parser.add_subparsers(dest="command")
@@ -832,6 +1153,19 @@ def build_parser() -> argparse.ArgumentParser:
     search.add_argument("--limit", type=int, default=10, help="Maximum catalogue results")
     search.add_argument("--json", action="store_true", help="Emit machine-readable JSON")
     search.set_defaults(func=cmd_search)
+
+    place_travel = sub.add_parser(
+        "place-travel",
+        help="Main means of travel to work for one Stats NZ place summary",
+    )
+    place_travel.add_argument("place", help="Official place path CLASS/slug, for example UR/auckland")
+    place_travel.add_argument(
+        "--address",
+        default="usual",
+        help="usual residence (default) or workplace address",
+    )
+    place_travel.add_argument("--json", action="store_true", help="Emit machine-readable JSON")
+    place_travel.set_defaults(func=cmd_place_travel)
 
     return parser
 

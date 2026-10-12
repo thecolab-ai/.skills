@@ -1,0 +1,11 @@
+{
+  "v": 1,
+  "generated_at": "2026-10-11T14:32:10.675Z",
+  "base_url": "https://data.aklontrack.com/open/v1/",
+  "licence": {
+    "name": "Proprietary",
+    "url": "https://example.com/terms",
+    "attribution": "none"
+  },
+  "days": []
+}

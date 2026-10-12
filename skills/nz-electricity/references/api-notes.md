@@ -70,6 +70,30 @@ Implemented datasets:
   - Caveats: market segments are not mutually exclusive; Solar+Batteries and Wind+Batteries registry categories were added in November 2023, so Solar and Other series can show category-change spikes around that period
   - Source note: values are derived from registry Fuel Type and Generation Capacity fields populated by distributors
 
+- `https://emidatasets.blob.core.windows.net/publicdata/Datasets/Retail/SolarInstallations/SolarInstallationsByRegion.csv`
+  - Command: `solar-regions`
+  - Official dataset: solar installations by region
+  - Auth model: none
+  - Header: `RegionType,RegionCode,Region,MarketSegment,ICPs,GenerationCapacityKilowattsAvg,GenerationCapacityKilowattsSum`
+  - Region types observed on 12 October 2026: `NZ`, `ISLAND`, `REG_COUNCIL`, `NWK_REPORTING_REGION`
+  - Market segments: `Res`, `Bus`, `All`. These are not the GUEHMT segments `SME`, `Com`, and `Ind`
+  - Filters: optional exact region name or region code, and optional market segment
+  - Units: ICP count, and generation capacity in kilowatts (average and sum). This is not the GUEHMT megawatt series
+  - Bounds: download stops at 262144 bytes and parsing stops at 5000 rows. The file observed on 12 October 2026 was 11270 bytes and 176 data rows
+  - Suppression: some ICP cells are the literal text `3 or less`, with a blank capacity sum. The CLI copies that text and leaves the blank sum null
+
+- `https://emidatasets.blob.core.windows.net/publicdata/Datasets/Retail/SolarInstallations/SolarInstallationsByStreet.csv`
+  - Command: `solar-streets`
+  - Official dataset: solar installations by street
+  - Auth model: none
+  - Header: `StatisticalArea2Code,StatisticalArea2Name,PhysicalAddressStreet,MarketSegment,ICPs,GenerationCapacityKilowattsAvg,GenerationCapacityKilowattsSum`
+  - There is no Region column. `--region` matches `StatisticalArea2Name` exactly. `--sa2` matches the 6-digit `StatisticalArea2Code`
+  - One of those two filters is required. Default `--limit` is 20. The hard maximum is 100. A missing filter or a larger limit is refused before the download
+  - Bounds: download stops at 6000000 bytes and parsing stops at 100000 rows. The file observed on 12 October 2026 was 4269866 bytes and 79052 data rows
+  - Market segments observed: `Res`, `Bus`, `All`
+  - Units: ICP count, and generation capacity in kilowatts
+  - Suppression: most street rows publish ICPs as the literal text `3 or less` and leave the capacity sum blank. The CLI does not replace that token with 3
+
 ### Electricity Authority gentailer energy margin source status
 
 - Provider: Electricity Authority / Tableau Public
@@ -181,6 +205,7 @@ Implemented feeds:
   - EMI point-of-connection `DollarsPerMegawattHour`
   - EMI generation plant trading-period kWh values
   - EMI GUEHMT distributed-generation ICP, capacity, uptake, and new-installation fields
+  - EMI solar-installation region and street ICP counts and kilowatt capacity, including the literal suppression token `3 or less`
   - `energy-margin` source availability/status fields from the Authority dashboard/article/Tableau surfaces
 
 - Derived by this CLI:
