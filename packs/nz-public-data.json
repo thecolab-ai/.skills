@@ -3,7 +3,7 @@
   "name": "nz-public-data",
   "description": "Public, read-only New Zealand data and public-interest sources.",
   "default": true,
-  "skill_count": 132,
+  "skill_count": 133,
   "skills": [
     "akl-housing-capacity",
     "akl-ontrack",
@@ -27,6 +27,7 @@
     "customs-tariff-nz",
     "data-govt-nz",
     "deprivation-nz",
+    "dft-pedal-cycle-factsheet",
     "doc-nz",
     "drinking-water-register-nz",
     "education-counts-nz",

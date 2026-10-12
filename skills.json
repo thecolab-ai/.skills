@@ -2,7 +2,7 @@
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
   "last_verified": "2026-10-12",
-  "skill_count": 180,
+  "skill_count": 181,
   "skills": [
     {
       "name": "airnz-flights",
@@ -950,6 +950,32 @@
         "www.arcgis.com"
       ],
       "last_verified": "2026-07-19",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "dft-pedal-cycle-factsheet",
+      "description": "Read the Department for Transport 2025 Great Britain pedal-cycle road casualty factsheet tables. Use when the task needs the official pedal-cycle ODS worksheets, casualty counts, rates, percentages, units, or missing-data shorthand from that factsheet. Resolves the workbook from the GOV.UK release and does not fetch pedestrian, motorcycle, or e-scooter factsheets.",
+      "path": "skills/dft-pedal-cycle-factsheet",
+      "category": "transport",
+      "source_owner": "Department for Transport",
+      "source_type": "official",
+      "source_url": "https://www.gov.uk/government/statistics/reported-road-casualties-great-britain-vulnerable-road-user-factsheets/reported-road-casualties-great-britain-pedal-cycle-factsheet-2025",
+      "auth": "none",
+      "access_mode": "public-download",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "none",
+      "schema_version": "1",
+      "skill_type": "public-download",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "www.gov.uk",
+        "assets.publishing.service.gov.uk"
+      ],
+      "last_verified": "2026-10-11",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
