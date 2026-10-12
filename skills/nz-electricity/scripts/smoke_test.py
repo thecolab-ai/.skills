@@ -227,6 +227,188 @@ def test_energy_margin_rejects_unknown_company():
 
 results.append(test("energy-margin rejects unknown company", test_energy_margin_rejects_unknown_company))
 
+
+REGION_FIXTURE = (SKILL_DIR / "tests" / "fixtures" / "solar-region-sample.csv").read_text(encoding="utf-8")
+STREET_FIXTURE = (SKILL_DIR / "tests" / "fixtures" / "solar-street-sample.csv").read_text(encoding="utf-8")
+
+
+def test_fixture_solar_suppression_token():
+    regions = cli.parse_solar_csv(REGION_FIXTURE, cli.SOLAR_REGION_COLUMNS, cli.SOLAR_REGION_MAX_ROWS)
+    streets = cli.parse_solar_csv(STREET_FIXTURE, cli.SOLAR_STREET_COLUMNS, cli.SOLAR_STREET_MAX_ROWS)
+    nelson = next(row for row in regions if row["region"] == "Nelson (Nelson Electricity)")
+    suppressed = next(row for row in streets if row["physical_address_street"] == "EXAMPLE ROAD")
+    numeric_three = next(row for row in streets if row["physical_address_street"] == "THREE ROAD")
+    normal = next(row for row in streets if row["physical_address_street"] == "SECOND ROAD")
+    if nelson["icps"] != "3 or less" or suppressed["icps"] != "3 or less":
+        print(f"  suppressed values: {nelson['icps']!r} {suppressed['icps']!r}")
+        return False
+    if not isinstance(nelson["icps"], str) or isinstance(nelson["icps"], int):
+        print("  suppressed ICP token must stay a string")
+        return False
+    if nelson["generation_capacity_kilowatts_sum"] is not None:
+        print("  blank suppressed capacity sum must stay null")
+        return False
+    if numeric_three["icps"] != 3 or isinstance(numeric_three["icps"], str):
+        print(f"  a published count of 3 must stay the integer 3, got {numeric_three['icps']!r}")
+        return False
+    if normal["icps"] != 21 or normal["generation_capacity_kilowatts_sum"] != 119.6:
+        print(f"  normal street row: {normal}")
+        return False
+    rendered = cli.render_solar(
+        {"meta": {"returned_count": 1, "matched_count": 1, "publisher": "Electricity Authority", "licence": "CC-BY-4.0", "source_url": "fixture", "units": cli.SOLAR_UNITS, "suppression": cli.SOLAR_SUPPRESSION_NOTE, "truncated": False}, "results": [suppressed]},
+        "street",
+    )
+    if "3 or less" not in rendered:
+        print("  human output dropped the suppression token")
+        return False
+    encoded = json.dumps(suppressed)
+    if '"icps": "3 or less"' not in encoded:
+        print(f"  JSON coerced the token: {encoded}")
+        return False
+    return True
+
+
+results.append(test("fixture solar parser keeps literal 3 or less", test_fixture_solar_suppression_token))
+
+
+def test_fixture_solar_street_filter_and_malformed():
+    streets = cli.parse_solar_csv(STREET_FIXTURE, cli.SOLAR_STREET_COLUMNS, cli.SOLAR_STREET_MAX_ROWS)
+    selected, matched = cli.filter_solar_streets(
+        streets, region="north cape", sa2="100100", market_segment="Res", limit=1
+    )
+    if matched != 3 or len(selected) != 1 or selected[0]["icps"] != "3 or less":
+        print(f"  filter: matched={matched} selected={selected}")
+        return False
+    try:
+        cli.filter_solar_streets(streets, region=None, sa2=None, market_segment=None, limit=20)
+    except cli.SolarCommandError as exc:
+        if exc.code != 7:
+            print(f"  unbounded filter code {exc.code}")
+            return False
+    else:
+        print("  unbounded street filter was accepted")
+        return False
+    try:
+        cli.parse_solar_csv("not,a,solar,header\n1,2,3,4\n", cli.SOLAR_REGION_COLUMNS, 10)
+    except cli.SolarCommandError as exc:
+        if exc.code != 6:
+            print(f"  malformed header code {exc.code}")
+            return False
+    else:
+        print("  malformed solar CSV was accepted")
+        return False
+    try:
+        cli.parse_solar_csv("", cli.SOLAR_REGION_COLUMNS, 10)
+    except cli.SolarCommandError as exc:
+        if exc.code != 6:
+            print(f"  empty CSV code {exc.code}")
+            return False
+    else:
+        print("  empty solar CSV was accepted")
+        return False
+    return True
+
+
+results.append(test("fixture solar street filter bounds and malformed CSV", test_fixture_solar_street_filter_and_malformed))
+
+
+def test_contract_street_bounds():
+    refused = run(["solar-streets", "--json"])
+    if refused.returncode != 7:
+        print(f"  unbounded exit {refused.returncode} stderr={refused.stderr[:200]!r}")
+        return False
+    payload = json.loads(refused.stdout)
+    if payload.get("results") != [] or payload.get("error", {}).get("type") != "unsupported_operation":
+        print(f"  unbounded payload: {refused.stdout[:300]}")
+        return False
+    if "3 or less" not in payload.get("meta", {}).get("suppression", ""):
+        print("  error envelope dropped the suppression note")
+        return False
+    too_wide = run(["solar-streets", "--sa2", "100100", "--limit", "101", "--json"])
+    if too_wide.returncode != 7:
+        print(f"  oversize limit exit {too_wide.returncode} stdout={too_wide.stdout[:200]!r}")
+        return False
+    bad_segment = run(["solar-regions", "--market-segment", "SME", "--json"])
+    if bad_segment.returncode != 2:
+        print(f"  bad segment exit {bad_segment.returncode}")
+        return False
+    bad_sa2 = run(["solar-streets", "--sa2", "North Cape", "--json"])
+    if bad_sa2.returncode != 2:
+        print(f"  bad sa2 exit {bad_sa2.returncode}")
+        return False
+    if cli.SOLAR_STREET_MAX_LIMIT != 100 or cli.SOLAR_STREET_MAX_BYTES != 6_000_000:
+        print("  street bounds constants moved")
+        return False
+    if cli.SOLAR_STREET_DEFAULT_LIMIT > cli.SOLAR_STREET_MAX_LIMIT:
+        print("  default street limit exceeds the hard maximum")
+        return False
+    return True
+
+
+results.append(test("contract street results and bytes stay bounded", test_contract_street_bounds))
+
+
+def test_live_solar_regions():
+    result = run(["solar-regions", "--json"])
+    if result.returncode != 0:
+        print(result.stderr[:400])
+        print(result.stdout[:400])
+        return False
+    data = json.loads(result.stdout)
+    meta = data.get("meta") or {}
+    rows = data.get("results")
+    if meta.get("publisher") != "Electricity Authority" or meta.get("licence") != "CC-BY-4.0":
+        print(f"  meta: {meta}")
+        return False
+    if not str(meta.get("source_url", "")).startswith("https://emidatasets.blob.core.windows.net/"):
+        print(f"  source_url: {meta.get('source_url')}")
+        return False
+    if not str(meta.get("retrieved_at", "")).endswith("Z"):
+        print(f"  retrieved_at: {meta.get('retrieved_at')}")
+        return False
+    if not isinstance(rows, list) or not rows:
+        print("  expected a non-empty region result list")
+        return False
+    expected_keys = {
+        "region_type",
+        "region_code",
+        "region",
+        "market_segment",
+        "icps",
+        "generation_capacity_kilowatts_avg",
+        "generation_capacity_kilowatts_sum",
+    }
+    nz_res = None
+    suppressed = 0
+    for row in rows:
+        if set(row) != expected_keys:
+            print(f"  header keys: {sorted(row)}")
+            return False
+        icps = row["icps"]
+        if icps == "3 or less":
+            suppressed += 1
+            if isinstance(icps, int):
+                print("  live suppression token was coerced to an int")
+                return False
+        elif isinstance(icps, bool) or not isinstance(icps, int) or icps <= 0:
+            print(f"  unexpected ICP value: {icps!r}")
+            return False
+        if row["region"] == "New Zealand" and row["market_segment"] == "Res" and row["region_type"] == "NZ":
+            nz_res = row
+    if nz_res is None or not isinstance(nz_res["icps"], int) or nz_res["icps"] <= 0:
+        print(f"  New Zealand residential row: {nz_res}")
+        return False
+    if suppressed < 1:
+        print("  live region file did not contain the literal suppression token")
+        return False
+    if "kilowatts" not in str(meta.get("units", "")).lower():
+        print("  units note missing")
+        return False
+    return True
+
+
+results.append(test("live solar-regions keeps a positive New Zealand residential ICP count", test_live_solar_regions))
+
 if all(results):
     print("All tests passed.")
     sys.exit(0)

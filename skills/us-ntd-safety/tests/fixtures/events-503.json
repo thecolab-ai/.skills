@@ -1,0 +1,12 @@
+{
+  "synthetic": true,
+  "contains_personal_data": false,
+  "contains_live_credentials": false,
+  "resource": "events",
+  "exchanges": [
+    {
+      "status": 503,
+      "body_raw": ""
+    }
+  ]
+}

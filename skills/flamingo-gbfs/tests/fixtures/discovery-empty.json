@@ -1,0 +1,11 @@
+{
+  "http_status": 200,
+  "body": {
+    "last_updated": "2026-10-11T00:00:00Z",
+    "ttl": 3600,
+    "version": "3.0",
+    "data": {
+      "feeds": []
+    }
+  }
+}

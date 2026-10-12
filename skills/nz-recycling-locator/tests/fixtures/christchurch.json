@@ -1,0 +1,9 @@
+{
+  "objectIdFieldName": "CollectionDepotID",
+  "geometryType": "esriGeometryPoint",
+  "spatialReference": {"wkid": 4326, "latestWkid": 4326},
+  "features": [
+    {"attributes": {"CollectionDepotID": 901, "DepotName": "Example Eco Depot", "AcceptsRefuse": 1, "AcceptsRecycling": 1, "AcceptsGreenWaste": 0, "AcceptsRefuseDesc": "yes", "AcceptsRecyclingDesc": "yes", "AcceptsGreenWasteDesc": "no", "OperatingHours": "Monday to Friday 9am–4pm", "CreateDate": null, "LastEditDate": 1767225600123}, "geometry": {"x": 172.61, "y": -43.51}},
+    {"attributes": {"CollectionDepotID": 902, "DepotName": "Example Garden Depot", "AcceptsRefuse": 0, "AcceptsRecycling": 0, "AcceptsGreenWaste": 1, "AcceptsRefuseDesc": "no", "AcceptsRecyclingDesc": "no", "AcceptsGreenWasteDesc": "yes", "OperatingHours": null, "CreateDate": null, "LastEditDate": null}, "geometry": {"x": 172.71, "y": -43.61}}
+  ]
+}

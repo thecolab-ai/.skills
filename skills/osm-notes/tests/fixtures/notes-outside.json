@@ -1,0 +1,21 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {"type": "Point", "coordinates": [0.1, 51.5]},
+      "properties": {
+        "id": 201,
+        "date_created": "2026-03-01 00:00:00 UTC",
+        "status": "open",
+        "comments": [
+          {
+            "date": "2026-03-01 00:00:00 UTC",
+            "action": "opened",
+            "text": "Synthetic note outside the requested box."
+          }
+        ]
+      }
+    }
+  ]
+}

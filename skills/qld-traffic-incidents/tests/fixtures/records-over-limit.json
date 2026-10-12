@@ -1,0 +1,7 @@
+{
+  "total_count": 2,
+  "results": [
+    {"id": "fixture-1", "status": "Published", "geo_point_2d": null},
+    {"id": "fixture-2", "status": "Published", "geo_point_2d": null}
+  ]
+}
