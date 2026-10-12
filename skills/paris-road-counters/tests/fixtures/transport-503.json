@@ -1,0 +1,8 @@
+{
+  "steps": [
+    {
+      "transport": "unavailable",
+      "http_status": 503
+    }
+  ]
+}

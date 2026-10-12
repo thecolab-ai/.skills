@@ -2,13 +2,23 @@
 
 Authentication: none
 
-Last verified: 2026-10-08
+Last verified: 2026-10-12
 
 Primary catalogues:
 
 - [Elevation catalogue](https://nz-elevation.s3.ap-southeast-2.amazonaws.com/catalog.json)
 - [Imagery catalogue](https://nz-imagery.s3.ap-southeast-2.amazonaws.com/catalog.json)
+- [Coastal catalogue](https://nz-coastal.s3.ap-southeast-2.amazonaws.com/catalog.json)
 - [LINZ imagery project](https://github.com/linz/imagery) documents the public archive.
+
+Hosts: `nz-elevation.s3.ap-southeast-2.amazonaws.com`,
+`nz-imagery.s3.ap-southeast-2.amazonaws.com`,
+`nz-coastal.s3.ap-southeast-2.amazonaws.com`.
+
+Elevation and imagery selectors below were checked on 2026-10-08. The coastal
+collection was checked on 2026-10-12. `latest_data` keeps the published STAC
+interval end, including its UTC `Z` timestamp. Do not rewrite that timestamp
+into a New Zealand civil date.
 
 These static STAC documents have relative links: catalogue `rel=child` points
 to a collection; collection `rel=item` points to tile Features. Resolve every
@@ -60,6 +70,38 @@ different acquisition areas; query the relevant collection rather than merging
 them into an assumed single dataset. The example bbox surrounds Mt Albert:
 `174.715,-36.905,174.725,-36.895`.
 
+## Coastal selector
+
+Prefix the path with `coastal:`. On 2026-10-12 the root catalogue returned 108
+child links. `collections` pages that list (default 100, cap 200). This skill
+does not publish the other children as separate catalogue rows.
+
+| Bucket | Path | Product |
+|---|---|---|
+| coastal | `auckland/mangawhai-to-snells_2025/dem_1m/2193` | 2025 1 m DEM |
+
+The collection document states `license` `CC-BY-4.0`, `gsd` 1, region
+`auckland`, and temporal interval `2025-03-06T11:00:00Z` to
+`2025-03-15T11:00:00Z`. Providers name Toitū Te Whenua Land Information New
+Zealand as host, licensor and processor, and Woolpert as producer. Item
+`AY31_10000_0103` declares asset `visual` as
+`image/tiff; application=geotiff; profile=cloud-optimized`. A small bbox that
+selects that tile is `174.59,-36.01,174.60,-36.00`. Read the licence from each
+collection at `info` time. A catalogue title is not a licence.
+
+Paths containing `/dem_` or `/dsm_` are labelled DEM or DSM. Published
+hillshade paths such as `dem-hillshade` do not match those segments and stay
+`unknown`. Do not relabel them.
+
+`point` remains limited to `elevation` DEM and DSM collections. Coastal use
+stops at tile metadata and COG hrefs. There is no raster download, bucket
+mirror, or GDAL invocation. A smoke probe may request the first 16 bytes of one
+COG and must not treat the raster body as a result.
+
+OpenAerialMap and Copernicus GFM are not this bucket. GFM collection metadata
+is proprietary. Neither host is allowlisted. This bucket is also not the
+OpenTopography point-cloud catalogue.
+
 ## Sampling and limits
 
 `point` provides `gdallocationinfo -valonly -wgs84 /vsicurl/<COG URL> <lon> <lat>`.
@@ -77,8 +119,11 @@ The search scope is mainland NZ (165–180° E, 48–33° S); it does not cover 
 Chatham Islands, antimeridian-crossing requests, point clouds or other grids.
 Footprints represent whole raster tiles; nodata may exist within a footprint.
 
-`tests/fixtures/stac-samples.json` contains captured public responses. Catalogue
-children and collection item links are trimmed to seven Auckland collections,
-Mt Albert candidates and each collection's first tile. All remaining source
-fields are unchanged. The fixture records its capture time and trim description.
-Tests use the same parser/search path offline and reject malformed metadata.
+`tests/fixtures/stac-samples.json` contains captured public responses. Elevation
+and imagery catalogue children and item links are trimmed to seven Auckland
+collections, Mt Albert candidates and each collection's first tile. The coastal
+catalogue fixture keeps the Mangawhai to Snells 1 m DEM and 1 m DSM child links.
+Only the 1 m DEM collection document and item `AY31_10000_0103` are stored.
+All remaining source fields are unchanged. The fixture records its capture time
+and trim description. Tests use the same parser/search path offline and reject
+malformed metadata.

@@ -1,6 +1,6 @@
 ---
 name: stats-nz
-description: "Query official Stats NZ data: CPI, GDP, population estimates/projections, migration, and CSV catalogue. No API key or browser session required."
+description: "Query official Stats NZ data: CPI, GDP, population estimates/projections, migration, place-summary travel to work, and CSV catalogue. No API key or browser session required."
 license: MIT
 compatibility: "Requires Python 3.10+ and network access for live data"
 metadata:
@@ -19,7 +19,7 @@ metadata:
   thecolab.pack: "nz-public-data"
   thecolab.source_url: "https://www.stats.govt.nz"
   thecolab.allowed_domains: "tools.summaries.stats.govt.nz,www.stats.govt.nz"
-  thecolab.last_verified: "2026-07-19"
+  thecolab.last_verified: "2026-10-11"
   thecolab.health: "healthy"
   thecolab.maintainer: "@adam91holt"
 ---
@@ -35,6 +35,7 @@ This skill ships support for:
 - Consumers price index quarterly index numbers
 - National estimated population and national population projections
 - Regional council estimated resident population from Stats NZ place summaries
+- Main means of travel to work from one Stats NZ place summary
 - International long-term migrant arrivals, departures, and net migration
 - Quarterly GDP production and expenditure headline series
 - Exact series lookup for the wired CPI and GDP CSV releases
@@ -42,7 +43,7 @@ This skill ships support for:
 
 ## Use this when
 
-- A user asks for official New Zealand CPI, GDP, population, or migration figures
+- A user asks for official New Zealand CPI, GDP, population, migration, or place-summary travel-to-work figures
 - A user needs recent Stats NZ release values in a repeatable command-line workflow
 - A user wants a Stats NZ CSV dataset URL or to search the public CSV catalogue
 - A workflow needs public, no-login, machine-readable Stats NZ data
@@ -54,6 +55,8 @@ This skill ships support for:
 - Administrative Data Explorer or OData API calls that require subscription keys
 - Geospatial boundaries, maps, or GIS workflows from datafinder.stats.govt.nz
 - Census microdata, confidentialised unit records, or custom table-builder extraction
+- Figure.NZ or any other republished table. Travel to work is read only from the official Stats NZ place summary
+- Travel to education, origin-destination matrices, or a crawl of every geography
 - Redistributing public-data extracts as a standalone dataset
 
 ## Preferred workflow
@@ -62,6 +65,7 @@ This skill ships support for:
 2. Use `cpi` for the headline quarterly all-groups CPI index
 2a. Use `fpi` for the headline monthly all-groups Food Price Index
 3. Use `population` for national estimates, `population --projection YEAR` for national projections, or `population --region REGION` for regional council population
+3a. Use `place-travel CLASS/slug` for main means of travel to work at one place. `population` remains the estimated-resident-population command
 4. Use `migration` for latest long-term migrant arrivals, departures, and net migration
 5. Use `gdp` for quarterly headline GDP production and expenditure series
 6. Use `series <id>` when the user gives a Stats NZ `Series_reference`
@@ -82,6 +86,7 @@ python3 skills/stats-nz/scripts/cli.py <command> [flags]
 - `cpi [--from DATE] [--to DATE] [--json]` - Consumers price index quarterly all-groups index for New Zealand
 - `fpi [--from DATE] [--to DATE] [--json]` - Food price index monthly all-groups index for New Zealand
 - `population [--region REGION] [--projection YEAR] [--scenario SCENARIO] [--json]` - national population, regional council population, or national projection
+- `place-travel PLACE [--address usual|workplace] [--json]` - main means of travel to work for one place summary
 - `migration [--json]` - latest estimated long-term migrant arrivals, departures, and net migration
 - `gdp [--from DATE] [--to DATE] [--json]` - quarterly headline GDP production and expenditure measures
 - `series ID [--from DATE] [--to DATE] [--limit N] [--json]` - observations for a wired Stats NZ `Series_reference`
@@ -95,6 +100,7 @@ python3 skills/stats-nz/scripts/cli.py cpi --from 2025-03 --json
 python3 skills/stats-nz/scripts/cli.py fpi --json
 python3 skills/stats-nz/scripts/cli.py population --json
 python3 skills/stats-nz/scripts/cli.py population --region auckland --json
+python3 skills/stats-nz/scripts/cli.py place-travel UR/auckland --json
 python3 skills/stats-nz/scripts/cli.py population --projection 2050 --json
 python3 skills/stats-nz/scripts/cli.py migration --json
 python3 skills/stats-nz/scripts/cli.py gdp --json
@@ -113,7 +119,8 @@ python3 skills/stats-nz/scripts/cli.py search "gross domestic product" --limit 5
 - No API key, username, password, cookie, or browser session is required for implemented commands
 - `cpi`, `fpi`, `gdp`, `migration`, `series`, and `search` use the public Stats NZ large-datasets CSV catalogue at `https://www.stats.govt.nz/large-datasets/csv-files-for-download/`
 - `fpi` resolves the latest Food Price Index "index numbers" CSV on that page; the bulk-CSV page can host an older FPI release than Infoshare, so it auto-freshens when a newer CSV is posted
-- `population` uses public Stats NZ indicator, projection release, and place-summary pages
+- `population` uses public Stats NZ indicator, projection release, and regional-council place-summary pages. It still reads estimated resident population only
+- `place-travel` reads one place-summary page on `tools.summaries.stats.govt.nz` and returns the main-means-of-travel-to-work rows for usual residence or workplace address. One place per call, 15-second timeout, and a 2 MB page cap. A suppressed cell keeps the published confidentiality indicator and does not invent a percent or count. An empty travel section is a failure
 - The modern Stats NZ OData/API surface was not wired because live discovery indicated subscription-key requirements; this skill stays no-login and read-only
 - CSV release URLs change as new releases are published; the CLI discovers the current release from the Stats NZ catalogue where possible
 - Default output is human-readable; every data command supports `--json` for chaining into other tools

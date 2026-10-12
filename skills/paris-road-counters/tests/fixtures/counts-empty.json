@@ -1,0 +1,34 @@
+{
+  "steps": [
+    {
+      "http_status": 200,
+      "body": {
+        "dataset_id": "comptages-routiers-permanents",
+        "metas": {
+          "dcat": {
+            "granularity": "Horaire"
+          },
+          "default": {
+            "title": "Comptage routier - Données trafic issues des capteurs permanents",
+            "license": "Open Database License (ODbL)",
+            "license_url": "http://opendatacommons.org/licenses/odbl/",
+            "publisher": "Direction de la Voirie et des Déplacements - Ville de Paris",
+            "timezone": "Europe/Paris",
+            "data_processed": "2026-01-15T01:02:03+00:00",
+            "records_count": 3,
+            "geometry_types": [
+              "LineString"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "http_status": 200,
+      "body": {
+        "total_count": 0,
+        "results": []
+      }
+    }
+  ]
+}

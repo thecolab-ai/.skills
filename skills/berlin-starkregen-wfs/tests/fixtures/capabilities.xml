@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<wfs:WFS_Capabilities xmlns:wfs="http://www.opengis.net/wfs/2.0" xmlns:ows="http://www.opengis.net/ows/1.1" version="2.0.0">
+  <ows:ServiceIdentification>
+    <ows:Title>Starkregengefahrenkarte</ows:Title>
+    <ows:Fees>Der Datenbestand wird unter der Lizenz CC-BY-4.0-Namensnennung International Public License veröffentlicht (vgl. https://creativecommons.org/licenses/by/4.0/legalcode.de). Der Quellenvermerk gemäß Abschnitt 3a der Lizenz lautet "Gebiete Moabit, Flughafensee, Neukölln, Rudow, Kladow/Gatow: Berliner Wasserbetriebe / Starkregengefahrenkarte; Gebiete Niederschönhausen Ost, Obersee, Frankentaler Ufer: Geoportal Berlin / Starkregengefahrenkarte / Starkregengefahrenkarte".</ows:Fees>
+    <ows:AccessConstraints>Es gelten keine Zugriffsbeschränkungen.</ows:AccessConstraints>
+  </ows:ServiceIdentification>
+  <ows:ServiceProvider>
+    <ows:ProviderName>Senatsverwaltung für Stadtentwicklung, Bauen und Wohnen Berlin</ows:ProviderName>
+  </ows:ServiceProvider>
+  <wfs:FeatureTypeList>
+    <wfs:FeatureType>
+      <wfs:Name>ua_srgk:ca_fliessgeschwindigkeit_aussergewoehnlich</wfs:Name>
+      <wfs:Title>Fließgeschwindigkeit (außergewöhnliches Ereignis)</wfs:Title>
+      <wfs:DefaultCRS>urn:ogc:def:crs:EPSG::25833</wfs:DefaultCRS>
+    </wfs:FeatureType>
+    <wfs:FeatureType>
+      <wfs:Name>ua_srgk:da_fliessgeschwindigkeit_extrem</wfs:Name>
+      <wfs:Title>Fließgeschwindigkeit (extremes Ereignis)</wfs:Title>
+      <wfs:DefaultCRS>urn:ogc:def:crs:EPSG::25833</wfs:DefaultCRS>
+    </wfs:FeatureType>
+    <wfs:FeatureType>
+      <wfs:Name>ua_srgk:ba_fliessgeschwindigkeit_selten</wfs:Name>
+      <wfs:Title>Fließgeschwindigkeit (seltenes Ereignis)</wfs:Title>
+      <wfs:DefaultCRS>urn:ogc:def:crs:EPSG::25833</wfs:DefaultCRS>
+    </wfs:FeatureType>
+    <wfs:FeatureType>
+      <wfs:Name>ua_srgk:a_modellgebiete</wfs:Name>
+      <wfs:Title>Modellgebiete</wfs:Title>
+      <wfs:DefaultCRS>urn:ogc:def:crs:EPSG::25833</wfs:DefaultCRS>
+    </wfs:FeatureType>
+  </wfs:FeatureTypeList>
+</wfs:WFS_Capabilities>

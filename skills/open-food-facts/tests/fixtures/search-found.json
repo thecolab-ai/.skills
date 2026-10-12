@@ -1,0 +1,23 @@
+{
+  "http_status": 200,
+  "body": {
+    "count": 1,
+    "page": 1,
+    "page_count": 1,
+    "page_size": 1,
+    "skip": 0,
+    "products": [
+      {
+        "code": "09415522002738",
+        "product_name": "Fixture yoghurt",
+        "brands": "Fixture Dairy",
+        "countries_tags": [
+          "en:new-zealand"
+        ],
+        "categories_tags": [
+          "en:yogurts"
+        ]
+      }
+    ]
+  }
+}

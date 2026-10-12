@@ -33,7 +33,8 @@ The release-specific CSV paths change when Stats NZ publishes a new release, so 
 ## Command notes
 
 - `cpi` reports the latest all-groups CPI index and computes quarterly and annual percentage change from the same series.
-- `population` without flags reads the Stats NZ population indicator. `--projection YEAR` reads the national population projections graph CSV. `--region REGION` reads the regional council place summary and extracts the latest estimated resident population.
+- `population` without flags reads the Stats NZ population indicator. `--projection YEAR` reads the national population projections graph CSV. `--region REGION` reads the regional council place summary and extracts the latest estimated resident population. That ERP read is unchanged.
+- `place-travel CLASS/slug` reads one `https://tools.summaries.stats.govt.nz/places/CLASS/slug` page. It returns main-means-of-travel-to-work rows for usual residence (`--address usual`, the default) or workplace address (`--address workplace`). Each row keeps mode, mode code, period, percent, people count, units, and any confidentiality indicator. The call is bounded to one URL, 15 seconds, 2 MB, and 40 rows. It does not use Figure.NZ.
 - `migration` filters the migration age/sex CSV to long-term migrant totals by month, sex `TOTAL`, age `TOTAL`, and computes net migration as arrivals minus departures.
 - `gdp` reports the latest wired production and expenditure headline series from the quarterly GDP CSV.
 - `search` searches public CSV catalogue titles and returns source URLs.

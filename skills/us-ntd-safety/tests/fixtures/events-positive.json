@@ -1,0 +1,479 @@
+{
+  "synthetic": true,
+  "contains_personal_data": false,
+  "contains_live_credentials": false,
+  "resource": "events",
+  "exchanges": [
+    {
+      "status": 200,
+      "body": {
+        "licenseId": "USGOV_WORKS",
+        "rowsUpdatedAt": 1791313446,
+        "license": {
+          "name": "Public Domain U.S. Government"
+        },
+        "columns": [
+          {
+            "fieldName": "_5_digit_ntd_id",
+            "dataTypeName": "text"
+          },
+          {
+            "fieldName": "agency",
+            "dataTypeName": "text"
+          },
+          {
+            "fieldName": "uace_code",
+            "dataTypeName": "text"
+          },
+          {
+            "fieldName": "rail_bus_ferry",
+            "dataTypeName": "text"
+          },
+          {
+            "fieldName": "mode_name",
+            "dataTypeName": "text"
+          },
+          {
+            "fieldName": "mode",
+            "dataTypeName": "text"
+          },
+          {
+            "fieldName": "consolidated_mode_name",
+            "dataTypeName": "text"
+          },
+          {
+            "fieldName": "type_of_service",
+            "dataTypeName": "text"
+          },
+          {
+            "fieldName": "fixed_route_flag",
+            "dataTypeName": "checkbox"
+          },
+          {
+            "fieldName": "rail_y_n",
+            "dataTypeName": "checkbox"
+          },
+          {
+            "fieldName": "year",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "incident_number",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "incident_date",
+            "dataTypeName": "calendar_date"
+          },
+          {
+            "fieldName": "incident_time",
+            "dataTypeName": "text"
+          },
+          {
+            "fieldName": "event_type",
+            "dataTypeName": "text"
+          },
+          {
+            "fieldName": "event_type_group",
+            "dataTypeName": "text"
+          },
+          {
+            "fieldName": "assault_homicide_person_type_desc",
+            "dataTypeName": "text"
+          },
+          {
+            "fieldName": "assault_homicide_type_desc",
+            "dataTypeName": "text"
+          },
+          {
+            "fieldName": "assault_homicide_transit_worker_flag",
+            "dataTypeName": "checkbox"
+          },
+          {
+            "fieldName": "event_category",
+            "dataTypeName": "text"
+          },
+          {
+            "fieldName": "runaway_train_flag",
+            "dataTypeName": "text"
+          },
+          {
+            "fieldName": "safety_security",
+            "dataTypeName": "text"
+          },
+          {
+            "fieldName": "collision_with",
+            "dataTypeName": "text"
+          },
+          {
+            "fieldName": "property_damage",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "property_damage_type",
+            "dataTypeName": "text"
+          },
+          {
+            "fieldName": "disabling_damage_flag",
+            "dataTypeName": "checkbox"
+          },
+          {
+            "fieldName": "total_injuries",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "total_fatalities",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "towed_y_n",
+            "dataTypeName": "text"
+          },
+          {
+            "fieldName": "number_of_transit_vehicles",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "number_of_vehicles_involved",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "number_of_cars_on_involved_transit_vehicles",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "derailed_cars_count",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "location_type",
+            "dataTypeName": "text"
+          },
+          {
+            "fieldName": "evacuation",
+            "dataTypeName": "checkbox"
+          },
+          {
+            "fieldName": "life_safety_y_n",
+            "dataTypeName": "text"
+          },
+          {
+            "fieldName": "evac_to_right_of_way",
+            "dataTypeName": "text"
+          },
+          {
+            "fieldName": "self_evacuation_y_n",
+            "dataTypeName": "text"
+          },
+          {
+            "fieldName": "evacuation_location",
+            "dataTypeName": "text"
+          },
+          {
+            "fieldName": "hazmat_type",
+            "dataTypeName": "text"
+          },
+          {
+            "fieldName": "fire_type",
+            "dataTypeName": "text"
+          },
+          {
+            "fieldName": "fire_fuel",
+            "dataTypeName": "text"
+          },
+          {
+            "fieldName": "weather",
+            "dataTypeName": "text"
+          },
+          {
+            "fieldName": "lighting",
+            "dataTypeName": "text"
+          },
+          {
+            "fieldName": "current_condition",
+            "dataTypeName": "text"
+          },
+          {
+            "fieldName": "tide",
+            "dataTypeName": "text"
+          },
+          {
+            "fieldName": "road_configuration",
+            "dataTypeName": "text"
+          },
+          {
+            "fieldName": "track_configuration",
+            "dataTypeName": "text"
+          },
+          {
+            "fieldName": "path_condition",
+            "dataTypeName": "text"
+          },
+          {
+            "fieldName": "rail_alignment",
+            "dataTypeName": "text"
+          },
+          {
+            "fieldName": "rail_grade_crossing_control",
+            "dataTypeName": "text"
+          },
+          {
+            "fieldName": "right_of_way_condition",
+            "dataTypeName": "text"
+          },
+          {
+            "fieldName": "intersection",
+            "dataTypeName": "text"
+          },
+          {
+            "fieldName": "service_stop_control_device",
+            "dataTypeName": "text"
+          },
+          {
+            "fieldName": "operator_location",
+            "dataTypeName": "text"
+          },
+          {
+            "fieldName": "intentional_y_n",
+            "dataTypeName": "text"
+          },
+          {
+            "fieldName": "vehicle_action",
+            "dataTypeName": "text"
+          },
+          {
+            "fieldName": "collision_impact_point",
+            "dataTypeName": "text"
+          },
+          {
+            "fieldName": "derailment_type",
+            "dataTypeName": "text"
+          },
+          {
+            "fieldName": "transit_y_n",
+            "dataTypeName": "text"
+          },
+          {
+            "fieldName": "fuel_type",
+            "dataTypeName": "text"
+          },
+          {
+            "fieldName": "vehicle_speed",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "transit_vehicle_type",
+            "dataTypeName": "text"
+          },
+          {
+            "fieldName": "non_rail_transit_vehicle",
+            "dataTypeName": "text"
+          },
+          {
+            "fieldName": "manufacturer",
+            "dataTypeName": "text"
+          },
+          {
+            "fieldName": "transit_vehicle_rider",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "people_waiting_or_leaving",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "transit_vehicle_operator",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "transit_employee_fatalities",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "other_worker_fatalities",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "bicyclist_fatalities",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "pedestrian_in_crosswalk",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "pedestrian_not_in_crosswalk",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "pedestrian_crossing_tracks",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "pedestrian_walking_along",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "occupant_of_other_vehicle",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "other_fatalities",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "suicide_fatalities",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "trespasser_fatalities_subtotal_",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "transit_vehicle_rider_injuries",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "transit_vehicle_rider_serious",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "people_waiting_or_leaving_1",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "people_waiting_or_leaving_2",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "transit_vehicle_operator_1",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "transit_vehicle_operator_2",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "transit_employee_injuries",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "transit_employee_serious",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "other_worker_injuries",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "other_worker_serious_injuries",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "bicyclist_injuries",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "bicyclist_serious_injuries",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "pederstiran_in_crosswalk",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "pederstiran_in_crosswalk_1",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "pedestrian_not_in_crosswalk_1",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "pedestrian_not_in_crosswalk_2",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "pedestrian_crossing_tracks_1",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "pedestrian_crossing_tracks_2",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "pedestrian_walking_along_1",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "pedestrian_walking_along_2",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "occupant_of_other_vehicle_1",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "occupant_of_other_vehicle_2",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "other_injuries",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "other_serious_injuries",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "suicide_injuries",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "suicide_serious_injuries",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "trespasser_inuries_subtotal_",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "trespasser_serious_injuries_subtotal_",
+            "dataTypeName": "number"
+          },
+          {
+            "fieldName": "total_serious_injuries",
+            "dataTypeName": "number"
+          }
+        ],
+        "attribution": "Federal Transit Administration"
+      }
+    },
+    {
+      "status": 200,
+      "body": [
+        {
+          "_5_digit_ntd_id": "00000",
+          "agency": "Synthetic Transit Agency",
+          "mode": "MB",
+          "mode_name": "Bus",
+          "year": "2024",
+          "event_type": "Collision",
+          "event_category": "Safety",
+          "safety_security": "SFT",
+          "total_fatalities": "0",
+          "total_injuries": "1",
+          "property_damage": "n/a",
+          "fixed_route_flag": true,
+          "incident_date": "2024-06-01T00:00:00.000",
+          "incident_time": "9:00:00 AM",
+          "incident_description": "fixture-narrative-marker",
+          "person_list": "fixture-person-marker",
+          "approximate_address": "fixture-address-marker",
+          "latitude": "1.0",
+          "longitude": "2.0"
+        }
+      ]
+    }
+  ]
+}
