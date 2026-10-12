@@ -3,7 +3,7 @@
   "name": "nz-public-data",
   "description": "Public, read-only New Zealand data and public-interest sources.",
   "default": true,
-  "skill_count": 130,
+  "skill_count": 131,
   "skills": [
     "akl-housing-capacity",
     "akl-rainfall",
@@ -130,6 +130,7 @@
     "tiakiwai-water-nz",
     "treasury-fiscal-data-nz",
     "uhslc-gesla-nz",
+    "us-ntd-safety",
     "wcc-arcgis-nz",
     "wellington-bin-schedule",
     "winz-rates-nz",
