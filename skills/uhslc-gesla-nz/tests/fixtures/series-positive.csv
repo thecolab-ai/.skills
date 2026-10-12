@@ -1,0 +1,5 @@
+time,sea_level,flag1,flag2,record_id
+UTC,m,,,
+2024-01-01T00:00:00Z,1.250,1,1,auckland-auct-nzl-ttw
+2024-01-01T00:00:00Z,1.2500000002,1,1,auckland-auct-nzl-ttw
+2024-01-01T01:00:00Z,-99.9999,5,0,auckland-auct-nzl-ttw
