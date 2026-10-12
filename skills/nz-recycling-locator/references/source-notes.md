@@ -86,8 +86,12 @@ those links. This avoids guessing a street address from a territory or presentin
   attributes had that edge noise and one card had no coordinates. Every card
   receives the generic `Reuse` label. The shared `card--opshop` class is page
   membership, not evidence that a store accepts clothing or building materials.
-  Hours are left null because the listing cards do not publish them. Store
-  detail pages and operator links are not crawled.
+  Each card also gets one shared disclaimer because the directory does not
+  state accepted materials. That sentence stays on the record for readers and
+  is omitted from text search, including the words clothing and building.
+  A search hit needs those words in that store's name, address, materials or
+  other store-specific text. Hours are left null because the listing cards do
+  not publish them. Store detail pages and operator links are not crawled.
 - Auckland CRC uses the bounded visible list after the published list-introduction
   marker and before the copyright footer. Each entry has name, locality, full
   address and display address. Missing/changed four-field structure fails
@@ -192,7 +196,10 @@ skipped; skipped sources alone do not make the status listing partial. Spatial
 filtering excludes unlocated records; GeoJSON without a spatial filter uses null
 geometry for these entries.
 
-`search` is textual discovery, so words may occur in exclusion text. `find`
+`search` is textual discovery of store-specific fields, so words may occur in
+exclusion text that a publisher wrote for that site. Shared disclaimers this
+skill adds to every record of a source are shown in `details` and are not
+search matches. `find`
 uses material labels, but labels are still broad; show `details` before giving
 specific disposal advice. Directory records do not guarantee
 current availability, capacity or bookings.

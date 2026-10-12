@@ -56,8 +56,11 @@ python3 scripts/cli.py item "battery" --json
    resalable and non-resalable clothing labels as well as an explicit op-shop
    or textiles label. Habitat stores use the generic `Reuse` label only, so
    they match `reuse` and do not match `clothing`.
-   `search` matches all words in names, addresses, labels and source descriptions,
-   including restrictions.
+   `search` matches all words in names, addresses, material labels and
+   store-specific descriptions, including publisher restrictions. A shared
+   disclaimer that is identical on every listing of a source is not a match.
+   Habitat details say the card does not state accepted materials; those words
+   do not make every store a clothing or building hit.
 3. `find` requires `--near=longitude,latitude`; radius defaults to 20 km.
    `find` and `search` support `--bbox=minLon,minLat,maxLon,maxLat` and
    `--format geojson`. Null coordinates remain null and are excluded from

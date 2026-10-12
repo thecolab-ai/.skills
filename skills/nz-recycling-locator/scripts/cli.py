@@ -58,6 +58,15 @@ NOT_FETCHED = frozenset({'council', 'techcollect', 'trow', 'zerowaste'})
 DEFAULT_SOURCES = [s for s in SOURCES if s not in NOT_FETCHED]
 FETCH_HOSTS = {urlparse(spec['url']).hostname for source, spec in SOURCES.items()
                if source not in NOT_FETCHED}
+# Identical wording this skill adds because the publisher did not state
+# store-specific acceptance. Readers still see it; text search does not.
+SHARED_DETAILS = {
+    'habitat': 'Reuse store. This listing does not state accepted materials. Confirm clothing, building materials, donations and hours with the store.',
+    'christchurch': 'Council collection depot. Broad acceptance flags do not specify individual materials or reuse services.',
+    'crc': 'Community recycling directory; confirm individual material acceptance, charges and hours with the operator.',
+    'trow': 'Stock location, not confirmed donation acceptance. Pre-sale items may not be ready; arrange collection with TROW.',
+}
+SEARCH_FIELDS = ('name', 'address', 'display_address', 'locality', 'materials', 'details', 'region', 'territory')
 
 
 class SourceError(Exception):
@@ -350,7 +359,7 @@ def parse_trow(data, retrieved):
     latest = max((date for group in groups.values() for date in group['dates']), default=None)
     return [record('trow', 'TROW ReStore — ' + (location or 'location not stated'), location,
                    materials=['Reuse', 'Salvaged building materials'] + sorted(g['materials']),
-                   details='Stock location, not confirmed donation acceptance. Pre-sale items may not be ready; arrange collection with TROW.',
+                   details=SHARED_DETAILS['trow'],
                    retrieved=retrieved, latest=latest, available_items=g['available'],
                    pre_sale_items=g['pre-sale'], website='https://trowrestore.com/')
             for location, g in sorted(groups.items())]
@@ -373,7 +382,7 @@ def parse_christchurch(data, retrieved, url=None):
                                                ('AcceptsGreenWaste', 'Green waste')) if a[field] == 1]
         rows.append(record('christchurch', a['DepotName'], lon=g.get('x'), lat=g.get('y'),
                            materials=materials, hours=a.get('OperatingHours'),
-                           details='Council collection depot. Broad acceptance flags do not specify individual materials or reuse services.',
+                           details=SHARED_DETAILS['christchurch'],
                            url=url, retrieved=retrieved, latest=latest, id=a['CollectionDepotID']))
     require(rows, 'Christchurch returned no collection depots')
     return rows
@@ -413,7 +422,7 @@ def parse_habitat(text, retrieved):
             # The shared page class is not evidence of clothing or building-material acceptance.
             self.rows.append(record('habitat', a['data-title'], a['data-address'], a.get('data-lng'), a.get('data-lat'),
                                     materials=['Reuse'],
-                                    details='Reuse store. This listing does not state accepted materials. Confirm clothing, building materials, donations and hours with the store.',
+                                    details=SHARED_DETAILS['habitat'],
                                     retrieved=retrieved, id=a['data-id']))
     parser = Cards()
     parser.feed(text)
@@ -452,7 +461,7 @@ def parse_crc(text, retrieved):
         require(address.endswith('New Zealand') and re.search(r'\d', display_address),
                 'Auckland CRC directory address fields are missing')
         relation = crc_address_relation(address, display_address)
-        details = 'Community recycling directory; confirm individual material acceptance, charges and hours with the operator.'
+        details = SHARED_DETAILS['crc']
         if relation == 'distinct':
             distinct += 1
             details += ' The publisher supplied a second address form that does not match the directory line; both are retained and neither is treated as a correction.'
@@ -723,6 +732,24 @@ ALIASES = {'battery': ['batteries', 'household batteries'], 'batteries': ['batte
            'cardboard': ['cardboard and paper', 'cardboard'], 'metal': ['scrap metal', 'ferrous metal', 'non-ferrous metal']}
 
 
+def store_specific_text(row):
+    """Search haystack. Shared listing disclaimers are not evidence for a store."""
+    boilerplate = SHARED_DETAILS.get(row.get('source'), '')
+    parts = []
+    for key in SEARCH_FIELDS:
+        text = str(row.get(key) or '')
+        if key == 'details' and boilerplate:
+            text = text.replace(boilerplate, ' ')
+        parts.append(text)
+    return ' '.join(parts).casefold()
+
+
+def search_matches(row, query):
+    haystack = store_specific_text(row)
+    terms = [term for term in query.casefold().split() if term]
+    return bool(terms) and all(term in haystack for term in terms)
+
+
 def material_matches(row, query):
     query = query.casefold()
     if query in ALIASES:
@@ -863,9 +890,7 @@ def command_data(args):
     if args.command == 'find':
         rows = [r for r in rows if material_matches(r, args.material)]
     elif args.command == 'search':
-        terms = args.text.casefold().split()
-        rows = [r for r in rows if all(t in ' '.join(str(r.get(k) or '') for k in
-                 ('name', 'address', 'display_address', 'locality', 'materials', 'details', 'region', 'territory')).casefold() for t in terms)]
+        rows = [r for r in rows if search_matches(r, args.text)]
     rows = spatial_filter(rows, args.bbox, getattr(args, 'near', None), getattr(args, 'radius', 20))
     fail_if_empty(rows, health)
     if any(r['source'] == 'branz' and (r.get('facility_type') == 'Service' or r.get('status') != 'Existing') for r in rows):

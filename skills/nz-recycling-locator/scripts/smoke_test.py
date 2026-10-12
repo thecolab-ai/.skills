@@ -52,6 +52,17 @@ def source_check(source):
         assert all(r['materials'] == ['Reuse'] for r in rows)
         assert all(not cli.material_matches(r, 'clothing') for r in rows)
         assert sum(r['lon'] is not None for r in rows) >= len(rows) - 1
+        disclaimer = cli.SHARED_DETAILS['habitat'].casefold()
+        assert 'clothing' in disclaimer and 'building' in disclaimer
+        assert all(disclaimer in (r.get('details') or '').casefold() for r in rows)
+        for term in ('clothing', 'building'):
+            hits = [r for r in rows if cli.search_matches(r, term)]
+            assert len(hits) < len(rows)
+            for row in hits:
+                assert term in cli.store_specific_text(row)
+        print(f'  habitat search excludes shared disclaimer '
+              f'({sum(cli.search_matches(r, "clothing") for r in rows)} clothing, '
+              f'{sum(cli.search_matches(r, "building") for r in rows)} building, {len(rows)} stores)')
     if source == 'crc':
         assert all(r['address'] and r['display_address'] and r['lon'] is None for r in rows)
         distinct = [r for r in rows if r.get('address_forms_differ')]

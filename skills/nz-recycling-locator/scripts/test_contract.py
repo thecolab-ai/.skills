@@ -278,6 +278,46 @@ class Parsers(unittest.TestCase):
             with self.assertRaises(cli.SourceError):
                 cli.parse_habitat(damaged, STAMP)
 
+    def test_search_ignores_shared_boilerplate_and_keeps_store_text(self):
+        shops = cli.parse_habitat((FIXTURES / 'habitat.html').read_text(), STAMP)
+        disclaimer = cli.SHARED_DETAILS['habitat']
+        self.assertIn('clothing', disclaimer.casefold())
+        self.assertIn('building', disclaimer.casefold())
+        self.assertTrue(all(row['details'] == disclaimer for row in shops))
+        for term in ('clothing', 'building', 'donations'):
+            self.assertEqual([row['id'] for row in shops if cli.search_matches(row, term)], [])
+            code, payload = self.invoke(
+                ['search', term, '--source', 'habitat', '--limit', '0', '--json'], [(shops, False)])
+            self.assertEqual(code, 0)
+            self.assertEqual(payload['count'], 0)
+            self.assertEqual(payload['total_matches'], 0)
+            self.assertEqual(payload['results'], [])
+        named = [{**shops[0], 'name': 'Sample Clothing ReStore'}]
+        self.assertTrue(cli.search_matches(named[0], 'clothing'))
+        self.assertFalse(cli.search_matches(named[0], 'building'))
+        code, payload = self.invoke(['search', 'clothing', '--source', 'habitat', '--json'], [(named, False)])
+        self.assertEqual(code, 0)
+        self.assertEqual([row['name'] for row in payload['results']], ['Sample Clothing ReStore'])
+        specific = {**shops[1], 'details': disclaimer + ' This store publishes a building-materials bay.'}
+        self.assertTrue(cli.search_matches(specific, 'building'))
+        self.assertFalse(cli.search_matches(specific, 'clothing'))
+        code, payload = self.invoke(['search', 'building', '--source', 'habitat', '--json'], [([specific], False)])
+        self.assertEqual(payload['results'][0]['id'], shops[1]['id'])
+        labelled = {**shops[0], 'materials': ['Clothing']}
+        self.assertTrue(cli.search_matches(labelled, 'clothing'))
+        publisher = cli.record('recyclemap', 'Example Site', materials=['Batteries'],
+                               details='Does not accept clothing.', retrieved=STAMP)
+        self.assertTrue(cli.search_matches(publisher, 'clothing'))
+        depots = cli.parse_christchurch(fixture('christchurch'), STAMP)
+        self.assertTrue(all(cli.SHARED_DETAILS['christchurch'] in row['details'] for row in depots))
+        self.assertEqual([row for row in depots if cli.search_matches(row, 'reuse')], [])
+        self.assertTrue(any(cli.search_matches(row, 'recycling') for row in depots))
+        centres = cli.parse_crc((FIXTURES / 'crc.html').read_text(), STAMP)
+        self.assertEqual([row for row in centres if cli.search_matches(row, 'charges')], [])
+        self.assertEqual(
+            [row['name'] for row in centres if cli.search_matches(row, 'second')],
+            ['Example Divergent Recycling Centre'])
+
     def test_new_source_dispatch_and_json_provenance(self):
         parsers = {'christchurch': cli.parse_christchurch, 'habitat': cli.parse_habitat, 'crc': cli.parse_crc}
         for source, parse in parsers.items():
