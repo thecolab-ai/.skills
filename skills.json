@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
-  "last_verified": "2026-10-08",
-  "skill_count": 164,
+  "last_verified": "2026-10-12",
+  "skill_count": 175,
   "skills": [
     {
       "name": "airnz-flights",
@@ -64,6 +64,34 @@
       "local_output": [
         "private-json-csv-export"
       ]
+    },
+    {
+      "name": "akl-housing-capacity",
+      "description": "Query Auckland housing supply trends and 2022/23 plan-enabled and feasible housing capacity. Use for monthly housing updates, building consents, HBA, capacity for growth, PC78, local-board growth capacity, social housing delivery and housing demolition source discovery.",
+      "path": "skills/akl-housing-capacity",
+      "category": "housing",
+      "source_owner": "Auckland Council",
+      "source_type": "official",
+      "source_url": "https://knowledgeauckland.org.nz/",
+      "auth": "none",
+      "access_mode": "public-download",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "none",
+      "schema_version": "1",
+      "skill_type": "public-download",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "knowledgeauckland.org.nz",
+        "www.knowledgeauckland.org.nz",
+        "www.hud.govt.nz",
+        "www.kaingaora.govt.nz"
+      ],
+      "last_verified": "2026-10-08",
+      "health": "degraded",
+      "maintainer": "@adam91holt"
     },
     {
       "name": "akl-rainfall",
@@ -165,6 +193,31 @@
       ],
       "last_verified": "2026-07-19",
       "health": "gated",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "au-energy-rating",
+      "description": "Look up Australian and New Zealand Energy Rating labelled appliance registrations from the Australian Government data.gov.au CKAN package. Use for package metadata, resource names, the stated licence, and a short datastore preview of air conditioners, whitegoods, televisions, monitors, pool pumps, lamps or commercial ice-makers. Read-only, no API key, and it does not download the large CSV files.",
+      "path": "skills/au-energy-rating",
+      "category": "public-data",
+      "source_owner": "Australian Government Department of Climate Change, Energy, the Environment and Water",
+      "source_type": "official",
+      "source_url": "https://data.gov.au/data/api/3/action/package_show?id=559708e5-480e-4f94-8429-c49571e82761",
+      "auth": "none",
+      "access_mode": "public-api",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "none",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "data.gov.au"
+      ],
+      "last_verified": "2026-10-12",
+      "health": "healthy",
       "maintainer": "@adam91holt"
     },
     {
@@ -301,6 +354,31 @@
       "maintainer": "@adam91holt"
     },
     {
+      "name": "berlin-starkregen-wfs",
+      "description": "Read Berlin Starkregen flood model areas from the official Geoportal Berlin WFS. Use for Starkregengefahrenkarte feature types and bounded Modellgebiete names such as Neukölln. Does not download velocity-layer geometry.",
+      "path": "skills/berlin-starkregen-wfs",
+      "category": "environment",
+      "source_owner": "Senatsverwaltung für Stadtentwicklung, Bauen und Wohnen Berlin",
+      "source_type": "official",
+      "source_url": "https://gdi.berlin.de/services/wfs/ua_srgk",
+      "auth": "none",
+      "access_mode": "public-api",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "none",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "gdi.berlin.de"
+      ],
+      "last_verified": "2026-10-11",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
       "name": "biosecurity-nz",
       "description": "Searches New Zealand biosecurity public data from the Official NZ Pest Register, PIER import requirements metadata, data.govt.nz CKAN records, and MPI active-response pages. Use when checking whether an organism is regulated, unwanted, or notifiable in NZ; finding pest synonyms/statuses; resolving import commodity requirement links; listing current biosecurity responses; or documenting source/access caveats.",
       "path": "skills/biosecurity-nz",
@@ -377,6 +455,31 @@
         "www.bookme.co.nz"
       ],
       "last_verified": "2026-07-19",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "brisbane-intersection-traffic",
+      "description": "Read keyless Brisbane City Council real-time intersection lane volume, occupancy and traffic-signal locations from data.brisbane.qld.gov.au. Use for SCATS traffic signal controller site readings, lane flow, degree of saturation, or signal point locations. Not Queensland-wide incidents, flood, bikeway or other Brisbane datasets.",
+      "path": "skills/brisbane-intersection-traffic",
+      "category": "transport",
+      "source_owner": "Brisbane City Council",
+      "source_type": "official",
+      "source_url": "https://data.brisbane.qld.gov.au/",
+      "auth": "none",
+      "access_mode": "public-api",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "none",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "data.brisbane.qld.gov.au"
+      ],
+      "last_verified": "2026-10-11",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
@@ -1132,6 +1235,31 @@
       "maintainer": "@adam91holt"
     },
     {
+      "name": "flamingo-gbfs",
+      "description": "Read Flamingo public Auckland GBFS 3.0 feeds for the feed list, system licence, and current vehicle positions. Use for keyless scooter locations and range in metres. Do not use for trip histories, trajectories, Ride Report aggregates, or GTFS timetables.",
+      "path": "skills/flamingo-gbfs",
+      "category": "transport",
+      "source_owner": "Flamingo",
+      "source_type": "commercial",
+      "source_url": "https://data.rideflamingo.com/gbfs/3/auckland/gbfs.json",
+      "auth": "none",
+      "access_mode": "public-api",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "60s",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "data.rideflamingo.com"
+      ],
+      "last_verified": "2026-10-11",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
       "name": "fma-nz",
       "description": "Query FMA warnings/alerts and licensed provider pages for NZ crowdfunding, peer-to-peer lending, and financial-advice sources. Search alerts, list/register providers by type, and return source-backed JSON payloads for machine-readable workflows.",
       "path": "skills/fma-nz",
@@ -1730,6 +1858,31 @@
         "services.arcgis.com"
       ],
       "last_verified": "2026-10-08",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "linz-tide-gauges-nz",
+      "description": "Query official LINZ tide-gauge sea-level observations. Use for Auckland Devonport (AUCT) and other published LINZ gauge codes, daily UTC minute heights, sensor datasets, and file listings. Not tide predictions.",
+      "path": "skills/linz-tide-gauges-nz",
+      "category": "environment",
+      "source_owner": "Toitū Te Whenua Land Information New Zealand (LINZ)",
+      "source_type": "official",
+      "source_url": "https://sealevel-data.linz.govt.nz/index.html?tidegauge=AUCT",
+      "auth": "none",
+      "access_mode": "public-api",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "24h",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "sealevel-data.linz.govt.nz"
+      ],
+      "last_verified": "2026-10-11",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
@@ -4489,6 +4642,32 @@
       "maintainer": "@adam91holt"
     },
     {
+      "name": "nz-point-clouds",
+      "description": "Find New Zealand airborne LiDAR point-cloud collections on OpenTopography and list bounded public file URLs and sizes. Use for catalogue search, dataset licence, capture interval, and LAZ tile discovery. Do not use for LINZ DEM or DSM rasters, imagery tiles, elevation sampling, or point-cloud downloads.",
+      "path": "skills/nz-point-clouds",
+      "category": "geospatial",
+      "source_owner": "OpenTopography",
+      "source_type": "mixed",
+      "source_url": "https://portal.opentopography.org/API/otCatalog",
+      "auth": "none",
+      "access_mode": "public-api",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "none",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "portal.opentopography.org",
+        "opentopography.s3.sdsc.edu"
+      ],
+      "last_verified": "2026-10-11",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
       "name": "nz-police-data",
       "description": "Query official anonymised New Zealand Police victimisation, proceedings and offence statistics with suppression and interpretation context.",
       "path": "skills/nz-police-data",
@@ -4736,7 +4915,7 @@
     },
     {
       "name": "nz-stac",
-      "description": "Find LINZ elevation and aerial imagery collections and COG tiles from public NZ STAC catalogues. Use for DEM/DSM, RGB/infrared footprints, bbox tile searches and elevation point sampling guidance.",
+      "description": "Find LINZ elevation, coastal LiDAR, and aerial imagery collections and COG tiles from public NZ STAC catalogues. Use for DEM/DSM, coastal elevation footprints, RGB/infrared footprints, bbox tile searches and elevation point sampling guidance.",
       "path": "skills/nz-stac",
       "category": "geospatial",
       "source_owner": "Toitū Te Whenua Land Information New Zealand",
@@ -4754,15 +4933,16 @@
       "pack": "nz-public-data",
       "allowed_domains": [
         "nz-elevation.s3.ap-southeast-2.amazonaws.com",
-        "nz-imagery.s3.ap-southeast-2.amazonaws.com"
+        "nz-imagery.s3.ap-southeast-2.amazonaws.com",
+        "nz-coastal.s3.ap-southeast-2.amazonaws.com"
       ],
-      "last_verified": "2026-10-08",
+      "last_verified": "2026-10-12",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
     {
       "name": "nz-tides-surf",
-      "description": "Query New Zealand LINZ tide predictions and SwellMap surf forecasts through a lightweight read-only CLI. Use when the task involves NZ tide times, next high/low tide, surf forecasts, swell trend, or choosing the best nearby surf break for a drive.",
+      "description": "Query New Zealand LINZ tide predictions, LINZ standard-port tidal levels, and SwellMap surf forecasts through a lightweight read-only CLI. Use when the task involves NZ tide times, next high/low tide, standard-port levels such as MHWS, MSL, HAT or LAT, surf forecasts, swell trend, or choosing the best nearby surf break for a drive.",
       "path": "skills/nz-tides-surf",
       "category": "environment",
       "source_owner": "Toitū Te Whenua LINZ and SwellMap",
@@ -4786,16 +4966,16 @@
         "www.surfline.com",
         "www.swellmap.com"
       ],
-      "last_verified": "2026-07-19",
+      "last_verified": "2026-10-12",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
     {
       "name": "nz-traffic-counts",
-      "description": "Query NZ traffic, cycle and pedestrian count sites and time series, starting with Auckland Transport, NZTA TMS and Heart of the City. Use for historical volumes, active-mode monitoring and nearby count sites.",
+      "description": "Query NZ traffic, cycle and pedestrian count sites and time series, from Auckland Transport, NZTA TMS, Heart of the City, Hamilton, Christchurch, Wellington and Tauranga. Use for historical volumes, active-mode monitoring and nearby count sites.",
       "path": "skills/nz-traffic-counts",
       "category": "transport",
-      "source_owner": "Auckland Transport; NZ Transport Agency; Heart of the City",
+      "source_owner": "Auckland Transport; NZ Transport Agency; Heart of the City; Hamilton City Council; Christchurch City Council; Wellington City Council; Tauranga City Council",
       "source_type": "mixed",
       "source_url": "https://at.govt.nz/about-us/reports-publications/traffic-counts",
       "auth": "none",
@@ -4812,9 +4992,14 @@
         "at.govt.nz",
         "www.hotcity.co.nz",
         "services.arcgis.com",
-        "services2.arcgis.com"
+        "services2.arcgis.com",
+        "services1.arcgis.com",
+        "cemeteryaws.tauranga.govt.nz",
+        "smartview.ccc.govt.nz",
+        "gis.wcc.govt.nz",
+        "gis-snowflake-opendata-public-wcc-arcgis-prod.s3.ap-southeast-2.amazonaws.com"
       ],
-      "last_verified": "2026-10-08",
+      "last_verified": "2026-10-11",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
@@ -5083,6 +5268,57 @@
         "www.ombudsman.parliament.nz"
       ],
       "last_verified": "2026-07-19",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "open-food-facts",
+      "description": "Look up a food product by barcode on Open Food Facts, and run a bounded country or category search. Use for keyless public product name, brand, quantity, category and country facts. Do not use for Open Products Facts, product photos, personal nutrition advice, or database dumps.",
+      "path": "skills/open-food-facts",
+      "category": "food",
+      "source_owner": "Open Food Facts",
+      "source_type": "community",
+      "source_url": "https://world.openfoodfacts.org",
+      "auth": "none",
+      "access_mode": "public-api",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "none",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "world.openfoodfacts.org"
+      ],
+      "last_verified": "2026-10-11",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "osm-notes",
+      "description": "Read OpenStreetMap map notes inside a small WGS84 bounding box. Use when the task needs open or recently closed OSM notes, note text, status, and coordinates for a place such as central Auckland. Read-only GET of the notes API. Do not use for Overpass places, geocoding, or creating, commenting on, closing, or reopening notes.",
+      "path": "skills/osm-notes",
+      "category": "public-data",
+      "source_owner": "OpenStreetMap contributors",
+      "source_type": "community",
+      "source_url": "https://api.openstreetmap.org/api/0.6/notes.json",
+      "auth": "none",
+      "access_mode": "public-api",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "none",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "api.openstreetmap.org",
+        "www.openstreetmap.org"
+      ],
+      "last_verified": "2026-10-11",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
@@ -5453,6 +5689,31 @@
         "00gcmopt4b-dsn.algolia.net"
       ],
       "last_verified": "2026-07-19",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "qld-traffic-incidents",
+      "description": "Read current Queensland traffic incidents from the official OpenDataSoft dataset queensland-traffic-incidents. Use for Queensland road closures, hazards, roadworks and other published traffic incidents when a bounded, keyless record window is enough.",
+      "path": "skills/qld-traffic-incidents",
+      "category": "transport",
+      "source_owner": "Queensland",
+      "source_type": "official",
+      "source_url": "https://queensland.opendatasoft.com/api/explore/v2.1/catalog/datasets/queensland-traffic-incidents",
+      "auth": "none",
+      "access_mode": "public-api",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "none",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "queensland.opendatasoft.com"
+      ],
+      "last_verified": "2026-10-12",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },
@@ -5921,6 +6182,31 @@
       ],
       "last_verified": "2026-10-08",
       "health": "degraded",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "uhslc-gesla-nz",
+      "description": "Read a short University of Hawaii Sea Level Center GESLA sea-level series for one New Zealand station. Use for hourly or sub-hourly sea level in metres with quality flags. Not for LINZ tide predictions, the LINZ minute archive, or a global download.",
+      "path": "skills/uhslc-gesla-nz",
+      "category": "environment",
+      "source_owner": "University of Hawaii Sea Level Center",
+      "source_type": "official",
+      "source_url": "https://uhslc.soest.hawaii.edu/erddap/info/global_hourly_gesla/index.html",
+      "auth": "none",
+      "access_mode": "public-api",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "none",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "uhslc.soest.hawaii.edu"
+      ],
+      "last_verified": "2026-10-11",
+      "health": "healthy",
       "maintainer": "@adam91holt"
     },
     {

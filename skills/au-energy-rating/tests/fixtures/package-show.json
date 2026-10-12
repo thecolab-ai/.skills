@@ -1,0 +1,34 @@
+{
+  "success": true,
+  "result": {
+    "id": "559708e5-480e-4f94-8429-c49571e82761",
+    "name": "energy-rating-for-household-appliances",
+    "title": "Energy Rating Data for household appliances",
+    "notes": "Synthetic fixture for labelled products sold in Australia and New Zealand.\n",
+    "license_id": "cc-by",
+    "license_title": "Creative Commons Attribution 3.0 Australia",
+    "license_url": "http://creativecommons.org/licenses/by/3.0/au/",
+    "metadata_modified": "2026-10-11T08:03:44.379542",
+    "organization": {
+      "title": "Australian Government Department of Climate Change, Energy, the Environment and Water"
+    },
+    "resources": [
+      {
+        "id": "0973a476-eb0c-45e6-9a18-054f74307843",
+        "name": "Air Conditioners                                                                 -",
+        "format": "CSV",
+        "datastore_active": true,
+        "size": 12,
+        "last_modified": "2026-10-10T08:03:01.595358"
+      },
+      {
+        "id": "4b512c09-7ae7-4f0b-8e5f-c6402afdac96",
+        "name": "Air Conditioner Data Dictionary",
+        "format": "DOCX",
+        "datastore_active": false,
+        "size": null,
+        "last_modified": "2022-02-02T00:00:00"
+      }
+    ]
+  }
+}
