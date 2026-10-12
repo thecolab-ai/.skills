@@ -1,0 +1,28 @@
+{
+  "http_status": 200,
+  "headers": {},
+  "body": {
+    "total_count": 1,
+    "results": [
+      {
+        "objectid": "fixture-signal-2",
+        "subsystem": 0,
+        "tsc": "833",
+        "areanum": "B0833",
+        "globalid": "fixture-global-2",
+        "geo_shape": {
+          "type": "Feature",
+          "geometry": {
+            "type": "Point",
+            "coordinates": [153.16, -27.5]
+          },
+          "properties": {}
+        },
+        "geo_point_2d": {
+          "lon": 153.16,
+          "lat": -27.44
+        }
+      }
+    ]
+  }
+}
