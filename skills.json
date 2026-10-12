@@ -2,7 +2,7 @@
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
   "last_verified": "2026-10-12",
-  "skill_count": 177,
+  "skill_count": 178,
   "skills": [
     {
       "name": "airnz-flights",
@@ -5430,6 +5430,31 @@
           "www.paknsave.co.nz"
         ]
       }
+    },
+    {
+      "name": "paris-road-counters",
+      "description": "Read Ville de Paris permanent road-counter arc-hours from comptages routiers permanents. Use for hourly one-direction flow (débit) and loop occupancy (taux d'occupation), with ODbL attribution. Do not use for the historical archive, the Lambert referential, Belib chargers, or New Zealand traffic counts.",
+      "path": "skills/paris-road-counters",
+      "category": "transport",
+      "source_owner": "Direction de la Voirie et des Déplacements - Ville de Paris",
+      "source_type": "official",
+      "source_url": "https://opendata.paris.fr/explore/dataset/comptages-routiers-permanents/information/",
+      "auth": "none",
+      "access_mode": "public-api",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "none",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "opendata.paris.fr"
+      ],
+      "last_verified": "2026-10-11",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
     },
     {
       "name": "pbtech-nz",
