@@ -1,0 +1,53 @@
+{
+  "status": 200,
+  "truncated": false,
+  "contains_live_credentials": false,
+  "contains_personal_data": false,
+  "body": {
+    "type": "FeatureCollection",
+    "features": [
+      {
+        "type": "Feature",
+        "id": "NZL-Urban_Auckland_geological_units.9001",
+        "geometry_name": "geom",
+        "geometry": {
+          "type": "MultiPolygon",
+          "coordinates": [
+            [
+              [
+                [174.77, -36.85],
+                [174.78, -36.85],
+                [174.78, -36.84],
+                [174.77, -36.84],
+                [174.77, -36.85]
+              ]
+            ]
+          ]
+        },
+        "properties": {
+          "area": 1000.0,
+          "perimeter": 400.0,
+          "geol_units": 1,
+          "geol_uni_1": 2.0,
+          "unit_code": "FIX",
+          "strat_unit": "Fixture Conglomerate",
+          "strat_age": "Mi",
+          "descriptio": "Synthetic pebble description for the parser.",
+          "old_unit_c": "old",
+          "source": "Fixture sheet.",
+          "scale": 50000
+        }
+      }
+    ],
+    "totalFeatures": 3,
+    "numberMatched": 3,
+    "numberReturned": 1,
+    "timeStamp": "2014-01-01T00:00:00Z",
+    "crs": {
+      "type": "name",
+      "properties": {
+        "name": "urn:ogc:def:crs:CRS::84"
+      }
+    }
+  }
+}

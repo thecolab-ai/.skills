@@ -2,7 +2,7 @@
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
   "last_verified": "2026-10-12",
-  "skill_count": 184,
+  "skill_count": 185,
   "skills": [
     {
       "name": "airnz-flights",
@@ -1514,6 +1514,31 @@
         "www.procurement.govt.nz"
       ],
       "last_verified": "2026-07-19",
+      "health": "healthy",
+      "maintainer": "@adam91holt"
+    },
+    {
+      "name": "gns-auckland-geology",
+      "description": "Query GNS Science Auckland urban geological units from the public WFS. Use for a bounded WGS84 bounding-box lookup of unit code, stratigraphic name, age code, map scale, and polygon geometry. Do not use for active faults, shaking layers, or geological maps of other cities.",
+      "path": "skills/gns-auckland-geology",
+      "category": "geospatial",
+      "source_owner": "GNS Science",
+      "source_type": "official",
+      "source_url": "https://data.gns.cri.nz/webmaps/gns/wfs",
+      "auth": "none",
+      "access_mode": "public-api",
+      "data_class": "public",
+      "writes": false,
+      "browser": false,
+      "risk": "low",
+      "cache_ttl": "none",
+      "schema_version": "1",
+      "skill_type": "public-api",
+      "pack": "nz-public-data",
+      "allowed_domains": [
+        "data.gns.cri.nz"
+      ],
+      "last_verified": "2026-10-12",
       "health": "healthy",
       "maintainer": "@adam91holt"
     },

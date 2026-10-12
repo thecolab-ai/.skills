@@ -1,0 +1,37 @@
+{
+  "status": 200,
+  "truncated": false,
+  "contains_live_credentials": false,
+  "contains_personal_data": false,
+  "body": {
+    "type": "FeatureCollection",
+    "features": [
+      {
+        "type": "Feature",
+        "id": "NZL-Urban_Auckland_geological_units.9002",
+        "geometry": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [1750000, 5920000],
+              [1750100, 5920000],
+              [1750100, 5920100],
+              [1750000, 5920000]
+            ]
+          ]
+        },
+        "properties": {
+          "unit_code": "NZTM"
+        }
+      }
+    ],
+    "numberMatched": 1,
+    "numberReturned": 1,
+    "crs": {
+      "type": "name",
+      "properties": {
+        "name": "urn:ogc:def:crs:EPSG::4326"
+      }
+    }
+  }
+}

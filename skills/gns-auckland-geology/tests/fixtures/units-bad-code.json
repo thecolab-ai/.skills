@@ -1,0 +1,46 @@
+{
+  "status": 200,
+  "truncated": false,
+  "contains_live_credentials": false,
+  "contains_personal_data": false,
+  "body": {
+    "type": "FeatureCollection",
+    "features": [
+      {
+        "type": "Feature",
+        "id": "NZL-Urban_Auckland_geological_units.9004",
+        "geometry_name": "geom",
+        "geometry": {
+          "type": "MultiPolygon",
+          "coordinates": [
+            [
+              [
+                [174.77, -36.85],
+                [174.78, -36.85],
+                [174.78, -36.84],
+                [174.77, -36.84],
+                [174.77, -36.85]
+              ]
+            ]
+          ]
+        },
+        "properties": {
+          "unit_code": "~tl",
+          "strat_unit": "Fixture malformed code",
+          "descriptio": "Synthetic leading-mark code.",
+          "scale": 50000
+        }
+      }
+    ],
+    "totalFeatures": 1,
+    "numberMatched": 1,
+    "numberReturned": 1,
+    "timeStamp": "2014-01-01T00:00:00Z",
+    "crs": {
+      "type": "name",
+      "properties": {
+        "name": "urn:ogc:def:crs:CRS::84"
+      }
+    }
+  }
+}

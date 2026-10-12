@@ -3,7 +3,7 @@
   "name": "nz-public-data",
   "description": "Public, read-only New Zealand data and public-interest sources.",
   "default": true,
-  "skill_count": 136,
+  "skill_count": 137,
   "skills": [
     "akl-housing-capacity",
     "akl-ontrack",
@@ -44,6 +44,7 @@
     "fyi-oia-nz",
     "geonet-nz",
     "gets-procurement-nz",
+    "gns-auckland-geology",
     "gns-hazards-nz",
     "gtfs-nz",
     "gwrc-hilltop-nz",

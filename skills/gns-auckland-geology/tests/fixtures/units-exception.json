@@ -1,0 +1,7 @@
+{
+  "status": 400,
+  "truncated": false,
+  "contains_live_credentials": false,
+  "contains_personal_data": false,
+  "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><ows:ExceptionReport version=\"2.0.0\"><ows:Exception exceptionCode=\"InvalidParameterValue\" locator=\"typeName\"><ows:ExceptionText>Feature type was not the Auckland geological units layer</ows:ExceptionText></ows:Exception></ows:ExceptionReport>"
+}

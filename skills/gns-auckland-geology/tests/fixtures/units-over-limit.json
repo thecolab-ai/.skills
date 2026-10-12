@@ -1,0 +1,32 @@
+{
+  "status": 200,
+  "truncated": false,
+  "contains_live_credentials": false,
+  "contains_personal_data": false,
+  "body": {
+    "type": "FeatureCollection",
+    "features": [
+      {
+        "type": "Feature",
+        "id": "NZL-Urban_Auckland_geological_units.1",
+        "geometry": {
+          "type": "Polygon",
+          "coordinates": [[[174.77, -36.85], [174.78, -36.85], [174.78, -36.84], [174.77, -36.84], [174.77, -36.85]]]
+        },
+        "properties": {"unit_code": "ONE"}
+      },
+      {
+        "type": "Feature",
+        "id": "NZL-Urban_Auckland_geological_units.2",
+        "geometry": {
+          "type": "Polygon",
+          "coordinates": [[[174.77, -36.85], [174.78, -36.85], [174.78, -36.84], [174.77, -36.84], [174.77, -36.85]]]
+        },
+        "properties": {"unit_code": "TWO"}
+      }
+    ],
+    "numberMatched": 2,
+    "numberReturned": 2,
+    "crs": {"type": "name", "properties": {"name": "urn:ogc:def:crs:EPSG::4326"}}
+  }
+}
