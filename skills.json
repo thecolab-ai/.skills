@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
-  "last_verified": "2026-10-12",
-  "skill_count": 185,
+  "last_verified": "2026-10-31",
+  "skill_count": 186,
   "skills": [
     {
       "name": "airnz-flights",
@@ -1462,6 +1462,33 @@
       "last_verified": "2026-07-19",
       "health": "healthy",
       "maintainer": "@adam91holt"
+    },
+    {
+      "name": "genesis-energy-nz",
+      "description": "Read a user-authorised Genesis Energy NZ account electricity interval usage and provider-reported usage costs. Use for daily or bounded date-range electricity summaries; no invoices, payments, tariff quotes, or account changes.",
+      "path": "skills/genesis-energy-nz",
+      "category": "energy",
+      "source_owner": "Genesis Energy",
+      "source_type": "commercial",
+      "source_url": "https://myaccount.genesisenergy.co.nz",
+      "auth": "mixed",
+      "access_mode": "authenticated-personal",
+      "data_class": "personal",
+      "writes": false,
+      "browser": false,
+      "risk": "high",
+      "cache_ttl": "none",
+      "schema_version": "1",
+      "skill_type": "authenticated-personal",
+      "pack": "nz-personal-data",
+      "allowed_domains": [
+        "auth.genesisenergy.co.nz",
+        "web-api.genesisenergy.co.nz",
+        "myaccount.genesisenergy.co.nz"
+      ],
+      "last_verified": "2026-10-31",
+      "health": "gated",
+      "maintainer": "@jameshulse"
     },
     {
       "name": "geonet-nz",

@@ -3,9 +3,10 @@
   "name": "nz-personal-data",
   "description": "User-authorised personal data with runtime credentials and no live personal CI fixtures.",
   "default": false,
-  "skill_count": 5,
+  "skill_count": 6,
   "skills": [
     "akahu-personal",
+    "genesis-energy-nz",
     "newworld-nz",
     "paknsave-nz",
     "trademe-nz",
