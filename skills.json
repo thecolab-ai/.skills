@@ -1465,7 +1465,7 @@
     },
     {
       "name": "genesis-energy-nz",
-      "description": "Read a user-authorised Genesis Energy NZ account electricity interval usage and provider-reported usage costs. Use for daily or bounded date-range electricity summaries; no invoices, payments, tariff quotes, or account changes.",
+      "description": "Get electricity use and usage costs from your Genesis Energy NZ account. Use for hourly readings, daily totals, or a summary of up to 31 days.",
       "path": "skills/genesis-energy-nz",
       "category": "energy",
       "source_owner": "Genesis Energy",

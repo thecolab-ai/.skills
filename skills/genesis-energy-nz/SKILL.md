@@ -1,6 +1,6 @@
 ---
 name: genesis-energy-nz
-description: "Read a user-authorised Genesis Energy NZ account electricity interval usage and provider-reported usage costs. Use for daily or bounded date-range electricity summaries; no invoices, payments, tariff quotes, or account changes."
+description: "Get electricity use and usage costs from your Genesis Energy NZ account. Use for hourly readings, daily totals, or a summary of up to 31 days."
 license: MIT
 metadata:
   thecolab.category: "energy"
@@ -25,10 +25,61 @@ metadata:
 
 # Genesis Energy NZ
 
-Read a user's own electricity intervals and associated Genesis-reported NZD
-usage costs. This is a community client of the My Account website endpoints.
-It runs independently of Home Assistant and uses only the Python standard library.
-Requires Python 3.10+, IANA timezone data and user-supplied Genesis credentials.
+See how much electricity you have used and the usage costs Genesis reports for
+your account. Get hourly readings, daily totals or a summary for a chosen period.
+
+## What it retrieves
+
+| Data | What you get |
+| --- | --- |
+| Electricity use | kWh for each completed hour |
+| Usage costs | The NZD cost Genesis reports for those hours |
+| Summaries | Daily totals or a total for a chosen period of up to 31 days |
+| Latest reading | When the newest supplied hour started |
+| Completeness | How many requested hours were supplied or are still missing |
+
+## Example
+
+Made-up data from the synthetic test fixture; no real account information:
+
+| Hour starting (NZ time) | Electricity use | Usage cost |
+| --- | ---: | ---: |
+| 1 Jan 2024, 00:00 | 0.10 kWh | NZ$0.03 |
+| 1 Jan 2024, 01:00 | 0.20 kWh | NZ$0.06 |
+
+**Summary:** 0.30 kWh and NZ$0.09 across 2 of the day's 24 hours. The latest
+reading starts at 01:00 NZDT. **22 hours are missing, so this is a partial total.**
+
+<details>
+<summary>Example JSON summary record</summary>
+
+The same example as one record in the JSON `results` array:
+
+```json
+{
+  "start_date": "2024-01-01",
+  "end_date": "2024-01-01",
+  "timezone": "Pacific/Auckland",
+  "expected_intervals": 24,
+  "received_intervals": 2,
+  "missing_intervals": 22,
+  "coverage": "incomplete",
+  "latest_interval_start": "2024-01-01T01:00:00+13:00",
+  "observed_usage_kwh": "0.30",
+  "observed_usage_cost_nzd": "0.09"
+}
+```
+
+</details>
+
+Usage costs cover the readings Genesis supplies. They are not a tariff quote or
+a complete bill; tax, fixed charges and discount coverage still need confirmation.
+
+## Setup
+
+Requires a Genesis account, Python 3.10+ and IANA timezone data. It runs
+independently of Home Assistant and uses only the Python standard library.
+This community skill connects to the Genesis My Account website endpoints.
 
 ## Access and privacy
 
