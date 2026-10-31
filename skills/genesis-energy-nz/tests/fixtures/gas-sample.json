@@ -1,0 +1,21 @@
+{
+  "fixture": "synthetic-gas-intervals",
+  "contains_live_credentials": false,
+  "contains_personal_data": false,
+  "response": {
+    "unused_field": "synthetic-gas-ignored-marker",
+    "usage": [
+      {
+        "startDate": "2024-01-01T00:00:00+13:00",
+        "kw": "2.0",
+        "costNZD": "0.18",
+        "unused_field": "synthetic-gas-ignored-marker"
+      },
+      {
+        "startDate": "2024-01-01T01:00:00+13:00",
+        "kw": "3.0",
+        "costNZD": "0.27"
+      }
+    ]
+  }
+}

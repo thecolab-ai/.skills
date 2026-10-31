@@ -16,6 +16,7 @@ from urllib.parse import parse_qs, urlencode, urljoin, urlsplit
 
 AUTH = "https://auth.genesisenergy.co.nz/auth.genesisenergy.co.nz"
 DATA = "https://web-api.genesisenergy.co.nz/v2/private/electricity/site-usage"
+GAS_DATA = "https://web-api.genesisenergy.co.nz/v2/private/naturalgas/advanced/usage"
 REDIRECT = "https://myaccount.genesisenergy.co.nz/auth/redirect"
 # Public Genesis website OAuth application identifier, not a user/API secret.
 CLIENT_ID = "8e41676f-7601-4490-9786-85d74f387f47"
@@ -49,7 +50,16 @@ class Transport:
     def request(self, method, url, *, form=None, payload=None, headers=None):
         parsed = urlsplit(url)
         auth_origin = (parsed.scheme, parsed.netloc) == ("https", "auth.genesisenergy.co.nz")
-        if not (auth_origin or url == DATA):
+        gas_target = urlsplit(GAS_DATA)
+        gas_read = (method == "GET" and not parsed.fragment and
+                    (parsed.scheme, parsed.netloc, parsed.path) ==
+                    (gas_target.scheme, gas_target.netloc, gas_target.path))
+        if gas_read:
+            query = parse_qs(parsed.query, keep_blank_values=True)
+            gas_read = (set(query) == {"startDate", "endDate", "intervalType"}
+                        and all(len(values) == 1 for values in query.values())
+                        and query["intervalType"] == ["HOURLY"])
+        if not (auth_origin or (method == "POST" and url == DATA) or gas_read):
             raise GenesisError(4, "Unexpected Genesis destination")
         body = None
         request_headers = {"User-Agent": "genesis-energy-nz/1", **(headers or {})}
@@ -74,6 +84,10 @@ class Transport:
                     # Never echo an arbitrary header; only a short delay in seconds.
                     retry = retry if re.fullmatch(r"[0-9]{1,8}", retry) else None
                     raise GenesisError(4, "Genesis rate limit; retry later", retry)
+                if gas_read and status in (400, 404, 422):
+                    # Absence of a gas service and provider date rejection may
+                    # look alike. Do not claim which one occurred or invent zero.
+                    raise GenesisError(7, "Gas usage is unavailable for this account or date range; try earlier dates or check gas service")
                 if status not in (200, 302, 303, 400):
                     raise GenesisError(5, "Unexpected Genesis HTTP status")
                 raw = response.read(MAX_BODY + 1)
@@ -95,7 +109,7 @@ def object_json(body):
 
 
 class Client:
-    """One invocation, one login, and a fixed electricity read endpoint."""
+    """One invocation, one login, and fixed electricity/optional gas reads."""
 
     def __init__(self, transport=None):
         self.transport = transport if transport is not None else Transport()
@@ -195,4 +209,15 @@ class Client:
         }, headers={"Authorization": f"Bearer {self.token}"})
         if status != 200:
             raise GenesisError(5, "Genesis electricity request failed")
+        return object_json(body)
+
+    def gas(self, start, end):
+        if not self.token:
+            raise GenesisError(3, "Genesis sign-in required")
+        url = GAS_DATA + "?" + urlencode({
+            "startDate": start.isoformat(), "endDate": end.isoformat(), "intervalType": "HOURLY",
+        })
+        status, body, _ = self.request("GET", url, headers={"Authorization": f"Bearer {self.token}"})
+        if status != 200:
+            raise GenesisError(5, "Genesis gas request failed")
         return object_json(body)

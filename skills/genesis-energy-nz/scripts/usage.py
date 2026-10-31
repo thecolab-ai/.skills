@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Normalise only electricity interval fields and report explicit coverage."""
+"""Normalise selected fuel intervals and report explicit coverage."""
 from __future__ import annotations
 
 from datetime import date, datetime, time, timedelta, timezone
@@ -62,12 +62,15 @@ def normalise(data, start, end, now):
     return rows
 
 
-def fetch_usage(client, start, end, now, pause):
-    """Inclusive two-date requests stay below the observed 100-row limit."""
+def fetch_usage(client, start, end, now, pause, fuel="electricity"):
+    """Read exactly one fuel; two-date chunks stay below both observed caps."""
+    if fuel not in ("electricity", "gas"):
+        raise GenesisError(2, "Select electricity or gas")
+    read = client.gas if fuel == "gas" else client.electricity
     rows, cursor = {}, start
     while cursor <= end:
         chunk_end = min(cursor + timedelta(days=1), end)
-        incoming = normalise(client.electricity(cursor, chunk_end), cursor, chunk_end, now)
+        incoming = normalise(read(cursor, chunk_end), cursor, chunk_end, now)
         rows.update(incoming)
         cursor = chunk_end + timedelta(days=1)
         if cursor <= end:

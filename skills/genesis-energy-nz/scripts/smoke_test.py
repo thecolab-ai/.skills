@@ -13,8 +13,8 @@ def main():
     if not result.wasSuccessful():
         print("[FAIL] fixture Genesis synthetic behaviour")
         return 1
-    print("[PASS] fixture synthetic interval parsing, precision, gaps and DST")
-    print("[PASS] contract fixed authentication destinations, bounded chunks and safe errors")
+    print("[PASS] fixture synthetic electricity/gas parsing, precision, gaps and DST")
+    print("[PASS] contract optional gas isolation, fixed destinations, bounded chunks and safe errors")
     print("[SKIP] live Genesis verification requires owner-authorised personal credentials; never run in CI")
     return 0
 

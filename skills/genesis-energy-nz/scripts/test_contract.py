@@ -11,6 +11,7 @@ import subprocess
 import sys
 import unittest
 import urllib.error
+from urllib.parse import parse_qs, urlencode, urlsplit
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
@@ -19,7 +20,7 @@ from unittest.mock import Mock, patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "lib"))
 from contract_test import audit_skill
 import cli
-from genesis import AUTH, DATA, REDIRECT, Client, GenesisError, NoRedirect, Transport, object_json, MAX_BODY
+from genesis import AUTH, DATA, GAS_DATA, REDIRECT, Client, GenesisError, NoRedirect, Transport, object_json, MAX_BODY
 from usage import HOUR, NZ, coverage, date_range, fetch_usage, midnight, normalise, records
 
 FIXTURES = Path(__file__).resolve().parents[1] / "tests" / "fixtures"
@@ -245,6 +246,8 @@ class SourceTests(unittest.TestCase):
         code, out, err, _ = self.invoke(args, factory, env)
         self.assertEqual(code, 0)
         self.assertFalse(err)
+        factory.return_value.gas.assert_not_called()
+        self.assertEqual(json.loads(out)["meta"]["fuel"], "electricity")
         self.assertEqual(json.loads(out)["results"][0]["observed_usage_cost_nzd"], "0.09")
         for marker in (*env.values(), "synthetic-ignored-marker", "access_token"):
             self.assertNotIn(marker, out)
@@ -258,6 +261,150 @@ class SourceTests(unittest.TestCase):
         self.assertEqual(code, 6)
         self.assertNotIn("synthetic-password", out + err)
         self.assertNotIn("Traceback", out + err)
+
+
+    def test_optional_gas_selects_only_gas_and_identifies_output(self):
+        fixture = json.loads((FIXTURES / "gas-sample.json").read_text())
+        self.assertFalse(fixture["contains_live_credentials"])
+        self.assertFalse(fixture["contains_personal_data"])
+        for command in ("usage", "summary"):
+            factory = Mock()
+            factory.return_value.gas.return_value = fixture["response"]
+            env = {"GENESIS_EMAIL": "fixture-user@example.invalid", "GENESIS_PASSWORD": "synthetic-password"}
+            args = [command, "--fuel", "gas", "--start", "2024-01-01", "--end", "2024-01-01", "--json"]
+            code, out, err, _ = self.invoke(args, factory, env)
+            self.assertEqual(code, 0)
+            self.assertFalse(err)
+            factory.return_value.electricity.assert_not_called()
+            factory.return_value.gas.assert_called_once_with(DAY, DAY)
+            result = json.loads(out)
+            self.assertEqual(result["meta"]["fuel"], "gas")
+            self.assertEqual(result["meta"]["source_url"], GAS_DATA)
+            self.assertEqual(result["meta"]["observed_usage_cost_nzd"], "0.45")
+            self.assertEqual(result["meta"]["missing_intervals"], 22)
+            for value in (*env.values(), "synthetic-gas-ignored-marker", "access_token"):
+                self.assertNotIn(value, out + err)
+
+    def test_gas_uses_fixed_get_endpoint_and_date_query_without_body(self):
+        fixture = json.loads((FIXTURES / "gas-sample.json").read_text())["response"]
+        transport = QueueTransport([(200, json.dumps(fixture), {})])
+        client = Client(transport)
+        client.token = "synthetic-access"
+        self.assertEqual(client.gas(DAY, DAY), fixture)
+        method, url, kwargs = transport.calls[0]
+        self.assertEqual(method, "GET")
+        parsed = urlsplit(url)
+        self.assertEqual(url.split("?")[0], GAS_DATA)
+        self.assertEqual(parse_qs(parsed.query), {"startDate": ["2024-01-01"], "endDate": ["2024-01-01"], "intervalType": ["HOURLY"]})
+        self.assertEqual(kwargs, {"headers": {"Authorization": "Bearer synthetic-access"}})
+        real_transport = Transport()
+        response = urllib.error.HTTPError(url, 200, "", {}, io.BytesIO(json.dumps(fixture).encode()))
+        with patch.object(real_transport.opener, "open", return_value=response) as opened:
+            self.assertEqual(object_json(real_transport.request(method, url, **kwargs)[1]), fixture)
+        request = opened.call_args.args[0]
+        self.assertEqual(request.get_method(), "GET")
+        self.assertIsNone(request.data)
+        self.assertEqual(request.get_header("Authorization"), "Bearer synthetic-access")
+        self.assertNotIn("synthetic-access", request.full_url)
+        with patch.object(real_transport.opener, "open") as opened:
+            for invalid_url in (GAS_DATA + "/extra?" + parsed.query, url + "&token=synthetic-access", url + "&startDate=2024-01-01", url + "#fragment"):
+                with self.assertRaises(GenesisError):
+                    real_transport.request("GET", invalid_url)
+            with self.assertRaises(GenesisError):
+                real_transport.request("POST", url)
+            opened.assert_not_called()
+
+    def test_gas_unavailable_is_a_safe_error_and_does_not_affect_electricity(self):
+        url = GAS_DATA + "?" + urlencode({"startDate": "2024-01-01", "endDate": "2024-01-01", "intervalType": "HOURLY"})
+        env = {"GENESIS_EMAIL": "fixture-user@example.invalid", "GENESIS_PASSWORD": "synthetic-password"}
+        for status in (400, 404, 422):
+            transport = Transport()
+            response = urllib.error.HTTPError(url, status, "synthetic-private-message", {}, io.BytesIO(b"synthetic-private-body"))
+            with patch.object(transport.opener, "open", side_effect=response) as opened:
+                with self.assertRaises(GenesisError) as raised:
+                    transport.request("GET", url)
+                opened.assert_called_once()
+            self.assertEqual(raised.exception.code, 7)
+            self.assertNotIn("synthetic-private", str(raised.exception))
+            factory = Mock()
+            factory.return_value.gas.side_effect = raised.exception
+            factory.return_value.electricity.return_value = sample()
+            args = ["summary", "--start", "2024-01-01", "--end", "2024-01-01", "--json"]
+            code, out, err, _ = self.invoke([*args, "--fuel", "gas"], factory, env)
+            self.assertEqual(code, 7)
+            result = json.loads(out)
+            self.assertEqual(result["error"]["type"], "unsupported_operation")
+            self.assertEqual(result["results"], [])
+            self.assertEqual(result["meta"]["fuel"], "gas")
+            self.assertNotIn("observed_usage_cost_nzd", result["meta"])
+            code, out, err, _ = self.invoke(args, factory, env)
+            self.assertEqual(code, 0)
+            self.assertEqual(json.loads(out)["meta"]["fuel"], "electricity")
+            self.assertEqual(factory.return_value.gas.call_count, 1)
+
+    def test_empty_gas_and_later_chunk_failure_never_become_zero(self):
+        factory = Mock()
+        factory.return_value.gas.return_value = {"usage": []}
+        env = {"GENESIS_EMAIL": "fixture-user@example.invalid", "GENESIS_PASSWORD": "synthetic-password"}
+        args = ["summary", "--fuel", "gas", "--start", "2024-01-01", "--end", "2024-01-01", "--json"]
+        code, out, err, _ = self.invoke(args, factory, env)
+        self.assertEqual(code, 0)
+        report = json.loads(out)["results"][0]
+        self.assertEqual(report["coverage"], "no_readings")
+        self.assertIsNone(report["observed_usage_kwh"])
+        self.assertIsNone(report["observed_usage_cost_nzd"])
+        fixture = json.loads((FIXTURES / "gas-sample.json").read_text())["response"]
+        factory.return_value.gas.side_effect = [fixture, GenesisError(7, "Gas usage is unavailable for this account or date range; try earlier dates or check gas service")]
+        args[6] = "2024-01-03"
+        with patch.object(cli.time, "sleep"):
+            code, out, err, _ = self.invoke(args, factory, env)
+        self.assertEqual(code, 7)
+        self.assertEqual(json.loads(out)["results"], [])
+        factory.return_value.electricity.assert_not_called()
+
+    def test_gas_bounded_chunks_and_dst(self):
+        client, pause = Mock(), Mock()
+        start, end = date(2024, 4, 6), date(2024, 4, 7)
+        hours = 49
+        client.gas.return_value = {"usage": [
+            {"startDate": (midnight(start) + i * HOUR).isoformat(), "kw": "1.0", "costNZD": "0.09"}
+            for i in range(hours)
+        ]}
+        rows = fetch_usage(client, start, end, datetime(2024, 4, 10, tzinfo=timezone.utc), pause, "gas")
+        self.assertEqual(len(rows), hours)
+        self.assertEqual(coverage(rows, start, end)["coverage"], "complete")
+        self.assertEqual(coverage(rows, end, end)["expected_intervals"], 25)
+        client.electricity.assert_not_called()
+        client.gas.assert_called_once_with(start, end)
+        pause.assert_not_called()
+        client.reset_mock()
+        client.gas.return_value = {"usage": []}
+        fetch_usage(client, DAY, date(2024, 1, 31), NOW, pause, "gas")
+        self.assertEqual(client.gas.call_count, 16)
+        self.assertEqual(pause.call_count, 15)
+        client.electricity.assert_not_called()
+
+    def test_gas_auth_rate_limit_and_outage_are_not_absent_service(self):
+        url = GAS_DATA + "?" + urlencode({"startDate": "2024-01-01", "endDate": "2024-01-01", "intervalType": "HOURLY"})
+        for status, code in ((401, 4), (403, 4), (429, 4), (503, 5)):
+            transport = Transport()
+            response = urllib.error.HTTPError(url, status, "synthetic-private-message", {"Retry-After": "60"}, io.BytesIO(b"synthetic-private-body"))
+            with patch.object(transport.opener, "open", side_effect=response) as opened:
+                with self.assertRaises(GenesisError) as raised:
+                    transport.request("GET", url)
+                opened.assert_called_once()
+            self.assertEqual(raised.exception.code, code)
+            if status == 429:
+                self.assertEqual(raised.exception.retry_after, "60")
+            self.assertNotIn("synthetic-private", str(raised.exception))
+
+    def test_gas_missing_credentials_and_invalid_fuel_do_not_query(self):
+        base = ["summary", "--start", "2024-01-01", "--end", "2024-01-01", "--json"]
+        for fuel, expected in (("gas", 3), ("invalid-fuel", 2)):
+            code, out, err, factory = self.invoke([*base, "--fuel", fuel])
+            self.assertEqual(code, expected)
+            factory.assert_not_called()
+            self.assertEqual(json.loads(out)["results"], [])
 
 
 def main():

@@ -1465,7 +1465,7 @@
     },
     {
       "name": "genesis-energy-nz",
-      "description": "Get electricity use and usage costs from your Genesis Energy NZ account. Use for hourly readings, daily totals, or a summary of up to 31 days.",
+      "description": "Get electricity use and usage costs from your Genesis Energy NZ account, with optional natural gas. Use for hourly readings and daily or period summaries.",
       "path": "skills/genesis-energy-nz",
       "category": "energy",
       "source_owner": "Genesis Energy",

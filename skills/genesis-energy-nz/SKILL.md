@@ -1,6 +1,6 @@
 ---
 name: genesis-energy-nz
-description: "Get electricity use and usage costs from your Genesis Energy NZ account. Use for hourly readings, daily totals, or a summary of up to 31 days."
+description: "Get electricity use and usage costs from your Genesis Energy NZ account, with optional natural gas. Use for hourly readings and daily or period summaries."
 license: MIT
 metadata:
   thecolab.category: "energy"
@@ -27,18 +27,20 @@ metadata:
 
 See how much electricity you have used and the usage costs Genesis reports for
 your account. Get hourly readings, daily totals or a summary for a chosen period.
+Natural gas is available as an optional choice if you have it with Genesis.
 
 ## What it retrieves
 
 | Data | What you get |
 | --- | --- |
 | Electricity use | kWh for each completed hour |
+| Natural gas (optional) | Hourly gas use and usage costs, where available |
 | Usage costs | The NZD cost Genesis reports for those hours |
 | Summaries | Daily totals or a total for a chosen period of up to 31 days |
 | Latest reading | When the newest supplied hour started |
 | Completeness | How many requested hours were supplied or are still missing |
 
-## Example
+## Electricity example
 
 Made-up data from the synthetic test fixture; no real account information:
 
@@ -74,6 +76,28 @@ The same example as one record in the JSON `results` array:
 
 Usage costs cover the readings Genesis supplies. They are not a tariff quote or
 a complete bill; tax, fixed charges and discount coverage still need confirmation.
+
+## Optional gas
+
+Commands read **electricity only by default**. Add `--fuel gas` to read natural
+gas instead; no electricity request is made for that invocation. Users without
+gas can use the default commands without any gas checks or configuration.
+
+```bash
+python3 skills/genesis-energy-nz/scripts/cli.py summary --fuel gas --start 2024-01-01 --end 2024-01-01 --group range --json
+```
+
+Made-up gas example from the synthetic test fixture:
+
+| Period | Gas use (interpreted kWh) | Usage cost | Coverage |
+| --- | ---: | ---: | --- |
+| 1 Jan 2024 | 5.0 kWh | NZ$0.45 | 2 of 24 hours; partial total |
+
+If Genesis returns no readings, totals are null and coverage is `no_readings`.
+A rejected gas account/date request returns an error, never zero usage. That can
+mean the account has no supported gas service or that dates are beyond the latest
+available readings; try earlier dates or check the service in My Account.
+This does not affect separate electricity requests. No combined-fuel total is made.
 
 ## Setup
 
@@ -114,9 +138,11 @@ limited to 31 days per invocation, and cannot extend beyond today. Reads use
 inclusive two-date chunks, one second apart. Query on demand; do not poll more
 than hourly. Older date availability is controlled by Genesis and not guaranteed.
 
+Both commands accept `--fuel electricity|gas`; omitting it selects electricity.
 `usage` returns completed hourly intervals. `summary` returns one record per NZ
 calendar day, or one for the whole range. Both accept `--json`; without it they
-print a coverage header and readable records. The common repo runner also works.
+print a coverage header and readable records. JSON `meta.fuel` identifies the
+selected fuel. The common repo runner also works.
 
 ## Interpretation
 
@@ -124,7 +150,8 @@ print a coverage header and readable records. The common repo runner also works.
   observed usage costs, not tariff quotes, invoices, balances or a complete bill.
   GST, fixed charges, discounts and fee inclusion have not been established.
 - The provider field `kw` is interpreted as interval kWh, following the upstream
-  integration. Confirm against My Account before relying on totals.
+  client. This applies to both fuels; gas units have not been independently
+  established. Confirm against My Account before relying on totals.
 - `observed_*` sums include only supplied completed intervals. Missing intervals
   never become zero. An empty period has null totals and `no_readings`.
 - Coverage compares received hours with the **entire requested date range**;
@@ -132,14 +159,14 @@ print a coverage header and readable records. The common repo runner also works.
   `coverage`, `missing_intervals` and `latest_interval_start` with any total.
 - The upstream endpoint implicitly selects a site. This version cannot list or
   select sites; use only where that default is the intended site.
-- Only electricity is implemented. There are no gas, invoice, payment, profile,
-  tariff-change or generic endpoint commands.
+- Gas is opt-in natural gas only, not an LPG price feed. There are no invoice,
+  payment, profile, tariff-change or generic endpoint commands.
 
 ## Verification and resources
 
 - `scripts/cli.py`: canonical entrypoint; JSON uses the provenance helpers in
   `scripts/provenance.py` with static error messages and stable exit codes.
-- `scripts/genesis.py`: fixed-destination authentication and electricity reads.
+- `scripts/genesis.py`: fixed-destination authentication, electricity reads and optional gas reads.
 - `scripts/usage.py`: strict field selection, intervals and NZ coverage handling.
 - `scripts/test_contract.py` and `scripts/smoke_test.py`: offline synthetic checks;
   neither authenticates or reads personal data, even when credentials are set.
