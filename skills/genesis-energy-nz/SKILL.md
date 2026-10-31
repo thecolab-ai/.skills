@@ -77,8 +77,8 @@ a complete bill; tax, fixed charges and discount coverage still need confirmatio
 
 ## Setup
 
-Requires a Genesis account, Python 3.10+ and IANA timezone data. It runs
-independently of Home Assistant and uses only the Python standard library.
+Requires a Genesis account, Python 3.10+ and IANA timezone data.
+Uses only the Python standard library.
 This community skill connects to the Genesis My Account website endpoints.
 
 ## Access and privacy
@@ -91,7 +91,7 @@ This community skill connects to the Genesis My Account website endpoints.
   API subscription in this implementation; an accessible Genesis account is needed.
   Example variable names for a private environment file are `GENESIS_EMAIL` and
   `GENESIS_PASSWORD`; provision their values privately and never commit that file.
-  The CLI does not automatically load environment files or existing HA credentials.
+  The CLI does not automatically load environment files or existing application credentials.
 - Authentication goes directly to Genesis. Cookies and tokens are kept only
   in memory. No external proxy service, telemetry, disk cache or credential store.
 - Treat returned usage and costs as private household data. Avoid shared logs,

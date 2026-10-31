@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bounded Genesis My Account reads, adapted from MIT ha-genesisenergy.
+"""Bounded Genesis My Account reads, derived from an MIT-licensed Genesis client.
 
 See ../LICENSE and ../references/source-notes.md for attribution and limitations.
 No credentials, tokens, cookies, response bodies or account identifiers are logged.

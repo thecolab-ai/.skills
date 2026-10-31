@@ -38,7 +38,7 @@ def main(argv=None):
         now = datetime.now(timezone.utc)
         start, end = date_range(args.start, args.end, now.astimezone(NZ).date())
         # Read credentials only after validating the requested operation. Never
-        # read HA storage, browser profiles, keyrings, .env files or CLI secrets.
+        # read existing app config, browser profiles, keyrings, .env files or CLI secrets.
         email = os.environ.get("GENESIS_EMAIL")
         password = os.environ.get("GENESIS_PASSWORD")
         if not email or not password:

@@ -7,12 +7,11 @@
 
 Publisher: Genesis Energy. Primary website: https://myaccount.genesisenergy.co.nz.
 The code derives its sign-in sequence and electricity field mapping from
-[JoelBrenstrum/ha-genesisenergy](https://github.com/JoelBrenstrum/ha-genesisenergy)
+[the upstream Genesis client](https://github.com/JoelBrenstrum/ha-genesisenergy)
 at commit `9a3a0e5edf94f29f23448595b47fdac81d549c92`, with subsequent authentication,
 privacy and interval-handling improvements. The original MIT copyright and licence
-are preserved in `../LICENSE`. This contribution uses a synchronous stdlib client;
-it has no Home Assistant runtime dependency. The code licence does not grant
-reuse rights over private account data. No public data reuse licence is asserted.
+are preserved in `../LICENSE`. This contribution uses a synchronous stdlib client.
+The code licence does not grant reuse rights over private account data. No public data reuse licence is asserted.
 
 ## Authentication and outbound traffic
 
