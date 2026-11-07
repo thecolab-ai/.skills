@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import random
 import subprocess
 import sys
 from pathlib import Path
@@ -15,7 +16,29 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import cli  # noqa: E402
 
 LIVE_BARCODE = "3017624010701"
-ABSENT_BARCODE = "1234567890128"
+
+
+def ean13_check_digit(first12: str) -> str:
+    total = sum(int(digit) * (3 if index % 2 else 1) for index, digit in enumerate(first12))
+    return str((10 - total % 10) % 10)
+
+
+def absent_barcode(rng: random.Random | None = None) -> str:
+    """A fresh EAN-13-shaped code with a deliberately wrong check digit.
+
+    A fixed "absent" code is not stable: 1234567890128 (a valid EAN-13 often
+    used as an example) was added to Open Food Facts on 2026-10-28 as Harvest
+    Box fruit clusters, which broke the not-found probe. A random code with an
+    invalid check digit cannot be printed on a real product, and a new one is
+    drawn per run so nobody can "fill" it.
+    """
+    rng = rng or random.SystemRandom()
+    first12 = "29" + "".join(rng.choice("0123456789") for _ in range(10))
+    good = ean13_check_digit(first12)
+    return first12 + str((int(good) + 1 + rng.randrange(9)) % 10)
+
+
+ABSENT_BARCODE = absent_barcode()
 NETWORK_MARKERS = (
     "network error",
     "upstream unavailable",
@@ -84,6 +107,14 @@ def fixture_checks() -> None:
     require("/00012345678905.json?" in url and url.startswith("https://world.openfoodfacts.org/"), url)
     print("[PASS] fixture barcode URL preserves leading zeros on the allowlisted host")
 
+    require(ean13_check_digit("301762401070") == "1", "EAN-13 check digit drifted")
+    require(ean13_check_digit("123456789012") == "8", "EAN-13 check digit drifted")
+    for seed in range(50):
+        probe = absent_barcode(random.Random(seed))
+        require(len(probe) == 13 and cli.normalise_barcode(probe) == probe, probe)
+        require(probe[-1] != ean13_check_digit(probe[:12]), f"absent probe {probe} has a valid check digit")
+    print("[PASS] fixture absent-barcode probe is a fresh EAN-13 shape with an invalid check digit")
+
 
 def transport_failure(code: int, stdout: str, stderr: str) -> bool:
     if code not in {4, 5}:
@@ -130,7 +161,7 @@ def live_checks() -> int:
         absent = json.loads(absent_out)
         require(absent_code == 0 and absent["results"] == [], absent_out[:500])
         require(any("product_not_found" in item for item in absent.get("warnings", [])), absent.get("warnings"))
-        print("[PASS] live unknown barcode 1234567890128 is an empty not-found result")
+        print(f"[PASS] live unknown barcode {ABSENT_BARCODE} (invalid check digit) is an empty not-found result")
 
         searched = json.loads(search_out)
         require(search_code == 0 and searched["results"], search_out[:500])
