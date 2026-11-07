@@ -13,7 +13,7 @@ Search HTML embeds a `window.category` JSON object. Observed fields include `ite
 
 ## JSON-LD fields
 
-Detail pages expose Product JSON-LD with name, description, brand, image, SKU and one or more offers. Offers commonly include price, currency, availability, and SKU. Parsers tolerate list/dict offers, missing optional fields, malformed unrelated blocks, HTML entities, and `@graph` wrappers.
+Detail pages expose Product JSON-LD with name, description, brand, image, SKU and one or more offers. Offers commonly include price, currency, availability, and SKU. Since November 2026 product pages emit a schema.org `ProductGroup` (group name, brand, description, `productGroupID`) whose `hasVariant` array holds one `Product` per colour/size, each with its own offer; the CLI flattens variant offers (SKU from the variant) and reports the cheapest priced offer. Parsers tolerate list/dict offers, missing optional fields, malformed unrelated blocks, HTML entities, and `@graph` wrappers.
 
 ## Output contract
 
