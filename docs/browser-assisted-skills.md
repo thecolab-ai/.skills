@@ -25,6 +25,7 @@ Browser-assisted mode must be opt-in and honest:
 - keep normal validation and non-browser smoke tests working on clean hosts;
 - if CloakBrowser is missing, return a clear machine-readable error named `cloakbrowser_not_installed`;
 - include a human recommendation to install CloakBrowser or rerun without `--browser`;
+- if CloakBrowser is installed but cannot start a session (launch or `new_page` fails, or CloakBrowser >= 0.7 raises `CloakBrowserLicenseError`, e.g. the plan's concurrent-session limit), return a machine-readable `browser_unavailable` error, never a traceback; smoke tests may SKIP on that explicit state only;
 - treat CAPTCHA, request-auth, bot challenges, or protected flows as blocked states, not puzzles to defeat;
 - if the browser path is blocked but a public fallback exists, return the fallback data and include an explicit blocked flag such as `fare_search_blocked: true`.
 
@@ -92,6 +93,8 @@ GitHub Actions smoke runs should install CloakBrowser and set:
 COLAB_SMOKE_WITH_CLOAKBROWSER=1
 COLAB_SMOKE_USE_BROWSER=1
 ```
+
+CloakBrowser 0.7.0 (1 November 2026) needs a licence key for every launch, and a free key allows one concurrent session. The parallel smoke runner can therefore see `browser_unavailable` (exit code 76, session limit) for browser skills that start while another browser is open.
 
 `scripts/run_all_smoke.sh` uses `uv run --with cloakbrowser` when `COLAB_SMOKE_WITH_CLOAKBROWSER=1`, so browser-assisted smoke tests can import CloakBrowser without making it a repo-wide static dependency.
 
