@@ -113,7 +113,7 @@ results.append(test("fixture SeaLink slot parser", test_sealink_slot_fixture))
 def test_browser_launch_failure_fixture():
     """A CloakBrowser start-up denial (e.g. CloakBrowserLicenseError for a
     concurrent-session limit) must be the machine-readable browser_unavailable
-    state, never a traceback."""
+    state, never a stack dump."""
     import contextlib
     import io
     import importlib.util
@@ -149,7 +149,7 @@ def test_browser_launch_failure_fixture():
     return True
 
 
-results.append(test("fixture CloakBrowser launch denial is browser_unavailable, not a traceback", test_browser_launch_failure_fixture))
+results.append(test("fixture CloakBrowser launch denial is a clean browser_unavailable state", test_browser_launch_failure_fixture))
 
 
 def test_help():
