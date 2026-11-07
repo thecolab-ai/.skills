@@ -120,7 +120,7 @@ def test_browser_launch_failure_fixture():
     return True
 
 
-results.append(test("fixture CloakBrowser launch denial is browser_unavailable, not a traceback", test_browser_launch_failure_fixture))
+results.append(test("fixture CloakBrowser launch denial is a clean browser_unavailable state", test_browser_launch_failure_fixture))
 
 
 def test_help():
