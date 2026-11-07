@@ -166,7 +166,7 @@ def test_browser_launch_failure_fixture():
     return True
 
 
-results.append(test('fixture CloakBrowser launch denial is browser_unavailable, not a traceback', test_browser_launch_failure_fixture))
+results.append(test('fixture CloakBrowser launch denial is a clean browser_unavailable state', test_browser_launch_failure_fixture))
 
 results.append(test("fixture Beehive RSS parsing", test_fixture_rss_parser))
 results.append(test("transient skip line is sanitised", test_transient_skip_line_is_sanitised))
