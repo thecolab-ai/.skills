@@ -17,7 +17,7 @@ No username, password, account cookie, private token, or browser session is requ
 - `GET /search/updategrid?q={query}&start={offset}&sz=32` for product search. The response is an HTML product-grid fragment with product data in `data-gtm-product` / `data-ga-product` attributes.
 - `GET /search/updategrid?cgid=specials&q={query?}&start={offset}&sz=32` for specials. The optional `q` parameter filters within the specials category.
 - `GET /on/demandware.store/Sites-twl-Site/default/Product-Show?pid={sku}` for product detail. The response includes schema.org Product JSON-LD and ecommerce detail metadata.
-- `GET /on/demandware.store/Sites-twl-Site/default/Stores-FindStores?region={NZ-region-code}` for stores. Omitting `region` returns all public stores; region codes include `NZ-AUK`, `NZ-CAN`, and the other region codes exposed by the store finder page.
+- `GET /on/demandware.store/Sites-twl-Site/default/Stores-FindStores?region={NZ-region-code}` for stores. Without `region` the controller now geolocates the caller's IP (observed 2026-11-08: `searchKey` lat 60.17/long 24.93, zero stores, from a European host), so the CLI sends an explicit NZ-wide circle `lat=-41&long=174&radius=2000` instead, which returned all 84 stores across 15 region codes; region codes include `NZ-AUK`, `NZ-CAN`, and the other region codes exposed by the store finder page.
 
 The site runs on Salesforce Commerce Cloud / Demandware (`Sites-twl-Site`). The implemented surface uses the public storefront controller endpoints rather than authenticated SLAS/SCAPI calls.
 

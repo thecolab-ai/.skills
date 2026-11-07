@@ -647,17 +647,35 @@ def cmd_product(args: argparse.Namespace) -> None:
     emit(data, args.json)
 
 
+# Without a region, Stores-FindStores now geolocates the caller's IP and searches near
+# that point (e.g. Helsinki for a European host, returning zero stores). An explicit
+# NZ-wide search circle keeps the national list independent of where the caller is.
+NZ_STORE_SEARCH = {"lat": -41.0, "long": 174.0, "radius": 2000}
+
+
+def stores_params(region: str | None) -> dict[str, Any]:
+    return {"region": region} if region else dict(NZ_STORE_SEARCH)
+
+
+def parse_stores_payload(payload: Any) -> list[dict[str, Any]]:
+    container = payload.get("stores") if isinstance(payload, dict) else None
+    raw_stores = container.get("stores") if isinstance(container, dict) else None
+    if not isinstance(raw_stores, list):
+        die("unexpected Stores-FindStores response shape: missing stores.stores[]")
+    return [parse_store(s) for s in raw_stores if isinstance(s, dict)]
+
+
 def cmd_stores(args: argparse.Namespace) -> None:
     region = normalize_region(args.region)
+    params = stores_params(region)
     started = time.perf_counter()
     browser_blocked = False
     try:
-        payload = request_json(STORES_PATH, {"region": region}, browser=args.browser)
+        payload = request_json(STORES_PATH, params, browser=args.browser)
     except BrowserBlockedError:
         browser_blocked = True
-        payload = request_json(STORES_PATH, {"region": region}, browser=False)
-    raw_stores = (((payload or {}).get("stores") or {}).get("stores") or [])
-    stores = [parse_store(s) for s in raw_stores if isinstance(s, dict)]
+        payload = request_json(STORES_PATH, params, browser=False)
+    stores = parse_stores_payload(payload)
     data = {
         "method": "direct public HTTP after blocked browser fallback" if browser_blocked else ("CloakBrowser public page fetch" if args.browser else "direct public HTTP"),
         "browser_blocked": browser_blocked or None,
