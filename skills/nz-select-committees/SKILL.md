@@ -65,4 +65,5 @@ The CLI reads Parliament's server-rendered select-committee index, including off
 - `scripts/test_contract.py` — deterministic repository contract audit
 - `scripts/smoke_test.py` — parser fixture and bounded live probe
 - `tests/fixtures/open.html` and `detail.html` — deadline, membership and evidence fixtures
+- `tests/fixtures/open-dissolved.html` — open items with an `N/A` closing date while Parliament is dissolved
 - `references/source-notes.md` — feasibility, provenance and source limits

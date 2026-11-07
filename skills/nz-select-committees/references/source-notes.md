@@ -7,6 +7,6 @@
 - Public listings: committee list, open submissions, business, evidence/submissions and reports
 - Access: public and read-only; hosts `www3.parliament.nz`, `www.parliament.nz`
 
-The parser reads Parliament listing rows and preserves title, committee, closing date/time and canonical item URL. Exact times are normalised with the explicit `Pacific/Auckland` timezone; a date-only source remains date-only. Bounded detail enrichment adds published committee membership and official evidence/submission/briefing links to committee, item and evidence commands. Missing detail fields remain missing rather than inferred.
+The parser reads Parliament listing rows and preserves title, committee, closing date/time and canonical item URL. Exact times are normalised with the explicit `Pacific/Auckland` timezone; a date-only source remains date-only. When Parliament is dissolved the open-submissions listing shows `N/A` in the closing-date column (submissions close early in the next Parliament); those items are kept with `closing_date: null` and are excluded from `closing-soon`. Bounded detail enrichment adds published committee membership and official evidence/submission/briefing links to committee, item and evidence commands. Missing detail fields remain missing rather than inferred.
 
 No account or submission flow is implemented. Parliament may present Radware challenges; these are blocked states, not empty results. User-configured proxy routing remains available through the repository fetch layer.
