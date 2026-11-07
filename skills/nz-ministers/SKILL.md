@@ -92,7 +92,8 @@ browser to clear the challenge **once**:
 - After that, those commands work over **plain HTTP from the cache** — no browser —
   until the cookies expire.
 - Without clearance, those commands return a machine-readable blocked state
-  (`clearance_required`, or `cloakbrowser_not_installed` if CloakBrowser is missing);
+  (`clearance_required`, `cloakbrowser_not_installed` if CloakBrowser is missing, or
+  `browser_unavailable` if it is installed but cannot start a session);
   `latest` always works regardless.
 
 The **full ministerial-diary archive** is rendered by a JavaScript search on beehive;

@@ -129,6 +129,23 @@ def _http_get(url: str, clearance: dict[str, str]) -> str:
         raise ApiError(str(e)) from e
 
 
+def _browser_unavailable(exc: BaseException) -> ClearanceUnavailable:
+    """Wrap a CloakBrowser start-up failure (e.g. a licence or concurrent-session
+    denial, or a browser that cannot launch on this host) as a clean
+    machine-readable state instead of a traceback."""
+    lines = str(exc).strip().splitlines()
+    detail = lines[0][:240] if lines else ""
+    return ClearanceUnavailable(
+        "browser_unavailable: CloakBrowser is installed but could not start a browser session "
+        f"({type(exc).__name__}: {detail})"
+    )
+
+
+def _is_cloakbrowser_licence_error(exc: BaseException) -> bool:
+    """CloakBrowser >= 0.7 can deny a session after launch (e.g. over the plan's seat limit)."""
+    return type(exc).__name__ == "CloakBrowserLicenseError"
+
+
 def _browser_fetch(url: str) -> tuple[str, str, str]:
     """Open `url` in CloakBrowser, clear the Incapsula challenge, and return
     (html, user_agent, cookie_header).
@@ -152,16 +169,21 @@ def _browser_fetch(url: str) -> tuple[str, str, str]:
     try:
         # CloakBrowser prints a banner to stdout on some versions — keep stdout clean.
         with contextlib.redirect_stdout(sys.stderr):
-            browser = launch(
-                headless=True,
-                args=["--no-sandbox", "--disable-dev-shm-usage"],
-                timezone="Pacific/Auckland",
-                locale="en-NZ",
-            )
-            page = browser.new_page()
+            try:
+                browser = launch(
+                    headless=True,
+                    args=["--no-sandbox", "--disable-dev-shm-usage"],
+                    timezone="Pacific/Auckland",
+                    locale="en-NZ",
+                )
+                page = browser.new_page()
+            except Exception as exc:
+                raise _browser_unavailable(exc) from exc
             try:
                 page.goto(url, wait_until="domcontentloaded", timeout=10000)
             except Exception as exc:
+                if _is_cloakbrowser_licence_error(exc):
+                    raise _browser_unavailable(exc) from exc
                 if 'timeout' in type(exc).__name__.lower() or 'ERR_TIMED_OUT' in str(exc):
                     raise ClearanceUnavailable('browser_blocked: Beehive browser navigation timed out') from exc
                 raise ApiError(f'Beehive browser navigation failed: {type(exc).__name__}') from exc
@@ -179,6 +201,10 @@ def _browser_fetch(url: str) -> tuple[str, str, str]:
                 )
             ua = page.evaluate("() => navigator.userAgent")
             cookie = "; ".join(f'{c["name"]}={c["value"]}' for c in page.context.cookies())
+    except Exception as exc:
+        if _is_cloakbrowser_licence_error(exc):
+            raise _browser_unavailable(exc) from exc
+        raise
     finally:
         if browser is not None:
             with contextlib.suppress(Exception):
@@ -630,8 +656,14 @@ def main(argv: list[str] | None = None) -> int:
                     {
                         "error": code,
                         "message": msg,
-                        "recommendation": "Run once with --browser (requires CloakBrowser) to mint "
-                        "beehive clearance cookies, or use `latest` which needs no browser.",
+                        "recommendation": (
+                            "CloakBrowser could not start (for example a licence or concurrent-session "
+                            "limit). Close other CloakBrowser sessions and retry, or use `latest` which "
+                            "needs no browser."
+                            if code == "browser_unavailable"
+                            else "Run once with --browser (requires CloakBrowser) to mint "
+                            "beehive clearance cookies, or use `latest` which needs no browser."
+                        ),
                     },
                     indent=2,
                 ),
