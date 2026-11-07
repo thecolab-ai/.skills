@@ -94,7 +94,7 @@ COLAB_SMOKE_WITH_CLOAKBROWSER=1
 COLAB_SMOKE_USE_BROWSER=1
 ```
 
-CloakBrowser 0.7.0 (1 November 2026) needs a licence key for every launch, and a free key allows one concurrent session. The parallel smoke runner can therefore see `browser_unavailable` (exit code 76, session limit) for browser skills that start while another browser is open.
+CloakBrowser 0.7.0 (1 November 2026) needs a licence key for every launch, and a free key allows one concurrent session. To avoid that, `scripts/run_smoke_tests.py` runs skills whose scripts reference `cloakbrowser` one at a time (a single browser lane) when `COLAB_SMOKE_WITH_CLOAKBROWSER=1`; other skills stay parallel. A browser skill that is killed by the smoke timeout can still hold the seat for up to 4 minutes, so a following browser skill may report `browser_unavailable` (exit code 76, session limit).
 
 `scripts/run_all_smoke.sh` uses `uv run --with cloakbrowser` when `COLAB_SMOKE_WITH_CLOAKBROWSER=1`, so browser-assisted smoke tests can import CloakBrowser without making it a repo-wide static dependency.
 
