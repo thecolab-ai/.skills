@@ -452,6 +452,23 @@ class BrowserUnavailableError(RuntimeError):
     """Raised when --browser is requested but CloakBrowser is unavailable."""
 
 
+def browser_unavailable(exc: BaseException) -> BrowserUnavailableError:
+    """Wrap a CloakBrowser start-up failure (e.g. a licence or concurrent-session
+    denial, or a browser that cannot launch on this host) as a clean
+    machine-readable state instead of a traceback."""
+    lines = str(exc).strip().splitlines()
+    detail = lines[0][:240] if lines else ""
+    return BrowserUnavailableError(
+        "browser_unavailable: CloakBrowser is installed but could not start a browser session "
+        f"({type(exc).__name__}: {detail})"
+    )
+
+
+def is_cloakbrowser_licence_error(exc: BaseException) -> bool:
+    """CloakBrowser >= 0.7 can deny a session after launch (e.g. over the plan's seat limit)."""
+    return type(exc).__name__ == "CloakBrowserLicenseError"
+
+
 def die(message: str, code: int = 1) -> None:
     print(f"nz-ferries: {message}", file=sys.stderr)
     raise SystemExit(code)
@@ -770,18 +787,23 @@ def fetch_fullers_public_page_with_browser(route: dict[str, Any], day: date) -> 
     url = fullers_query_url(route, day)
     browser = None
     try:
-        browser = launch(
-            headless=True,
-            args=["--no-sandbox", "--disable-dev-shm-usage"],
-            timezone="Pacific/Auckland",
-            locale="en-NZ",
-        )
-        page = browser.new_page()
+        try:
+            browser = launch(
+                headless=True,
+                args=["--no-sandbox", "--disable-dev-shm-usage"],
+                timezone="Pacific/Auckland",
+                locale="en-NZ",
+            )
+            page = browser.new_page()
+        except Exception as exc:
+            raise browser_unavailable(exc) from exc
         try:
             page.goto(url, wait_until="domcontentloaded", timeout=10000)
             html_text = page.content()
             error = None
         except Exception as exc:
+            if is_cloakbrowser_licence_error(exc):
+                raise browser_unavailable(exc) from exc
             try:
                 html_text = page.content() if page else ""
             except Exception:
@@ -1910,11 +1932,19 @@ def main(argv: list[str] | None = None) -> None:
     try:
         args.func(args)
     except BrowserUnavailableError as exc:
-        payload = {
-            "error": "cloakbrowser_not_installed",
-            "message": str(exc),
-            "recommendation": "Recommend that the user installs CloakBrowser or reruns without --browser for the AT GTFS/direct public HTTP path.",
-        }
+        message = str(exc)
+        if message.startswith("browser_unavailable:"):
+            payload = {
+                "error": "browser_unavailable",
+                "message": message,
+                "recommendation": "CloakBrowser could not start (for example a licence or concurrent-session limit). Close other CloakBrowser sessions and retry, or rerun without --browser for the AT GTFS/direct public HTTP path.",
+            }
+        else:
+            payload = {
+                "error": "cloakbrowser_not_installed",
+                "message": message,
+                "recommendation": "Recommend that the user installs CloakBrowser or reruns without --browser for the AT GTFS/direct public HTTP path.",
+            }
         if getattr(args, "json", False):
             print(json.dumps(payload, indent=2, ensure_ascii=False))
         else:

@@ -30,6 +30,14 @@ def is_transient(stderr):
     return any(marker in stderr.lower() for marker in ('network error', 'timed out', 'http 5', 'http 429'))
 
 
+def browser_unavailable_payload(stdout: str) -> bool:
+    try:
+        payload = json.loads(stdout)
+    except (json.JSONDecodeError, TypeError):
+        return False
+    return isinstance(payload, dict) and payload.get("error") == "browser_unavailable"
+
+
 def test(name: str, fn):
     try:
         ok = fn()
@@ -102,6 +110,48 @@ results.append(test('fixture bounded retries preserve schema failures and browse
 results.append(test("fixture SeaLink slot parser", test_sealink_slot_fixture))
 
 
+def test_browser_launch_failure_fixture():
+    """A CloakBrowser start-up denial (e.g. CloakBrowserLicenseError for a
+    concurrent-session limit) must be the machine-readable browser_unavailable
+    state, never a traceback."""
+    import contextlib
+    import io
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("nz_ferries_cli_launch_fixture", CLI)
+    cli = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = cli
+    spec.loader.exec_module(cli)
+    CloakBrowserLicenseError = type("CloakBrowserLicenseError", (RuntimeError,), {})
+
+    def denied_launch(**kw):
+        raise CloakBrowserLicenseError("CloakBrowser Pro: session limit reached for your plan.")
+
+    out = io.StringIO()
+    with patch.dict(sys.modules, {'cloakbrowser': types.SimpleNamespace(launch=denied_launch)}), \
+            contextlib.redirect_stdout(out):
+        try:
+            cli.fetch_fullers_public_page_with_browser({'from': 'Example', 'to': 'Example Island'}, __import__('datetime').date(2026, 10, 8))
+        except cli.BrowserUnavailableError as exc:
+            assert str(exc).startswith('browser_unavailable:') and 'CloakBrowserLicenseError' in str(exc)
+        else:
+            raise AssertionError('launch denial must raise BrowserUnavailableError')
+        with patch.object(cli, 'fetch_fullers_public_page_with_browser', side_effect=cli.browser_unavailable(CloakBrowserLicenseError('session limit reached'))), \
+                patch.object(cli, 'fetch_sailings', side_effect=lambda *a, **kw: cli.fetch_fullers_public_page_with_browser()):
+            try:
+                cli.main(['sailings', 'auckland-devonport', '--json', '--browser'])
+            except SystemExit as exc:
+                assert exc.code == 2
+            else:
+                raise AssertionError('browser_unavailable must exit 2')
+    payload = json.loads(out.getvalue())
+    assert payload['error'] == 'browser_unavailable' and 'Traceback' not in out.getvalue()
+    assert browser_unavailable_payload(out.getvalue())
+    return True
+
+
+results.append(test("fixture CloakBrowser launch denial is browser_unavailable, not a traceback", test_browser_launch_failure_fixture))
+
+
 def test_help():
     result = run(["--help"])
     return result.returncode == 0
@@ -170,6 +220,9 @@ def test_fullers_browser_probe():
     if result.returncode != 0:
         if is_transient(result.stderr):
             print('[SKIP] Fullers/AT public schedule temporarily unavailable after two bounded attempts')
+            return True
+        if browser_unavailable_payload(result.stdout):
+            print('[SKIP] CloakBrowser installed but could not start a browser session (licence/session limit or host); Fullers browser probe not run')
             return True
         print(f"  stderr: {result.stderr[:200]}")
         return False
