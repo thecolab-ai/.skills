@@ -46,6 +46,45 @@ RESOURCES: dict[str, dict[str, str]] = {
 }
 
 
+# EECA renamed CSV headers (seen 2026-11): "Points"/"Charge Points" became "EVSEs (Charge Points)",
+# "BEVs per Charge Point" became "BEVs per EVSE" and co-funded "ApplicationId" became "AppId".
+# Headers are mapped back to the internal names; missing columns fail loudly as a schema change.
+_METRIC_ALIASES = {"EVSEs (Charge Points)": "Charge Points", "BEVs per EVSE": "BEVs per Charge Point"}
+HEADER_ALIASES: dict[str, dict[str, str]] = {
+    "chargers": {"EVSEs (Charge Points)": "Points"},
+    "cofunded": {"EVSEs (Charge Points)": "Points", "AppId": "ApplicationId"},
+    "metrics-region": _METRIC_ALIASES,
+    "metrics-district": _METRIC_ALIASES,
+}
+REQUIRED_COLUMNS: dict[str, tuple[str, ...]] = {
+    "chargers": ("UnitId", "Points", "SiteId", "Current", "KwRated", "Region", "District"),
+    "cofunded": ("ApplicationId", "Points", "Status", "KwRated", "Region", "District"),
+    "metrics-region": ("Region", "Charge Points", "Battery Electric Vehicles", "BEVs per Charge Point"),
+    "metrics-district": ("District", "Region", "Charge Points", "Battery Electric Vehicles", "BEVs per Charge Point"),
+}
+
+
+def parse_csv(text: str, resource: str) -> list[dict[str, str]]:
+    """Parse an EECA dashboard CSV into rows keyed by the CLI's internal column names."""
+    reader = csv.reader(io.StringIO(text))
+    header = next(reader, None)
+    if not header:
+        raise ValueError("CSV has no header row")
+    aliases = HEADER_ALIASES[resource]
+    columns = [aliases.get(name.strip(), name.strip()) for name in header]
+    # The district export labels its first (district name) column "Region" as well as the
+    # later parent-region column; csv.DictReader would silently keep only the last one.
+    if resource == "metrics-district" and "District" not in columns and columns.count("Region") == 2:
+        columns[columns.index("Region")] = "District"
+    duplicates = sorted({name for name in columns if columns.count(name) > 1})
+    if duplicates:
+        raise ValueError(f"duplicate columns: {', '.join(duplicates)}")
+    missing = [name for name in REQUIRED_COLUMNS[resource] if name not in columns]
+    if missing:
+        raise ValueError(f"missing expected columns: {', '.join(missing)}")
+    return [dict(zip(columns, row)) for row in reader if any(cell.strip() for cell in row)]
+
+
 def die(message: str, code: int = 1) -> None:
     print(f"eeca-ev-chargers-nz: {message}", file=sys.stderr)
     raise SystemExit(code)
@@ -72,9 +111,9 @@ def fetch_csv_rows(resource: str, timeout: int = 30) -> tuple[list[dict[str, str
     except nzfetch.FetchError as e:
         die(str(e))
     try:
-        return list(csv.DictReader(io.StringIO(body.decode("utf-8-sig")))), final_url
-    except csv.Error as e:
-        die(f"invalid CSV from {url}: {e}")
+        return parse_csv(body.decode("utf-8-sig"), resource), final_url
+    except (csv.Error, ValueError) as e:
+        die(f"unexpected CSV schema from {url}: {e}")
 
 
 def norm(text: Any) -> str:

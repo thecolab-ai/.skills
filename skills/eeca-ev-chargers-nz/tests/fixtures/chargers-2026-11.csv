@@ -1,0 +1,5 @@
+﻿UnitId,EVSEs (Charge Points),SiteId,Owner,Operator,DateFirstOperational,Current,KwRated,Address,Latitude,Longitude,Locality,Region,District,Connectors
+00502c95-6974-44b0-99e2-e09ef62c4ecf,1,bp charge Massey Road,bp charge,BP,2023-06-30,DC,75,"264 Massey Road Mangere, Auckland 2024, ",-36.960086822509766,174.83230590820312,Auckland,Auckland,Auckland,"[""CHAdeMO"",""Type 2 CCS""]"
+00b3bd1d-3fa1-4058-a60d-8c14aa390cb1,1,Manukau,ChargeNet NZ,ChargeNet NZ,2025-03-26,DC,200,"6 Cavendish Drive, Auckland 2104, New Zealand",-36.988094329833984,174.87921142578125,Auckland,Auckland,Auckland,"[""Type 2 CCS""]"
+0110d342-6284-4c90-a11b-ee841d9da6d1,2,NZ BLOOD SERVICE,MERIDIAN ENERGY LIMITED,MERIDIAN ENERGY LIMITED,2019-10-12,AC,44,"71 Great South Road, Epsom, Auckland 1051",-36.88177108764648,174.78404235839844,Auckland,Auckland,Auckland,"[""Type 2 Socketed"",""Type 2 Socketed""]"
+00259abd-8a6e-4b3d-93c6-e3047a7df94c,1,Waikato Innovation Park,Hikotron,Hikotron,,AC,7,"Waikato Innovation Park, 1 Melody Lane, Hamilton East, Hamilton 3216",-37.77815628051758,175.3080596923828,Hamilton,Waikato,Hamilton,"[""Type 2 Socketed""]"

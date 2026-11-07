@@ -93,4 +93,5 @@ python3 skills/eeca-ev-chargers-nz/scripts/cli.py summary --level region --min-k
 
 - CLI: `scripts/cli.py`
 - Smoke test: `scripts/smoke_test.py`
+- Contract test: `scripts/test_contract.py` (trimmed 2026-11 CSV captures in `tests/fixtures/`)
 - Source notes: `references/source-notes.md`

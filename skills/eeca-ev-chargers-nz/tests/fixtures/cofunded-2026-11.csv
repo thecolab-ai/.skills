@@ -1,0 +1,3 @@
+﻿AppId,EVSEs (Charge Points),Applicant,ProjectType,Status,GoLiveDate,KwRated,Address,Locality,Region,District,Latitude,Longitude
+01-001,24,The Warehouse Limited,LEVCF,Live,2018-07-01 00:00:00+00:00,22,"620 Karamu Road North, Hastings, 4122",,Hawke's Bay,,-39.6384646,176.8505533
+01-022,4,Thames Coromandel District Council,LEVCF,Live,2017-05-31 00:00:00+00:00,50,"6 Tokoroa Road, Tairua",,Waikato,,-37.0007569,175.8501488
