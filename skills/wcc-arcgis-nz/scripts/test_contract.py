@@ -117,10 +117,11 @@ class CapabilityContractTests(unittest.TestCase):
 
     def test_search_withholds_unsupported_service_url_instead_of_failing(self):
         # Nightly smoke 42416982995: a WCC-owned "flood" item points at the
-        # internal gisdev.wcc.govt.nz host and aborted the whole search.
+        # internal gisdev WCC host and aborted the whole search (an
+        # off-allowlist .invalid host stands in for it here).
         page = fixture("search-page.json")
         page["results"][0]["url"] = (
-            "https://gisdev.wcc.govt.nz/arcgis/rest/services/Environment/FloodZones/MapServer"
+            "https://gisdev.wcc.invalid/arcgis/rest/services/Environment/FloodZones/MapServer"
         )
         payload = self.invoke(
             ["search", "flood", "--json"],
@@ -129,7 +130,7 @@ class CapabilityContractTests(unittest.TestCase):
         self.assertEqual(len(payload["items"]), 2)
         self.assertIsNone(payload["items"][0]["url"])
         self.assertEqual(len(payload["warnings"]), 1)
-        self.assertIn("gisdev.wcc.govt.nz", payload["warnings"][0])
+        self.assertIn("gisdev.wcc.invalid", payload["warnings"][0])
         self.assertNotIn("gisdev", json.dumps(payload["items"]))
         # Supported service URLs are still emitted, and nothing is fetched there.
         clean = self.invoke(
