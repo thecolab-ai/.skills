@@ -82,7 +82,7 @@ GET https://www.bargainchemist.co.nz/products/{handle}.js
 
 Live read-only checks confirmed this endpoint for handles returned by Boost search, such as `panadol-liquid-caps-16s`. The response includes Shopify product fields such as `id`, `title`, `handle`, `vendor`, `type`, `available`, `price`, `variants[]`, `images`, and `featured_image`. Prices from this route are integer cents and are normalized to NZD decimal values by the CLI.
 
-If Shopify product JSON is unavailable for a handle, the CLI attempts a read-only Boost search fallback and returns an exact handle match when present. The fallback is documented in the JSON response with `fallback`.
+If Shopify product JSON is unavailable for a handle, the CLI attempts a read-only Boost search fallback and returns an exact handle match when present. The fallback is documented in the JSON response with `fallback`, and `fallback_reason` carries the Shopify product JSON error (for example a blocked/rate-limited or HTTP error) that triggered it.
 
 ## CLI output shape
 
