@@ -117,6 +117,42 @@ class Parsers(unittest.TestCase):
         self.assertIsNone(row['lat'])
         self.assert_record(row)
 
+    def test_repair_sitemap_accepts_encoded_slugs(self):
+        urls = cli.repair_urls((FIXTURES / 'repair-sitemap.xml').read_text())
+        self.assertEqual(len(urls), 3)
+        self.assertTrue(all('/localrepaircafes/' in u for u in urls))
+        self.assertFalse(any('auckland-central-city-library' in u for u in urls))
+
+    def test_repair_auckland_detail_with_postcode_after_city(self):
+        url = 'https://www.repairnetworkaotearoa.org.nz/localrepaircafes/example-suburb-repair-caf%C3%A9-'
+        row = cli.parse_repair((FIXTURES / 'repair-auckland.html').read_text(), url, STAMP)
+        self.assertEqual(row['name'], 'Example Suburb Repair Café')
+        self.assertIn('Auckland 2110', row['address'])
+        self.assertIn('First Saturday', row['hours'])
+        self.assertNotIn('https://', row['hours'])
+        self.assertIsNone(row['lon'])
+        self.assert_record(row)
+
+    def test_smoke_repair_probe_discovers_current_auckland_cafe(self):
+        # The live probe once hard-coded a café slug that later left the directory.
+        import smoke_test
+        urls = cli.repair_urls((FIXTURES / 'repair-sitemap.xml').read_text())
+        pages = {urls[0]: (FIXTURES / 'repair.html').read_text(),
+                 urls[1]: '<html/>',
+                 urls[2]: (FIXTURES / 'repair-auckland.html').read_text()}
+        seen = []
+        def fetch(link):
+            seen.append(link)
+            return pages[link]
+        with self.assertRaises(cli.SourceError):
+            smoke_test.first_auckland_repair(urls, fetch)
+        seen.clear()
+        row = smoke_test.first_auckland_repair([urls[0], urls[2], urls[1]], fetch)
+        self.assertEqual(row['name'], 'Example Suburb Repair Café')
+        self.assertEqual(seen, [urls[0], urls[2]])
+        with self.assertRaises(AssertionError):
+            smoke_test.first_auckland_repair([urls[0], urls[2]], fetch, limit=1)
+
     def test_trow_groups_stock_locations_and_excludes_sold(self):
         rows = cli.parse_trow(fixture('trow'), STAMP)
         self.assertEqual(len(rows), 2)

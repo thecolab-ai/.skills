@@ -3,6 +3,7 @@
 import json
 from concurrent.futures import ThreadPoolExecutor
 import os
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -72,13 +73,28 @@ def source_check(source):
     print(f'  {source}: {len(rows)} directory entries')
 
 
+REPAIR_DETAIL_LIMIT = 20
+
+
+def first_auckland_repair(urls, fetch, limit=REPAIR_DETAIL_LIMIT):
+    """Return the first parsed Auckland café with an address and schedule, reading at most limit pages.
+
+    Cafés join and leave the Repair Network directory, so the probe discovers a current
+    Auckland listing instead of relying on one fixed slug.
+    """
+    for link in urls[:limit]:
+        row = cli.parse_repair(fetch(link), link, cli.utc_now())
+        if row['address'] and 'Auckland' in row['address'] and row['hours']:
+            return row
+    raise AssertionError(f'no Auckland repair café with address and schedule in the first {limit} detail pages')
+
+
 def repair_check():
     urls = cli.repair_urls(cli.get(cli.SOURCES['repair']['url']))
-    link = next(u for u in urls if 'auckland-central-city-library' in u)
-    row = cli.parse_repair(cli.get(link), link, cli.utc_now())
-    assert 'Lorne Street' in row['address']
-    assert 'Saturday' in row['hours']
-    assert row['lon'] is None
+    row = first_auckland_repair(urls, cli.get)
+    assert re.search(r'\b\d{4}\b', row['address'])
+    assert re.search(r'\d[ap]m|saturday|sunday|month', row['hours'], re.I)
+    assert row['lon'] is None and row['lat'] is None
     print(f'  repair: {len(urls)} café URLs; {row["name"]}, {row["address"]}')
 
 

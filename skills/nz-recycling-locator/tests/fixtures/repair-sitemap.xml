@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Synthetic structure example (Wix dynamic sitemap shape captured 2026-11-07; library café no longer listed). -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" generatedBy="WIX">
+<url>
+<loc>https://www.repairnetworkaotearoa.org.nz/localrepaircafes/sampletown-repair-caf%C3%A9</loc>
+<lastmod>2026-11-04</lastmod>
+</url>
+<url>
+<loc>https://www.repairnetworkaotearoa.org.nz/localrepaircafes/t%C4%81maki-example-repair-caf%C3%A9</loc>
+<lastmod>2026-11-03</lastmod>
+</url>
+<url>
+<loc>https://www.repairnetworkaotearoa.org.nz/localrepaircafes/example-suburb-repair-caf%C3%A9-</loc>
+<lastmod>2026-11-03</lastmod>
+</url>
+</urlset>
