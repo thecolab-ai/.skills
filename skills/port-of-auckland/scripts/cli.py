@@ -184,7 +184,7 @@ def parse_tauranga_queue(text):
     page = Page(); page.feed(text)
     heading = next((h for h in page.headings if h.startswith('Truck Turn Data - Last ')), '')
     match = re.fullmatch(r'Truck Turn Data - Last (\d+) Minutes \(([^)]+)\)', heading)
-    queue = re.search(r'Current road queue is:\s*(\d+) trucks', text)
+    queue = re.search(r'Current road queue is:\s*(\d+) trucks?\b', text)
     if not match or not queue:
         raise SkillError('Source schema error: Tauranga queue count or timestamp missing')
     latest = local_time(match[2], '%A %d %B %Y %H:%M')
@@ -364,7 +364,7 @@ def print_record(record):
         minutes, seconds = divmod(record['turn_seconds'], 60)
         print(f"{record['location']}: {minutes} min {seconds} sec for the last {record['window_minutes']} min; observed {record['observed_at']}")
     elif record.get('metric') == 'road_queue':
-        print(f"Tauranga road queue: {record['queue_trucks']} trucks; observed {record['observed_at']}")
+        print(f"Tauranga road queue: {record['queue_trucks']} truck{'' if record['queue_trucks'] == 1 else 's'}; observed {record['observed_at']}")
     elif record.get('kind') == 'expected_arrivals':
         print(f"{record['port'].title()}: {record['vessel_calls']} expected vessel calls, {record['distinct_vessels']} distinct vessel names")
     elif record.get('kind') == 'truck_snapshot':
