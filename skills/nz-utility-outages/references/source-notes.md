@@ -17,14 +17,14 @@ API key, browser automation, login or account operation is used.
 |---|---|---|
 | S0262 | Watercare Services Limited | <https://webapi.watercare.co.nz/faults-outages/content> |
 | S2574 | Wellington Electricity Lines Limited | <https://www.welectricity.co.nz/outages/getalloutages> |
-| S0271 | KiwiRail | <https://www.kiwirail.co.nz/our-network/our-regions/amp/upcoming-work/> |
+| S0271 | KiwiRail | <https://www.kiwirail.co.nz/network-investment/where-we-are-working/search/> |
 | S0270 | KiwiRail | <https://www.kiwirail.co.nz/assets/Uploads/Our-network/Our-regions/Auckland-Metro-Rail/BOL-Calendar-for-website_new.pdf> |
 
 Watercare's [public map](https://www.watercare.co.nz/home/faults-and-outages)
 robots.txt allows all paths. The API host's robots.txt is unavailable (403),
 while the documented public JSON GET succeeds. This adapter consumes that
 first-party feed rather than scraping hidden paths. Wellington's robots.txt
-returns 404. KiwiRail disallows `/admin` and `/Security/`; neither is accessed.
+returns 404. KiwiRail disallows `/admin`, `/dev` and error pages; none is accessed.
 No dataset-specific open licence was identified for Watercare or Wellington;
 licence is omitted rather than substituting the skill's MIT code licence.
 KiwiRail's copyright notice is preserved, without claiming open reuse rights.
@@ -61,20 +61,27 @@ The feed includes historical/recent rows; use `--status` to select current/plann
 
 ### KiwiRail works
 
-Only headings and paragraphs within `<main>` are parsed. Short-term and ongoing
-work sections are recognised explicitly. Continuation paragraphs form one
-notice; other page background and navigation are excluded. Dated notices need
-both two full day/month values and one unambiguous year in the notice or its
-linked document filename. No year is inferred from retrieval time. Otherwise
-start/end are null and the original notice is preserved. Dates are inclusive.
-A rail bridge noise information notice is `rail_notice` with unknown status,
-not a confirmed outage. Notice IDs follow current document order and may change
-when the page is edited. The page has no source update timestamp, so no
-`latest_data` is supplied for work notices.
+Since November 2026 the old Auckland "upcoming work" page redirects to
+<https://www.kiwirail.co.nz/network-investment/where-we-are-working/>, a
+client-rendered project list. Its own search endpoint
+(`/network-investment/where-we-are-working/search/?status=in-progress|upcoming`)
+returns JSON `{"results", "pagination", "summary", "error"}` where `results` is
+HTML project cards (status badge, title link, `card__date`, `card__tag`s) and
+`summary` is "<N> results found". The status filter is single-valued, so the
+adapter makes one request per status and follows the page's `start` offset
+pagination (at most 10 pages). The summary total must equal the cards read, and
+every card must carry the requested status, a title and an official link;
+otherwise the result is a schema failure, not an empty success. Completed
+works are not requested.
 
-The page refers to a Metro Maintenance Plan timetable, but no timetable rows
-were present in the verified HTML. This skill does not invent those rows or
-interpret video content. All works have null geometry and affected count.
+Dates such as "November 7, 2026 – January 10, 2027" are inclusive NZ days; a
+single published date becomes `start` only. Unparseable or reversed dates stay
+`null` and the text is kept in `date_text`. With both dates, status follows the
+NZ-day window; otherwise in progress is `current` and upcoming is `planned`.
+`id` is the project page slug. The `+ N more` overflow tag is not a value. The
+page lists only works lasting three nights or more and has no update timestamp,
+so no `latest_data` is supplied. A `/map/` GeoJSON endpoint exists but is not
+read, so geometry and affected count stay `null`.
 
 ### Rail PDF calendar
 

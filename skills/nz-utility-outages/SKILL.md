@@ -1,6 +1,6 @@
 ---
 name: nz-utility-outages
-description: "Query Watercare Auckland water faults and planned shutdowns, Wellington electricity outages, KiwiRail Auckland work notices and the published rail closure calendar. Use for utility interruptions, maintenance windows and nearby outage searches; report Vector and other unavailable source limits explicitly."
+description: "Query Watercare Auckland water faults and planned shutdowns, Wellington electricity outages, KiwiRail rail works (in progress and upcoming) and the published rail closure calendar. Use for utility interruptions, maintenance windows and nearby outage searches; report Vector and other unavailable source limits explicitly."
 license: MIT
 compatibility: "Requires Python 3.10+ with system timezone data and network access for live data; standard library only"
 metadata:
@@ -57,9 +57,11 @@ See [references/source-notes.md](references/source-notes.md) for the reasons.
 - Wellington recognises cancellation and restoration separately. Dates use
   `Pacific/Auckland` daylight saving, then become UTC. Alternate dates are used
   only when the source's `useAlternateDate` flag is set.
-- KiwiRail works can cause neighbourhood disturbance without closing passenger
-  services. Each work notice has `passenger_closure_confirmed: false`.
-  Undated ongoing work stays undated; no year or coordinates are invented.
+- KiwiRail works come from the "Where we are working" project search (in
+  progress and upcoming works lasting three nights or more). They can cause
+  neighbourhood disturbance without closing passenger services, so each has
+  `passenger_closure_confirmed: false`. `source_status` keeps KiwiRail's label;
+  unparseable dates stay `null` with the published `date_text`.
 - `rail-closures` reads the official colour-coded PDF. Its verified coverage is
   **January–May 2026**, with publication date **2 February 2026**, rather than a
   complete 2026 timetable. `meta.coverage_start` and `meta.coverage_end` always
@@ -77,7 +79,7 @@ occurs locally and includes point locations on the box boundary. `near` uses
 haversine distance to the operator's published point, which is representative
 rather than a guaranteed affected-property boundary. Unlocated records are
 excluded from spatial matches and counted in `meta.excluded_unlocated`.
-KiwiRail has no published coordinates: `outages --utility kiwirail --bbox ...`
+The KiwiRail adapter reads no coordinates: `outages --utility kiwirail --bbox ...`
 returns an unsupported-operation error. Unfiltered GeoJSON may use null geometry.
 
 `--format geojson` implies JSON output and emits a `FeatureCollection` with

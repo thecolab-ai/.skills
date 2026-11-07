@@ -4,14 +4,15 @@ from __future__ import annotations
 
 import argparse
 import calendar
+import html
 import json
 import math
 import pathlib
 import re
 import sys
+import urllib.parse
 import zlib
 from datetime import date, datetime, timezone
-from html.parser import HTMLParser
 from zoneinfo import ZoneInfo
 
 from provenance import add_spatial_arguments, error_envelope, geojson_envelope, provenance, result_envelope
@@ -42,10 +43,11 @@ SOURCES = {
     },
     'kiwirail': {
         'publisher': 'KiwiRail',
-        'source_url': 'https://www.kiwirail.co.nz/our-network/our-regions/amp/upcoming-work/',
-        'access': 'supported', 'coverage': 'Auckland metro rail', 'spatial': False,
+        'source_url': 'https://www.kiwirail.co.nz/network-investment/where-we-are-working/search/',
+        'page_url': 'https://www.kiwirail.co.nz/network-investment/where-we-are-working/',
+        'access': 'supported', 'coverage': 'KiwiRail network (Auckland and Wellington works listed)', 'spatial': False,
         'licence': 'Copyright KiwiRail; no dataset-specific reuse licence stated',
-        'note': 'Published HTML work notices, not passenger service closures. No coordinates are supplied.',
+        'note': 'Public project search JSON (in-progress and upcoming works lasting three nights or more), not passenger service closures. Coordinates are not read.',
     },
     'kiwirail-calendar': {
         'publisher': 'KiwiRail',
@@ -105,7 +107,7 @@ def fetch(utility, *, binary=False):
         if utility == 'wellington':
             return json.loads(nzfetch.fetch_text(url, timeout=10, allowed_hosts=ALLOWED_HOSTS))
         if utility == 'kiwirail':
-            return nzfetch.fetch_text(url, timeout=10, allowed_hosts=ALLOWED_HOSTS)
+            return fetch_kiwirail(url)
         body, _, _ = nzfetch.fetch_bytes(url, timeout=10, expect_json=True, accept='application/json,*/*',
                                         allowed_hosts=ALLOWED_HOSTS)
         return json.loads(body)
@@ -116,6 +118,28 @@ def fetch(utility, *, binary=False):
     except nzfetch.FetchError as exc:
         # Keep messages bounded and avoid returning proxy/configuration details.
         raise SourceError(5, f'network error: {utility} source unavailable ({type(exc).__name__})') from exc
+
+
+def fetch_json(url):
+    body, _, _ = nzfetch.fetch_bytes(url, timeout=10, expect_json=True, accept='application/json,*/*',
+                                    allowed_hosts=ALLOWED_HOSTS)
+    return json.loads(body)
+
+
+def fetch_kiwirail(url):
+    """Fetch each status filter, following the search's `start` offset pagination (bounded)."""
+    pages = {}
+    for status in KIWIRAIL_STATUSES:
+        pages[status], offset = [], 0
+        for _ in range(KIWIRAIL_MAX_PAGES):
+            query = {'status': status, **({'start': offset} if offset else {})}
+            page = fetch_json(url + '?' + urllib.parse.urlencode(query))
+            pages[status].append(page)
+            total, cards = kiwirail_cards(page, status)
+            offset += len(cards)
+            if not cards or offset >= total:
+                break
+    return pages
 
 
 def require_row(row, fields):
@@ -255,91 +279,100 @@ def parse_wellington(payload, meta, now):
     return rows
 
 
-class WorkHTML(HTMLParser):
-    """Read heading/paragraph blocks only within the page's main element."""
-    def __init__(self):
-        super().__init__(convert_charrefs=True)
-        self.in_main = False
-        self.tag = None
-        self.parts, self.links, self.blocks = [], [], []
-        self.strong = False
-        self.title_parts = []
-
-    def handle_starttag(self, tag, attrs):
-        attrs = dict(attrs)
-        if tag == 'main':
-            self.in_main = True
-        if self.in_main and tag in ('h1', 'h2', 'h3', 'p'):
-            self.tag, self.parts, self.links = tag, [], []
-            self.title_parts = []
-        elif self.tag and tag == 'strong':
-            self.strong = True
-        elif self.tag and tag == 'a' and attrs.get('href'):
-            self.links.append(attrs['href'])
-
-    def handle_data(self, value):
-        if self.tag:
-            self.parts.append(value)
-            if self.strong:
-                self.title_parts.append(value)
-
-    def handle_endtag(self, tag):
-        if tag == self.tag:
-            self.blocks.append((tag, re.sub(r'\s+', ' ', ''.join(self.parts)).strip(), self.links,
-                                ''.join(self.title_parts).strip()))
-            self.tag = None
-        if tag == 'strong':
-            self.strong = False
-        if tag == 'main':
-            self.in_main = False
+KIWIRAIL_STATUSES = {'in-progress': 'current', 'upcoming': 'planned'}
+KIWIRAIL_MAX_PAGES = 10
+KIWIRAIL_ORIGIN = 'https://www.kiwirail.co.nz'
+MONTHS = {name.lower(): number for number, name in enumerate(calendar.month_name) if name}
 
 
-def parse_works(body, meta, now=None):
+def kiwirail_text(value):
+    return re.sub(r'\s+', ' ', html.unescape(re.sub(r'<[^>]+>', ' ', value))).strip()
+
+
+def kiwirail_date(value):
+    match = re.fullmatch(r'([A-Za-z]+) (\d{1,2}), (20\d{2})', value.strip())
+    if not match or match.group(1).lower() not in MONTHS:
+        raise ValueError('unrecognised date')
+    return date(int(match.group(3)), MONTHS[match.group(1).lower()], int(match.group(2)))
+
+
+def kiwirail_cards(page, status):
+    """Return (published total, cards) for one page of the project search JSON."""
+    require_row(page, ('results', 'pagination', 'summary'))
+    if page.get('error'):
+        raise SourceError(5, 'network error: kiwirail search reported an upstream error')
+    if not all(isinstance(page[key], str) for key in ('results', 'pagination', 'summary')):
+        raise ValueError('KiwiRail project search fields must be HTML text')
+    summary = kiwirail_text(page['summary'])
+    total = re.fullmatch(r'(\d{1,4}) results? found', summary)
+    if total is None and not re.fullmatch(r'(?i)no results? found\.?', summary):
+        raise ValueError('KiwiRail project search summary changed')
+    chunks = re.split(r'<div class="card [^"]*card--project[^"]*"', page['results'])
+    if chunks[0].strip():
+        raise ValueError('KiwiRail project cards changed')
+    cards = []
+    for chunk in chunks[1:]:
+        badge = re.search(r'status-badge--([a-z-]+)', chunk)
+        link = re.search(r'<a class="card__link" href="([^"]+)"[^>]*>(.*?)</a>', chunk, re.S)
+        if not badge or not link or not kiwirail_text(link.group(2)):
+            raise ValueError('KiwiRail project card is missing its status, title or link')
+        if badge.group(1) != status:
+            raise ValueError('KiwiRail project search ignored its status filter')
+        href = html.unescape(link.group(1))
+        if href.startswith('/'):
+            href = KIWIRAIL_ORIGIN + href
+        if not href.startswith(KIWIRAIL_ORIGIN + '/'):
+            raise ValueError('KiwiRail project link is not on the official host')
+        dates = re.search(r'<span class="card__date">(.*?)</span>', chunk, re.S)
+        tags = [kiwirail_text(tag) for tag in re.findall(r'<li class="card__tag">(.*?)</li>', chunk, re.S)]
+        cards.append({'status': badge.group(1), 'title': kiwirail_text(link.group(2)), 'link': href,
+                      'date_text': kiwirail_text(dates.group(1)) if dates else None, 'tags': [tag for tag in tags if tag]})
+    count_value = int(total.group(1)) if total else 0
+    if count_value < len(cards) or (count_value > len(cards) and not page['pagination'].strip()):
+        raise ValueError('KiwiRail project count disagrees with its summary')
+    return count_value, cards
+
+
+def parse_works(pages, meta, now=None):
+    """Normalise KiwiRail "Where we are working" project cards (in progress and upcoming)."""
     now = now or datetime.now(timezone.utc)
-    parser = WorkHTML()
-    parser.feed(body)
-    rows, section, area, grouped = [], None, None, []
-    found_sections = set()
-    for tag, text, links, title in parser.blocks:
-        if tag == 'h2':
-            section = 'short' if 'short term upgrade works' in text.lower() else 'ongoing' if 'ongoing upgrade works' in text.lower() else None
-            if section:
-                found_sections.add(section)
-        elif section and tag == 'h3':
-            area = text
-        elif section and tag == 'p' and text:
-            if not title and grouped and grouped[-1][0] == section and grouped[-1][1] == area:
-                grouped[-1][3] += ' ' + text
-                grouped[-1][4].extend(links)
-            else:
-                grouped.append([section, area, title, text, list(links)])
-    if found_sections != {'short', 'ongoing'} or not grouped:
-        raise ValueError('KiwiRail work notice headings changed')
-    for index, (section, area, title, text, links) in enumerate(grouped):
-        # Site notices may omit a year in prose but include it in their linked notice filename.
-        years = set(re.findall(r'\b(20\d{2})\b', text + ' ' + ' '.join(links)))
-        dates = re.findall(r'\b(\d{1,2})\s+(' + '|'.join(calendar.month_name[1:]) + r')\b', text)
-        start = end = None
-        if len(years) == 1 and len(dates) == 2:
-            year = int(next(iter(years)))
+    if not isinstance(pages, dict) or set(pages) != set(KIWIRAIL_STATUSES):
+        raise ValueError('KiwiRail project search pages are missing')
+    rows, seen = [], set()
+    for status, status_pages in pages.items():
+        if not isinstance(status_pages, list) or not status_pages:
+            raise ValueError('KiwiRail project search pages are missing')
+        cards, total = [], None
+        for page in status_pages:
+            page_total, page_cards = kiwirail_cards(page, status)
+            total = page_total if total is None else total
+            cards.extend(page_cards)
+        if total != len(cards):
+            raise ValueError('KiwiRail project count disagrees with its summary')
+        for card in cards:
+            identifier = card['link'].rstrip('/').rsplit('/', 1)[-1]
+            if identifier in seen:
+                continue  # A project can change status between the two bounded requests.
+            seen.add(identifier)
+            start = end = None
+            parts = re.split(r'\s+[\u2013\u2014-]\s+', card['date_text'] or '')
             try:
-                first, last = [date(year, list(calendar.month_name).index(month), int(day)) for day, month in dates]
-                if first > last:
-                    first = first.replace(year=year - 1)
-                start, end = first.isoformat(), last.isoformat()
+                if len(parts) in (1, 2) and parts[0]:
+                    start = kiwirail_date(parts[0]).isoformat()
+                    end = kiwirail_date(parts[1]).isoformat() if len(parts) == 2 else None
+                    if end and end < start:
+                        start = end = None
             except ValueError:
-                pass  # An invalid date leaves this notice undated, without losing other notices.
-        # Preserve paragraphs even when dates are unavailable. No geocoding or year without source evidence.
-        notice_only = bool(title and 'noise' in title.lower() and 'work' not in title.lower())
-        status = 'unknown' if notice_only else 'planned' if section == 'short' else 'current'
-        if not notice_only and start and end:
-            status = window_status(iso_time(start + 'T00:00:00', local=True),
-                                   iso_time(end + 'T23:59:59.999999', local=True), now)
-        rows.append(record('kiwirail', meta, identifier=f'notice-{index + 1}', kind='rail_notice' if notice_only else 'rail_work',
-                           status=status, start=start, end=end,
-                           area=title or area or text.split(' - ', 1)[0], description=text,
-                           date_precision='day' if start else None, notice_links=links,
-                           passenger_closure_confirmed=False))
+                start = end = None  # Keep the published text; never guess a date.
+            row_status = KIWIRAIL_STATUSES[status]
+            if start and end:
+                row_status = window_status(iso_time(start + 'T00:00:00', local=True),
+                                           iso_time(end + 'T23:59:59.999999', local=True), now)
+            rows.append(record('kiwirail', meta, identifier=identifier, kind='rail_work', status=row_status,
+                               start=start, end=end, area=card['title'], description=card['title'],
+                               date_precision='day' if start else None, date_text=card['date_text'],
+                               source_status=status, tags=card['tags'], notice_links=[card['link']],
+                               passenger_closure_confirmed=False))
     return rows
 
 
@@ -467,7 +500,7 @@ def main(argv=None):
             if args.command == 'rail-closures' and args.from_date and args.to_date and args.from_date > args.to_date:
                 raise InputError('--from must be on or before --to')
             if args.command == 'outages' and args.bbox and not SOURCES[utility]['spatial'] and SOURCES[utility]['access'] == 'supported':
-                raise SourceError(7, 'KiwiRail publishes no coordinates; --bbox cannot filter its work notices')
+                raise SourceError(7, 'the KiwiRail adapter reads no coordinates; --bbox cannot filter its work notices')
             if utility == 'all':
                 rows = []
                 meta = provenance(SOURCE_URL, 'Watercare and Wellington Electricity')
