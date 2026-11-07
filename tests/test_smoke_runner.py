@@ -10,7 +10,8 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from run_smoke_tests import run_one, smoke_command  # noqa: E402
+import run_smoke_tests  # noqa: E402
+from run_smoke_tests import run_in_lane, run_one, smoke_command, uses_browser  # noqa: E402
 
 
 class SmokeRunnerTests(unittest.TestCase):
@@ -210,6 +211,50 @@ metadata:
                     str(smoke),
                 ],
             )
+
+    def test_browser_skills_are_detected_from_their_scripts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            skill = self.make_skill(Path(tmp), "print('[PASS] fixture ok')\n")
+            self.assertFalse(uses_browser(skill))
+            (skill / "scripts" / "cli.py").write_text(
+                "from cloakbrowser import launch\n", encoding="utf-8"
+            )
+            self.assertTrue(uses_browser(skill))
+
+    def test_browser_smokes_never_overlap_when_cloakbrowser_is_enabled(self) -> None:
+        # Nightly 42416982995: 16 parallel workers shared one free CloakBrowser
+        # seat and four browser skills failed at launch.
+        import threading
+        import time
+        from concurrent.futures import ThreadPoolExecutor
+
+        active = 0
+        peak = 0
+        guard = threading.Lock()
+
+        def fake_run_one(skill_dir, timeout):
+            nonlocal active, peak
+            with guard:
+                active += 1
+                peak = max(peak, active)
+            time.sleep(0.05)
+            with guard:
+                active -= 1
+            return {"skill": skill_dir.name}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            skills = []
+            for index in range(4):
+                skill = self.make_skill(Path(tmp) / str(index), "print('[PASS] fixture ok')\n")
+                (skill / "scripts" / "cli.py").write_text("import cloakbrowser\n", encoding="utf-8")
+                skills.append(skill)
+            for enabled, expected_peak in (("1", 1), ("", 4)):
+                active = peak = 0
+                with mock.patch.dict(os.environ, {"COLAB_SMOKE_WITH_CLOAKBROWSER": enabled}), \
+                     mock.patch.object(run_smoke_tests, "run_one", side_effect=fake_run_one):
+                    with ThreadPoolExecutor(max_workers=4) as executor:
+                        list(executor.map(lambda path: run_in_lane(path, 10), skills))
+                self.assertEqual(peak, expected_peak, f"enabled={enabled!r}")
 
 
 if __name__ == "__main__":
