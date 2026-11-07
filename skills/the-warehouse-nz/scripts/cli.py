@@ -28,6 +28,23 @@ class BrowserUnavailableError(RuntimeError):
 class BrowserBlockedError(RuntimeError):
     """Raised when browser mode reaches an upstream bot/challenge page."""
 
+
+def browser_unavailable(exc: BaseException) -> BrowserUnavailableError:
+    """Wrap a CloakBrowser start-up failure (e.g. a licence or concurrent-session
+    denial, or a browser that cannot launch on this host) as a clean
+    machine-readable state instead of a traceback."""
+    lines = str(exc).strip().splitlines()
+    detail = lines[0][:240] if lines else ""
+    return BrowserUnavailableError(
+        "browser_unavailable: CloakBrowser is installed but could not start a browser session "
+        f"({type(exc).__name__}: {detail})"
+    )
+
+
+def is_cloakbrowser_licence_error(exc: BaseException) -> bool:
+    """CloakBrowser >= 0.7 can deny a session after launch (e.g. over the plan's seat limit)."""
+    return type(exc).__name__ == "CloakBrowserLicenseError"
+
 BASE_WEB = "https://www.thewarehouse.co.nz"
 SEARCH_PATH = "/search/updategrid"
 PRODUCT_PATH = "/on/demandware.store/Sites-twl-Site/default/Product-Show"
@@ -145,13 +162,16 @@ def browser_request(
     url = url_with_params(path, params)
     browser = None
     try:
-        browser = launch(
-            headless=True,
-            args=["--no-sandbox", "--disable-dev-shm-usage"],
-            timezone="Pacific/Auckland",
-            locale="en-NZ",
-        )
-        page = browser.new_page()
+        try:
+            browser = launch(
+                headless=True,
+                args=["--no-sandbox", "--disable-dev-shm-usage"],
+                timezone="Pacific/Auckland",
+                locale="en-NZ",
+            )
+            page = browser.new_page()
+        except Exception as exc:
+            raise browser_unavailable(exc) from exc
         page.goto(BASE_WEB, wait_until="domcontentloaded", timeout=timeout_ms)
         result = page.evaluate(
             """async ({url, accept}) => {
@@ -178,6 +198,10 @@ def browser_request(
         if looks_blocked(text):
             raise BrowserBlockedError(f"browser request reached blocked/challenge page at {final_url}")
         return text, final_url
+    except Exception as exc:
+        if is_cloakbrowser_licence_error(exc):
+            raise browser_unavailable(exc) from exc
+        raise
     finally:
         if browser is not None:
             browser.close()
@@ -792,11 +816,19 @@ def main(argv: list[str] | None = None) -> int:
     try:
         args.func(args)
     except BrowserUnavailableError as exc:
-        payload = {
-            "error": "cloakbrowser_not_installed",
-            "message": str(exc),
-            "recommendation": "Recommend that the user installs CloakBrowser or reruns without --browser for the direct public HTTP path.",
-        }
+        message = str(exc)
+        if message.startswith("browser_unavailable:"):
+            payload = {
+                "error": "browser_unavailable",
+                "message": message,
+                "recommendation": "CloakBrowser could not start (for example a licence or concurrent-session limit). Close other CloakBrowser sessions and retry, or rerun without --browser for the direct public HTTP path.",
+            }
+        else:
+            payload = {
+                "error": "cloakbrowser_not_installed",
+                "message": message,
+                "recommendation": "Recommend that the user installs CloakBrowser or reruns without --browser for the direct public HTTP path.",
+            }
         if getattr(args, "json", False):
             print(json.dumps(payload, indent=2, ensure_ascii=False))
         else:

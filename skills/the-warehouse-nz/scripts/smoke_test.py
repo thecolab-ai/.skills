@@ -3,7 +3,9 @@ import json
 import os
 import subprocess
 import sys
+import types
 from pathlib import Path
+from unittest.mock import patch
 
 SKILL_DIR = Path(__file__).parent.parent
 CLI = SKILL_DIR / "scripts" / "cli.py"
@@ -22,6 +24,20 @@ def run(args: list) -> subprocess.CompletedProcess:
         cwd=str(SKILL_DIR),
         timeout=30,
     )
+
+
+def browser_unavailable_skip(result: subprocess.CompletedProcess, what: str) -> bool:
+    """True (after printing a SKIP) only for the CLI's explicit browser_unavailable state."""
+    if not USE_BROWSER or result.returncode != 2:
+        return False
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return False
+    if not isinstance(payload, dict) or payload.get("error") != "browser_unavailable":
+        return False
+    print(f"[SKIP] {what}: CloakBrowser installed but could not start a browser session (licence/session limit or host)")
+    return True
 
 
 def test(name: str, fn):
@@ -73,6 +89,40 @@ def test_product_fixture():
 results.append(test("fixture product tile parser", test_product_fixture))
 
 
+def test_browser_launch_failure_fixture():
+    """CloakBrowser start-up denials (CloakBrowserLicenseError at launch or
+    after the handshake) must be the machine-readable browser_unavailable state."""
+    import contextlib
+    import importlib.util
+    import io
+    spec = importlib.util.spec_from_file_location("warehouse_cli_launch_fixture", CLI)
+    cli = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(cli)
+    CloakBrowserLicenseError = type("CloakBrowserLicenseError", (RuntimeError,), {})
+
+    def denied_launch(**kw):
+        raise CloakBrowserLicenseError("CloakBrowser Pro: session limit reached for your plan.")
+
+    def denied_goto(*a, **kw):
+        raise CloakBrowserLicenseError("CloakBrowser Pro: session limit reached for your plan.")
+
+    late_page = types.SimpleNamespace(goto=denied_goto)
+    late_browser = types.SimpleNamespace(new_page=lambda: late_page, close=lambda: None)
+    for launch in (denied_launch, lambda **kw: late_browser):
+        out = io.StringIO()
+        with patch.dict(sys.modules, {"cloakbrowser": types.SimpleNamespace(launch=launch)}), \
+                contextlib.redirect_stdout(out):
+            code = cli.main(["search", "toys", "--limit", "3", "--json", "--browser"])
+        payload = json.loads(out.getvalue())
+        assert code == 2, code
+        assert payload["error"] == "browser_unavailable", payload
+        assert "CloakBrowserLicenseError" in payload["message"], payload
+    return True
+
+
+results.append(test("fixture CloakBrowser launch denial is browser_unavailable, not a traceback", test_browser_launch_failure_fixture))
+
+
 def test_help():
     result = run(["--help"])
     return result.returncode == 0
@@ -83,6 +133,8 @@ results.append(test("--help exits 0", test_help))
 
 def test_search():
     result = run(with_browser(["search", "toys", "--limit", "3", "--json"]))
+    if browser_unavailable_skip(result, "search"):
+        return True
     if result.returncode != 0:
         print(f"  stderr: {result.stderr[:200]}")
         return False
@@ -99,6 +151,8 @@ results.append(test("search toys returns products[]", test_search))
 
 def test_stores():
     result = run(with_browser(["stores", "--json"]))
+    if browser_unavailable_skip(result, "stores"):
+        return True
     if result.returncode != 0:
         print(f"  stderr: {result.stderr[:200]}")
         return False
@@ -115,6 +169,8 @@ results.append(test("stores returns stores[]", test_stores))
 
 def test_specials():
     result = run(with_browser(["specials", "--limit", "3", "--json"]))
+    if browser_unavailable_skip(result, "specials"):
+        return True
     if result.returncode != 0:
         print(f"  stderr: {result.stderr[:200]}")
         return False
