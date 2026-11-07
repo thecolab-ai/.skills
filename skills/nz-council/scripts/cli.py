@@ -1299,6 +1299,23 @@ class BrowserBlockedError(RuntimeError):
     """Raised when --browser reaches a public-page challenge or unusable page."""
 
 
+def browser_unavailable(exc: BaseException) -> BrowserUnavailableError:
+    """Wrap a CloakBrowser start-up failure (e.g. a licence or concurrent-session
+    denial, or a browser that cannot launch on this host) as a clean
+    machine-readable state instead of a traceback."""
+    lines = str(exc).strip().splitlines()
+    detail = lines[0][:240] if lines else ""
+    return BrowserUnavailableError(
+        "browser_unavailable: CloakBrowser is installed but could not start a browser session "
+        f"({type(exc).__name__}: {detail})"
+    )
+
+
+def is_cloakbrowser_licence_error(exc: BaseException) -> bool:
+    """CloakBrowser >= 0.7 can deny a session after launch (e.g. over the plan's seat limit)."""
+    return type(exc).__name__ == "CloakBrowserLicenseError"
+
+
 def die(message: str, code: int = 1) -> None:
     print(f"nz-council: {message}", file=sys.stderr)
     raise SystemExit(code)
@@ -1583,13 +1600,16 @@ def fetch_text_cloakbrowser(url: str, timeout_ms: int = 90000) -> str:
 
     browser = None
     try:
-        browser = launch(
-            headless=True,
-            args=["--no-sandbox", "--disable-dev-shm-usage"],
-            timezone="Pacific/Auckland",
-            locale="en-NZ",
-        )
-        page = browser.new_page()
+        try:
+            browser = launch(
+                headless=True,
+                args=["--no-sandbox", "--disable-dev-shm-usage"],
+                timezone="Pacific/Auckland",
+                locale="en-NZ",
+            )
+            page = browser.new_page()
+        except Exception as exc:
+            raise browser_unavailable(exc) from exc
         page.goto(url, wait_until="networkidle", timeout=timeout_ms)
         html_text = page.content()
         if is_bot_wall(html_text):
@@ -1597,6 +1617,10 @@ def fetch_text_cloakbrowser(url: str, timeout_ms: int = 90000) -> str:
         if is_missing_page(html_text):
             raise BrowserBlockedError("browser_blocked: browser returned missing-page HTML")
         return html_text
+    except Exception as exc:
+        if is_cloakbrowser_licence_error(exc):
+            raise browser_unavailable(exc) from exc
+        raise
     finally:
         if browser is not None:
             browser.close()
@@ -4615,11 +4639,19 @@ def main() -> None:
                 ) from exc
         args.func(args)
     except BrowserUnavailableError as exc:
-        payload = {
-            "error": "cloakbrowser_not_installed",
-            "message": str(exc),
-            "recommendation": "Recommend that the user installs CloakBrowser or reruns without --browser for direct public HTTP / legacy CDP fallback.",
-        }
+        message = str(exc)
+        if message.startswith("browser_unavailable:"):
+            payload = {
+                "error": "browser_unavailable",
+                "message": message,
+                "recommendation": "CloakBrowser could not start (for example a licence or concurrent-session limit). Close other CloakBrowser sessions and retry, or rerun without --browser for direct public HTTP / legacy CDP fallback.",
+            }
+        else:
+            payload = {
+                "error": "cloakbrowser_not_installed",
+                "message": message,
+                "recommendation": "Recommend that the user installs CloakBrowser or reruns without --browser for direct public HTTP / legacy CDP fallback.",
+            }
         if getattr(args, "json", False):
             print(json.dumps(payload, indent=2, ensure_ascii=False))
         else:

@@ -77,7 +77,7 @@ Run from this skill directory or point directly at the script:
 python3 skills/nz-council/scripts/cli.py --help
 ```
 
-Every data command supports `--json` and optional `--browser`. Browser mode imports CloakBrowser only when requested and is intended for public council/facility pages where direct HTTP is Cloudflare/Akamai/Incapsula/Radware challenged; it does not book, log in, submit forms, or bypass CAPTCHA/challenge pages.
+Every data command supports `--json` and optional `--browser`. Browser mode imports CloakBrowser only when requested and is intended for public council/facility pages where direct HTTP is Cloudflare/Akamai/Incapsula/Radware challenged; it does not book, log in, submit forms, or bypass CAPTCHA/challenge pages. If CloakBrowser is missing the JSON error is `cloakbrowser_not_installed`; if it is installed but cannot start a session (for example a licence or concurrent-session limit) the JSON error is `browser_unavailable` (exit code 2).
 
 ## Commands
 

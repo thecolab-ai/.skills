@@ -3,7 +3,9 @@ import json
 import os
 import subprocess
 import sys
+import types
 from pathlib import Path
+from unittest.mock import patch
 
 SKILL_DIR = Path(__file__).parent.parent
 CLI = SKILL_DIR / "scripts" / "cli.py"
@@ -24,6 +26,20 @@ def run(args: list) -> subprocess.CompletedProcess:
     )
 
 
+def browser_unavailable_skip(result: subprocess.CompletedProcess, what: str) -> bool:
+    """True (after printing a SKIP) only for the CLI's explicit browser_unavailable state."""
+    if not USE_BROWSER or result.returncode != 2:
+        return False
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return False
+    if not isinstance(payload, dict) or payload.get("error") != "browser_unavailable":
+        return False
+    print(f"[SKIP] {what}: CloakBrowser installed but could not start a browser session (licence/session limit or host)")
+    return True
+
+
 def test(name: str, fn):
     try:
         ok = fn()
@@ -37,6 +53,51 @@ def test(name: str, fn):
 
 
 results = []
+
+
+def test_browser_launch_failure_fixture():
+    """CloakBrowser start-up denials (CloakBrowserLicenseError at launch or
+    after the handshake) must be the machine-readable browser_unavailable state."""
+    import contextlib
+    import importlib.util
+    import io
+    spec = importlib.util.spec_from_file_location("nz_council_cli_launch_fixture", CLI)
+    cli = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(cli)
+    CloakBrowserLicenseError = type("CloakBrowserLicenseError", (RuntimeError,), {})
+
+    def denied_launch(**kw):
+        raise CloakBrowserLicenseError("CloakBrowser Pro: session limit reached for your plan.")
+
+    def denied_goto(*a, **kw):
+        raise CloakBrowserLicenseError("CloakBrowser Pro: session limit reached for your plan.")
+
+    late_browser = types.SimpleNamespace(new_page=lambda: types.SimpleNamespace(goto=denied_goto), close=lambda: None)
+    for launch in (denied_launch, lambda **kw: late_browser):
+        with patch.dict(sys.modules, {"cloakbrowser": types.SimpleNamespace(launch=launch)}):
+            try:
+                cli.fetch_text_cloakbrowser("https://example.invalid/pools")
+            except cli.BrowserUnavailableError as exc:
+                assert str(exc).startswith("browser_unavailable:") and "CloakBrowserLicenseError" in str(exc), exc
+            else:
+                raise AssertionError("launch denial must raise BrowserUnavailableError")
+    out = io.StringIO()
+    with patch.dict(sys.modules, {"cloakbrowser": types.SimpleNamespace(launch=denied_launch)}), \
+            patch.object(cli, "fetch_text_result", return_value=("", "https://example.invalid/pools", 403, "HTTP 403")), \
+            patch.object(sys, "argv", ["cli.py", "pools", "--council", "hutt", "--limit", "3", "--json", "--browser"]), \
+            contextlib.redirect_stdout(out):
+        try:
+            cli.main()
+        except SystemExit as exc:
+            assert exc.code == 2, exc.code
+        else:
+            raise AssertionError("browser_unavailable must exit 2")
+    payload = json.loads(out.getvalue())
+    assert payload["error"] == "browser_unavailable", payload
+    return True
+
+
+results.append(test("fixture CloakBrowser launch denial is browser_unavailable, not a traceback", test_browser_launch_failure_fixture))
 
 
 def test_hours_fixture():
@@ -88,6 +149,8 @@ results.append(test("events returns events[]", test_events))
 def test_pools():
     args = ["pools", "--council", "hutt" if USE_BROWSER else "akl", "--limit", "3", "--json"]
     result = run(with_browser(args))
+    if browser_unavailable_skip(result, "pools"):
+        return True
     if result.returncode != 0:
         print(f"  stderr: {result.stderr[:200]}")
         return False
