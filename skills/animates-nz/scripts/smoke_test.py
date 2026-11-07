@@ -120,7 +120,13 @@ else:
     if live.returncode == 0:
         data = json.loads(live.stdout)
         results = data.get("results")
-        check("live search is non-empty and evidenced", bool(results and data.get("source_url") and data.get("retrieved_at")))
+        evidence = {key: data.get(key) for key in ("count", "total", "warnings", "source_url", "retrieved_at")}
+        check(
+            "live search is non-empty and evidenced",
+            bool(results and data.get("source_url") and data.get("retrieved_at")),
+            "expected at least one parsed product with source_url and retrieved_at; got "
+            + json.dumps(evidence, ensure_ascii=False)[:600],
+        )
         if results:
             snap = run("price-snapshot", str(results[0]["source_url"]), "--json")
             check("live price snapshot exits zero", snap.returncode == 0, snap.stderr[:300])
