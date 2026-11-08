@@ -81,6 +81,21 @@ def browser_session_limit_skip(result: subprocess.CompletedProcess, what: str) -
     return True
 
 
+def print_cli_failure(result: subprocess.CompletedProcess) -> None:
+    """Explain a failed CLI call. The CLI writes its JSON error payload to stdout, so a
+    browser_launch_failed payload is echoed (one bounded line) next to stderr: the smoke
+    runner treats that marker as a hard failure, even when another check hit a network block."""
+    try:
+        payload = json.loads(result.stdout)
+    except (json.JSONDecodeError, TypeError):
+        payload = None
+    if isinstance(payload, dict) and payload.get("error") == "browser_launch_failed":
+        message = " ".join(str(payload.get("message", "")).split())
+        message = message.removeprefix("browser_launch_failed:").strip()[:300]
+        print(f"  error: browser_launch_failed: {message}")
+    print(f"  stderr: {result.stderr[:200]}")
+
+
 def test(name: str, fn):
     try:
         ok = fn()
@@ -181,7 +196,7 @@ def test_pools():
     if browser_session_limit_skip(result, "pools"):
         return True
     if result.returncode != 0:
-        print(f"  stderr: {result.stderr[:200]}")
+        print_cli_failure(result)
         return False
     data = json.loads(result.stdout)
     if not isinstance(data.get("pools"), list):

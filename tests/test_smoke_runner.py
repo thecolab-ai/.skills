@@ -278,5 +278,109 @@ metadata:
                 self.assertEqual(peak, expected_peak, f"enabled={enabled!r}")
 
 
+# A stand-in CloakBrowser that fails at launch the way the real 0.7 wrapper does.
+FAKE_CLOAKBROWSER = '''
+import os
+
+
+class CloakBrowserLicenseError(RuntimeError):
+    pass
+
+
+MESSAGES = {
+    "licence-76": "CloakBrowser Pro: session limit reached for your plan. Close another running session or upgrade your plan.",
+    "licence-77": "CloakBrowser Pro: license key is invalid, expired, or missing.",
+    "licence-78": "CloakBrowser Pro: could not reach license server (network error, timed out).",
+}
+
+
+def launch(*args, **kwargs):
+    mode = os.environ["FAKE_CLOAKBROWSER_MODE"]
+    if mode in MESSAGES:
+        raise CloakBrowserLicenseError(MESSAGES[mode])
+    if mode == "timeout":
+        raise TimeoutError("Timed out after 30000ms: network error connecting to CDP")
+    raise TypeError("launch() got an unexpected keyword argument 'timezone'")
+
+
+async def launch_async(*args, **kwargs):
+    return launch(*args, **kwargs)
+'''
+
+# Every outbound connection fails, so the smokes' non-browser checks report a
+# network outage, as on a night when an upstream (eventfinda) blocks the runner.
+NO_NETWORK_SITECUSTOMIZE = '''
+import socket
+
+
+def _refuse(*args, **kwargs):
+    raise OSError("outbound connections disabled for this test")
+
+
+socket.socket.connect = _refuse
+socket.create_connection = _refuse
+socket.getaddrinfo = _refuse
+'''
+
+
+class RealBrowserSmokeClassificationTests(unittest.TestCase):
+    """Run the real nz-council and the-warehouse-nz smokes through run_one.
+
+    Their CLIs report browser_launch_failed in a JSON payload on stdout. The runner
+    must still see that marker and FAIL the skill when another check in the same smoke
+    hit a network block; only the exit-76 session limit may end up gated.
+    """
+
+    HARD_FAILURES = ("licence-77", "licence-78", "api-break", "timeout")
+
+    def run_real_smoke(self, skill: str, mode: str) -> dict[str, object]:
+        with tempfile.TemporaryDirectory() as tmp:
+            package = Path(tmp) / "cloakbrowser"
+            package.mkdir()
+            (package / "__init__.py").write_text(FAKE_CLOAKBROWSER, encoding="utf-8")
+            (Path(tmp) / "sitecustomize.py").write_text(NO_NETWORK_SITECUSTOMIZE, encoding="utf-8")
+            environment = {
+                "PYTHONPATH": tmp,
+                "COLAB_SMOKE_USE_BROWSER": "1",
+                "FAKE_CLOAKBROWSER_MODE": mode,
+            }
+            with mock.patch.dict(os.environ, environment), \
+                 mock.patch.object(run_smoke_tests, "smoke_command", side_effect=lambda p: [sys.executable, str(p)]):
+                return run_one(ROOT / "skills" / skill, 300)
+
+    def test_council_launch_failure_fails_despite_unrelated_network_block(self) -> None:
+        for mode in self.HARD_FAILURES:
+            with self.subTest(mode=mode):
+                result = self.run_real_smoke("nz-council", mode)
+                log = str(result["log"])
+                # The unrelated network failure is present, so only the marker keeps this a FAIL.
+                self.assertRegex(log, run_smoke_tests.NETWORK_MARKER)
+                self.assertEqual(result["status"], "fail", log[-1500:])
+                self.assertIn("error: browser_launch_failed:", log)
+                self.assertEqual(result["live_assertions"], 0)
+
+    def test_council_session_limit_stays_gated(self) -> None:
+        result = self.run_real_smoke("nz-council", "licence-76")
+        log = str(result["log"])
+        self.assertEqual(result["status"], "gated", log[-1500:])
+        self.assertNotIn("browser_launch_failed:", log)
+        self.assertTrue(any("exit 76" in skip for skip in result["skips"]), result["skips"])
+
+    def test_warehouse_launch_failure_marker_reaches_the_log(self) -> None:
+        for mode in self.HARD_FAILURES:
+            with self.subTest(mode=mode):
+                result = self.run_real_smoke("the-warehouse-nz", mode)
+                log = str(result["log"])
+                self.assertEqual(log.count("error: browser_launch_failed:"), 3, log[-1500:])
+                self.assertEqual(result["status"], "fail", log[-1500:])
+
+    def test_warehouse_session_limit_stays_gated(self) -> None:
+        result = self.run_real_smoke("the-warehouse-nz", "licence-76")
+        log = str(result["log"])
+        self.assertEqual(result["status"], "gated", log[-1500:])
+        self.assertNotIn("browser_launch_failed:", log)
+        self.assertEqual(sum("exit 76" in skip for skip in result["skips"]), 3, result["skips"])
+
+
 if __name__ == "__main__":
     unittest.main()
