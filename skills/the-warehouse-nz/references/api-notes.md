@@ -43,7 +43,7 @@ If CloakBrowser is not installed and `--browser --json` is requested, the CLI re
 }
 ```
 
-If CloakBrowser is installed but cannot start a browser session (for example CloakBrowser >= 0.7 refusing a launch with `CloakBrowserLicenseError` because the plan's concurrent-session limit is reached), `--browser --json` returns `{"error": "browser_unavailable", ...}` with exit code 2 instead of a traceback.
+If CloakBrowser >= 0.7 refuses the session because the licence's concurrent-session limit is in use (`CloakBrowserLicenseError`, binary exit 76), `--browser --json` returns `{"error": "browser_session_limit", ...}` with exit code 76; any other start-up failure (another licence error, a launch or `new_page` error) returns `{"error": "browser_launch_failed", ...}` with exit code 1. Neither prints a traceback.
 
 If the upstream returns CAPTCHA, queue, or challenge content, browser mode reports `browser_blocked`; agents should retry later or use the default direct public HTTP path when it works, not attempt to bypass the challenge.
 

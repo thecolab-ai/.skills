@@ -29,21 +29,49 @@ class BrowserBlockedError(RuntimeError):
     """Raised when browser mode reaches an upstream bot/challenge page."""
 
 
-def browser_unavailable(exc: BaseException) -> BrowserUnavailableError:
-    """Wrap a CloakBrowser start-up failure (e.g. a licence or concurrent-session
-    denial, or a browser that cannot launch on this host) as a clean
-    machine-readable state instead of a traceback."""
-    lines = str(exc).strip().splitlines()
-    detail = lines[0][:240] if lines else ""
-    return BrowserUnavailableError(
-        "browser_unavailable: CloakBrowser is installed but could not start a browser session "
-        f"({type(exc).__name__}: {detail})"
+class BrowserSessionLimitError(BrowserUnavailableError):
+    """CloakBrowser refused a session because the licence's concurrent-session limit is in use."""
+
+
+class BrowserLaunchError(BrowserUnavailableError):
+    """CloakBrowser is installed but failed to start for any reason other than the session limit."""
+
+
+# CloakBrowser >= 0.7: the Pro binary exits 76 when the licence's concurrent-session
+# limit is reached, and the Python wrapper re-raises that as CloakBrowserLicenseError
+# with this fixed message (cloakbrowser/license.py _LICENSE_EXIT_MESSAGES[76]). Only
+# that exact state is "seat busy". Codes 77-79 (invalid/missing key, licence server
+# unreachable, local config) and every other launch error are real failures.
+CLOAKBROWSER_SESSION_LIMIT_EXIT = 76
+CLOAKBROWSER_SESSION_LIMIT_TEXT = "CloakBrowser Pro: session limit reached"
+
+
+def is_cloakbrowser_session_limit(exc: BaseException) -> bool:
+    return type(exc).__name__ == "CloakBrowserLicenseError" and str(exc).lstrip().startswith(
+        CLOAKBROWSER_SESSION_LIMIT_TEXT
     )
 
 
 def is_cloakbrowser_licence_error(exc: BaseException) -> bool:
-    """CloakBrowser >= 0.7 can deny a session after launch (e.g. over the plan's seat limit)."""
+    """Any CloakBrowserLicenseError (exit 76-79), including one raised after the CDP handshake."""
     return type(exc).__name__ == "CloakBrowserLicenseError"
+
+
+def _first_line(exc: BaseException) -> str:
+    lines = str(exc).strip().splitlines()
+    return lines[0][:240] if lines else ""
+
+
+def browser_start_error(exc: BaseException) -> BrowserUnavailableError:
+    """Classify a CloakBrowser start-up failure: session limit (exit 76) or launch failure."""
+    if is_cloakbrowser_session_limit(exc):
+        return BrowserSessionLimitError(
+            "browser_session_limit: CloakBrowser concurrent-session limit reached "
+            f"(CloakBrowserLicenseError, binary exit {CLOAKBROWSER_SESSION_LIMIT_EXIT})"
+        )
+    return BrowserLaunchError(
+        f"browser_launch_failed: CloakBrowser is installed but failed to start ({type(exc).__name__}: {_first_line(exc)})"
+    )
 
 BASE_WEB = "https://www.thewarehouse.co.nz"
 SEARCH_PATH = "/search/updategrid"
@@ -171,7 +199,7 @@ def browser_request(
             )
             page = browser.new_page()
         except Exception as exc:
-            raise browser_unavailable(exc) from exc
+            raise browser_start_error(exc) from exc
         page.goto(BASE_WEB, wait_until="domcontentloaded", timeout=timeout_ms)
         result = page.evaluate(
             """async ({url, accept}) => {
@@ -200,7 +228,7 @@ def browser_request(
         return text, final_url
     except Exception as exc:
         if is_cloakbrowser_licence_error(exc):
-            raise browser_unavailable(exc) from exc
+            raise browser_start_error(exc) from exc
         raise
     finally:
         if browser is not None:
@@ -817,24 +845,33 @@ def main(argv: list[str] | None = None) -> int:
         args.func(args)
     except BrowserUnavailableError as exc:
         message = str(exc)
-        if message.startswith("browser_unavailable:"):
+        if isinstance(exc, BrowserSessionLimitError):
             payload = {
-                "error": "browser_unavailable",
+                "error": "browser_session_limit",
                 "message": message,
-                "recommendation": "CloakBrowser could not start (for example a licence or concurrent-session limit). Close other CloakBrowser sessions and retry, or rerun without --browser for the direct public HTTP path.",
+                "recommendation": "Another CloakBrowser session holds the licence's only seat. Close it and retry (a killed session frees its seat within about 4 minutes), or rerun without --browser for the direct public HTTP path.",
             }
+            exit_code = CLOAKBROWSER_SESSION_LIMIT_EXIT
+        elif isinstance(exc, BrowserLaunchError):
+            payload = {
+                "error": "browser_launch_failed",
+                "message": message,
+                "recommendation": "CloakBrowser is installed but could not start; check the CloakBrowser install and licence, or rerun without --browser for the direct public HTTP path.",
+            }
+            exit_code = 1
         else:
             payload = {
                 "error": "cloakbrowser_not_installed",
                 "message": message,
                 "recommendation": "Recommend that the user installs CloakBrowser or reruns without --browser for the direct public HTTP path.",
             }
+            exit_code = 2
         if getattr(args, "json", False):
             print(json.dumps(payload, indent=2, ensure_ascii=False))
         else:
             print(f"ERROR: {payload['message']}", file=sys.stderr)
             print(f"Recommendation: {payload['recommendation']}", file=sys.stderr)
-        return 2
+        return exit_code
     except BrowserBlockedError as exc:
         payload = {
             "error": "browser_blocked",

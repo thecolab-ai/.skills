@@ -90,7 +90,7 @@ python3 skills/the-warehouse-nz/scripts/cli.py search toys --limit 3 --json --br
 
 - Direct public HTTP is the default path; optional `--browser` imports CloakBrowser only when requested and uses a headless public page context for search, specials, product, and store fetches
 - If `--browser --json` is requested and CloakBrowser is missing, the CLI returns `{"error": "cloakbrowser_not_installed", ...}` so agents can recommend installation
-- If CloakBrowser is installed but cannot start a session (for example a licence or concurrent-session limit), the CLI returns `{"error": "browser_unavailable", ...}` with exit code 2; retry later or rerun without `--browser`
+- If CloakBrowser's licence session limit is in use, the CLI returns `{"error": "browser_session_limit", ...}` with exit code 76 (retry later or rerun without `--browser`); any other CloakBrowser start-up failure is `browser_launch_failed` with exit code 1
 - CAPTCHA, queue, or challenge pages are treated as blocked states, not bypass targets
 - No API key, username, password, account cookie, private token, cart, or checkout action is required for the implemented read-only operations
 - The CLI uses public Salesforce Commerce Cloud storefront endpoints and parses server-rendered product markup where JSON product search is not exposed

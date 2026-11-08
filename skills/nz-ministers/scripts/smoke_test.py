@@ -59,20 +59,71 @@ def is_transient(stderr):
                                   "browser_blocked", "temporarily blocked"))
 
 
-def browser_unavailable(result):
-    """True only for the CLI's explicit browser_unavailable state (CloakBrowser
-    installed but unable to start a session, e.g. licence/session limit)."""
-    if result.returncode != 2:
-        return False
+# CloakBrowser 0.7 licence denials, as the wrapper raises them (cloakbrowser/license.py).
+SESSION_LIMIT_EXIT = 76
+LICENCE_76 = ("CloakBrowser Pro: session limit reached for your plan. Close another running session "
+              "or upgrade your plan.")
+LICENCE_77 = "CloakBrowser Pro: license key is invalid, expired, or missing."
+
+
+def launch_failure_cases():
+    """(label, fake cloakbrowser.launch, expected exit code, expected error) for the CLI.
+
+    Only the exit-76 session limit is a SKIP state; every other start-up failure,
+    including other licence codes and API breaks, must be browser_launch_failed (exit 1).
+    """
+    import types as _types
+
+    licence_error = type("CloakBrowserLicenseError", (RuntimeError,), {})
+
+    def raises(exc):
+        def _launch(*a, **kw):
+            raise exc
+        return _launch
+
+    def late(exc):
+        def _goto(*a, **kw):
+            raise exc
+        page = _types.SimpleNamespace(goto=_goto, evaluate=_goto, content=_goto, wait_for_timeout=_goto)
+        return lambda *a, **kw: _types.SimpleNamespace(new_page=lambda *a, **kw: page, close=lambda: None)
+
+    return [
+        ("session limit at launch", raises(licence_error(LICENCE_76)), SESSION_LIMIT_EXIT, "browser_session_limit"),
+        ("session limit after handshake", late(licence_error(LICENCE_76)), SESSION_LIMIT_EXIT, "browser_session_limit"),
+        ("invalid licence key (exit 77)", raises(licence_error(LICENCE_77)), 1, "browser_launch_failed"),
+        ("invalid licence key after handshake", late(licence_error(LICENCE_77)), 1, "browser_launch_failed"),
+        ("launch() API break", raises(TypeError("launch() got an unexpected keyword argument 'timezone'")), 1, "browser_launch_failed"),
+        ("browser without new_page", lambda *a, **kw: _types.SimpleNamespace(close=lambda: None), 1, "browser_launch_failed"),
+        ("session-limit text from a non-licence error", raises(RuntimeError(LICENCE_76)), 1, "browser_launch_failed"),
+    ]
+
+
+def browser_error(result):
     try:
         payload = json.loads(result.stderr)
     except (json.JSONDecodeError, TypeError):
-        return False
-    return isinstance(payload, dict) and payload.get("error") == "browser_unavailable"
+        return None
+    return payload.get("error") if isinstance(payload, dict) else None
 
 
-BROWSER_UNAVAILABLE_SKIP = ("  [SKIP] CloakBrowser installed but could not start a browser session "
-                            "(licence/session limit or host)")
+def browser_session_limit(result):
+    """True only for CloakBrowser's concurrent-session limit: exit 76 plus the CLI's
+    machine-readable browser_session_limit payload. Any other browser start-up failure
+    (browser_launch_failed, exit 1) stays a FAIL."""
+    return result.returncode == SESSION_LIMIT_EXIT and browser_error(result) == "browser_session_limit"
+
+
+def browser_launch_failed(result):
+    """CloakBrowser could not start for a reason other than the session limit: a FAIL,
+    checked before the transient heuristics so launch text such as 'Timeout' cannot SKIP it."""
+    if result.returncode != 0 and browser_error(result) == "browser_launch_failed":
+        print(f"  browser launch failed: {result.stderr[:300]}")
+        return True
+    return False
+
+
+BROWSER_SESSION_LIMIT_SKIP = ("  [SKIP] CloakBrowser concurrent-session limit reached "
+                              "(CloakBrowserLicenseError, exit 76); browser path not exercised")
 
 
 def transient_skip_line(stderr, *, browser=False):
@@ -134,39 +185,28 @@ results.append(test('fixture bounded transient retries, schema failures and brow
 
 
 def test_browser_launch_failure_fixture():
-    """CloakBrowser start-up denials (CloakBrowserLicenseError at launch or
-    after the handshake) must be the machine-readable browser_unavailable state."""
+    """Only CloakBrowser's exit-76 session limit is a SKIP state; every other start-up
+    failure (other licence codes, API breaks) must exit 1 as browser_launch_failed."""
     import contextlib
     import io
     spec = importlib.util.spec_from_file_location('ministers_launch_fixture_cli', CLI)
     cli = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(cli)
-    CloakBrowserLicenseError = type('CloakBrowserLicenseError', (RuntimeError,), {})
-
-    def denied(*a, **kw):
-        raise CloakBrowserLicenseError('CloakBrowser Pro: session limit reached for your plan.')
-
-    late_browser = types.SimpleNamespace(new_page=lambda: types.SimpleNamespace(goto=denied), close=lambda: None)
-    for launch in (denied, lambda **kw: late_browser):
-        with patch.dict(sys.modules, {'cloakbrowser': types.SimpleNamespace(launch=launch)}):
-            try:
-                cli._browser_fetch('https://www.beehive.govt.nz/minister/synthetic')
-            except cli.ClearanceUnavailable as exc:
-                assert str(exc).startswith('browser_unavailable:') and 'CloakBrowserLicenseError' in str(exc), exc
-            else:
-                raise AssertionError('launch denial must raise ClearanceUnavailable')
-    err = io.StringIO()
-    with patch.dict(sys.modules, {'cloakbrowser': types.SimpleNamespace(launch=denied)}), \
-            patch.object(cli, 'load_clearance', return_value=None), \
-            contextlib.redirect_stderr(err):
-        code = cli.main(['minister', 'hon-synthetic-minister', '--browser', '--json'])
-    payload = json.loads(err.getvalue())
-    assert code == 2 and payload['error'] == 'browser_unavailable', (code, payload)
-    assert browser_unavailable(subprocess.CompletedProcess([], 2, '', err.getvalue()))
+    for label, launch, want_code, want_error in launch_failure_cases():
+        err = io.StringIO()
+        with patch.dict(sys.modules, {'cloakbrowser': types.SimpleNamespace(launch=launch)}), \
+                patch.object(cli, 'load_clearance', return_value=None), \
+                contextlib.redirect_stderr(err):
+            code = cli.main(['minister', 'hon-synthetic-minister', '--browser', '--json'])
+        result = subprocess.CompletedProcess([], code, '', err.getvalue())
+        assert (code, browser_error(result)) == (want_code, want_error), (label, code, err.getvalue()[:300])
+        assert browser_session_limit(result) is (want_error == 'browser_session_limit'), label
+        with contextlib.redirect_stdout(io.StringIO()):
+            assert browser_launch_failed(result) is (want_error == 'browser_launch_failed'), label
     return True
 
 
-results.append(test('fixture CloakBrowser launch denial is a clean browser_unavailable state', test_browser_launch_failure_fixture))
+results.append(test('fixture only the CloakBrowser exit-76 session limit skips; other launch failures fail', test_browser_launch_failure_fixture))
 
 results.append(test("fixture Beehive RSS parsing", test_fixture_rss_parser))
 results.append(test("transient skip line is sanitised", test_transient_skip_line_is_sanitised))
@@ -209,10 +249,12 @@ def test_minister():
     if WANT_BROWSER:
         args.append("--browser")
     r = run(args)
-    if WANT_BROWSER and browser_unavailable(r):
+    if WANT_BROWSER and browser_session_limit(r):
         PROTECTED_UNAVAILABLE = True
-        print(BROWSER_UNAVAILABLE_SKIP)
+        print(BROWSER_SESSION_LIMIT_SKIP)
         return True
+    if WANT_BROWSER and browser_launch_failed(r):
+        return False
     if r.returncode != 0 and is_transient(r.stderr):
         PROTECTED_UNAVAILABLE = True
         print(transient_skip_line(r.stderr, browser=WANT_BROWSER))
@@ -254,9 +296,11 @@ def test_articles():
         print("  [SKIP] articles needs browser clearance; not available on this host")
         return True
     r = run(["articles", MINISTER, "--limit", "5", "--browser", "--json"])
-    if browser_unavailable(r):
-        print(BROWSER_UNAVAILABLE_SKIP)
+    if browser_session_limit(r):
+        print(BROWSER_SESSION_LIMIT_SKIP)
         return True
+    if browser_launch_failed(r):
+        return False
     if r.returncode != 0:
         if is_transient(r.stderr):
             print(transient_skip_line(r.stderr, browser=True))
@@ -283,9 +327,11 @@ def test_roles():
         print("  [SKIP] roles needs browser clearance; not available on this host")
         return True
     r = run(["roles", MINISTER, "--browser", "--json"])
-    if browser_unavailable(r):
-        print(BROWSER_UNAVAILABLE_SKIP)
+    if browser_session_limit(r):
+        print(BROWSER_SESSION_LIMIT_SKIP)
         return True
+    if browser_launch_failed(r):
+        return False
     if r.returncode != 0:
         if is_transient(r.stderr):
             print(transient_skip_line(r.stderr, browser=True))
@@ -312,9 +358,11 @@ def test_diary():
         print("  [SKIP] diary needs browser clearance; not available on this host")
         return True
     r = run(["diary", MINISTER, "--browser", "--json"])
-    if browser_unavailable(r):
-        print(BROWSER_UNAVAILABLE_SKIP)
+    if browser_session_limit(r):
+        print(BROWSER_SESSION_LIMIT_SKIP)
         return True
+    if browser_launch_failed(r):
+        return False
     if r.returncode != 0:
         if is_transient(r.stderr):
             print(transient_skip_line(r.stderr, browser=True))

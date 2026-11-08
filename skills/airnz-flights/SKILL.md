@@ -76,7 +76,7 @@ python3 skills/airnz-flights/scripts/cli.py WLG ZQN 2026-08-04 --direct
 
 - `--direct` — direct flights only
 - `--adults N` — adult passenger count for the fare-search attempt
-- `--browser` — use optional CloakBrowser headless mode; if unavailable, returns `cloakbrowser_not_installed` for agents to surface as an installation recommendation
+- `--browser` — use optional CloakBrowser headless mode; if unavailable, returns `cloakbrowser_not_installed` for agents to surface as an installation recommendation; if its licence session limit is in use, returns `browser_session_limit` (exit 76), and any other start-up failure returns `browser_launch_failed` (exit 1)
 - `--limit N` — max rows in human output
 - `--json` — emit machine-readable JSON
 
