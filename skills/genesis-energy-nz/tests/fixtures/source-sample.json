@@ -1,0 +1,26 @@
+{
+  "fixture": "synthetic-electricity-intervals",
+  "contains_live_credentials": false,
+  "contains_personal_data": false,
+  "response": {
+    "unused_field": "synthetic-ignored-marker",
+    "usage": [
+      {
+        "startDate": "2024-01-01T01:00:00+13:00",
+        "kw": "0.20",
+        "costNZD": "0.06"
+      },
+      {
+        "startDate": "2024-01-01T00:00:00+13:00",
+        "kw": "0.10",
+        "costNZD": "0.03",
+        "unused_field": "synthetic-ignored-marker"
+      },
+      {
+        "startDate": "2024-01-01T01:00:00+13:00",
+        "kw": "0.20",
+        "costNZD": "0.06"
+      }
+    ]
+  }
+}
