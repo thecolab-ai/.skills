@@ -5,11 +5,11 @@
 - Declared outbound hosts: api.bsky.app, bsky.app
 - Access mode: public-api
 - Authentication: none
-- Last verified: 2026-07-22
+- Last verified: 2026-10-12
 
 ## Endpoints
 
-Unauthenticated XRPC on `api.bsky.app` (verified 2026-07-22):
+Unauthenticated XRPC on `api.bsky.app` (verified 2026-10-12):
 
 - `app.bsky.feed.searchPosts?q=&sort=latest|top&since=&lang=&limit=` — public post search
 - `app.bsky.feed.getAuthorFeed?actor=&limit=&filter=posts_no_replies` — public account feed
@@ -29,7 +29,14 @@ throughout. `bsky.app` appears only in generated web links, never fetched.
 - Handles are self-registered; only domain handles (e.g. `*.govt.nz`) imply
   control of that domain. The SKILL.md instructs verifying accounts via
   `profile` before treating them as official.
-- Unauthenticated rate limits are generous but unpublished; the CLI bounds
-  `--limit` at 100 (the API cap) and makes one request per command.
+- Unauthenticated rate limits are generous but unpublished. Search and profile
+  send the caller's `--limit`. `getAuthorFeed` has no known value that excludes
+  reposts (`posts_no_replies` removes replies only; the reason union is
+  `reasonRepost` or `reasonPin`). The feed command makes one request for the
+  API maximum page of 100 items, drops only `app.bsky.feed.defs#reasonRepost`,
+  keeps `reasonPin`, and then applies `--limit` to authored posts. A page of
+  reposts can therefore return fewer posts than requested; that is an empty
+  authored window, not an outage. `feed_items_scanned` is how far into that
+  page the command read.
 - Reuse: posts are public user content — quote with attribution (handle + URL),
   do not bulk-republish, and treat as unverified crowd signal.

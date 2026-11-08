@@ -19,7 +19,7 @@ metadata:
   thecolab.pack: "nz-public-data"
   thecolab.source_url: "https://api.bsky.app/xrpc/app.bsky.feed.searchPosts"
   thecolab.allowed_domains: "api.bsky.app,bsky.app"
-  thecolab.last_verified: "2026-07-22"
+  thecolab.last_verified: "2026-10-12"
   thecolab.health: "healthy"
   thecolab.maintainer: "@adam91holt"
 ---
@@ -54,7 +54,7 @@ python3 skills/bluesky-nz/scripts/cli.py profile some-account.bsky.social
 ```
 
 - `search QUERY [--sort latest|top] [--since ISO] [--lang CODE] [--limit N] [--json]` — public post search
-- `feed HANDLE [--limit N] [--json]` — recent public posts from one account (replies excluded)
+- `feed HANDLE [--limit N] [--json]` — recent public posts from one account. The AppView `posts_no_replies` filter drops replies only. Reposts are removed afterwards, and a pinned post is kept. `--limit` is the maximum authored posts taken from one 100-item page, so a repost-heavy page can return fewer than requested.
 - `profile HANDLE [--json]` — public profile summary
 
 ## Notes
