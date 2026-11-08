@@ -18,7 +18,7 @@ metadata:
   thecolab.skill_type: "public-download"
   thecolab.pack: "nz-public-data"
   thecolab.source_url: "https://elections.nz/stats-and-research/"
-  thecolab.allowed_domains: "elections.nz,www.elections.nz,electionresults.govt.nz,www.electionresults.govt.nz"
+  thecolab.allowed_domains: "elections.nz,www.elections.nz,electionresults.govt.nz,www.electionresults.govt.nz,archive.electionresults.govt.nz"
   thecolab.last_verified: "2026-09-12"
   thecolab.health: "healthy"
   thecolab.maintainer: "@adam91holt"
@@ -65,7 +65,7 @@ Add `--limit N` (1–100) to bound any command. Human output is the default.
 - Finance aggregation uses only the Commission's published party-summary tables. It never extracts donor/contributor names, addresses or donor-level records, and never recomputes totals from detailed schedules.
 - Do not derive voter-level profiles or political persuasion.
 
-Result commands parse the Commission's published CSV tables. Existing `donations` and `expenses` commands continue to return matching first-party return documents. `finance-aggregates` returns structured party-summary facts; `finance-rules` returns scoped official wording. A valid unmatched filter is an empty success, while source-layout or amount drift fails explicitly.
+Result commands parse the Commission's published CSV tables from its results archive (`archive.electionresults.govt.nz`), falling back to the original results host only on HTTP 404. If every official location answers 404 the command fails with `export_not_found` (exit 6), never an empty or transient-outage result. Existing `donations` and `expenses` commands continue to return matching first-party return documents. `finance-aggregates` returns structured party-summary facts; `finance-rules` returns scoped official wording. A valid unmatched filter is an empty success, while source-layout or amount drift fails explicitly.
 
 ## Resources
 

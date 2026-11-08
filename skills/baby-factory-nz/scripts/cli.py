@@ -189,6 +189,35 @@ def normalize_ld_product(raw: dict[str, Any], source_url: str) -> dict[str, Any]
     }
 
 
+def ld_types(raw: dict[str, Any]) -> set[str]:
+    value = raw.get("@type")
+    values = value if isinstance(value, list) else [value]
+    return {str(item).rsplit("/", 1)[-1] for item in values if isinstance(item, str)}
+
+
+def normalize_ld_product_group(raw: dict[str, Any], source_url: str) -> dict[str, Any]:
+    """Flatten a schema.org ProductGroup (one Product per variant) into the Product shape."""
+    variants = [item for item in raw.get("hasVariant") or [] if isinstance(item, dict) and "Product" in ld_types(item)] if isinstance(raw.get("hasVariant"), list) else []
+    offers: list[dict[str, Any]] = []
+    for variant in variants:
+        for offer in normalize_ld_product(variant, source_url)["offers"]:
+            offers.append({**offer, "sku": offer.get("sku") or variant.get("sku")})
+    images = [variant.get("image") for variant in variants if variant.get("image")]
+    merged = {key: value for key, value in raw.items() if key not in {"hasVariant", "offers"}}
+    if not merged.get("image") and images:
+        merged["image"] = images[0]
+    if not merged.get("sku"):
+        merged["sku"] = raw.get("productGroupID")
+    product = normalize_ld_product(merged, source_url)
+    priced = [offer for offer in offers if offer.get("price") is not None]
+    cheapest = min(priced, key=lambda offer: offer["price"]) if priced else {}
+    product.update({
+        "price": cheapest.get("price"), "currency": cheapest.get("currency") or "NZD",
+        "availability": cheapest.get("availability"), "offers": offers,
+    })
+    return product
+
+
 def product_url(value: str) -> str:
     value = value.strip()
     if value.startswith("https://"):
@@ -204,10 +233,12 @@ def product_url(value: str) -> str:
 def get_product(value: str, timeout: int) -> tuple[dict[str, Any], str]:
     url = product_url(value)
     markup, final_url = fetch_text(url, timeout)
-    raw = next((item for item in json_ld_objects(markup) if item.get("@type") == "Product"), None)
-    if not raw:
-        raise CliError(f"no Product JSON-LD found at {final_url}; the page may have changed")
-    product = normalize_ld_product(raw, final_url)
+    objects = json_ld_objects(markup)
+    raw = next((item for item in objects if "Product" in ld_types(item)), None)
+    group = None if raw else next((item for item in objects if "ProductGroup" in ld_types(item)), None)
+    if not raw and not group:
+        raise CliError(f"no Product or ProductGroup JSON-LD found at {final_url}; the page may have changed")
+    product = normalize_ld_product(raw, final_url) if raw else normalize_ld_product_group(group, final_url)
     if not product.get("name") or product.get("price") is None:
         raise CliError(f"incomplete Product JSON-LD at {final_url}")
     product["source_url"] = final_url

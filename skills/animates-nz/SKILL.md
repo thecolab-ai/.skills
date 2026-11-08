@@ -64,6 +64,7 @@ The global `--timeout N` option goes before the command and defaults to 10 secon
 
 - Uses Python standard library only and unauthenticated GET requests.
 - Search uses the public Magento read-only search endpoint only to obtain bounded product IDs, then parses Product JSON-LD from detail HTML.
+- If Magento search returns no matches (the case since 30 Oct 2026), search falls back to word matching on the public product sitemap. It marks this with `search_source: "sitemap_fallback"` and a warning; these results are in sitemap order, not relevance ranked. See `references/api-notes.md`.
 - Responses are size-capped; malformed or incomplete upstream data fails instead of returning fabricated success.
 - Search can make one search request plus up to `--limit` detail requests; keep limits narrow.
 

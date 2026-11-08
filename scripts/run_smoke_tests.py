@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -51,7 +52,9 @@ NETWORK_MARKER = re.compile(
     r"temporary failure|timed? out|http (?:403|406|429|451|5\d\d)",
     re.I,
 )
-TRACEBACK_MARKER = re.compile(r"traceback|syntaxerror", re.I)
+# A browser skill that could not start CloakBrowser for any reason other than the
+# exit-76 session limit is broken, not an outage: never gate it on network words.
+TRACEBACK_MARKER = re.compile(r"traceback|syntaxerror|browser_launch_failed", re.I)
 
 
 def assertion_kind(line: str) -> str | None:
@@ -95,6 +98,31 @@ def static_assertions(path: Path) -> int:
         for node in ast.walk(tree)
     )
     return count
+
+
+# CloakBrowser 0.7+ claims a free licence key when none is configured, and a
+# free key allows one concurrent browser session. Parallel browser smokes then
+# fail with CloakBrowserLicenseError (session limit), so they share one lane.
+BROWSER_LANE = threading.Lock()
+
+
+def uses_browser(skill_dir: Path) -> bool:
+    """Return whether a skill's scripts can launch CloakBrowser."""
+    for script in sorted((skill_dir / "scripts").glob("*.py")):
+        try:
+            if "cloakbrowser" in script.read_text(encoding="utf-8").lower():
+                return True
+        except (OSError, UnicodeDecodeError):
+            continue
+    return False
+
+
+def run_in_lane(skill_dir: Path, timeout: int) -> dict[str, object]:
+    """Run one smoke, serialising CloakBrowser skills when the browser is enabled."""
+    if os.environ.get("COLAB_SMOKE_WITH_CLOAKBROWSER") == "1" and uses_browser(skill_dir):
+        with BROWSER_LANE:
+            return run_one(skill_dir, timeout)
+    return run_one(skill_dir, timeout)
 
 
 def smoke_command(path: Path) -> list[str]:
@@ -309,7 +337,7 @@ def main() -> int:
         max_workers=min(max(1, args.jobs), max(1, len(skill_dirs)))
     ) as executor:
         results = list(
-            executor.map(lambda path: run_one(path, args.timeout), skill_dirs)
+            executor.map(lambda path: run_in_lane(path, args.timeout), skill_dirs)
         )
     results.sort(key=lambda result: str(result["skill"]))
     write_summary(results)

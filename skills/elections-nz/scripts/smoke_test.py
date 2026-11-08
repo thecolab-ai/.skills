@@ -34,11 +34,18 @@ print("[PASS] fixture aggregate finance, empty filter, reporting rules and priva
 unit = subprocess.run([sys.executable, str(SKILL/"scripts/test_finance.py")], capture_output=True, text=True, timeout=30)
 assert unit.returncode == 0, unit.stdout + unit.stderr
 print("[PASS] contract adversarial finance layouts and normal/empty/blocked CLI states")
-run = subprocess.run([sys.executable, str(SKILL/"scripts/cli.py"), "results", "--year", "2023", "--limit", "2", "--json"], capture_output=True, text=True, timeout=45)
+live_failures = []
+run = subprocess.run([sys.executable, str(SKILL/"scripts/cli.py"), "results", "--year", "2023", "--limit", "2", "--json"], capture_output=True, text=True, timeout=75)
 if run.returncode == 0:
-    payload=json.loads(run.stdout); assert payload["data"] and payload["source"]["url"].startswith("https://electionresults.govt.nz/"); print("[PASS] live official election results CSV")
+    payload = json.loads(run.stdout); result_url = payload["source"]["url"]
+    assert payload["data"] and result_url.startswith(("https://archive.electionresults.govt.nz/", "https://electionresults.govt.nz/")), result_url
+    print(f"[PASS] live official election results CSV from {result_url}")
 elif run.returncode in {4,5}:
     print(f"[SKIP] Electoral Commission blocked/unavailable: {run.stderr.strip()}")
+elif run.returncode == 6 and '"export_not_found"' in run.stderr:
+    # HTTP 404 at every official location is permanent source drift, never an outage skip.
+    print(f"[FAIL] schema official 2023 results export missing (HTTP 404 at every official location): {run.stderr.strip()}")
+    live_failures.append("results export not found")
 else: print(run.stderr, file=sys.stderr); raise SystemExit(1)
 
 try:
@@ -70,9 +77,12 @@ try:
     live_expense_rules = parse_reporting_rules(live_expense_html, expense_url, stamp, 2023)
     evidence = "\n".join(str(row["evidence_text"]) for row in live_expense_rules)
     for required in ("$1,388,000", "$32,600", "13 March, 2024", "need to declare", "required to include an audit report"):
-        assert required in evidence
+        assert required in evidence, f"live 2023 expense rules lack {required!r}; rule headings: {sorted({str(row['heading']) for row in live_expense_rules})}"
     print("[PASS] live expense aggregates retain regulated period and complete core rules")
 except (nzfetch.Blocked, nzfetch.RateLimited) as exc:
     print(f"[SKIP] live expense finance blocked: {exc}")
 except nzfetch.FetchError as exc:
     print(f"[SKIP] live expense finance upstream unavailable: {exc}")
+
+if live_failures:
+    raise SystemExit(1)

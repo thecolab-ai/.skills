@@ -95,6 +95,11 @@ def test_charger_fixture() -> str:
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
+    renamed = module.parse_csv(
+        "UnitId,EVSEs (Charge Points),SiteId,Current,KwRated,Region,District\nUNIT-2,3,S,AC,7,Auckland,Auckland\n",
+        "chargers",
+    )
+    assert module.normalise_charger(renamed[0])["points"] == 3
     record = module.normalise_charger(
         {
             "UnitId": "UNIT-1",
@@ -136,8 +141,8 @@ results.append(
             data.get("status") == "ok"
             and isinstance(data.get("records"), list)
             and len(data["records"]) > 0
-            and all(row.get("current") == "DC" and row.get("kw_rated", 0) >= 50 for row in data["records"]),
-            "expected non-empty DC records with kw_rated >= 50",
+            and all(row.get("current") == "DC" and row.get("kw_rated", 0) >= 50 and row.get("points") for row in data["records"]),
+            "expected non-empty DC records with kw_rated >= 50 and charge points",
         ),
     )
 )
@@ -149,8 +154,10 @@ results.append(
         lambda data: (
             data.get("status") == "ok"
             and isinstance(data.get("records"), list)
-            and any(row.get("battery_electric_vehicles") for row in data["records"]),
-            "expected regional BEV counts",
+            and any(row.get("battery_electric_vehicles") for row in data["records"])
+            and all(row.get("name") and row.get("charge_points") for row in data["records"])
+            and any(row.get("bevs_per_charge_point") for row in data["records"]),
+            "expected regional BEV counts, charge points and BEVs per charge point",
         ),
     )
 )
@@ -163,8 +170,9 @@ results.append(
             data.get("status") == "ok"
             and isinstance(data.get("records"), list)
             and len(data["records"]) > 0
-            and all((row.get("status") or "").lower() == "live" for row in data["records"]),
-            "expected live co-funded charger rows",
+            and all((row.get("status") or "").lower() == "live" for row in data["records"])
+            and all(row.get("application_id") and row.get("points") for row in data["records"]),
+            "expected live co-funded charger rows with application IDs and points",
         ),
     )
 )

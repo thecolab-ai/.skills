@@ -28,6 +28,51 @@ class BrowserUnavailableError(RuntimeError):
 class BrowserBlockedError(RuntimeError):
     """Raised when browser mode reaches an upstream bot/challenge page."""
 
+
+class BrowserSessionLimitError(BrowserUnavailableError):
+    """CloakBrowser refused a session because the licence's concurrent-session limit is in use."""
+
+
+class BrowserLaunchError(BrowserUnavailableError):
+    """CloakBrowser is installed but failed to start for any reason other than the session limit."""
+
+
+# CloakBrowser >= 0.7: the Pro binary exits 76 when the licence's concurrent-session
+# limit is reached, and the Python wrapper re-raises that as CloakBrowserLicenseError
+# with this fixed message (cloakbrowser/license.py _LICENSE_EXIT_MESSAGES[76]). Only
+# that exact state is "seat busy". Codes 77-79 (invalid/missing key, licence server
+# unreachable, local config) and every other launch error are real failures.
+CLOAKBROWSER_SESSION_LIMIT_EXIT = 76
+CLOAKBROWSER_SESSION_LIMIT_TEXT = "CloakBrowser Pro: session limit reached"
+
+
+def is_cloakbrowser_session_limit(exc: BaseException) -> bool:
+    return type(exc).__name__ == "CloakBrowserLicenseError" and str(exc).lstrip().startswith(
+        CLOAKBROWSER_SESSION_LIMIT_TEXT
+    )
+
+
+def is_cloakbrowser_licence_error(exc: BaseException) -> bool:
+    """Any CloakBrowserLicenseError (exit 76-79), including one raised after the CDP handshake."""
+    return type(exc).__name__ == "CloakBrowserLicenseError"
+
+
+def _first_line(exc: BaseException) -> str:
+    lines = str(exc).strip().splitlines()
+    return lines[0][:240] if lines else ""
+
+
+def browser_start_error(exc: BaseException) -> BrowserUnavailableError:
+    """Classify a CloakBrowser start-up failure: session limit (exit 76) or launch failure."""
+    if is_cloakbrowser_session_limit(exc):
+        return BrowserSessionLimitError(
+            "browser_session_limit: CloakBrowser concurrent-session limit reached "
+            f"(CloakBrowserLicenseError, binary exit {CLOAKBROWSER_SESSION_LIMIT_EXIT})"
+        )
+    return BrowserLaunchError(
+        f"browser_launch_failed: CloakBrowser is installed but failed to start ({type(exc).__name__}: {_first_line(exc)})"
+    )
+
 BASE_WEB = "https://www.thewarehouse.co.nz"
 SEARCH_PATH = "/search/updategrid"
 PRODUCT_PATH = "/on/demandware.store/Sites-twl-Site/default/Product-Show"
@@ -145,13 +190,16 @@ def browser_request(
     url = url_with_params(path, params)
     browser = None
     try:
-        browser = launch(
-            headless=True,
-            args=["--no-sandbox", "--disable-dev-shm-usage"],
-            timezone="Pacific/Auckland",
-            locale="en-NZ",
-        )
-        page = browser.new_page()
+        try:
+            browser = launch(
+                headless=True,
+                args=["--no-sandbox", "--disable-dev-shm-usage"],
+                timezone="Pacific/Auckland",
+                locale="en-NZ",
+            )
+            page = browser.new_page()
+        except Exception as exc:
+            raise browser_start_error(exc) from exc
         page.goto(BASE_WEB, wait_until="domcontentloaded", timeout=timeout_ms)
         result = page.evaluate(
             """async ({url, accept}) => {
@@ -178,6 +226,10 @@ def browser_request(
         if looks_blocked(text):
             raise BrowserBlockedError(f"browser request reached blocked/challenge page at {final_url}")
         return text, final_url
+    except Exception as exc:
+        if is_cloakbrowser_licence_error(exc):
+            raise browser_start_error(exc) from exc
+        raise
     finally:
         if browser is not None:
             browser.close()
@@ -647,17 +699,35 @@ def cmd_product(args: argparse.Namespace) -> None:
     emit(data, args.json)
 
 
+# Without a region, Stores-FindStores now geolocates the caller's IP and searches near
+# that point (e.g. Helsinki for a European host, returning zero stores). An explicit
+# NZ-wide search circle keeps the national list independent of where the caller is.
+NZ_STORE_SEARCH = {"lat": -41.0, "long": 174.0, "radius": 2000}
+
+
+def stores_params(region: str | None) -> dict[str, Any]:
+    return {"region": region} if region else dict(NZ_STORE_SEARCH)
+
+
+def parse_stores_payload(payload: Any) -> list[dict[str, Any]]:
+    container = payload.get("stores") if isinstance(payload, dict) else None
+    raw_stores = container.get("stores") if isinstance(container, dict) else None
+    if not isinstance(raw_stores, list):
+        die("unexpected Stores-FindStores response shape: missing stores.stores[]")
+    return [parse_store(s) for s in raw_stores if isinstance(s, dict)]
+
+
 def cmd_stores(args: argparse.Namespace) -> None:
     region = normalize_region(args.region)
+    params = stores_params(region)
     started = time.perf_counter()
     browser_blocked = False
     try:
-        payload = request_json(STORES_PATH, {"region": region}, browser=args.browser)
+        payload = request_json(STORES_PATH, params, browser=args.browser)
     except BrowserBlockedError:
         browser_blocked = True
-        payload = request_json(STORES_PATH, {"region": region}, browser=False)
-    raw_stores = (((payload or {}).get("stores") or {}).get("stores") or [])
-    stores = [parse_store(s) for s in raw_stores if isinstance(s, dict)]
+        payload = request_json(STORES_PATH, params, browser=False)
+    stores = parse_stores_payload(payload)
     data = {
         "method": "direct public HTTP after blocked browser fallback" if browser_blocked else ("CloakBrowser public page fetch" if args.browser else "direct public HTTP"),
         "browser_blocked": browser_blocked or None,
@@ -774,17 +844,34 @@ def main(argv: list[str] | None = None) -> int:
     try:
         args.func(args)
     except BrowserUnavailableError as exc:
-        payload = {
-            "error": "cloakbrowser_not_installed",
-            "message": str(exc),
-            "recommendation": "Recommend that the user installs CloakBrowser or reruns without --browser for the direct public HTTP path.",
-        }
+        message = str(exc)
+        if isinstance(exc, BrowserSessionLimitError):
+            payload = {
+                "error": "browser_session_limit",
+                "message": message,
+                "recommendation": "Another CloakBrowser session holds the licence's only seat. Close it and retry (a killed session frees its seat within about 4 minutes), or rerun without --browser for the direct public HTTP path.",
+            }
+            exit_code = CLOAKBROWSER_SESSION_LIMIT_EXIT
+        elif isinstance(exc, BrowserLaunchError):
+            payload = {
+                "error": "browser_launch_failed",
+                "message": message,
+                "recommendation": "CloakBrowser is installed but could not start; check the CloakBrowser install and licence, or rerun without --browser for the direct public HTTP path.",
+            }
+            exit_code = 1
+        else:
+            payload = {
+                "error": "cloakbrowser_not_installed",
+                "message": message,
+                "recommendation": "Recommend that the user installs CloakBrowser or reruns without --browser for the direct public HTTP path.",
+            }
+            exit_code = 2
         if getattr(args, "json", False):
             print(json.dumps(payload, indent=2, ensure_ascii=False))
         else:
             print(f"ERROR: {payload['message']}", file=sys.stderr)
             print(f"Recommendation: {payload['recommendation']}", file=sys.stderr)
-        return 2
+        return exit_code
     except BrowserBlockedError as exc:
         payload = {
             "error": "browser_blocked",

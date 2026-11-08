@@ -44,6 +44,46 @@ class BrowserUnavailableError(RuntimeError):
     """Raised when --browser is requested but CloakBrowser is not installed."""
 
 
+class BrowserSessionLimitError(BrowserUnavailableError):
+    """CloakBrowser refused a session because the licence's concurrent-session limit is in use."""
+
+
+class BrowserLaunchError(BrowserUnavailableError):
+    """CloakBrowser is installed but failed to start for any reason other than the session limit."""
+
+
+# CloakBrowser >= 0.7: the Pro binary exits 76 when the licence's concurrent-session
+# limit is reached, and the Python wrapper re-raises that as CloakBrowserLicenseError
+# with this fixed message (cloakbrowser/license.py _LICENSE_EXIT_MESSAGES[76]). Only
+# that exact state is "seat busy". Codes 77-79 (invalid/missing key, licence server
+# unreachable, local config) and every other launch error are real failures.
+CLOAKBROWSER_SESSION_LIMIT_EXIT = 76
+CLOAKBROWSER_SESSION_LIMIT_TEXT = "CloakBrowser Pro: session limit reached"
+
+
+def is_cloakbrowser_licence_error(exc: BaseException) -> bool:
+    """Any CloakBrowserLicenseError (exit 76-79), including one raised after the CDP handshake."""
+    return type(exc).__name__ == "CloakBrowserLicenseError"
+
+
+def is_cloakbrowser_session_limit(exc: BaseException) -> bool:
+    return is_cloakbrowser_licence_error(exc) and str(exc).lstrip().startswith(CLOAKBROWSER_SESSION_LIMIT_TEXT)
+
+
+def browser_start_error(exc: BaseException) -> BrowserUnavailableError:
+    """Classify a CloakBrowser start-up failure: session limit (exit 76) or launch failure."""
+    if is_cloakbrowser_session_limit(exc):
+        return BrowserSessionLimitError(
+            "browser_session_limit: CloakBrowser concurrent-session limit reached "
+            f"(CloakBrowserLicenseError, binary exit {CLOAKBROWSER_SESSION_LIMIT_EXIT})"
+        )
+    lines = str(exc).strip().splitlines()
+    detail = lines[0][:240] if lines else ""
+    return BrowserLaunchError(
+        f"browser_launch_failed: CloakBrowser is installed but failed to start ({type(exc).__name__}: {detail})"
+    )
+
+
 class TransientBrowserError(RuntimeError):
     """A transient browser/navigation failure (anti-bot abort, timeout, connection
     reset). Retryable via the public timetable fallback rather than a hard failure."""
@@ -84,6 +124,8 @@ def _browser_goto(page: Any, url: str, *, timeout: int = 90000) -> None:
     except BrowserUnavailableError:
         raise
     except Exception as exc:  # noqa: BLE001 - classify, never leak a traceback
+        if is_cloakbrowser_licence_error(exc):
+            raise browser_start_error(exc) from exc
         if _is_transient_browser_error(exc):
             raise TransientBrowserError(str(exc)) from exc
         raise
@@ -445,13 +487,16 @@ def _cloakbrowser_fare_search(
 ) -> dict[str, Any]:
     browser = None
     try:
-        browser = launch(
-            headless=True,
-            args=["--no-sandbox", "--disable-dev-shm-usage"],
-            timezone="Pacific/Auckland",
-            locale="en-NZ",
-        )
-        page = browser.new_page()
+        try:
+            browser = launch(
+                headless=True,
+                args=["--no-sandbox", "--disable-dev-shm-usage"],
+                timezone="Pacific/Auckland",
+                locale="en-NZ",
+            )
+            page = browser.new_page()
+        except Exception as exc:  # noqa: BLE001 - classified: session limit or launch failure
+            raise browser_start_error(exc) from exc
         _browser_goto(page, start_url)
         payload = search_payload(origin, destination, depart_date, adults)
         search_result_raw = page.evaluate(
@@ -488,6 +533,10 @@ def _cloakbrowser_fare_search(
             start_url,
             "CloakBrowser headless browser search; read-only fare results page parse",
         )
+    except Exception as exc:
+        if is_cloakbrowser_licence_error(exc):
+            raise browser_start_error(exc) from exc
+        raise
     finally:
         if browser is not None:
             browser.close()
@@ -613,22 +662,33 @@ def main(argv: list[str] | None = None) -> int:
             as_json = "--json" in argv
         else:
             as_json = "--json" in sys.argv[1:]
+        if isinstance(exc, BrowserSessionLimitError):
+            error, exit_code = "browser_session_limit", CLOAKBROWSER_SESSION_LIMIT_EXIT
+            recommendation = (
+                "Another CloakBrowser session holds the licence's only seat. Close it and retry "
+                "(a killed session frees its seat within about 4 minutes), or run without --browser for the fallback path."
+            )
+        elif isinstance(exc, BrowserLaunchError):
+            error, exit_code = "browser_launch_failed", 1
+            recommendation = (
+                "CloakBrowser is installed but could not start; check the CloakBrowser install and licence, "
+                "or run without --browser for the fallback path."
+            )
+        else:
+            error, exit_code = "cloakbrowser_not_installed", 2
+            recommendation = "Recommend that the user installs CloakBrowser or runs without --browser for the fallback path."
         if as_json:
             print(
                 json.dumps(
-                    {
-                        "error": "cloakbrowser_not_installed",
-                        "message": message,
-                        "recommendation": "Recommend that the user installs CloakBrowser or runs without --browser for the fallback path.",
-                    },
+                    {"error": error, "message": message, "recommendation": recommendation},
                     indent=2,
                     sort_keys=True,
                 )
             )
         else:
             print(f"ERROR: {message}", file=sys.stderr)
-            print("Recommendation: ask the user to install CloakBrowser, or rerun without --browser.", file=sys.stderr)
-        return 2
+            print(f"Recommendation: {recommendation}", file=sys.stderr)
+        return exit_code
     except RuntimeError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1

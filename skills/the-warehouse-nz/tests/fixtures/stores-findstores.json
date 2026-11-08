@@ -1,0 +1,15 @@
+{
+  "_comment": "Synthetic, trimmed to the 2026-11 Stores-FindStores response shape.",
+  "action": "Stores-FindStores",
+  "stores": {
+    "stores": [
+      {"ID": "9001", "name": "The Warehouse Fixture North", "stateCode": "NZ-AUK", "fullAddress": "1 Fixture Road, Auckland 1010",
+       "city": "Auckland", "postalCode": "1010", "phone": "09 000 0000", "latitude": -36.85, "longitude": 174.76,
+       "openingHoursJson": {"text": "Open today", "openingHours": "8am - 9pm"}, "isOpenNow": true,
+       "isClickAndCollectSupported": true, "storePickUpStatus": "available", "mapURL": "https://www.thewarehouse.co.nz/stores/fixture-north"},
+      {"ID": "9002", "name": "The Warehouse Fixture South", "stateCode": "NZ-OTA", "addressLines": ["2 Fixture Street", "Dunedin"],
+       "latitude": -45.87, "longitude": 170.5}
+    ],
+    "searchKey": {"lat": -41, "long": 174}
+  }
+}

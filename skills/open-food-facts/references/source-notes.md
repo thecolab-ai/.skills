@@ -43,6 +43,13 @@ brand Ferrero, and no `nova_group` (`missing_fields`). Its `last_modified_t` was
 with `page_size=1`, returned one row and a source count. The 404 body is gzip
 compressed; the client decompresses it before reading `status`.
 
+Update 2026-11-08: `1234567890128` is no longer absent. It was added on 2026-10-28
+(`last_modified_t` 1793195881) as Harvest Box "Mango & Banana Oven Baked Fruit
+Clusters" and now returns HTTP 200 `product_found`. The smoke test therefore draws a
+fresh EAN-13-shaped code with a deliberately invalid check digit on each run for the
+not-found probe; such a code returned HTTP 404 `product_not_found` with the same body
+shape as above.
+
 Structured search was verified the same day:
 
 `GET /api/v2/search?countries_tags=en:new-zealand&categories_tags=en:yogurts&page_size=2&fields=code,product_name,brands,countries_tags`

@@ -43,6 +43,11 @@ HTTP client until the cookies expire.
 - Cache stale mid-flight and no `--browser` → `{"error": "clearance_expired", ...}`.
 - CloakBrowser not installed → `{"error": "cloakbrowser_not_installed", ...}`.
 - CloakBrowser can't clear the wall → `{"error": "browser_blocked", ...}`.
+- CloakBrowser >= 0.7 refusing the session because the licence's concurrent-session
+  limit is in use (`CloakBrowserLicenseError`, binary exit 76) →
+  `{"error": "browser_session_limit", ...}` (exit 76); any other start-up failure
+  (another licence error, a launch or `new_page` error) →
+  `{"error": "browser_launch_failed", ...}` (exit 1). Never a traceback.
 
 In every blocked case `latest` still works with no browser. CAPTCHA / bot challenges
 are treated as blocked states, never bypass targets.

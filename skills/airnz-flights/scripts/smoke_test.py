@@ -9,6 +9,10 @@ import sys
 from datetime import date, timedelta
 from importlib.util import find_spec
 from pathlib import Path
+import contextlib
+import io
+import types
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[3]
 CLI = ROOT / "skills/airnz-flights/scripts/cli.py"
@@ -34,6 +38,70 @@ assert fixture_cli._is_transient_browser_error(RuntimeError("Timeout 90000ms exc
 assert not fixture_cli._is_transient_browser_error(ValueError("unexpected key in payload"))
 print("[PASS] fixture transient browser-navigation error classification")
 
+# CloakBrowser 0.7 licence denials, as the wrapper raises them (cloakbrowser/license.py).
+SESSION_LIMIT_EXIT = 76
+LICENCE_76 = ("CloakBrowser Pro: session limit reached for your plan. Close another running session "
+              "or upgrade your plan.")
+LICENCE_77 = "CloakBrowser Pro: license key is invalid, expired, or missing."
+
+
+def launch_failure_cases():
+    """(label, fake cloakbrowser.launch, expected exit code, expected error) for the CLI.
+
+    Only the exit-76 session limit is a SKIP state; every other start-up failure,
+    including other licence codes and API breaks, must be browser_launch_failed (exit 1).
+    """
+    import types as _types
+
+    licence_error = type("CloakBrowserLicenseError", (RuntimeError,), {})
+
+    def raises(exc):
+        def _launch(*a, **kw):
+            raise exc
+        return _launch
+
+    def late(exc):
+        def _goto(*a, **kw):
+            raise exc
+        page = _types.SimpleNamespace(goto=_goto, evaluate=_goto, content=_goto, wait_for_timeout=_goto)
+        return lambda *a, **kw: _types.SimpleNamespace(new_page=lambda *a, **kw: page, close=lambda: None)
+
+    return [
+        ("session limit at launch", raises(licence_error(LICENCE_76)), SESSION_LIMIT_EXIT, "browser_session_limit"),
+        ("session limit after handshake", late(licence_error(LICENCE_76)), SESSION_LIMIT_EXIT, "browser_session_limit"),
+        ("invalid licence key (exit 77)", raises(licence_error(LICENCE_77)), 1, "browser_launch_failed"),
+        ("invalid licence key after handshake", late(licence_error(LICENCE_77)), 1, "browser_launch_failed"),
+        ("launch() API break", raises(TypeError("launch() got an unexpected keyword argument 'timezone'")), 1, "browser_launch_failed"),
+        ("browser without new_page", lambda *a, **kw: _types.SimpleNamespace(close=lambda: None), 1, "browser_launch_failed"),
+        ("session-limit text from a non-licence error", raises(RuntimeError(LICENCE_76)), 1, "browser_launch_failed"),
+    ]
+
+
+def browser_error(stdout: str) -> str | None:
+    try:
+        payload = json.loads(stdout)
+    except json.JSONDecodeError:
+        return None
+    return payload.get("error") if isinstance(payload, dict) else None
+
+
+def browser_session_limit(returncode: int, stdout: str) -> bool:
+    """True only for CloakBrowser's concurrent-session limit: exit 76 plus the CLI's
+    machine-readable browser_session_limit payload. Any other browser start-up failure
+    (browser_launch_failed, exit 1) stays a FAIL."""
+    return returncode == SESSION_LIMIT_EXIT and browser_error(stdout) == "browser_session_limit"
+
+
+# Only the exit-76 session limit is a SKIP state; every other start-up failure
+# (other licence codes, API breaks) must exit 1 as browser_launch_failed.
+for label, launch, want_code, want_error in launch_failure_cases():
+    out = io.StringIO()
+    with patch.dict(sys.modules, {"cloakbrowser": types.SimpleNamespace(launch=launch)}), contextlib.redirect_stdout(out):
+        code = fixture_cli.main(["AKL", "WLG", "2026-12-01", "--json", "--browser"])
+    assert (code, browser_error(out.getvalue())) == (want_code, want_error), (label, code, out.getvalue()[:300])
+    assert browser_session_limit(code, out.getvalue()) is (want_error == "browser_session_limit"), label
+print("[PASS] fixture only the CloakBrowser exit-76 session limit skips; other launch failures fail")
+
 DATE = (date.today() + timedelta(days=7)).isoformat()
 browser_required = os.getenv("COLAB_SMOKE_USE_BROWSER") == "1"
 use_browser = browser_required or find_spec("cloakbrowser") is not None
@@ -41,6 +109,10 @@ cmd = [sys.executable, str(CLI), "AKL", "WLG", DATE, "--limit", "3", "--json"]
 if use_browser:
     cmd.append("--browser")
 proc = subprocess.run(cmd, text=True, capture_output=True, timeout=180)
+if use_browser and browser_session_limit(proc.returncode, proc.stdout):
+    print("[SKIP] airnz-flights browser fare search: CloakBrowser concurrent-session limit reached "
+          "(CloakBrowserLicenseError, exit 76); browser path not exercised")
+    raise SystemExit(0)
 if proc.returncode != 0:
     if use_browser and not browser_required:
         try:

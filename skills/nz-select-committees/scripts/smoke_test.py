@@ -11,7 +11,9 @@ assert detail["membership"][0]["role"]=="Chairperson" and detail["evidence"][0][
 navigation=parse_listing((S/"tests/fixtures/navigation-only.html").read_text(),"https://www3.parliament.nz/en/pb/sc/make-a-submission/open/","2026-07-19T00:00:00Z")
 empty=parse_listing((S/"tests/fixtures/empty-reports.html").read_text(),"https://www3.parliament.nz/en/pb/sc/reports/all/","2026-07-19T00:00:00Z")
 assert navigation==[] and empty==[]
-print("[PASS] fixture select-committee title, deadline, status and canonical URL")
+dissolved=parse_listing((S/"tests/fixtures/open-dissolved.html").read_text(),"https://www3.parliament.nz/en/pb/sc/make-a-submission/open/","2026-11-07T00:00:00Z")
+assert [r["title"] for r in dissolved]==["Example Amendment Bill","Sample Claims Settlement Bill"] and all(r["closing_date"] is None and r["closing_at"] is None and r["status"]=="open" and r["committee"] is None for r in dissolved)
+print("[PASS] fixture select-committee title, deadline, status, N/A deadline and canonical URL")
 for invalid in (("reports","--since","not-a-date"),("reports","--since","2026-02-30")):
  run=subprocess.run([sys.executable,str(S/"scripts/cli.py"),*invalid,"--json"],capture_output=True,text=True,timeout=10)
  assert run.returncode==2 and "valid YYYY-MM-DD" in run.stderr

@@ -249,6 +249,17 @@ def normalise_catalogue_item(item: dict[str, Any]) -> dict[str, Any]:
 
 def check_layer_host(url: str) -> None:
     """Require an exact Wellington ArcGIS REST MapServer/FeatureServer path."""
+    if not layer_host_allowed(url):
+        die(
+            f"unsupported layer URL {url!r}: use an exact HTTPS Wellington "
+            "MapServer/FeatureServer REST path",
+            7,
+            "blocked_host",
+        )
+
+
+def layer_host_allowed(url: str) -> bool:
+    """Return whether url is an exact Wellington ArcGIS REST service path."""
     try:
         parsed = urllib.parse.urlparse(url)
         host = (parsed.hostname or "").lower()
@@ -309,13 +320,7 @@ def check_layer_host(url: str) -> None:
                 )
             )
         )
-    if not allowed:
-        die(
-            f"unsupported layer URL {url!r}: use an exact HTTPS Wellington "
-            "MapServer/FeatureServer REST path",
-            7,
-            "blocked_host",
-        )
+    return allowed
 
 
 def fetch_item(
@@ -660,6 +665,7 @@ def cmd_search(args: argparse.Namespace) -> None:
             "malformed_response",
         )
     verified_results: list[dict[str, Any]] = []
+    warnings: list[str] = []
     for item in data["results"]:
         if not isinstance(item, dict):
             die(
@@ -677,8 +683,20 @@ def cmd_search(args: argparse.Namespace) -> None:
             str(item.get("id") or "search result"),
             expected_org=portal["org_id"],
         )
-        if item.get("url") and item.get("type") in {"Feature Service", "Map Service"}:
-            check_layer_host(str(item["url"]))
+        if (
+            item.get("url")
+            and item.get("type") in SERVICE_ITEM_TYPES
+            and not layer_host_allowed(str(item["url"]))
+        ):
+            # A council-owned catalogue entry can point at a host outside the
+            # supported service allowlist (for example an internal gisdev
+            # server). Withhold that URL instead of failing the whole page.
+            host = urllib.parse.urlparse(str(item["url"])).hostname or "unknown host"
+            warnings.append(
+                f"item {item.get('id')}: service URL on {host} is outside the "
+                "supported Wellington ArcGIS hosts and was withheld"
+            )
+            item = dict(item, url=None)
         verified_results.append(item)
     items = [normalise_item(item) for item in verified_results]
     payload = {
@@ -693,12 +711,14 @@ def cmd_search(args: argparse.Namespace) -> None:
         "next_start": data.get("nextStart"),
         "total_matches": data.get("total"),
         "items": items,
+        "warnings": warnings,
     }
     lines = [f"{portal['title']} datasets matching {args.keyword!r}: {len(items)} shown of {data.get('total')}"]
     for it in items:
         lines.append(f"- {it['id']} | {it['title']} ({it['type']})")
         if it["url"]:
             lines.append(f"    {it['url']}")
+    lines.extend(f"Warning: {warning}" for warning in warnings)
     if payload["next_start"] not in (None, -1):
         lines.append(f"Next page: --start {payload['next_start']}")
     emit(payload, args.json, lines)

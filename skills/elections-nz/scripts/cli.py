@@ -27,8 +27,36 @@ from political_finance import (  # noqa: E402
 )
 from result_contract import result_envelope, utc_now  # noqa: E402
 
-ALLOWED = {"elections.nz", "www.elections.nz", "electionresults.govt.nz", "www.electionresults.govt.nz"}
+ALLOWED = {"elections.nz", "www.elections.nz", "electionresults.govt.nz", "www.electionresults.govt.nz", "archive.electionresults.govt.nz"}
 WARNINGS = ["Only Electoral Commission results are authoritative.", "Finance records retain their reporting-period and disclosure-threshold context.", "Do not derive voter-level profiles or political persuasion."]
+# Past general-election results moved to the Commission's archive host in late
+# 2026 (its 2008/2020/2023 election pages now link "Official Result" there);
+# the original results host answers HTTP 404 for the 2023 exports. Try the
+# archive first and the original host only when the archive has no such file.
+RESULT_HOSTS = ("https://archive.electionresults.govt.nz", "https://electionresults.govt.nz")
+
+
+class ExportNotFound(Exception):
+    """Every official location answered HTTP 404: the export is gone, not a transient outage."""
+
+    def __init__(self, urls: list[str]) -> None:
+        super().__init__("official results export not found (HTTP 404) at " + ", ".join(urls))
+        self.urls = urls
+
+
+def fetch_results_export(year: int, filename: str) -> tuple[str, str]:
+    tried: list[str] = []
+    for host in RESULT_HOSTS:
+        url = f"{host}/electionresults_{year}/statistics/csv/{filename}"
+        try:
+            return url, nzfetch.fetch_text(url, timeout=30, allowed_hosts=ALLOWED)
+        except nzfetch.Blocked:
+            raise  # a block or rate limit is not evidence the file moved
+        except nzfetch.FetchError as exc:
+            if not str(exc).startswith("HTTP 404 "):
+                raise
+            tried.append(url)
+    raise ExportNotFound(tried)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -74,11 +102,9 @@ def main() -> int:
             freshness = "official Commission-published finance page observed at retrieval time"
         elif hasattr(args, "year"):
             if args.year not in {2005, 2008, 2011, 2014, 2017, 2020, 2023}: raise ValueError("unsupported general-election year")
-            base = f"https://electionresults.govt.nz/electionresults_{args.year}/statistics/csv"
             filename = "overall-results-summary.csv" if args.command in {"results", "party-vote"} else "party-votes-and-turnout-by-electorate.csv"
             if args.command == "candidate": filename = "winning-electorate-candidates.csv"
-            source_url = f"{base}/{filename}"
-            text = nzfetch.fetch_text(source_url, timeout=30, allowed_hosts=ALLOWED)
+            source_url, text = fetch_results_export(args.year, filename)
             if args.command in {"results", "party-vote"}:
                 rows = parse_overall_results(text, source_url, retrieved_at)
             elif args.command in {"turnout", "electorate"}:
@@ -87,8 +113,8 @@ def main() -> int:
                 rows = parse_winning_candidates(text, source_url, retrieved_at)
             if args.command == "electorate":
                 rows = [row for row in rows if args.name.casefold() in str(row["electorate"]).casefold()]
-                winner_url = f"{base}/winning-electorate-candidates.csv"
-                winners = parse_winning_candidates(nzfetch.fetch_text(winner_url, timeout=30, allowed_hosts=ALLOWED), winner_url, retrieved_at)
+                winner_url, winner_text = fetch_results_export(args.year, "winning-electorate-candidates.csv")
+                winners = parse_winning_candidates(winner_text, winner_url, retrieved_at)
                 data = [
                     {"electorate": row["electorate"], "turnout": row, "winning_candidate": next((winner for winner in winners if winner["electorate"] == row["electorate"]), None)}
                     for row in rows
@@ -117,6 +143,9 @@ def main() -> int:
             for row in data: print(" | ".join(str(value) for key, value in row.items() if key not in {"retrieved_at", "context"})[:1000])
             if not data: print("No matching records in this official publication.")
         return 0
+    except ExportNotFound as exc:
+        # Permanent source drift, not an outage: exit 6 so callers and smokes cannot read it as transient.
+        print(json.dumps({"error":"export_not_found","http_status":404,"tried_urls":exc.urls,"message":str(exc)}), file=sys.stderr); return 6
     except nzfetch.RateLimited as exc:
         print(json.dumps({"error":"rate_limited","retry_after":exc.retry_after,"message":str(exc)}), file=sys.stderr); return 4
     except ValueError as exc:

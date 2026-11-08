@@ -23,7 +23,9 @@
       "source_url": "https://www.repairnetworkaotearoa.org.nz/dynamic-localrepaircafes_p_8500816c_6fb3_4424_8161_90ad1ae5b8b2_0_5000-sitemap.xml",
       "publisher": "Repair Network Aotearoa",
       "files": [
-        "repair.html"
+        "repair.html",
+        "repair-sitemap.xml",
+        "repair-auckland.html"
       ],
       "fixture": "synthetic, structure captured 2026-10-08"
     },

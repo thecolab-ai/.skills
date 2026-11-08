@@ -144,6 +144,8 @@ def test_product() -> bool:
         return False
     if data.get("source") != "shopify-product-json":
         print(f"  Expected source=shopify-product-json, got {data.get('source')!r}")
+        if data.get("fallback_reason"):
+            print(f"  Shopify product JSON error: {str(data['fallback_reason'])[:300]}")
         return False
     if not isinstance(product.get("variants"), list) or not product["variants"]:
         print("  Expected product variants[]")

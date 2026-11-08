@@ -20,7 +20,7 @@ def fixtures():
     return {
         'watercare': json.loads((FIXTURES / 'watercare.json').read_text()),
         'wellington': json.loads((FIXTURES / 'wellington.json').read_text()),
-        'kiwirail': (FIXTURES / 'kiwirail.html').read_text(),
+        'kiwirail': json.loads((FIXTURES / 'kiwirail.json').read_text()),
         'kiwirail-calendar': (FIXTURES / 'calendar.pdf').read_bytes(),
     }
 
@@ -71,48 +71,68 @@ def run():
     print('[PASS] fixture Wellington resolution, counts, summer/winter offsets, alternate dates and cancellation')
 
     work = cli.parse_works(data['kiwirail'], cli.source_meta('kiwirail'), NOW)
-    assert len(work) == 4 and work[0]['start'] == '2099-01-12' and work[0]['end'] == '2099-01-16'
-    assert work[1]['description'].endswith('Monday to Saturday.') and work[1]['area'] == 'Sample Station'
-    assert work[-1]['kind'] == 'rail_notice' and work[-1]['status'] == 'unknown'
-    assert all(row['geometry'] is None and not row['passenger_closure_confirmed'] for row in work)
-    no_year = data['kiwirail'].replace('January-2099.pdf', 'January.pdf')
-    assert cli.parse_works(no_year, cli.source_meta('kiwirail'), NOW)[0]['start'] is None
-    print('[PASS] fixture KiwiRail notice grouping, explicit year extraction and absence of invented locations/closures')
+    assert [row['id'] for row in work] == ['example-junction-247-works', 'sample-station', 'undated-line', 'example-summer-works']
+    assert work[0]['start'] == '2099-01-12' and work[0]['end'] == '2099-01-16' and work[0]['status'] == 'planned'
+    assert work[0]['tags'] == ['24/7 work', 'Maintenance'] and work[0]['source_status'] == 'in-progress'
+    assert work[0]['notice_links'] == ['https://www.kiwirail.co.nz/network-investment/where-we-are-working/example-junction-247-works/']
+    assert work[1]['area'] == 'Sample Station & yard upgrade' and work[1]['start'] == '2025-12-31' and work[1]['end'] is None
+    assert work[1]['status'] == 'current' and work[1]['date_precision'] == 'day'
+    assert work[2]['start'] is None and work[2]['date_text'] is None and work[2]['status'] == 'current'
+    assert work[3]['source_status'] == 'upcoming' and work[3]['status'] == 'planned'
+    assert all(row['geometry'] is None and not row['passenger_closure_confirmed'] and row['kind'] == 'rail_work' for row in work)
+    print('[PASS] fixture KiwiRail project cards, status filters, single/absent dates and absence of invented locations/closures')
 
-    new_year = no_year.replace('Monday 12 January until Friday 16 January', '24 December to 12 January 2027')
     for instant, expected_status in (
         ('2026-12-23T10:59:59Z', 'planned'),
         ('2026-12-23T11:00:00Z', 'current'),
         ('2027-01-12T10:59:59Z', 'current'),
         ('2027-01-12T11:00:00Z', 'unknown'),
     ):
-        current = cli.parse_works(new_year, cli.source_meta('kiwirail'), datetime.fromisoformat(instant.replace('Z', '+00:00')))
-        assert current[0]['start'] == '2026-12-24' and current[0]['end'] == '2027-01-12'
-        assert current[0]['status'] == expected_status
-    for invalid_range in ('31 April to 2 May 2027', '1 April to 31 April 2027'):
+        current = cli.parse_works(data['kiwirail'], cli.source_meta('kiwirail'), datetime.fromisoformat(instant.replace('Z', '+00:00')))
+        assert current[3]['start'] == '2026-12-24' and current[3]['end'] == '2027-01-12'
+        assert current[3]['status'] == expected_status
+    for invalid_range in ('April 31, 2027 – May 2, 2027', 'Sometime in 2027', 'May 2, 2027 – April 1, 2027'):
         altered = copy.deepcopy(data)
-        altered['kiwirail'] = new_year.replace('24 December to 12 January 2027', invalid_range)
+        altered['kiwirail']['upcoming'][0]['results'] = altered['kiwirail']['upcoming'][0]['results'].replace(
+            'December 24, 2026 – January 12, 2027', invalid_range)
         code, payload = invoke(['outages', '--utility', 'kiwirail', '--json'], altered)
         assert code == 0 and len(payload['results']) == len(work)
-        notice = payload['results'][0]
+        notice = payload['results'][3]
         assert notice['start'] is None and notice['end'] is None and notice['date_precision'] is None
-        assert invalid_range in notice['description'] and notice['notice_links']
-        assert payload['results'][1]['description'] == work[1]['description']
-    ongoing = data['kiwirail'].replace('ongoing construction.', 'construction from 7 October to 9 October 2026.')
-    assert cli.parse_works(ongoing, cli.source_meta('kiwirail'), NOW)[1]['status'] == 'current'
-    ongoing = ongoing.replace('7 October to 9 October 2026', '7 October to 9 October 2027')
-    assert cli.parse_works(ongoing, cli.source_meta('kiwirail'), NOW)[1]['status'] == 'planned'
-    print('[PASS] fixture KiwiRail new-year windows, inclusive NZ days, invalid notice dates and dated work statuses')
+        assert notice['date_text'] == invalid_range and notice['status'] == 'planned'
+    # Offset pagination: the second page is read and the summary total must match all cards.
+    paged = copy.deepcopy(data['kiwirail'])
+    first = paged['in-progress'][0]
+    split = first['results'].index('<div class="card card', first['results'].index('<div class="card card') + 1)
+    first['pagination'] = '<a href="?status=in-progress&amp;start=1">2</a>'
+    second = dict(first, results=first['results'][split:])
+    first['results'] = first['results'][:split]
+    paged['in-progress'].append(second)
+    assert [row['id'] for row in cli.parse_works(paged, cli.source_meta('kiwirail'), NOW)] == [row['id'] for row in work]
+    del paged['in-progress'][1]
+    assert_rejected(lambda: cli.parse_works(paged, cli.source_meta('kiwirail'), NOW))
+    requested = []
+    def fake_json(url):
+        requested.append(url)
+        status = 'upcoming' if 'status=upcoming' in url else 'in-progress'
+        return copy.deepcopy(paged[status][0] if 'start=' not in url else second)
+    with patch.object(cli, 'fetch_json', fake_json):
+        fetched = cli.fetch('kiwirail')
+    base = cli.SOURCES['kiwirail']['source_url']
+    assert requested == [base + '?status=in-progress', base + '?status=in-progress&start=1', base + '?status=upcoming']
+    assert len(fetched['in-progress']) == 2 and len(fetched['upcoming']) == 1
+    print('[PASS] fixture KiwiRail NZ-day windows, invalid dates kept as text, bounded offset pagination and count checks')
 
     for utility, binary, method, response in (
         ('watercare', False, 'fetch_bytes', (b'[]', 'application/json', cli.SOURCES['watercare']['source_url'])),
         ('wellington', False, 'fetch_text', '{}'),
-        ('kiwirail', False, 'fetch_text', data['kiwirail']),
+        ('kiwirail', False, 'fetch_bytes', (json.dumps({'results': '', 'pagination': '', 'summary': '<strong>0 results</strong> found', 'error': 0}).encode(), 'application/json', cli.SOURCES['kiwirail']['source_url'])),
         ('kiwirail-calendar', True, 'fetch_bytes', (data['kiwirail-calendar'], 'application/pdf', cli.SOURCES['kiwirail-calendar']['source_url'])),
     ):
         with patch.object(cli.nzfetch, method, return_value=response) as request:
             cli.fetch(utility, binary=binary)
-        assert request.call_args.args == (cli.SOURCES[utility]['source_url'],)
+        expected_url = cli.SOURCES[utility]['source_url'] + ('?status=upcoming' if utility == 'kiwirail' else '')
+        assert request.call_args.args == (expected_url,)
         assert request.call_args.kwargs['allowed_hosts'] == {
             'webapi.watercare.co.nz', 'www.welectricity.co.nz', 'www.kiwirail.co.nz',
         }
@@ -133,6 +153,19 @@ def run():
     assert_rejected(lambda: cli.parse_watercare([{'id': 1}], cli.source_meta('watercare'), NOW))
     assert_rejected(lambda: cli.parse_wellington({}, cli.source_meta('wellington'), NOW))
     assert_rejected(lambda: cli.parse_works('<main><p>Changed page</p></main>', cli.source_meta('kiwirail')))
+    changed = data['kiwirail']
+    for key, old, replacement in (
+        ('summary', '<strong>3 results</strong> found', 'Showing projects'),
+        ('results', 'card--project', 'card--article'),
+        ('results', 'class="card__link"', 'class="card__anchor"'),
+        ('results', 'status-badge--in-progress', 'status-badge--completed'),
+        ('results', 'https://www.kiwirail.co.nz/network-investment', 'https://example.invalid/network-investment'),
+        ('summary', '3 results', '4 results'),
+    ):
+        altered = copy.deepcopy(changed)
+        altered['in-progress'][0][key] = altered['in-progress'][0][key].replace(old, replacement)
+        assert_rejected(lambda: cli.parse_works(altered, cli.source_meta('kiwirail'), NOW))
+    assert_rejected(lambda: cli.parse_works({'in-progress': changed['in-progress']}, cli.source_meta('kiwirail'), NOW))
     assert_rejected(lambda: cli.point({'lng': math.nan, 'lat': 0}))
     print('[PASS] fixture schema changes and non-finite coordinates fail without empty-success fallbacks')
 

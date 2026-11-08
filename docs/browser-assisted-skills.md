@@ -25,6 +25,8 @@ Browser-assisted mode must be opt-in and honest:
 - keep normal validation and non-browser smoke tests working on clean hosts;
 - if CloakBrowser is missing, return a clear machine-readable error named `cloakbrowser_not_installed`;
 - include a human recommendation to install CloakBrowser or rerun without `--browser`;
+- if CloakBrowser >= 0.7 refuses a session because the licence's concurrent-session limit is in use (`CloakBrowserLicenseError` for the binary's exit code 76, message "CloakBrowser Pro: session limit reached", at launch or after the handshake), return machine-readable `browser_session_limit` and exit with code 76; smoke tests may SKIP on that exact state (exit 76 plus that error) only;
+- any other start-up failure (licence codes 77-79 such as a missing or invalid key, an unreachable licence server or local configuration, a CloakBrowser API break, `launch`/`new_page` errors) must return `browser_launch_failed` with exit code 1, never a traceback, and smoke tests must FAIL on it; check it before any transient/outage heuristic so its text cannot be mistaken for an outage;
 - treat CAPTCHA, request-auth, bot challenges, or protected flows as blocked states, not puzzles to defeat;
 - if the browser path is blocked but a public fallback exists, return the fallback data and include an explicit blocked flag such as `fare_search_blocked: true`.
 
@@ -92,6 +94,8 @@ GitHub Actions smoke runs should install CloakBrowser and set:
 COLAB_SMOKE_WITH_CLOAKBROWSER=1
 COLAB_SMOKE_USE_BROWSER=1
 ```
+
+CloakBrowser 0.7.0 (1 November 2026) needs a licence key for every launch, and a free key allows one concurrent session. To avoid that, `scripts/run_smoke_tests.py` runs skills whose scripts reference `cloakbrowser` one at a time (a single browser lane) when `COLAB_SMOKE_WITH_CLOAKBROWSER=1`; other skills stay parallel. A browser skill that is killed by the smoke timeout can still hold the seat for up to 4 minutes, so a following browser skill may report `browser_session_limit` (exit code 76) and SKIP. The Smoke Tests workflow uses a concurrency group so two runs on the same self-hosted runner never compete for the seat, and the runner always classifies `browser_launch_failed` as a hard failure.
 
 `scripts/run_all_smoke.sh` uses `uv run --with cloakbrowser` when `COLAB_SMOKE_WITH_CLOAKBROWSER=1`, so browser-assisted smoke tests can import CloakBrowser without making it a repo-wide static dependency.
 

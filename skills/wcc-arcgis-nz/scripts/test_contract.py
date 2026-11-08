@@ -115,6 +115,33 @@ class CapabilityContractTests(unittest.TestCase):
         self.assertEqual(len(calls), 2)
         self.assertEqual(payload["items"][1]["organisation"], CLI.PORTALS["wcc"]["org_id"])
 
+    def test_search_withholds_unsupported_service_url_instead_of_failing(self):
+        # Nightly smoke 42416982995: a WCC-owned "flood" item points at the
+        # internal gisdev WCC host and aborted the whole search (an
+        # off-allowlist .invalid host stands in for it here).
+        page = fixture("search-page.json")
+        page["results"][0]["url"] = (
+            "https://gisdev.wcc.invalid/arcgis/rest/services/Environment/FloodZones/MapServer"
+        )
+        payload = self.invoke(
+            ["search", "flood", "--json"],
+            lambda url, params=None: (page, url),
+        )
+        self.assertEqual(len(payload["items"]), 2)
+        self.assertIsNone(payload["items"][0]["url"])
+        self.assertEqual(len(payload["warnings"]), 1)
+        self.assertIn("gisdev.wcc.invalid", payload["warnings"][0])
+        self.assertNotIn("gisdev", json.dumps(payload["items"]))
+        # Supported service URLs are still emitted, and nothing is fetched there.
+        clean = self.invoke(
+            ["search", "flood", "--json"],
+            lambda url, params=None: (fixture("search-page.json"), url),
+        )
+        self.assertEqual(clean["warnings"], [])
+        self.assertTrue(clean["items"][0]["url"].startswith("https://services1.arcgis.com/"))
+        # Direct use of the unsupported URL is still refused.
+        self.assert_rejected(lambda: CLI.check_layer_host(page["results"][0]["url"]), 7, "blocked_host")
+
     def test_item_normalises_catalogue_metadata_and_accepts_both_councils(self):
         for name, org_id in (
             ("item-wcc.json", CLI.PORTALS["wcc"]["org_id"]),

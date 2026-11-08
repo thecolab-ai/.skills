@@ -51,6 +51,14 @@ The metrics CSVs contain already-aggregated dashboard measures:
 - `BEV Penetration`, `BEVs per Capita`
 - District metrics also include `Region`
 
+Header changes seen 2026-11: `Points`/`Charge Points` are now published as
+`EVSEs (Charge Points)`, `BEVs per Charge Point` as `BEVs per EVSE`, and co-funded
+`ApplicationId` as `AppId` (with a new `ProjectType`). The district export labels its
+first (district name) column `Region` as well as the parent-region column. The CLI maps
+both old and new headers to the names above, treats the first district-file `Region`
+column as `District`, and fails with "unexpected CSV schema" when an expected column is
+missing rather than returning empty counts.
+
 ## Caveats
 
 - The EECA dashboard is public dashboard data, not a live charger-status API.

@@ -51,6 +51,15 @@ class FixtureTests(unittest.TestCase):
         self.assertNotIn('turn_seconds', rows[0])
         self.assertEqual(latest, rows[0]['observed_at'])
 
+    def test_tauranga_queue_singular_truck(self):
+        # Live page on 8 Nov 2026 said "Current road queue is: 0 truck" (singular, empty next train).
+        for count in ('0', '1'):
+            source = fixture('tauranga-queue.html').replace('7 trucks', count + ' truck').replace('EX99', '')
+            rows, _ = cli.parse_tauranga_queue(source)
+            self.assertEqual(rows[0]['queue_trucks'], int(count))
+        with self.assertRaises(cli.SkillError):
+            cli.parse_tauranga_queue(fixture('tauranga-queue.html').replace('7 trucks', '7 trucksX'))
+
     def test_schema_failures_are_not_empty_successes(self):
         for parser, source in [(cli.parse_arrivals, 'Vessel,Arrival\n'),
                                (cli.parse_trucks, '<html>No metrics</html>'),

@@ -62,6 +62,35 @@ class ParserTests(unittest.TestCase):
         self.assertTrue(any("required to include an audit report" in str(row["evidence_text"]) for row in expense_rules))
         self.assertTrue(all(row["reporting_year"] == 2023 for row in expense_rules))
 
+    def test_site_alert_banner_does_not_displace_page_election_year(self) -> None:
+        # Since the 2026 General Election the Commission prepends a site-wide
+        # alert section with a hidden "Alert" h2 ahead of the page h1. It must
+        # not unscope the 2023 page rules or become a rule itself.
+        banner = (
+            '<section id="banner__alert" aria-labelledby="banner-title">'
+            '<h2 id="banner-title" hidden>Alert</h2><div id="banner__alert__body"><div class="alert">'
+            "<p>Voting in the 2026 General Election closes today! Parties must declare spending over $1,000.</p>"
+            "</div></div></section>"
+        )
+        with_banner = EXPENSES.replace("<body>", "<body>" + banner, 1)
+        self.assertNotEqual(with_banner, EXPENSES)
+        rules = parse_reporting_rules(with_banner, EXPENSE_URLS[2023], STAMP, 2023)
+        self.assertEqual(rules, parse_reporting_rules(EXPENSES, EXPENSE_URLS[2023], STAMP, 2023))
+        evidence = "\n".join(str(row["evidence_text"]) for row in rules)
+        for required in ("$1,388,000", "$32,600", "13 March, 2024", "need to declare", "required to include an audit report"):
+            self.assertIn(required, evidence)
+        self.assertNotIn("2026 General Election", evidence)
+        self.assertNotIn("Alert", {str(row["heading"]) for row in rules})
+        self.assertEqual(
+            parse_expense_aggregates(with_banner, EXPENSE_URLS[2023], STAMP, 2023),
+            parse_expense_aggregates(EXPENSES, EXPENSE_URLS[2023], STAMP, 2023),
+        )
+        annual_with_banner = ANNUAL.replace("<body>", "<body>" + banner, 1)
+        self.assertEqual(
+            parse_reporting_rules(annual_with_banner, ANNUAL_URL, STAMP, 2025),
+            parse_reporting_rules(ANNUAL, ANNUAL_URL, STAMP, 2025),
+        )
+
     def test_rule_year_comes_from_reporting_section_not_deadline_year(self) -> None:
         rules_2024 = parse_reporting_rules(ANNUAL, ANNUAL_URL, STAMP, 2024)
         threshold = next(row for row in rules_2024 if row["amounts_nzd_mentioned"] == ["20000.00"])
@@ -157,6 +186,57 @@ class CliTests(unittest.TestCase):
         error = json.loads(stderr)
         self.assertEqual(error["error"], "invalid_input_or_source_schema")
         self.assertIn("requested reporting year 2016", error["message"])
+
+
+class ResultsExportCliTests(unittest.TestCase):
+    """Results exports: archive host first, and HTTP 404 is permanent drift, not an outage."""
+
+    OVERALL = (FIXTURES / "overall-results.csv").read_text(encoding="utf-8")
+    ARCHIVE = "https://archive.electionresults.govt.nz/electionresults_2023/statistics/csv/overall-results-summary.csv"
+    ORIGINAL = "https://electionresults.govt.nz/electionresults_2023/statistics/csv/overall-results-summary.csv"
+
+    def invoke(self, responses: list[str | Exception]) -> tuple[int, str, str, list[str]]:
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with patch.object(sys, "argv", ["cli.py", "results", "--year", "2023", "--limit", "2", "--json"]), patch.object(
+            cli.nzfetch, "fetch_text", side_effect=responses
+        ) as fetch, contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            code = cli.main()
+        return code, stdout.getvalue(), stderr.getvalue(), [call.args[0] for call in fetch.call_args_list]
+
+    def test_archive_host_is_the_primary_official_source(self) -> None:
+        code, stdout, _, urls = self.invoke([self.OVERALL])
+        self.assertEqual(code, 0)
+        self.assertEqual(urls, [self.ARCHIVE])
+        payload = json.loads(stdout)
+        self.assertEqual(payload["source"]["url"], self.ARCHIVE)
+        self.assertEqual(payload["data"][0]["source_url"], self.ARCHIVE)
+        self.assertEqual(payload["data"][0]["party"], "National Party")
+
+    def test_original_host_is_used_only_when_archive_answers_404(self) -> None:
+        code, stdout, _, urls = self.invoke([nzfetch.FetchError(f"HTTP 404 from {self.ARCHIVE}"), self.OVERALL])
+        self.assertEqual(code, 0)
+        self.assertEqual(urls, [self.ARCHIVE, self.ORIGINAL])
+        self.assertEqual(json.loads(stdout)["source"]["url"], self.ORIGINAL)
+
+    def test_404_everywhere_is_export_not_found_not_unavailable(self) -> None:
+        code, stdout, stderr, urls = self.invoke([
+            nzfetch.FetchError(f"HTTP 404 from {self.ARCHIVE}"),
+            nzfetch.FetchError(f"HTTP 404 from {self.ORIGINAL}"),
+        ])
+        self.assertEqual(code, 6)
+        self.assertEqual(stdout, "")
+        error = json.loads(stderr)
+        self.assertEqual(error["error"], "export_not_found")
+        self.assertEqual(error["http_status"], 404)
+        self.assertEqual(error["tried_urls"], [self.ARCHIVE, self.ORIGINAL])
+        self.assertEqual(urls, [self.ARCHIVE, self.ORIGINAL])
+        self.assertNotIn("data", error)
+
+    def test_block_and_transient_errors_keep_their_states_without_host_hopping(self) -> None:
+        code, _, stderr, urls = self.invoke([nzfetch.Blocked("official source challenge")])
+        self.assertEqual((code, json.loads(stderr)["error"], urls), (4, "blocked", [self.ARCHIVE]))
+        code, _, stderr, urls = self.invoke([nzfetch.FetchError(f"HTTP 503 from {self.ARCHIVE}")])
+        self.assertEqual((code, json.loads(stderr)["error"], urls), (5, "source_unavailable", [self.ARCHIVE]))
 
 
 if __name__ == "__main__":

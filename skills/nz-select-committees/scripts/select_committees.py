@@ -79,7 +79,10 @@ def parse_listing(html: str, source_url: str, retrieved_at: str) -> list[dict[st
         if not title or title.casefold() in {"rss", "next", "previous", "view all"}: continue
         cells = [clean(value) for value in re.findall(r"<td\b[^>]*>(.*?)</td>", block, re.I | re.S)]
         closing_date, closing_at, timezone = parse_deadline(context)
-        if kind == "submissions" and (len(cells) < 2 or not closing_date or "submission" not in context.casefold()):
+        # Between Parliaments (e.g. after the 1 October 2026 dissolution) open items publish "N/A"
+        # in the closing-date cell; keep them as open items with no deadline rather than dropping them.
+        no_deadline = bool(cells) and cells[-1].casefold() == "n/a"
+        if kind == "submissions" and (len(cells) < 2 or not (closing_date or no_deadline) or "submission" not in context.casefold()):
             continue
         if kind == "reports" and not closing_date:
             continue

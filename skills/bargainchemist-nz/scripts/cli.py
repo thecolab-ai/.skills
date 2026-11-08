@@ -381,6 +381,7 @@ def product_detail(value: str, *, raw: bool = False) -> dict[str, Any]:
     except ApiError as e:
         fallback = product_from_boost(handle, raw=raw)
         if fallback is not None:
+            fallback["fallback_reason"] = str(e)
             fallback["elapsed_ms"] = round((time.perf_counter() - started) * 1000)
             return fallback
         raise ApiError(f"{e}; Boost fallback did not find handle {handle!r}") from e
