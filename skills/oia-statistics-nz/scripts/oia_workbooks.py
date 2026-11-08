@@ -53,6 +53,17 @@ def workbook_rows(body):
         raise ValueError(f'OIA workbook schema changed: {exc}') from exc
 
 
+def published_agency_name(value):
+    """Agency name as published, without a trailing footnote marker.
+
+    The July–December 2019 workbook glues note numbers to names ('Kainga Ora8',
+    'Ministry of Housing and Urban Development6'). The note is not part of the
+    name. A digit that is not glued to a letter, such as 'COVID-19', stays.
+    """
+    name = re.sub(r'\s*\(\d+\)$', '', value or '').strip()
+    return re.sub(r'(?<=[^\W\d_])\d{1,2}$', '', name).strip()
+
+
 def metric_key(heading, kind):
     text = heading.lower()
     percent = kind.lower() == 'percent'
@@ -108,7 +119,7 @@ def parse_release(body, period):
                 agency_type = row[0]
             if len(row) < 3 or not row[1] or not re.fullmatch(r'\d+(?:\.0+)?', row[2]):
                 continue
-            agency = re.sub(r'\s*\(\d+\)$', '', row[1]).strip()
+            agency = published_agency_name(row[1])
             if 'total' in agency.lower():
                 continue
             item = combined.setdefault(agency, {'Agency': agency, 'Agency_Type': agency_type,
