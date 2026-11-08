@@ -69,6 +69,27 @@ metadata:
             result = run_one(skill, 10)
             self.assertEqual(result["status"], "gated")
 
+    def test_browser_launch_failure_is_hard_even_with_network_words(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            skill = self.make_skill(
+                Path(tmp),
+                "print('[FAIL] live search returns products')\n"
+                "print('{\"error\": \"browser_launch_failed\", \"message\": \"TimeoutError: timed out\"}')\n"
+                "raise SystemExit(1)\n",
+            )
+            result = run_one(skill, 10)
+            self.assertEqual(result["status"], "fail")
+
+    def test_browser_session_limit_skip_is_gated(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            skill = self.make_skill(
+                Path(tmp),
+                "print('[PASS] fixture only the CloakBrowser exit-76 session limit skips')\n"
+                "print('[SKIP] search: CloakBrowser concurrent-session limit reached (CloakBrowserLicenseError, exit 76)')\n",
+            )
+            result = run_one(skill, 10)
+            self.assertEqual(result["status"], "gated")
+
     def test_live_assertion_failure_without_outage_is_hard(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             skill = self.make_skill(

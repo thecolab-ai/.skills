@@ -17,6 +17,11 @@ permissions:
 jobs:
   smoke:
     runs-on: [self-hosted, linux, x64, skills-smoke]
+    # The free CloakBrowser licence allows one concurrent session on this runner;
+    # queue overlapping runs instead of letting them take each other's seat.
+    concurrency:
+      group: skills-smoke-cloakbrowser
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
         with:

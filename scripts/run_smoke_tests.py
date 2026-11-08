@@ -52,7 +52,9 @@ NETWORK_MARKER = re.compile(
     r"temporary failure|timed? out|http (?:403|406|429|451|5\d\d)",
     re.I,
 )
-TRACEBACK_MARKER = re.compile(r"traceback|syntaxerror", re.I)
+# A browser skill that could not start CloakBrowser for any reason other than the
+# exit-76 session limit is broken, not an outage: never gate it on network words.
+TRACEBACK_MARKER = re.compile(r"traceback|syntaxerror|browser_launch_failed", re.I)
 
 
 def assertion_kind(line: str) -> str | None:
