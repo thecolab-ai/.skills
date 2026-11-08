@@ -1,26 +1,26 @@
 ---
 name: carjam-nz
-description: "Query CarJam NZ public/basic vehicle information pages through a lightweight no-login CLI. Use when the task involves New Zealand vehicle plate, VIN, or chassis lookup, make/model/year/colour, public registration/WOF/licence snippets, odometer snippets, or CarJam source URLs. Read-only; no paid report purchase, owner lookup, login, account, or write actions."
+description: "Report CarJam NZ vehicle lookup as access restricted. Use when a task asks for a New Zealand plate, VIN, or chassis, make, model, year, or a CarJam source URL. This is not a dependable keyless connector: live vehicle retrieval requires a permitted CarJam API or provider agreement and is refused with a blocked result. Offline HTML fixtures remain for parser coverage only. Read-only; no scraping, challenge bypass, paid report purchase, owner lookup, login, or write actions."
 license: MIT
-compatibility: "Requires Python 3.10+ and network access for live data"
+compatibility: "Requires Python 3.10+. Live vehicle retrieval is access restricted and does not use the network."
 metadata:
   thecolab.category: "public-data"
   thecolab.source_owner: "CarJam"
   thecolab.source_type: "commercial"
   thecolab.auth: "none"
-  thecolab.access_mode: "html-readonly"
+  thecolab.access_mode: "access-restricted"
   thecolab.data_class: "public"
   thecolab.writes: "false"
   thecolab.browser: "false"
   thecolab.risk: "low"
-  thecolab.cache_ttl: "24h"
+  thecolab.cache_ttl: "none"
   thecolab.schema_version: "1"
   thecolab.skill_type: "html-readonly"
   thecolab.pack: "nz-commercial-web"
   thecolab.source_url: "https://www.carjam.co.nz"
   thecolab.allowed_domains: "www.carjam.co.nz"
-  thecolab.last_verified: "2026-07-19"
-  thecolab.health: "healthy"
+  thecolab.last_verified: "2026-10-12"
+  thecolab.health: "gated"
   thecolab.maintainer: "@adam91holt"
 ---
 
@@ -28,29 +28,30 @@ metadata:
 
 ## Goal
 
-Query public/basic CarJam NZ vehicle information from the no-login HTML report page through a deterministic Python CLI.
+Tell the caller that CarJam live vehicle retrieval is access restricted. This skill is not a dependable keyless connector. `lookup` and `batch` return the repository blocked result and do not contact CarJam.
+
+A permitted CarJam API or provider agreement is required before any live vehicle retrieval can be added. This copy does not implement that API and does not hold an agreement.
 
 ## Use this when
 
-- A user asks for public CarJam details for a New Zealand plate, VIN, or chassis
-- A user wants a quick make/model/year/colour/plate/VIN summary
-- A workflow needs machine-readable public vehicle metadata with source URLs
-- A user wants to know which fields are report-gated versus visible for free
+- A user asks for CarJam details for a New Zealand plate, VIN, or chassis
+- A workflow needs an honest machine-readable refusal instead of a guessed vehicle
+- Someone needs to confirm that keyless HTML retrieval is not the supported path
 
 ## Do not use this for
 
-- Paid CarJam report purchase, checkout, subscription, login, or account actions
-- Owner name/address lookup, personal information extraction, or bypassing report gates
-- Updating stolen status, reminders, watchlists, or any write/mutation flow
-- Treating public snippets as official legal advice; direct users to NZTA/Waka Kotahi or CarJam for authoritative/current status
+- Live plate, VIN, or chassis retrieval, including retries against `/car/`
+- Browser automation, cookies, or challenge solving
+- Paid report purchase, checkout, subscription, login, or account actions
+- Owner name or address lookup, or any write action
+- Treating a previous public snippet, or an offline fixture, as a current vehicle record
 
 ## Preferred workflow
 
-1. Run `scripts/cli.py lookup <plate>` for one vehicle
-2. Add `--json` for structured output or chaining
-3. Use `--raw` only when the task needs all parsed public fields rather than the concise summary
-4. Use `batch` for a small set of plates; keep the default delay to avoid hammering the public site
-5. Clearly distinguish public/basic fields from paid/report-gated fields shown as `Get Report`, `May be in Report`, or `Subscribe`
+1. Run `lookup` or `batch`. Expect exit code 4 and error type `blocked`.
+2. Tell the user that live retrieval needs a permitted CarJam API or provider agreement.
+3. Do not work around the refusal with another host, a browser, or a cached vehicle.
+4. Use the offline parser only on the synthetic fixtures in this skill.
 
 ## CLI
 
@@ -62,26 +63,28 @@ python3 skills/carjam-nz/scripts/cli.py <command> [flags]
 
 ### Commands
 
-- `lookup <identifier> [--type plate|vin|chassis] [--json] [--raw]` — lookup one vehicle
-- `batch <identifier...> [--type plate|vin|chassis] [--sleep seconds] [--fail-fast] [--json]` — compact summaries for multiple identifiers
+- `lookup <identifier> [--type plate|vin|chassis] [--json] [--raw]` — refuse one live lookup
+- `batch <identifier...> [--type plate|vin|chassis] [--json]` — refuse a live batch
+
+Both commands validate the identifier locally, then refuse. `--json` prints `meta`, an empty `results` array, and `error`. Human output prints the same refusal on stderr. Invalid identifiers exit 2 with type `invalid_input`. Neither command exits 0 for a vehicle query.
 
 Examples:
 
 ```bash
-python3 skills/carjam-nz/scripts/cli.py lookup ABC123
 python3 skills/carjam-nz/scripts/cli.py lookup ABC123 --json
-python3 skills/carjam-nz/scripts/cli.py lookup 7A8CJ0P0797205527 --type vin --json
 python3 skills/carjam-nz/scripts/cli.py batch ABC123 KMM42 --json
 ```
 
 ## Resources
 
 - CLI entrypoint: `scripts/cli.py`
-- Live smoke test: `scripts/smoke_test.py`
-- Source/stability notes: `references/api-notes.md`
+- Smoke test: `scripts/smoke_test.py`
+- Source notes: `references/source-notes.md`
+- Restriction notes: `references/api-notes.md`
 
 ## Notes
 
-- No API key, username, password, account cookie, browser automation, or paid report purchase is required for supported commands
-- This skill parses public HTML, not a published API; CarJam page structure can change
-- Some fields are intentionally report-gated by CarJam and are preserved as locked/gated rather than bypassed
+- Declared health is `gated`. Smoke records the restriction as a skip plus fixture and contract checks, not as a live vehicle pass.
+- The 12 October 2026 live failure `no public vehicle fields found for plate 'PSP532'` stays a recorded failure. It is not reclassified as a successful lookup or as a temporary outage.
+- Offline parsing of synthetic HTML remains covered. A saved CarJam shell with no public fields is still a hard parser failure.
+- Authentication stays `none` because this skill does not collect or send a credential. Lack of a credential is not success.

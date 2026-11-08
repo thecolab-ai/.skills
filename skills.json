@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
   "generated_from": "skills/*/SKILL.md metadata",
-  "last_verified": "2026-10-12",
-  "skill_count": 185,
+  "last_verified": "2026-10-31",
+  "skill_count": 186,
   "skills": [
     {
       "name": "airnz-flights",
@@ -641,27 +641,27 @@
     },
     {
       "name": "carjam-nz",
-      "description": "Query CarJam NZ public/basic vehicle information pages through a lightweight no-login CLI. Use when the task involves New Zealand vehicle plate, VIN, or chassis lookup, make/model/year/colour, public registration/WOF/licence snippets, odometer snippets, or CarJam source URLs. Read-only; no paid report purchase, owner lookup, login, account, or write actions.",
+      "description": "Report CarJam NZ vehicle lookup as access restricted. Use when a task asks for a New Zealand plate, VIN, or chassis, make, model, year, or a CarJam source URL. This is not a dependable keyless connector: live vehicle retrieval requires a permitted CarJam API or provider agreement and is refused with a blocked result. Offline HTML fixtures remain for parser coverage only. Read-only; no scraping, challenge bypass, paid report purchase, owner lookup, login, or write actions.",
       "path": "skills/carjam-nz",
       "category": "public-data",
       "source_owner": "CarJam",
       "source_type": "commercial",
       "source_url": "https://www.carjam.co.nz",
       "auth": "none",
-      "access_mode": "html-readonly",
+      "access_mode": "access-restricted",
       "data_class": "public",
       "writes": false,
       "browser": false,
       "risk": "low",
-      "cache_ttl": "24h",
+      "cache_ttl": "none",
       "schema_version": "1",
       "skill_type": "html-readonly",
       "pack": "nz-commercial-web",
       "allowed_domains": [
         "www.carjam.co.nz"
       ],
-      "last_verified": "2026-07-19",
-      "health": "healthy",
+      "last_verified": "2026-10-12",
+      "health": "gated",
       "maintainer": "@adam91holt"
     },
     {
@@ -1462,6 +1462,33 @@
       "last_verified": "2026-07-19",
       "health": "healthy",
       "maintainer": "@adam91holt"
+    },
+    {
+      "name": "genesis-energy-nz",
+      "description": "Get electricity use and usage costs from your Genesis Energy NZ account, with optional natural gas. Use for hourly readings and daily or period summaries.",
+      "path": "skills/genesis-energy-nz",
+      "category": "energy",
+      "source_owner": "Genesis Energy",
+      "source_type": "commercial",
+      "source_url": "https://myaccount.genesisenergy.co.nz",
+      "auth": "mixed",
+      "access_mode": "authenticated-personal",
+      "data_class": "personal",
+      "writes": false,
+      "browser": false,
+      "risk": "high",
+      "cache_ttl": "none",
+      "schema_version": "1",
+      "skill_type": "authenticated-personal",
+      "pack": "nz-personal-data",
+      "allowed_domains": [
+        "auth.genesisenergy.co.nz",
+        "web-api.genesisenergy.co.nz",
+        "myaccount.genesisenergy.co.nz"
+      ],
+      "last_verified": "2026-10-31",
+      "health": "gated",
+      "maintainer": "@jameshulse"
     },
     {
       "name": "geonet-nz",
