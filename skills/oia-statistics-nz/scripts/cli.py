@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import functools
 import html
 import io
 import hashlib
@@ -386,6 +387,10 @@ def _rows_for_period(rows: list[dict[str, str]], period_arg: str | None) -> tupl
 REUSED_ID_WARNING_PREFIX = 'The published sources reuse'
 
 
+# The name helpers below are pure and are called for every release record
+# against every agency identity (hundreds of thousands of times per command),
+# so they are memoised for the life of this one-shot process.
+@functools.lru_cache(maxsize=None)
 def _name_key(value: str) -> str:
     """Casefold, strip macrons/diacritics and punctuation; keep the CSV '?' placeholder."""
     text = unicodedata.normalize("NFKD", (value or "").casefold().replace("&", " and "))
@@ -393,10 +398,23 @@ def _name_key(value: str) -> str:
     return " ".join(re.sub(r"[^\w?]", " ", text).split())
 
 
+@functools.lru_cache(maxsize=None)
 def _name_pattern(key: str) -> re.Pattern[str]:
     # The all-data CSV replaces some Māori letters with '?', so each letter of
     # the release name may also match a '?' in a CSV name.
     return re.compile("".join(f"[{re.escape(ch)}?]" if ch.isalpha() else re.escape(ch) for ch in key))
+
+
+@functools.lru_cache(maxsize=None)
+def _name_prefix_pattern(key: str) -> re.Pattern[str]:
+    """``key`` followed by a word boundary; use with ``.match`` for a whole-word prefix."""
+    return re.compile(_name_pattern(key).pattern + r"(?![\w?])")
+
+
+@functools.lru_cache(maxsize=None)
+def _name_within_pattern(key: str) -> re.Pattern[str]:
+    """``key`` as whole words anywhere in a name; use with ``.search``."""
+    return re.compile(r"(?<![\w?])" + _name_pattern(key).pattern + r"(?![\w?])")
 
 
 def _keys_equivalent(left: str, right: str) -> bool:
@@ -406,6 +424,7 @@ def _keys_equivalent(left: str, right: str) -> bool:
     return bool(_name_pattern(left).fullmatch(right) or _name_pattern(right).fullmatch(left))
 
 
+@functools.lru_cache(maxsize=None)
 def _name_relation(query_name: str, stored_name: str) -> str | None:
     """How a query or release name relates to one stored agency name.
 
@@ -419,9 +438,9 @@ def _name_relation(query_name: str, stored_name: str) -> str | None:
         return None
     if _keys_equivalent(query, stored):
         return "exact"
-    if len(query.split()) >= 2 and re.match(_name_pattern(query).pattern + r"(?![\w?])", stored):
+    if len(query.split()) >= 2 and _name_prefix_pattern(query).match(stored):
         return "prefix"
-    if len(stored) >= 12 and re.search(r"(?<![\w?])" + _name_pattern(stored).pattern + r"(?![\w?])", query):
+    if len(stored) >= 12 and _name_within_pattern(stored).search(query):
         return "within"
     return None
 
