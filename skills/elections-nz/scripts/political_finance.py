@@ -113,15 +113,24 @@ def party_name(text: str) -> str:
 
 
 class FinancePage(HTMLParser):
-    """Capture tables and prose while retaining accordion reporting-year context."""
+    """Capture tables and prose while retaining accordion reporting-year context.
+
+    The Commission's site-wide alert banner (``<section id="banner__alert">``,
+    added for the 2026 General Election with a hidden "Alert" h2 ahead of the
+    page h1) is not page content: its headings and prose are ignored so they
+    can neither displace the page's election year nor become reporting rules.
+    """
 
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
         self.skip = 0
+        self.banner_depth = 0
         self.section = ""
         self.section_buffer: list[str] | None = None
         self.heading: list[str] | None = None
+        self.heading_tag = ""
         self.headings: list[str] = []
+        self.h1: str | None = None
         self.passage: dict[str, object] | None = None
         self.passages: list[dict[str, str]] = []
         self.table: dict[str, object] | None = None
@@ -131,6 +140,13 @@ class FinancePage(HTMLParser):
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         attributes = dict(attrs)
+        if self.banner_depth:
+            if tag == "section":
+                self.banner_depth += 1
+            return
+        if tag == "section" and attributes.get("id") == "banner__alert":
+            self.banner_depth = 1
+            return
         if tag in {"script", "style"}:
             self.skip += 1
             return
@@ -140,6 +156,7 @@ class FinancePage(HTMLParser):
             self.section_buffer = []
         if tag in {"h1", "h2", "h3", "h4"}:
             self.heading = []
+            self.heading_tag = tag
         if tag in {"p", "li"}:
             self.passage = {"tag": tag, "parts": [], "section": self.section, "heading": self.headings[-1] if self.headings else ""}
         if tag == "table":
@@ -152,7 +169,7 @@ class FinancePage(HTMLParser):
             self.active_link = {"href": attributes["href"] or "", "label": ""}
 
     def handle_data(self, data: str) -> None:
-        if self.skip:
+        if self.skip or self.banner_depth:
             return
         if self.section_buffer is not None:
             self.section_buffer.append(data)
@@ -170,6 +187,10 @@ class FinancePage(HTMLParser):
             self.active_link["label"] += data
 
     def handle_endtag(self, tag: str) -> None:
+        if self.banner_depth:
+            if tag == "section":
+                self.banner_depth -= 1
+            return
         if tag in {"script", "style"}:
             self.skip = max(0, self.skip - 1)
             return
@@ -206,6 +227,8 @@ class FinancePage(HTMLParser):
             title = normalise("".join(self.heading))
             if title:
                 self.headings.append(title)
+                if self.heading_tag == "h1" and self.h1 is None:
+                    self.h1 = title
             self.heading = None
         if tag == "button" and self.section_buffer is not None:
             self.section = normalise("".join(self.section_buffer))
@@ -383,7 +406,10 @@ def parse_reporting_rules(html: str, source_url: str, retrieved_at: str, year: i
         ),
         None,
     )
-    page_year = _single_year(page.headings[0]) if page.headings else None
+    # The election year lives in the page h1; any earlier heading (site chrome)
+    # must not decide it. Pages without an h1 keep the first-heading rule.
+    page_title = page.h1 if page.h1 is not None else (page.headings[0] if page.headings else "")
+    page_year = _single_year(page_title) if page_title else None
     results: list[dict[str, object]] = []
     seen: set[str] = set()
     for passage in page.passages:
