@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""CarJam NZ public read-only vehicle information lookup CLI.
+"""CarJam NZ vehicle lookup, restricted to offline parsing.
 
-Fetches the public CarJam vehicle page and extracts the free/basic fields that are
-already rendered in the HTML. No login, paid report purchase, owner lookup, or
-write actions.
+Live plate, VIN, and chassis retrieval is access restricted until a permitted
+CarJam API or provider agreement exists. Commands refuse before any network
+call. They do not request /car/ pages, use a browser, or solve challenges.
 """
 from __future__ import annotations
 
@@ -13,20 +13,15 @@ from html.parser import HTMLParser
 import json
 import re
 import sys
-import time
-import urllib.error
-import urllib.parse
-import urllib.request
+from datetime import datetime, timezone
 from typing import Any
 
-BASE_URL = "https://www.carjam.co.nz"
-USER_AGENT = "Mozilla/5.0 (compatible; thecolab-carjam-nz-skill/1.0)"
+SOURCE_URL = "https://www.carjam.co.nz"
+PUBLISHER = "CarJam"
 LOCKED_MARKERS = ("Get Report", "May be in Report", "Subscribe")
 
-# HTTP-200 anti-bot / interstitial bodies that some CDNs return in place of the
-# real page. These are transient (shared CI IPs, rate limits) rather than a real
-# "plate not found" or an HTML-structure change, so they should be retried and,
-# if still blocked, surfaced as an upstream outage — not a hard failure.
+# HTTP-200 anti-bot / interstitial bodies. Offline fixtures still classify these
+# as temporary parser failures. Live commands never fetch a page to reach them.
 BLOCK_MARKERS = (
     "just a moment",
     "attention required",
@@ -86,23 +81,73 @@ SUMMARY_KEYS = [
     "police_reported_stolen", "ruc", "cof",
 ]
 
+EXIT_INVALID_INPUT = 2
+EXIT_BLOCKED = 4
+ERROR_TYPES = {
+    EXIT_INVALID_INPUT: "invalid_input",
+    EXIT_BLOCKED: "blocked",
+}
 
-def die(message: str, code: int = 1) -> None:
+
+def parser_die(message: str) -> None:
+    """Offline parser failure. Not a live retrieval result."""
     print(f"error: {message}", file=sys.stderr)
+    raise SystemExit(1)
+
+
+def provenance_meta() -> dict[str, str]:
+    retrieved_at = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+    return {
+        "source_url": SOURCE_URL,
+        "publisher": PUBLISHER,
+        "retrieved_at": retrieved_at,
+    }
+
+
+def fail(code: int, message: str, *, as_json: bool) -> None:
+    if as_json:
+        payload = {
+            "meta": provenance_meta(),
+            "results": [],
+            "error": {
+                "code": code,
+                "type": ERROR_TYPES[code],
+                "message": message,
+            },
+        }
+        print(json.dumps(payload, indent=2, ensure_ascii=False))
+    else:
+        print(f"error: {message}", file=sys.stderr)
     raise SystemExit(code)
 
 
-def normalise_identifier(value: str) -> str:
+def normalise_identifier(value: str, *, as_json: bool) -> str:
     cleaned = re.sub(r"[^A-Za-z0-9-]", "", value or "").upper()
     if not cleaned:
-        die("identifier cannot be empty")
+        fail(EXIT_INVALID_INPUT, "identifier cannot be empty", as_json=as_json)
     if len(cleaned) > 40:
-        die("identifier is too long for a plate/VIN/chassis lookup")
+        fail(
+            EXIT_INVALID_INPUT,
+            "identifier is too long for a plate, VIN, or chassis lookup",
+            as_json=as_json,
+        )
     return cleaned
 
 
-_RETRY_STATUSES = {429, 502, 503, 504}
-_RETRY_DELAYS = (2, 5, 10)  # seconds between attempts 1→2, 2→3, 3→fail
+def access_message(lookup_type: str, identifiers: list[str]) -> str:
+    shown = ", ".join(repr(item) for item in identifiers[:8])
+    if len(identifiers) > 8:
+        shown += f", +{len(identifiers) - 8} more"
+    return (
+        f"CarJam live vehicle retrieval for {lookup_type} {shown} is access restricted "
+        "pending a permitted API or provider agreement. This skill is not a dependable "
+        "keyless connector. It does not request /car/ pages, use a browser or challenge "
+        "workaround, or scrape vehicle data."
+    )
+
+
+def refuse_live_retrieval(lookup_type: str, identifiers: list[str], *, as_json: bool) -> None:
+    fail(EXIT_BLOCKED, access_message(lookup_type, identifiers), as_json=as_json)
 
 
 def looks_like_block(body: str) -> bool:
@@ -112,60 +157,14 @@ def looks_like_block(body: str) -> bool:
 
 
 def has_carjam_shell(page: str) -> bool:
-    """True when *page* is a genuine CarJam vehicle response.
+    """True when *page* carries a CarJam application shell.
 
-    A real CarJam page — even for a plate with no free public fields — carries the
-    application shell (``data-key`` field spans and/or the CarJam-branded title).
-    A blocked/empty/proxy-error response carries none of these.
+    A saved CarJam page can carry ``data-key`` field spans and/or the CarJam
+    brand in the title. A blocked or empty body carries neither. This classifier
+    is for offline fixtures only.
     """
     low = page.lower()
     return "data-key=" in low or "carjam" in low
-
-
-def fetch(url: str) -> str:
-    """Fetch *url* with up to 3 attempts and exponential backoff.
-
-    Retries on HTTP 429/502/503/504, connection/timeout errors, and Cloudflare
-    challenge responses ("Just a moment" body or ``cf-mitigated`` header).
-    Other 4xx errors (bad plate etc.) fail immediately.
-    """
-    req = urllib.request.Request(
-        url,
-        headers={
-            "User-Agent": USER_AGENT,
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        },
-    )
-    last_error: str = "unknown error"
-    for attempt, delay in enumerate((*_RETRY_DELAYS, None), start=1):
-        try:
-            with urllib.request.urlopen(req, timeout=30) as response:
-                body = response.read().decode("utf-8", "replace")
-                # Cloudflare / anti-bot interstitial (HTTP 200) — treat as transient
-                cf_mitigated = response.headers.get("cf-mitigated", "")
-                if cf_mitigated or looks_like_block(body):
-                    last_error = f"anti-bot challenge on attempt {attempt}"
-                    should_retry = True
-                else:
-                    return body
-        except urllib.error.HTTPError as exc:
-            if exc.code not in _RETRY_STATUSES:
-                # Non-retryable HTTP error (e.g. 404 for bad plate) — fail fast
-                detail = exc.read().decode("utf-8", "replace")[:300]
-                die(f"HTTP {exc.code} for {url}: {detail}")
-            last_error = f"HTTP {exc.code} for {url}"
-            should_retry = True
-        except (urllib.error.URLError, TimeoutError, OSError) as exc:
-            last_error = f"network error for {url}: {exc}"
-            should_retry = True
-
-        if should_retry:
-            if delay is None:
-                # All retries exhausted — this is an upstream outage, not a bad plate.
-                die(f"all {attempt} attempts failed (temporary failure) — last error: {last_error}")
-            time.sleep(delay)
-
-    raise AssertionError("unreachable")
 
 
 class TextExtractor(HTMLParser):
@@ -235,18 +234,16 @@ def is_locked(value: str | None) -> bool:
 
 
 def parse_vehicle(page: str, *, source_url: str, identifier: str, lookup_type: str) -> dict[str, Any]:
+    """Parse a saved HTML fixture. This does not contact CarJam."""
     title = extract_title(page) or ""
     fields = extract_fields(page)
     if not any(fields.get(k) for k in ("year_of_manufacture", "make", "model", "plate", "vin", "chassis")):
         if looks_like_block(page) or not has_carjam_shell(page):
-            # No CarJam application shell at all — a transient block/empty/proxy-error
-            # response (common on shared CI IPs), not a genuine result. Surface as an
-            # upstream outage so smoke reporting gates rather than hard-fails.
-            die(
+            parser_die(
                 f"no CarJam vehicle page returned for {lookup_type} {identifier!r} "
                 "(temporary failure — likely a transient block or rate-limit; retry later)"
             )
-        die(f"no public vehicle fields found for {lookup_type} {identifier!r}")
+        parser_die(f"no public vehicle fields found for {lookup_type} {identifier!r}")
 
     summary = {key: fields.get(key) for key in SUMMARY_KEYS if key in fields}
     locked = sorted(key for key, value in fields.items() if is_locked(value))
@@ -266,7 +263,7 @@ def parse_vehicle(page: str, *, source_url: str, identifier: str, lookup_type: s
             alerts.append(found.group(0).strip())
 
     return {
-        "source": "CarJam NZ public vehicle page",
+        "source": "CarJam NZ saved HTML fixture",
         "source_url": source_url,
         "lookup_type": lookup_type,
         "query": identifier,
@@ -277,99 +274,62 @@ def parse_vehicle(page: str, *, source_url: str, identifier: str, lookup_type: s
         "locked_fields": locked,
         "alerts": alerts,
         "fields": fields,
-        "read_only_notice": "Public/basic HTML fields only; paid report, owner, purchase, account, and write actions are not used.",
+        "read_only_notice": (
+            "Offline fixture parse only. Live vehicle retrieval is access restricted "
+            "pending a permitted API or provider agreement."
+        ),
     }
 
 
-def lookup(identifier: str, lookup_type: str) -> dict[str, Any]:
-    ident = normalise_identifier(identifier)
-    query = urllib.parse.urlencode({lookup_type: ident})
-    url = f"{BASE_URL}/car/?{query}"
-    page = fetch(url)
-    return parse_vehicle(page, source_url=url, identifier=ident, lookup_type=lookup_type)
-
-
-def print_vehicle(result: dict[str, Any], *, all_fields: bool = False) -> None:
-    print(f"{result.get('vehicle') or result.get('title')}")
-    print(f"Source: {result['source_url']}")
-    fields = result["fields"] if all_fields else result["summary"]
-    for key, value in fields.items():
-        label = LABELS.get(key, key.replace("_", " ").title())
-        locked = " [paid/report-gated]" if is_locked(value) else ""
-        print(f"{label}: {value}{locked}")
-    if result.get("alerts"):
-        print("Alerts:")
-        for alert in result["alerts"]:
-            print(f"- {alert}")
-    if result.get("locked_fields"):
-        print(f"Report-gated fields: {', '.join(result['locked_fields'][:12])}")
-
-
 def cmd_lookup(args: argparse.Namespace) -> None:
-    result = lookup(args.identifier, args.type)
-    if args.json:
-        if not args.raw:
-            result = {k: v for k, v in result.items() if k != "fields"}
-        print(json.dumps(result, indent=2, ensure_ascii=False))
-    else:
-        print_vehicle(result, all_fields=args.raw)
+    ident = normalise_identifier(args.identifier, as_json=args.json)
+    refuse_live_retrieval(args.type, [ident], as_json=args.json)
 
 
 def cmd_batch(args: argparse.Namespace) -> None:
-    rows = []
-    for index, identifier in enumerate(args.identifiers):
-        if index and args.sleep:
-            time.sleep(args.sleep)
-        try:
-            result = lookup(identifier, args.type)
-            rows.append({
-                "query": result["query"],
-                "vehicle": result.get("vehicle"),
-                "plate": result.get("plate"),
-                "make": result["summary"].get("make"),
-                "model": result["summary"].get("model"),
-                "year": result["summary"].get("year_of_manufacture"),
-                "colour": result["summary"].get("main_colour"),
-                "registration_status": result["summary"].get("registration_status"),
-                "wof_expiry": result["summary"].get("expiry_date_of_last_successful_wof"),
-                "source_url": result["source_url"],
-            })
-        except SystemExit as exc:
-            if args.fail_fast:
-                raise
-            rows.append({"query": identifier, "error": str(exc)})
-    if args.json:
-        print(json.dumps({"vehicles": rows}, indent=2, ensure_ascii=False))
-    else:
-        for row in rows:
-            if row.get("error"):
-                print(f"{row['query']}: ERROR {row['error']}")
-            else:
-                bits = [str(row.get("query")), str(row.get("vehicle") or "unknown vehicle")]
-                for key in ["colour", "registration_status", "wof_expiry"]:
-                    if row.get(key):
-                        bits.append(f"{key.replace('_', ' ')}: {row[key]}")
-                print(" | ".join(bits))
+    identifiers = [normalise_identifier(item, as_json=args.json) for item in args.identifiers]
+    refuse_live_retrieval(args.type, identifiers, as_json=args.json)
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="CarJam NZ public read-only vehicle lookup.")
+    parser = argparse.ArgumentParser(
+        description=(
+            "CarJam NZ vehicle lookup is access restricted pending a permitted API "
+            "or provider agreement. This is not a dependable keyless connector. "
+            "Live retrieval is refused and does not contact CarJam."
+        )
+    )
     sub = parser.add_subparsers(dest="command", required=True)
 
-    p = sub.add_parser("lookup", help="Lookup one vehicle by plate, VIN, or chassis")
-    p.add_argument("identifier", help="Plate, VIN, or chassis")
-    p.add_argument("--type", choices=["plate", "vin", "chassis"], default="plate")
-    p.add_argument("--json", action="store_true")
-    p.add_argument("--raw", action="store_true", help="Include/print all parsed public fields")
-    p.set_defaults(func=cmd_lookup)
+    lookup = sub.add_parser(
+        "lookup",
+        help="Refuse one live plate, VIN, or chassis lookup as access restricted",
+    )
+    lookup.add_argument("identifier", help="Plate, VIN, or chassis")
+    lookup.add_argument("--type", choices=["plate", "vin", "chassis"], default="plate")
+    lookup.add_argument("--json", action="store_true")
+    lookup.add_argument(
+        "--raw",
+        action="store_true",
+        help="Accepted for compatibility; live retrieval is still refused",
+    )
+    lookup.set_defaults(func=cmd_lookup)
 
-    p = sub.add_parser("batch", help="Lookup multiple identifiers and print a compact summary")
-    p.add_argument("identifiers", nargs="+")
-    p.add_argument("--type", choices=["plate", "vin", "chassis"], default="plate")
-    p.add_argument("--sleep", type=float, default=0.5, help="Seconds to sleep between live requests")
-    p.add_argument("--fail-fast", action="store_true")
-    p.add_argument("--json", action="store_true")
-    p.set_defaults(func=cmd_batch)
+    batch = sub.add_parser(
+        "batch",
+        help="Refuse live lookup of multiple identifiers as access restricted",
+    )
+    batch.add_argument("identifiers", nargs="+")
+    batch.add_argument("--type", choices=["plate", "vin", "chassis"], default="plate")
+    batch.add_argument(
+        "--sleep",
+        type=float,
+        default=0.5,
+        help="Ignored. Live requests are not sent",
+    )
+    batch.add_argument("--fail-fast", action="store_true", help="Ignored. The command refuses before lookup")
+    batch.add_argument("--json", action="store_true")
+    batch.set_defaults(func=cmd_batch)
 
     args = parser.parse_args()
     args.func(args)

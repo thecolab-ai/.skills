@@ -1,14 +1,30 @@
 #!/usr/bin/env python3
-import contextlib
+"""Smoke tests for the CarJam access restriction.
+
+Live /car/ retrieval is not attempted. Fixture checks cover the offline parser,
+including the hard failure for a CarJam shell with no public fields. Contract
+checks require the typed blocked result. The historical live failure is recorded
+as a skip and is not turned into a successful vehicle lookup.
+"""
+from __future__ import annotations
+
 import importlib.util
 import io
 import json
+import contextlib
 import subprocess
 import sys
+import time
 from pathlib import Path
 
-SKILL_DIR = Path(__file__).parent.parent
+SKILL_DIR = Path(__file__).resolve().parents[1]
+REPO = Path(__file__).resolve().parents[3]
 CLI = SKILL_DIR / "scripts" / "cli.py"
+FIXTURES = SKILL_DIR / "tests" / "fixtures"
+RUNNER = REPO / "scripts" / "run_skill.py"
+
+ORIGINAL_LIVE_FAILURE = "no public vehicle fields found for plate 'PSP532'"
+
 spec = importlib.util.spec_from_file_location("carjam_fixture_cli", CLI)
 assert spec and spec.loader
 fixture_cli = importlib.util.module_from_spec(spec)
@@ -16,156 +32,280 @@ sys.modules[spec.name] = fixture_cli
 spec.loader.exec_module(fixture_cli)
 
 
-def run(args: list[str]) -> subprocess.CompletedProcess:
+def run(args: list[str]) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        [sys.executable, str(CLI)] + args,
+        [sys.executable, str(CLI), *args],
         capture_output=True,
         text=True,
         cwd=str(SKILL_DIR),
-        timeout=60,
+        timeout=15,
     )
 
 
-def test(name: str, fn):
+def test(name: str, fn) -> bool:
     try:
         ok = fn()
         status = "PASS" if ok else "FAIL"
         print(f"[{status}] {name}")
-        return ok
-    except Exception as e:
+        return bool(ok)
+    except Exception as exc:
         print(f"[FAIL] {name}")
-        print(f"  error: {e}")
+        print(f"  error: {exc}")
         return False
 
 
-results: list[bool] = []
-
-
-def test_fixture_vehicle_parser() -> bool:
-    page = """
-    <title>2018 Toyota Corolla - CarJam</title>
-    <td><span class="key" data-key="year_of_manufacture"></span><span class="value">2018</span></td>
-    <td><span class="key" data-key="make"></span><span class="value">Toyota</span></td>
-    <td><span class="key" data-key="model"></span><span class="value">Corolla</span></td>
-    <td><span class="key" data-key="plate"></span><span class="value">FIX123</span></td>
-    """
-    parsed = fixture_cli.parse_vehicle(
-        page,
-        source_url="https://www.carjam.co.nz/car/?plate=FIX123",
-        identifier="FIX123",
-        lookup_type="plate",
-    )
-    return parsed["vehicle"] == "2018 Toyota Corolla" and parsed["plate"] == "FIX123"
-
-
-results.append(test("fixture public vehicle HTML parser", test_fixture_vehicle_parser))
-
-
-def _die_message(page: str) -> str:
-    """Return the stderr message emitted when parse_vehicle rejects *page*."""
+def _die_message(page: str, identifier: str = "PSP532") -> str:
     buffer = io.StringIO()
     with contextlib.redirect_stderr(buffer):
         try:
             fixture_cli.parse_vehicle(
-                page, source_url="u", identifier="PSP532", lookup_type="plate"
+                page,
+                source_url="https://www.carjam.co.nz",
+                identifier=identifier,
+                lookup_type="plate",
             )
         except SystemExit:
             pass
     return buffer.getvalue()
 
 
+def blocked_payload(proc: subprocess.CompletedProcess[str]) -> dict:
+    if proc.returncode != 4:
+        raise AssertionError(f"exit {proc.returncode}, stderr={proc.stderr[:300]!r}")
+    payload = json.loads(proc.stdout)
+    error = payload.get("error") or {}
+    if error.get("code") != 4 or error.get("type") != "blocked":
+        raise AssertionError(payload)
+    message = str(error.get("message") or "")
+    lowered = message.lower()
+    if "access restricted" not in lowered:
+        raise AssertionError(message)
+    if "permitted api or provider agreement" not in lowered:
+        raise AssertionError(message)
+    if "not a dependable keyless connector" not in lowered:
+        raise AssertionError(message)
+    if payload.get("results") != []:
+        raise AssertionError(payload)
+    if "temporary failure" in lowered:
+        raise AssertionError("restriction was reclassified as an outage")
+    blob = proc.stdout + proc.stderr
+    for invented in ("HIACE", '"vehicle"', '"summary"'):
+        if invented in blob:
+            raise AssertionError(f"output invented vehicle data: {invented}")
+    meta = payload.get("meta") or {}
+    if meta.get("source_url") != "https://www.carjam.co.nz":
+        raise AssertionError(meta)
+    if meta.get("publisher") != "CarJam":
+        raise AssertionError(meta)
+    if not str(meta.get("retrieved_at", "")).endswith("Z"):
+        raise AssertionError(meta)
+    return payload
+
+
+results: list[bool] = []
+
+
+def test_fixture_vehicle_parser() -> bool:
+    page = (FIXTURES / "public-vehicle.html").read_text(encoding="utf-8")
+    parsed = fixture_cli.parse_vehicle(
+        page,
+        source_url="https://www.carjam.co.nz",
+        identifier="FIX123",
+        lookup_type="plate",
+    )
+    return (
+        parsed["vehicle"] == "2018 Toyota Corolla"
+        and parsed["plate"] == "FIX123"
+        and parsed["summary"]["make"] == "Toyota"
+    )
+
+
+results.append(test("fixture public vehicle HTML parser", test_fixture_vehicle_parser))
+
+
 def test_fixture_block_detection() -> bool:
-    # An HTTP-200 anti-bot interstitial (no CarJam shell) must be classified as a
-    # transient outage — the message carries a network marker so smoke reporting
-    # gates rather than hard-fails.
-    block_page = "<html><body>Access to this page has been denied.</body></html>"
+    block_page = (FIXTURES / "block-page.html").read_text(encoding="utf-8")
     if not fixture_cli.looks_like_block(block_page):
         return False
     if fixture_cli.has_carjam_shell(block_page):
         return False
-    if "temporary failure" not in _die_message(block_page):
-        return False
-    # A genuine CarJam page with the app shell but no free fields stays a hard
-    # failure (a real no-data / structure regression, not an outage).
-    shell_no_fields = "<title>PSP532 | CARJAM</title><div id='app'></div>"
-    return "temporary failure" not in _die_message(shell_no_fields)
+    message = _die_message(block_page, identifier="FIX123")
+    return "temporary failure" in message and "no public vehicle fields found" not in message
 
 
 results.append(test("fixture anti-bot block classified as transient outage", test_fixture_block_detection))
 
-# Current public Trade Me vehicle listing 5805102051 exposed this plate in
-# listing details on 2026-05-24. Use a real listed vehicle rather than a
-# vanity/example plate, because CarJam's public fields can disappear for
-# non-current or placeholder plates.
-SMOKE_PLATE = "PSP532"
-SMOKE_MAKE = "TOYOTA"
-SMOKE_MODEL = "HIACE"
-SMOKE_YEAR = "2019"
 
-
-def test_help() -> bool:
-    result = run(["--help"])
-    if result.returncode != 0:
-        print(result.stderr[:300])
-    return result.returncode == 0 and "CarJam NZ" in result.stdout
-
-
-results.append(test("--help exits 0", test_help))
-
-
-def test_lookup_json() -> bool:
-    result = run(["lookup", SMOKE_PLATE, "--json"])
-    if result.returncode != 0:
-        print(f"  stderr: {result.stderr[:300]}")
+def test_fixture_shell_without_fields_stays_hard_failure() -> bool:
+    page = (FIXTURES / "shell-no-fields.html").read_text(encoding="utf-8")
+    if not fixture_cli.has_carjam_shell(page):
         return False
-    payload = json.loads(result.stdout)
-    summary = payload.get("summary") or {}
-    checks = [
-        payload.get("vehicle"),
-        summary.get("make") == SMOKE_MAKE,
-        summary.get("model") == SMOKE_MODEL,
-        summary.get("year_of_manufacture") == SMOKE_YEAR,
-        summary.get("plate") == SMOKE_PLATE,
-        payload.get("source_url", "").startswith("https://www.carjam.co.nz/car/?plate="),
-    ]
-    if not all(checks):
-        print(f"  stdout: {result.stdout[:500]}")
+    if fixture_cli.looks_like_block(page):
         return False
-    return True
+    message = _die_message(page, identifier="PSP532")
+    return ORIGINAL_LIVE_FAILURE in message and "temporary failure" not in message
 
 
-results.append(test(f"lookup {SMOKE_PLATE} returns public vehicle summary", test_lookup_json))
+results.append(
+    test(
+        "fixture CarJam shell without public fields stays a hard failure",
+        test_fixture_shell_without_fields_stays_hard_failure,
+    )
+)
 
 
-def test_lookup_human() -> bool:
-    result = run(["lookup", SMOKE_PLATE])
-    if result.returncode != 0:
-        print(f"  stderr: {result.stderr[:300]}")
+def test_contract_help() -> bool:
+    proc = run(["--help"])
+    text = proc.stdout.lower()
+    return (
+        proc.returncode == 0
+        and "access restricted" in text
+        and "not a dependable keyless connector" in text
+        and "lookup" in text
+        and "batch" in text
+    )
+
+
+results.append(test("contract help text states access restricted", test_contract_help))
+
+
+def test_contract_lookup_json() -> bool:
+    started = time.monotonic()
+    proc = run(["lookup", "FIX123", "--json", "--raw"])
+    if time.monotonic() - started > 2:
+        raise AssertionError("lookup took long enough to be a network retry")
+    payload = blocked_payload(proc)
+    return "FIX123" in payload["error"]["message"] and proc.stderr == ""
+
+
+results.append(test("contract lookup json is access restricted", test_contract_lookup_json))
+
+
+def test_contract_lookup_human() -> bool:
+    proc = run(["lookup", "FIX123"])
+    if proc.returncode != 4:
         return False
-    return SMOKE_MAKE in result.stdout and SMOKE_MODEL in result.stdout and "Source: https://www.carjam.co.nz" in result.stdout
-
-
-results.append(test(f"lookup {SMOKE_PLATE} human output includes vehicle/source", test_lookup_human))
-
-
-def test_batch_json() -> bool:
-    result = run(["batch", SMOKE_PLATE, SMOKE_PLATE, "--sleep", "0", "--json"])
-    if result.returncode != 0:
-        print(f"  stderr: {result.stderr[:300]}")
+    if proc.stdout.strip():
         return False
-    payload = json.loads(result.stdout)
-    vehicles = payload.get("vehicles")
-    if not isinstance(vehicles, list) or len(vehicles) != 2:
-        print(f"  stdout: {result.stdout[:500]}")
+    text = proc.stderr.lower()
+    return (
+        text.startswith("error:")
+        and "access restricted" in text
+        and "permitted api or provider agreement" in text
+        and "hiace" not in text
+        and "source: https://www.carjam.co.nz/car/" not in text
+    )
+
+
+results.append(test("contract lookup human is access restricted", test_contract_lookup_human))
+
+
+def test_contract_batch_json() -> bool:
+    proc = run(["batch", "FIX123", "FIX456", "--sleep", "0", "--json"])
+    payload = blocked_payload(proc)
+    message = payload["error"]["message"]
+    return "FIX123" in message and "FIX456" in message and "vehicles" not in proc.stdout
+
+
+results.append(test("contract batch json is access restricted", test_contract_batch_json))
+
+
+def test_contract_invalid_identifier() -> bool:
+    proc = run(["lookup", "!!!", "--json"])
+    if proc.returncode != 2:
         return False
-    return all(row.get("vehicle") for row in vehicles)
+    payload = json.loads(proc.stdout)
+    error = payload.get("error") or {}
+    return (
+        error.get("code") == 2
+        and error.get("type") == "invalid_input"
+        and payload.get("results") == []
+        and "access restricted" not in str(error.get("message", "")).lower()
+    )
 
 
-results.append(test("batch returns two compact vehicle rows", test_batch_json))
+results.append(test("contract invalid identifier is invalid input", test_contract_invalid_identifier))
+
+
+def test_contract_overlong_identifier() -> bool:
+    proc = run(["lookup", "A" * 41, "--json"])
+    if proc.returncode != 2:
+        return False
+    payload = json.loads(proc.stdout)
+    error = payload.get("error") or {}
+    return error.get("code") == 2 and error.get("type") == "invalid_input" and payload.get("results") == []
+
+
+results.append(test("contract overlong identifier is invalid input", test_contract_overlong_identifier))
+
+
+def test_contract_batch_does_not_partially_succeed() -> bool:
+    proc = run(["batch", "FIX123", "!!!", "--json"])
+    if proc.returncode != 2:
+        return False
+    return "vehicles" not in proc.stdout and '"results": []' in proc.stdout
+
+
+results.append(
+    test(
+        "contract mixed batch stays a failure without vehicle rows",
+        test_contract_batch_does_not_partially_succeed,
+    )
+)
+
+
+def test_contract_vin_is_also_restricted() -> bool:
+    proc = run(["lookup", "SYNTHETICVIN123456", "--type", "vin", "--json"])
+    payload = blocked_payload(proc)
+    return "vin" in payload["error"]["message"] and "SYNTHETICVIN123456" in payload["error"]["message"]
+
+
+results.append(test("contract vin lookup is access restricted", test_contract_vin_is_also_restricted))
+
+
+def test_contract_runner_envelope() -> bool:
+    started = time.monotonic()
+    proc = subprocess.run(
+        [sys.executable, str(RUNNER), "carjam-nz", "lookup", "FIX123", "--json"],
+        capture_output=True,
+        text=True,
+        cwd=str(REPO),
+        timeout=20,
+    )
+    if time.monotonic() - started > 2:
+        raise AssertionError("runner lookup took long enough to be a network retry")
+    if proc.returncode != 4:
+        raise AssertionError(proc.stderr[:400] or proc.stdout[:400])
+    payload = json.loads(proc.stdout)
+    error = payload.get("error") or {}
+    return (
+        payload.get("ok") is False
+        and payload.get("blocked") is True
+        and error.get("code") == 4
+        and error.get("type") == "blocked"
+        and "access restricted" in str(error.get("message", "")).lower()
+        and payload.get("data") is None
+    )
+
+
+results.append(test("contract runner envelope is blocked", test_contract_runner_envelope))
+
+
+def test_contract_cli_has_no_live_fetch() -> bool:
+    source = CLI.read_text(encoding="utf-8")
+    forbidden = ("urlopen", "urlretrieve", "urllib.request", "cf-mitigated")
+    return not any(token in source for token in forbidden)
+
+
+results.append(test("contract cli does not fetch live pages", test_contract_cli_has_no_live_fetch))
+
+print(
+    "[SKIP] live vehicle retrieval is access restricted pending a permitted "
+    "CarJam API or provider agreement; original failure "
+    f"\"{ORIGINAL_LIVE_FAILURE}\" is not a passing lookup"
+)
 
 if all(results):
-    print("[PASS] live smoke assertions completed")
     sys.exit(0)
-else:
-    print(f"{results.count(False)} test(s) failed.")
-    sys.exit(1)
+print(f"{results.count(False)} test(s) failed.")
+sys.exit(1)
