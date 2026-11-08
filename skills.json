@@ -641,27 +641,27 @@
     },
     {
       "name": "carjam-nz",
-      "description": "Query CarJam NZ public/basic vehicle information pages through a lightweight no-login CLI. Use when the task involves New Zealand vehicle plate, VIN, or chassis lookup, make/model/year/colour, public registration/WOF/licence snippets, odometer snippets, or CarJam source URLs. Read-only; no paid report purchase, owner lookup, login, account, or write actions.",
+      "description": "Report CarJam NZ vehicle lookup as access restricted. Use when a task asks for a New Zealand plate, VIN, or chassis, make, model, year, or a CarJam source URL. This is not a dependable keyless connector: live vehicle retrieval requires a permitted CarJam API or provider agreement and is refused with a blocked result. Offline HTML fixtures remain for parser coverage only. Read-only; no scraping, challenge bypass, paid report purchase, owner lookup, login, or write actions.",
       "path": "skills/carjam-nz",
       "category": "public-data",
       "source_owner": "CarJam",
       "source_type": "commercial",
       "source_url": "https://www.carjam.co.nz",
       "auth": "none",
-      "access_mode": "html-readonly",
+      "access_mode": "access-restricted",
       "data_class": "public",
       "writes": false,
       "browser": false,
       "risk": "low",
-      "cache_ttl": "24h",
+      "cache_ttl": "none",
       "schema_version": "1",
       "skill_type": "html-readonly",
       "pack": "nz-commercial-web",
       "allowed_domains": [
         "www.carjam.co.nz"
       ],
-      "last_verified": "2026-07-19",
-      "health": "healthy",
+      "last_verified": "2026-10-12",
+      "health": "gated",
       "maintainer": "@adam91holt"
     },
     {
