@@ -106,6 +106,105 @@ check("redirect interception rejects foreign origins", redirect_rejected)
 check("final URL rejection is enforced", fetch_rejected("https://example.org/x"))
 check("oversized responses are rejected", fetch_rejected(cli.BASE + "/test"))
 check("empty HTML is not fabricated success", cli.parse_product("<html></html>", "https://example.invalid") is None)
+
+
+# Sitemap fallback: since 30 Oct 2026 Magento quick search returns total_count 0 for
+# every query, so search falls back to the public product sitemap (robots-allowed).
+import gzip as _gzip
+import io as _io
+
+SITEMAP_INDEX_FIXTURE = """<?xml version="1.0" encoding="UTF-8"?><sitemapindex>
+<sitemap><loc>https://www.animates.co.nz/media/sitemapcategory.xml</loc></sitemap>
+<sitemap><loc>https://www.animates.co.nz/media/sitemapproduct.xml</loc></sitemap></sitemapindex>"""
+SITEMAP_PRODUCTS_FIXTURE = """<?xml version="1.0" encoding="UTF-8"?><urlset>
+<url><loc>https://www.animates.co.nz/flukers-freeze-dried-crickets-457g.html</loc><image:image><image:title>Fluker&#039;s Freeze Dried Crickets 34g</image:title></image:image></url>
+<url><loc>https://example.org/royal-canin-dog-food.html</loc></url>
+<url><loc>https://www.animates.co.nz/royal-canin-beagle-adult-dog-food-3kg.html</loc><image:image><image:title>Royal Canin Beagle Adult Dog Food 3kg</image:title></image:image></url>
+<url><loc>https://www.animates.co.nz/hills-adult-cat-food-2kg.html</loc></url>
+<url><loc>https://www.animates.co.nz/k9-natural-lamb-1kg.html</loc><image:image><image:title>K9 Natural Lamb Dog Food 1kg</image:title></image:image></url>
+</urlset>"""
+PRODUCT_PAGE_FIXTURE = '<script type="application/ld+json">{"@type":"Product","name":"Royal Canin Beagle Adult Dog Food 3kg","sku":"RC-1","offers":{"@type":"Offer","price":"54.99","priceCurrency":"NZD","availability":"https://schema.org/InStock"}}</script>'
+
+
+class FixtureStream:
+    def __init__(self, url: str, body: bytes, encoding: str = ""):
+        self.url, self.body, self.headers = url, _io.BytesIO(body), {"Content-Encoding": encoding}
+        self.reads = 0
+    def geturl(self): return self.url
+    def read(self, size: int = -1):
+        self.reads += 1
+        return self.body.read(size)
+    def close(self): pass
+    def __enter__(self): return self
+    def __exit__(self, *args): return False
+
+
+class FixtureSite:
+    """Fake opener serving the storefront fixture; records every requested URL."""
+    def __init__(self, search_payload: dict, gzip_sitemap: bool = True):
+        self.search_payload, self.gzip_sitemap, self.requested = search_payload, gzip_sitemap, []
+    def open(self, request, timeout):
+        url = request.full_url
+        self.requested.append(url)
+        if url.startswith(cli.SEARCH_API):
+            return FixtureStream(url, json.dumps(self.search_payload).encode())
+        if url == cli.SITEMAP_INDEX:
+            return FixtureStream(url, SITEMAP_INDEX_FIXTURE.encode())
+        if url.endswith("/media/sitemapproduct.xml"):
+            raw = SITEMAP_PRODUCTS_FIXTURE.encode()
+            if self.gzip_sitemap and request.get_header("Accept-encoding") == "gzip":
+                return FixtureStream(url, _gzip.compress(raw), "gzip")
+            return FixtureStream(url, raw)
+        if url.endswith(".html") or "/catalog/product/view/id/" in url:
+            return FixtureStream(url, PRODUCT_PAGE_FIXTURE.encode())
+        raise AssertionError(f"unexpected fixture request {url}")
+
+
+def with_site(site: FixtureSite, fn):
+    original = cli.urllib.request.build_opener
+    cli.urllib.request.build_opener = lambda *handlers: site
+    try:
+        return fn()
+    finally:
+        cli.urllib.request.build_opener = original
+
+
+for gz in (True, False):
+    site = FixtureSite({"items": [], "total_count": 0}, gzip_sitemap=gz)
+    data = with_site(site, lambda: cli.search("Dog Foods", 2, 10))
+    urls = [item["source_url"] for item in data["results"]]
+    check(
+        f"fixture zero Magento matches fall back to the product sitemap ({'gzip' if gz else 'plain'})",
+        data["search_source"] == "sitemap_fallback" and data["total"] == 0 and data["count"] == 2
+        and urls == ["https://www.animates.co.nz/royal-canin-beagle-adult-dog-food-3kg.html", "https://www.animates.co.nz/k9-natural-lamb-1kg.html"]
+        and any("not relevance ranked" in w for w in data["warnings"])
+        and data["source_urls"][0].startswith(cli.SEARCH_API) and data["source_url"].endswith("/media/sitemapproduct.xml")
+        and not any("catalogsearch" in u or "example.org" in u for u in site.requested),
+        json.dumps({"urls": urls, "data": {k: data.get(k) for k in ("search_source", "total", "count", "warnings")}, "requested": site.requested})[:600],
+    )
+
+site = FixtureSite({"items": [{"id": 42}], "total_count": 1})
+data = with_site(site, lambda: cli.search("dog food", 1, 10))
+check("fixture Magento matches do not touch the sitemap", data["search_source"] == "magento_search" and data["count"] == 1 and data["results"][0]["product_id"] == "42" and not any("sitemap" in u for u in site.requested), json.dumps(site.requested))
+
+site = FixtureSite({"items": [], "total_count": 0})
+data = with_site(site, lambda: cli.search("unicorn saddle", 3, 10))
+check("fixture fallback with no sitemap match stays an empty result", data["count"] == 0 and data["search_source"] == "sitemap_fallback" and any("matched 0" in w for w in data["warnings"]), json.dumps(data["warnings"]))
+
+bomb = FixtureSite({"items": [], "total_count": 0})
+original_limit = cli.MAX_SITEMAP_XML_BYTES
+cli.MAX_SITEMAP_XML_BYTES = 200
+try:
+    with_site(bomb, lambda: cli.search("no such product words", 3, 10))
+    sitemap_capped = False
+except cli.CliError as exc:
+    sitemap_capped = "safety limit" in str(exc)
+finally:
+    cli.MAX_SITEMAP_XML_BYTES = original_limit
+check("fixture sitemap decompression is capped", sitemap_capped)
+check("fixture sitemap matching needs every query word", cli._url_block_match("<loc>https://www.animates.co.nz/hills-adult-cat-food-2kg.html</loc>", cli.query_tokens("dog food")) is None
+      and cli._url_block_match("<loc>https://www.animates.co.nz/hills-adult-cat-food-2kg.html</loc>", cli.query_tokens("cat foods")) is not None)
+
 help_result = run("--help")
 check("--help exits zero", help_result.returncode == 0, help_result.stderr[:200])
 check("timeout is bounded", run("--timeout", "61", "search", "dog").returncode != 0)
@@ -127,6 +226,7 @@ else:
             "expected at least one parsed product with source_url and retrieved_at; got "
             + json.dumps(evidence, ensure_ascii=False)[:600],
         )
+        print(f"  evidence: search_source={data.get('search_source')} total={data.get('total')} count={data.get('count')} warnings={json.dumps(data.get('warnings'), ensure_ascii=False)[:300]}")
         if results:
             snap = run("price-snapshot", str(results[0]["source_url"]), "--json")
             check("live price snapshot exits zero", snap.returncode == 0, snap.stderr[:300])

@@ -12,15 +12,22 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+import zlib
 from typing import Any
 
 BASE = "https://www.animates.co.nz"
 SEARCH_API = BASE + "/rest/default/V1/search"
+SITEMAP_INDEX = BASE + "/sitemap.xml"
 UA = "TheColab-animates-nz/1.0 (+https://github.com/thecolab-ai/.skills)"
 MAX_RESULTS = 10
 MAX_SEARCH_BYTES = 1_000_000
 MAX_PAGE_BYTES = 1_000_000
 MAX_TIMEOUT = 60
+# The product sitemap is ~14 MB of XML (about 1 MB gzipped) for ~5,700 products.
+MAX_SITEMAP_INDEX_BYTES = 200_000
+MAX_SITEMAP_WIRE_BYTES = 16_000_000
+MAX_SITEMAP_XML_BYTES = 48_000_000
+SITEMAP_CHUNK = 64 * 1024
 
 
 class CliError(RuntimeError):
@@ -201,28 +208,162 @@ def get_product(value: str, timeout: int) -> tuple[dict[str, Any], str]:
     return product, final_url
 
 
+def query_tokens(query: str) -> list[str]:
+    return [_stem(token) for token in re.findall(r"[a-z0-9]+", query.lower())]
+
+
+def _stem(token: str) -> str:
+    return token[:-1] if len(token) > 3 and token.endswith("s") and not token.endswith("ss") else token
+
+
+def _url_block_match(block: str, tokens: list[str]) -> tuple[str, str | None] | None:
+    loc = re.search(r"<loc>\s*([^<\s]+)\s*</loc>", block)
+    if not loc:
+        return None
+    url = html.unescape(loc.group(1))
+    if not is_allowed_url(url) or not urllib.parse.urlparse(url).path.endswith(".html"):
+        return None
+    title_match = re.search(r"<image:title>(.*?)</image:title>", block, re.DOTALL)
+    title = re.sub(r"\s+", " ", html.unescape(title_match.group(1))).strip() if title_match else None
+    slug = urllib.parse.urlparse(url).path.rsplit("/", 1)[-1][: -len(".html")]
+    words = {_stem(word) for word in re.findall(r"[a-z0-9]+", f"{slug} {title or ''}".lower())}
+    return (url, title) if all(token in words for token in tokens) else None
+
+
+def _product_sitemap_url(timeout: int) -> str:
+    text, final_url = fetch_text(SITEMAP_INDEX, timeout, MAX_SITEMAP_INDEX_BYTES)
+    for loc in re.findall(r"<loc>\s*([^<\s]+)\s*</loc>", text):
+        loc = html.unescape(loc)
+        if is_allowed_url(loc) and "sitemapproduct" in urllib.parse.urlparse(loc).path:
+            return loc
+    raise CliError(f"no product sitemap listed in {final_url}")
+
+
+def _open_storefront(url: str, timeout: int, accept: str, accept_gzip: bool = False):
+    if not is_allowed_url(url):
+        raise CliError("refusing request outside the Animates HTTPS storefront")
+    headers = {"User-Agent": UA, "Accept": accept, "Accept-Language": "en-NZ,en;q=0.9"}
+    if accept_gzip:
+        headers["Accept-Encoding"] = "gzip"
+    request = urllib.request.Request(url, headers=headers, method="GET")
+    try:
+        response = urllib.request.build_opener(StorefrontRedirectHandler()).open(request, timeout=timeout)
+    except urllib.error.HTTPError as exc:
+        raise CliError(f"HTTP {exc.code} from {url}") from exc
+    except urllib.error.URLError as exc:
+        raise CliError(f"network error calling {url}: {exc.reason}") from exc
+    except TimeoutError as exc:
+        raise CliError(f"request timed out after {timeout}s: {url}") from exc
+    if not is_allowed_url(response.geturl()):
+        response.close()
+        raise CliError("refusing response outside the Animates HTTPS storefront")
+    return response
+
+
+def sitemap_matches(query: str, limit: int, timeout: int) -> tuple[list[tuple[str, str | None]], str, int]:
+    """Stream the public product sitemap and return (url, title) pairs whose URL slug or
+    image title contains every query word, in sitemap order (not relevance ranked).
+
+    Robots-compliant: only the sitemap and public product .html pages are read; the
+    disallowed /catalogsearch/ pages are not used.
+    """
+    tokens = query_tokens(query)
+    if not tokens:
+        raise CliError("search query must contain letters or digits")
+    sitemap_url = _product_sitemap_url(timeout)
+    matches: list[tuple[str, str | None]] = []
+    scanned = 0
+    wire = xml = 0
+    buffer = ""
+    response = _open_storefront(sitemap_url, timeout, "application/xml,text/xml", accept_gzip=True)
+    try:
+        gzip_body = (response.headers.get("Content-Encoding") or "").strip().lower() == "gzip"
+        inflater = zlib.decompressobj(16 + zlib.MAX_WBITS) if gzip_body else None
+        while len(matches) < limit:
+            try:
+                chunk = response.read(SITEMAP_CHUNK)
+            except TimeoutError as exc:
+                raise CliError(f"request timed out after {timeout}s: {sitemap_url}") from exc
+            if not chunk:
+                break
+            wire += len(chunk)
+            if wire > MAX_SITEMAP_WIRE_BYTES:
+                raise CliError(f"response from {sitemap_url} exceeded the {MAX_SITEMAP_WIRE_BYTES}-byte safety limit")
+            if inflater is not None:
+                try:
+                    chunk = inflater.decompress(chunk, MAX_SITEMAP_XML_BYTES - xml + 1)
+                except zlib.error as exc:
+                    raise CliError(f"invalid gzip body from {sitemap_url}") from exc
+            xml += len(chunk)
+            if xml > MAX_SITEMAP_XML_BYTES:
+                raise CliError(f"sitemap {sitemap_url} exceeded the {MAX_SITEMAP_XML_BYTES}-byte safety limit")
+            buffer += chunk.decode("utf-8", "replace")
+            while len(matches) < limit:
+                end = buffer.find("</url>")
+                if end < 0:
+                    break
+                start = buffer.find("<url>")
+                block = buffer[start:end] if 0 <= start < end else buffer[:end]
+                buffer = buffer[end + len("</url>"):]
+                scanned += 1
+                hit = _url_block_match(block, tokens)
+                if hit and hit[0] not in {url for url, _ in matches}:
+                    matches.append(hit)
+            if len(buffer) > MAX_PAGE_BYTES:
+                raise CliError(f"sitemap {sitemap_url} has a <url> entry over {MAX_PAGE_BYTES} bytes")
+    finally:
+        response.close()
+    return matches, sitemap_url, scanned
+
+
 def search(query: str, limit: int, timeout: int) -> dict[str, Any]:
     ids, total, search_url = search_ids(query, limit, timeout)
     products: list[dict[str, Any]] = []
     warnings: list[str] = []
-    for product_id in ids:
-        try:
-            product, _ = get_product(product_id, timeout)
-            product["product_id"] = product_id
-            products.append(product)
-        except CliError as exc:
-            warnings.append(f"product {product_id}: {exc}")
-    if ids and not products:
-        raise CliError("search returned IDs but no product detail pages could be parsed")
+    source = "magento_search"
+    sources = [search_url]
+    if ids:
+        for product_id in ids:
+            try:
+                product, _ = get_product(product_id, timeout)
+                product["product_id"] = product_id
+                products.append(product)
+            except CliError as exc:
+                warnings.append(f"product {product_id}: {exc}")
+        if not products:
+            raise CliError("search returned IDs but no product detail pages could be parsed")
+    else:
+        # Since 30 Oct 2026 the storefront's Magento quick search has answered every
+        # query with total_count 0 while product pages still work. Fall back to the
+        # public product sitemap and say so; never present this as Magento's ranking.
+        source = "sitemap_fallback"
+        warnings.append(
+            f"Magento quick search returned no matches (total_count {total}); results come from "
+            "the public product sitemap by URL/title word match, in sitemap order, not relevance ranked"
+        )
+        matches, sitemap_url, scanned = sitemap_matches(query, limit, timeout)
+        sources.append(sitemap_url)
+        for url, title in matches:
+            try:
+                product, _ = get_product(url, timeout)
+                product["sitemap_title"] = title
+                products.append(product)
+            except CliError as exc:
+                warnings.append(f"product {url}: {exc}")
+        if matches and not products:
+            raise CliError("sitemap matched products but no product detail pages could be parsed")
+        warnings.append(f"sitemap scan read {scanned} product entr{'y' if scanned == 1 else 'ies'} and matched {len(matches)}")
     return {
         "retailer": "Animates NZ",
         "command": "search",
         "query": query,
         "count": len(products),
         "total": total,
+        "search_source": source,
         "results": products,
         "warnings": warnings,
-        "source_url": search_url,
+        "source_url": sources[-1],
+        "source_urls": sources,
         "retrieved_at": timestamp(),
     }
 
