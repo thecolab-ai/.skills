@@ -121,7 +121,7 @@ class SourceTests(unittest.TestCase):
         client, pause = Mock(), Mock()
         client.electricity.return_value = {"usage": []}
         start, end = date_range("2024-01-01", "2024-01-31", date(2024, 2, 1))
-        self.assertEqual(fetch_usage(client, start, end, NOW, pause), {})
+        self.assertEqual(fetch_usage(client, start, end, NOW, pause), ({}, None))
         self.assertEqual(client.electricity.call_count, 16)
         self.assertEqual(pause.call_count, 15)
         self.assertEqual(client.electricity.call_args_list[0].args, (DAY, DAY + timedelta(days=1)))
@@ -342,25 +342,138 @@ class SourceTests(unittest.TestCase):
             self.assertEqual(json.loads(out)["meta"]["fuel"], "electricity")
             self.assertEqual(factory.return_value.gas.call_count, 1)
 
-    def test_empty_gas_and_later_chunk_failure_never_become_zero(self):
+    def test_empty_gas_never_becomes_zero(self):
         factory = Mock()
         factory.return_value.gas.return_value = {"usage": []}
         env = {"GENESIS_EMAIL": "fixture-user@example.invalid", "GENESIS_PASSWORD": "synthetic-password"}
         args = ["summary", "--fuel", "gas", "--start", "2024-01-01", "--end", "2024-01-01", "--json"]
         code, out, err, _ = self.invoke(args, factory, env)
         self.assertEqual(code, 0)
-        report = json.loads(out)["results"][0]
+        result = json.loads(out)
+        report = result["results"][0]
         self.assertEqual(report["coverage"], "no_readings")
         self.assertIsNone(report["observed_usage_kwh"])
         self.assertIsNone(report["observed_usage_cost_nzd"])
+        self.assertNotIn("provider_unavailable_from", result["meta"])
+
+    GAS_UNAVAILABLE = "Gas usage is unavailable for this account or date range; try earlier dates or check gas service"
+    ENV = {"GENESIS_EMAIL": "fixture-user@example.invalid", "GENESIS_PASSWORD": "synthetic-password"}
+
+    def invoke_gas(self, command, side_effect, end="2024-01-05", extra=()):
+        """Five days = chunks starting 1, 3 and 5 Jan; returns parsed output and mocks."""
+        factory = Mock()
+        factory.return_value.gas.side_effect = side_effect
+        args = [command, "--fuel", "gas", "--start", "2024-01-01", "--end", end, *extra]
+        with patch.object(cli.time, "sleep") as sleep:
+            code, out, err, _ = self.invoke(args, factory, self.ENV)
+        return code, out, err, factory.return_value, sleep
+
+    def test_later_gas_rejection_keeps_verified_rows_as_incomplete(self):
         fixture = json.loads((FIXTURES / "gas-sample.json").read_text())["response"]
-        factory.return_value.gas.side_effect = [fixture, GenesisError(7, "Gas usage is unavailable for this account or date range; try earlier dates or check gas service")]
-        args[6] = "2024-01-03"
-        with patch.object(cli.time, "sleep"):
-            code, out, err, _ = self.invoke(args, factory, env)
+        rejection = GenesisError(7, self.GAS_UNAVAILABLE)
+        code, out, err, client, sleep = self.invoke_gas(
+            "summary", [fixture, rejection, AssertionError("read after rejection")],
+            extra=("--group", "range", "--json"))
+        self.assertEqual(code, 0)
+        self.assertFalse(err)
+        self.assertEqual(client.gas.call_args_list, [((DAY, date(2024, 1, 2)),), ((date(2024, 1, 3), date(2024, 1, 4)),)])
+        self.assertEqual(sleep.call_count, 1)
+        client.electricity.assert_not_called()
+        result = json.loads(out)
+        self.assertNotIn("error", result)
+        meta = result["meta"]
+        self.assertEqual(meta["provider_unavailable_from"], "2024-01-03")
+        self.assertEqual(meta["coverage"], "incomplete")
+        self.assertEqual((meta["expected_intervals"], meta["received_intervals"], meta["missing_intervals"]), (120, 2, 118))
+        self.assertEqual((meta["observed_usage_kwh"], meta["observed_usage_cost_nzd"]), ("5.0", "0.45"))
+        self.assertEqual(meta["latest_data"], "2024-01-01T01:00:00+13:00")
+        self.assertEqual(meta["usage_unit"], "kWh")
+        self.assertEqual(meta["usage_unit_status"], "assumed_unverified")
+        self.assertIn("interpreted as interval kWh", meta["unit_basis"])
+        self.assertEqual(result["results"], [{k: meta[k] for k in result["results"][0]}])
+        # Daily summary: rejected and later days stay missing, never zero.
+        code, out, _, client, _ = self.invoke_gas("summary", [fixture, rejection], extra=("--json",))
+        self.assertEqual(code, 0)
+        daily = json.loads(out)["results"]
+        self.assertEqual([day["coverage"] for day in daily], ["incomplete"] + ["no_readings"] * 4)
+        self.assertTrue(all(day["observed_usage_kwh"] is None and day["observed_usage_cost_nzd"] is None for day in daily[1:]))
+        # Hourly usage returns only the verified rows; text mode names the cut-off.
+        code, out, _, _, _ = self.invoke_gas("usage", [fixture, rejection], extra=("--json",))
+        self.assertEqual(code, 0)
+        self.assertEqual([row["usage_kwh"] for row in json.loads(out)["results"]], ["2.0", "3.0"])
+        code, out, err, _, _ = self.invoke_gas("usage", [fixture, rejection])
+        self.assertEqual(code, 0)
+        self.assertIn("rejected gas dates from 2024-01-03", out)
+        self.assertNotIn("synthetic-password", out + err)
+
+    def test_first_gas_rejection_is_still_an_error_without_rows(self):
+        code, out, _, client, sleep = self.invoke_gas(
+            "summary", [GenesisError(7, self.GAS_UNAVAILABLE), AssertionError("read after rejection")], extra=("--json",))
         self.assertEqual(code, 7)
+        result = json.loads(out)
+        self.assertEqual(result["results"], [])
+        self.assertEqual(result["error"]["type"], "unsupported_operation")
+        self.assertNotIn("provider_unavailable_from", result["meta"])
+        self.assertNotIn("observed_usage_kwh", result["meta"])
+        self.assertEqual(client.gas.call_count, 1)
+        sleep.assert_not_called()
+
+    def test_later_gas_blocked_outage_or_schema_failure_still_aborts(self):
+        fixture = json.loads((FIXTURES / "gas-sample.json").read_text())["response"]
+        for failure, expected in ((GenesisError(4, "Genesis rate limit; retry later"), 4),
+                                  (GenesisError(5, "Genesis gas request failed"), 5),
+                                  (GenesisError(6, "Genesis response schema changed"), 6),
+                                  ({"usage": None}, 6)):
+            with self.subTest(expected=expected, failure=failure):
+                code, out, _, client, sleep = self.invoke_gas("summary", [fixture, failure], extra=("--json",))
+                self.assertEqual(code, expected)
+                result = json.loads(out)
+                self.assertEqual(result["results"], [])
+                self.assertEqual(result["error"]["code"], expected)
+                self.assertNotIn("provider_unavailable_from", result["meta"])
+                self.assertNotIn("observed_usage_kwh", result["meta"])
+                self.assertEqual(client.gas.call_count, 2)
+                self.assertEqual(sleep.call_count, 1)
+
+    def test_empty_gas_chunk_then_rejection_is_no_readings_with_null_totals(self):
+        code, out, _, client, _ = self.invoke_gas(
+            "summary", [{"usage": []}, GenesisError(7, self.GAS_UNAVAILABLE)], extra=("--group", "range", "--json"))
+        self.assertEqual(code, 0)
+        result = json.loads(out)
+        meta = result["meta"]
+        self.assertEqual(meta["provider_unavailable_from"], "2024-01-03")
+        self.assertEqual(meta["coverage"], "no_readings")
+        self.assertEqual((meta["received_intervals"], meta["missing_intervals"]), (0, 120))
+        self.assertIsNone(meta["observed_usage_kwh"])
+        self.assertIsNone(meta["observed_usage_cost_nzd"])
+        self.assertNotIn("latest_data", meta)
+        self.assertEqual(client.gas.call_count, 2)
+
+    def test_electricity_later_failure_and_payload_are_unchanged(self):
+        factory = Mock()
+        factory.return_value.electricity.side_effect = [sample(), GenesisError(5, "Genesis electricity request failed")]
+        args = ["summary", "--start", "2024-01-01", "--end", "2024-01-03", "--json"]
+        with patch.object(cli.time, "sleep"):
+            code, out, _, _ = self.invoke(args, factory, self.ENV)
+        self.assertEqual(code, 5)
         self.assertEqual(json.loads(out)["results"], [])
-        factory.return_value.electricity.assert_not_called()
+        self.assertNotIn("provider_unavailable_from", json.loads(out)["meta"])
+        # Exit 7 cannot come from the electricity transport; even if it did, no partial rows.
+        client = Mock()
+        client.electricity.side_effect = [sample(), GenesisError(7, self.GAS_UNAVAILABLE)]
+        with self.assertRaises(GenesisError) as raised:
+            fetch_usage(client, DAY, date(2024, 1, 3), NOW, Mock())
+        self.assertEqual(raised.exception.code, 7)
+        factory = Mock()
+        factory.return_value.electricity.return_value = sample()
+        code, out, _, _ = self.invoke(["summary", "--start", "2024-01-01", "--end", "2024-01-01", "--group", "range", "--json"], factory, self.ENV)
+        self.assertEqual(code, 0)
+        self.assertEqual(set(json.loads(out)["meta"]), {
+            "source_url", "publisher", "retrieved_at", "fuel", "start_date", "end_date", "timezone",
+            "expected_intervals", "received_intervals", "missing_intervals", "coverage",
+            "latest_interval_start", "observed_usage_kwh", "observed_usage_cost_nzd",
+            "cost_basis", "unit_basis", "latest_data",
+        })
 
     def test_gas_bounded_chunks_and_dst(self):
         client, pause = Mock(), Mock()
@@ -370,7 +483,8 @@ class SourceTests(unittest.TestCase):
             {"startDate": (midnight(start) + i * HOUR).isoformat(), "kw": "1.0", "costNZD": "0.09"}
             for i in range(hours)
         ]}
-        rows = fetch_usage(client, start, end, datetime(2024, 4, 10, tzinfo=timezone.utc), pause, "gas")
+        rows, unavailable_from = fetch_usage(client, start, end, datetime(2024, 4, 10, tzinfo=timezone.utc), pause, "gas")
+        self.assertIsNone(unavailable_from)
         self.assertEqual(len(rows), hours)
         self.assertEqual(coverage(rows, start, end)["coverage"], "complete")
         self.assertEqual(coverage(rows, end, end)["expected_intervals"], 25)

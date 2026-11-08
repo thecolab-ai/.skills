@@ -63,19 +63,34 @@ def normalise(data, start, end, now):
 
 
 def fetch_usage(client, start, end, now, pause, fuel="electricity"):
-    """Read exactly one fuel; two-date chunks stay below both observed caps."""
+    """Read exactly one fuel; two-date chunks stay below both observed caps.
+
+    Returns ``(rows, unavailable_from)``. ``unavailable_from`` is the start date
+    of a gas chunk the provider rejected as unavailable (exit 7) after at least
+    one earlier gas chunk returned 200; reading stops there and the verified
+    earlier rows are kept. Otherwise it is None. A first-chunk rejection and
+    every other failure still abort without partial rows.
+    """
     if fuel not in ("electricity", "gas"):
         raise GenesisError(2, "Select electricity or gas")
     read = client.gas if fuel == "gas" else client.electricity
-    rows, cursor = {}, start
+    rows, cursor, accepted_chunks = {}, start, 0
     while cursor <= end:
         chunk_end = min(cursor + timedelta(days=1), end)
-        incoming = normalise(read(cursor, chunk_end), cursor, chunk_end, now)
-        rows.update(incoming)
+        try:
+            data = read(cursor, chunk_end)
+        except GenesisError as exc:
+            # Assumes, from the upstream client, that the gas endpoint rejects
+            # dates beyond its latest readings. Not verified against a live account.
+            if fuel == "gas" and exc.code == 7 and accepted_chunks:
+                return dict(sorted(rows.items())), cursor
+            raise
+        rows.update(normalise(data, cursor, chunk_end, now))
+        accepted_chunks += 1
         cursor = chunk_end + timedelta(days=1)
         if cursor <= end:
             pause(1)
-    return dict(sorted(rows.items()))
+    return dict(sorted(rows.items())), None
 
 
 def coverage(rows, start, end):

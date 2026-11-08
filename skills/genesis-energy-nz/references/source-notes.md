@@ -55,14 +55,18 @@ requirement to have both fuels, fallback between fuels, or combined cost total.
   Authorization header, never the URL. Transport only accepts the exact gas
   path, GET method and three query keys; no arbitrary endpoint or extra key.
 
-These are website endpoints rather than a documented public developer API;
-provider changes can break compatibility. Implicit site selection is inherited;
+These are website endpoints rather than a documented public developer API or a
+Genesis-approved API; provider changes can break compatibility. The
+[Genesis online services terms](https://www.genesisenergy.co.nz/terms/online-services-terms)
+make the account holder responsible for authorised access to their account and
+allow Genesis to refuse access or change its online services. Implicit site selection is inherited;
 no account/site identifier is extracted or exposed.
 
 The upstream client observed approximately 100 electricity and 120 gas rows per response.
 Use inclusive two-date chunks (at most 49 hours across autumn DST), at least one
 second apart. At most 31 days / 16 usage requests per invocation; no automatic
-network retries. Any failed chunk aborts without partial output. A response with
+network retries. Any failed chunk aborts without partial output, except the
+gas date-rejection case below. A response with
 100 or more rows (a conservative cap for either fuel), invalid/conflicting rows,
 or rows outside its requested dates
 is a schema failure. Silent omissions below that limit remain detectable only as
@@ -73,6 +77,18 @@ those dates are already in the past. Gas HTTP 400/404/422 becomes exit 7 with a
 static account-or-date-unavailable message, not an inferred diagnosis or zero
 usage. The response cannot reliably distinguish a missing gas service from
 unsupported dates or a changed endpoint. Use earlier dates or check the service.
+
+Partial gas tail: when at least one earlier gas chunk returned HTTP 200 (including
+an empty `usage: []`) and a later gas chunk gets exit 7, reading stops immediately
+with no further request. The verified earlier rows are returned with exit 0 and
+`meta.provider_unavailable_from` set to the rejected chunk's start date. Coverage
+still spans the whole requested range, so the tail is missing (`incomplete` or
+`no_readings`, null totals when empty), never zero. This relies on the upstream
+client's observation that the gas endpoint rejects dates past its latest readings;
+it has not been verified against a live account. A first-chunk exit 7 is still an
+error with no rows, and later exit 4/5/6 still abort without partial output.
+Electricity behaviour is unchanged.
+
 Auth rejection (401/403), rate limits (429), outages, and malformed data retain
 separate errors. A gas failure never triggers an electricity request. Empty
 `usage: []` produces `no_readings` with null totals; it is not proof of no service.
@@ -83,8 +99,11 @@ fields are discarded. Aware whole-hour timestamps are normalised to UTC, deduped
 validated against each chunk and then displayed with NZ offsets. Only completed
 intervals are returned. Decimal strings preserve numeric precision in JSON.
 The interpretation of `kw` as interval kWh for both fuels follows upstream and
-needs an owner comparison against My Account, especially for gas units; `costNZD` is usage cost with unknown tax/fixed-fee
-coverage. Never extrapolate a tariff, claim a full bill, or label delayed data live.
+needs an owner comparison against My Account, especially for gas units. Gas output
+therefore carries `meta.usage_unit: "kWh"` and `meta.usage_unit_status:
+"assumed_unverified"` alongside `unit_basis`; electricity output is unchanged.
+`costNZD` follows Genesis's Energy IQ costs: estimated variable charges excluding
+fixed fees, not bill totals; GST and discount treatment are unknown. Never extrapolate a tariff, claim a full bill, or label delayed data live.
 
 Coverage counts every hour in the requested calendar dates using UTC arithmetic,
 including 23/25-hour NZ DST days. Totals are labelled `observed_*`; they remain
@@ -110,7 +129,8 @@ Last deterministic verification: 2026-10-31. Fixtures are hand-authored and mark
 synthetic. Contract/smoke tests exercise simulated sign-in, cookie handling,
 redirect rejection, field selection, bounded requests, DST, gaps and safe failures.
 Tests include explicit/default fuel isolation, gas GET/query handling, missing
-service, empty readings, delayed-date failure, outages and safe gas errors.
+service, empty readings, delayed-date failure, the partial gas tail (call counts,
+metadata, first-chunk and non-7 failures), outages and safe gas errors.
 They never use network or personal credentials. Source health stays `gated`:
 neither fuel in this extracted stdlib client has been verified against a real account.
 An owner-authorised private comparison is needed to establish current login,

@@ -50,12 +50,17 @@ def main(argv=None):
             raise GenesisError(3, "Set GENESIS_EMAIL and GENESIS_PASSWORD privately in the environment")
         client = Client()
         client.authenticate(email, password)
-        rows = fetch_usage(client, start, end, now, time.sleep, args.fuel)
+        rows, unavailable_from = fetch_usage(client, start, end, now, time.sleep, args.fuel)
         meta = provenance(source_url, "Genesis Energy")
         meta["fuel"] = args.fuel
         meta.update(coverage(rows, start, end))
         meta["cost_basis"] = "provider costNZD for supplied intervals; not a tariff quote or complete bill"
         meta["unit_basis"] = "provider kw interpreted as interval kWh; confirm against My Account before relying on totals"
+        if args.fuel == "gas":
+            meta["usage_unit"] = "kWh"
+            meta["usage_unit_status"] = "assumed_unverified"
+        if unavailable_from is not None:
+            meta["provider_unavailable_from"] = unavailable_from.isoformat()
         if rows:
             meta["latest_data"] = meta["latest_interval_start"]
         result = result_envelope(records(rows, start, end, args.command, getattr(args, "group", "day")), meta)
@@ -64,6 +69,8 @@ def main(argv=None):
         else:
             print(f"Genesis {args.fuel}: {meta['coverage']}; {meta['received_intervals']}/{meta['expected_intervals']} requested hours supplied")
             print("NZD figures are provider-reported usage costs; missing hours are not zero.")
+            if unavailable_from is not None:
+                print(f"Genesis rejected gas dates from {unavailable_from.isoformat()}; reading stopped and those hours are missing.")
             for record in result["results"]:
                 print(json.dumps(record, ensure_ascii=False))
         return 0

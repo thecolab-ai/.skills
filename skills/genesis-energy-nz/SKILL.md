@@ -94,9 +94,16 @@ Made-up gas example from the synthetic test fixture:
 | 1 Jan 2024 | 5.0 kWh | NZ$0.45 | 2 of 24 hours; partial total |
 
 If Genesis returns no readings, totals are null and coverage is `no_readings`.
-A rejected gas account/date request returns an error, never zero usage. That can
-mean the account has no supported gas service or that dates are beyond the latest
-available readings; try earlier dates or check the service in My Account.
+A rejected gas account/date request returns an error (exit 7), never zero usage.
+That can mean the account has no supported gas service or that dates are beyond
+the latest available readings; try earlier dates or check the service in My Account.
+
+If an **earlier** gas chunk was accepted and a later one is rejected, reading stops
+there and the accepted hours are returned with exit 0. `meta.provider_unavailable_from`
+gives the first rejected date; those hours stay missing, so coverage is `incomplete`
+or `no_readings`, not zero. This treats the rejection as the end of available gas
+readings, an upstream-client assumption not yet verified against a live account.
+A first-chunk rejection, or any other failure, still returns no rows.
 This does not affect separate electricity requests. No combined-fuel total is made.
 
 ## Setup
@@ -107,7 +114,10 @@ This community skill connects to the Genesis My Account website endpoints.
 
 ## Access and privacy
 
-- Use only when the user authorises reading their own Genesis account.
+- Use only when the user authorises reading their own Genesis account. The
+  [Genesis online services terms](https://www.genesisenergy.co.nz/terms/online-services-terms)
+  make the account holder responsible for authorised access, and Genesis may
+  refuse access or change these website endpoints. This is not a Genesis-approved API.
 - The user supplies `GENESIS_EMAIL` and `GENESIS_PASSWORD` out of band through
   the environment. Do not ask them to paste credentials into chat or put them
   in command arguments, source files, logs, fixtures, or commits.
@@ -146,12 +156,15 @@ selected fuel. The common repo runner also works.
 
 ## Interpretation
 
-- `usage_cost_nzd` is the provider's `costNZD` for that interval. These are
-  observed usage costs, not tariff quotes, invoices, balances or a complete bill.
-  GST, fixed charges, discounts and fee inclusion have not been established.
+- `usage_cost_nzd` is the provider's `costNZD` for that interval. Genesis presents
+  Energy IQ costs as estimated variable charges that exclude fixed fees, so these
+  are not bill totals, tariff quotes, invoices or balances. GST and discount
+  treatment have not been established.
 - The provider field `kw` is interpreted as interval kWh, following the upstream
   client. This applies to both fuels; gas units have not been independently
-  established. Confirm against My Account before relying on totals.
+  established, so gas output adds `meta.usage_unit: "kWh"` with
+  `meta.usage_unit_status: "assumed_unverified"`. Confirm against My Account
+  before relying on totals.
 - `observed_*` sums include only supplied completed intervals. Missing intervals
   never become zero. An empty period has null totals and `no_readings`.
 - Coverage compares received hours with the **entire requested date range**;
